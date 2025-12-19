@@ -27,7 +27,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
-  Activity,
   LayoutDashboard,
   ClipboardList,
   Settings,
@@ -35,6 +34,7 @@ import {
   ChevronUp,
   User,
 } from "lucide-react";
+import logoImage from "@assets/ChatGPT_Image_Dec_18,_2025,_09_45_03_PM_(1)_1766173209038.png";
 
 const menuItems = [
   { title: "Dashboard", url: "/provider", icon: LayoutDashboard },
@@ -81,14 +81,8 @@ export default function ProviderLayout({ children }: { children: React.ReactNode
       <div className="flex h-screen w-full">
         <Sidebar>
           <SidebarHeader className="border-b px-4 py-3">
-            <Link href="/" className="flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary">
-                <Activity className="h-5 w-5 text-primary-foreground" />
-              </div>
-              <div>
-                <span className="font-semibold">Perfusion</span>
-                <span className="ml-1.5 text-xs text-muted-foreground">Provider</span>
-              </div>
+            <Link href="/" className="flex items-center">
+              <img src={logoImage} alt="Perfusion" className="h-8 w-auto" />
             </Link>
           </SidebarHeader>
           <SidebarContent>

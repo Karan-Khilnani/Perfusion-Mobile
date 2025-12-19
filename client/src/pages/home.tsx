@@ -28,7 +28,7 @@ export default function Home() {
           <img
             src={logoImage}
             alt="Perfusion"
-            className="mb-8 h-auto w-64 md:w-80 lg:w-96"
+            className="mb-8 h-auto w-80 md:w-96 lg:w-[28rem]"
             data-testid="img-logo"
           />
           
