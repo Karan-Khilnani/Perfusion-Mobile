@@ -171,14 +171,14 @@ export default function ReferralPage() {
               <div className="space-y-2">
                 <Label>Location</Label>
                 <Select 
-                  value={filters.location} 
-                  onValueChange={(v) => setFilters({ ...filters, location: v })}
+                  value={filters.location || "all"} 
+                  onValueChange={(v) => setFilters({ ...filters, location: v === "all" ? "" : v })}
                 >
                   <SelectTrigger data-testid="select-location">
                     <SelectValue placeholder="All locations" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">All locations</SelectItem>
+                    <SelectItem value="all">All locations</SelectItem>
                     {uniqueLocations.map((loc) => (
                       <SelectItem key={loc} value={loc}>{loc}</SelectItem>
                     ))}
@@ -189,14 +189,14 @@ export default function ReferralPage() {
               <div className="space-y-2">
                 <Label>Department</Label>
                 <Select 
-                  value={filters.department} 
-                  onValueChange={(v) => setFilters({ ...filters, department: v })}
+                  value={filters.department || "all"} 
+                  onValueChange={(v) => setFilters({ ...filters, department: v === "all" ? "" : v })}
                 >
                   <SelectTrigger data-testid="select-department">
                     <SelectValue placeholder="All departments" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">All departments</SelectItem>
+                    <SelectItem value="all">All departments</SelectItem>
                     {uniqueDepartments.map((dept) => (
                       <SelectItem key={dept} value={dept}>{dept}</SelectItem>
                     ))}
