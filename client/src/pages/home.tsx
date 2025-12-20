@@ -23,7 +23,7 @@ export default function Home() {
         />
       </div>
 
-      <div className="relative z-10 flex min-h-screen flex-col items-center justify-center px-6">
+      <div className="relative z-10 flex min-h-screen flex-col items-center justify-center px-6 pb-32">
         <div className="flex flex-col items-center text-center">
           <img
             src={logoImage}
@@ -58,12 +58,6 @@ export default function Home() {
               </Button>
             </Link>
           </div>
-        </div>
-
-        <div className="absolute bottom-8 text-center">
-          <p className="text-sm tracking-widest text-white/40 uppercase">
-            Trusted by critical care networks
-          </p>
         </div>
       </div>
     </div>
