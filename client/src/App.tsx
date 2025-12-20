@@ -15,6 +15,7 @@ import ConsultationPage from "@/pages/user/consultation";
 import ConsultationBookingPage from "@/pages/user/consultation-booking";
 import CriticalCarePage from "@/pages/user/critical-care";
 import CriticalCareBookingPage from "@/pages/user/critical-care-booking";
+import ReferralPage from "@/pages/user/referral";
 import OrdersPage from "@/pages/user/orders";
 
 import ProviderLayout from "@/pages/provider/layout";
@@ -54,6 +55,7 @@ function Router() {
       <Route path="/user/consultation/:id/book" component={withUserLayout(ConsultationBookingPage)} />
       <Route path="/user/critical-care" component={withUserLayout(CriticalCarePage)} />
       <Route path="/user/critical-care/:type/:id/book" component={withUserLayout(CriticalCareBookingPage)} />
+      <Route path="/user/referral" component={withUserLayout(ReferralPage)} />
       <Route path="/user/orders" component={withUserLayout(OrdersPage)} />
       
       <Route path="/provider" component={withProviderLayout(ProviderDashboard)} />

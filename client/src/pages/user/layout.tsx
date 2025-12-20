@@ -31,6 +31,7 @@ import {
   FlaskConical,
   Stethoscope,
   HeartPulse,
+  Ambulance,
   ClipboardList,
   LogOut,
   ChevronUp,
@@ -40,10 +41,10 @@ import logoImage from "@assets/ChatGPT_Image_Dec_18,_2025,_09_45_03_PM_(1)_17661
 
 const menuItems = [
   { title: "Dashboard", url: "/user", icon: Home },
-  { title: "Lab Services", url: "/user/labs", icon: FlaskConical },
+  { title: "Labs", url: "/user/labs", icon: FlaskConical },
   { title: "Consultation", url: "/user/consultation", icon: Stethoscope },
-  { title: "Critical Care", url: "/user/critical-care", icon: HeartPulse },
-  { title: "My Orders", url: "/user/orders", icon: ClipboardList },
+  { title: "Emergency & Critical Care", url: "/user/critical-care", icon: HeartPulse },
+  { title: "Referral", url: "/user/referral", icon: Ambulance },
 ];
 
 export default function UserLayout({ children }: { children: React.ReactNode }) {
@@ -84,9 +85,9 @@ export default function UserLayout({ children }: { children: React.ReactNode }) 
     <SidebarProvider style={sidebarStyle as React.CSSProperties}>
       <div className="flex h-screen w-full">
         <Sidebar>
-          <SidebarHeader className="border-b px-4 py-3">
+          <SidebarHeader className="border-b px-4 py-4">
             <Link href="/" className="flex items-center">
-              <img src={logoImage} alt="Perfusion" className="h-8 w-auto" />
+              <img src={logoImage} alt="Perfusion" className="h-12 w-auto" />
             </Link>
           </SidebarHeader>
           <SidebarContent>

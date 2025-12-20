@@ -104,7 +104,7 @@ export default function CriticalCarePage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Critical Care</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Emergency & Critical Care</h1>
         <p className="text-muted-foreground">
           Emergency decision support and escalation to specialized care
         </p>

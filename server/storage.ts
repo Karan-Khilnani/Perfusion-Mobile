@@ -5,12 +5,16 @@ import type {
   Consultant,
   Hospital,
   CriticalCareDoctor,
+  ReferralHospital,
+  TransportService,
   Booking,
   InsertLab,
   InsertLabTest,
   InsertConsultant,
   InsertHospital,
   InsertCriticalCareDoctor,
+  InsertReferralHospital,
+  InsertTransportService,
   InsertBooking,
   BookingStatus,
 } from "@shared/schema";
@@ -41,6 +45,17 @@ export interface IStorage {
   getCriticalCareDoctorById(id: string): Promise<CriticalCareDoctor | undefined>;
   createCriticalCareDoctor(doctor: InsertCriticalCareDoctor): Promise<CriticalCareDoctor>;
   
+  // Referral Hospitals
+  getReferralHospitals(): Promise<ReferralHospital[]>;
+  getReferralHospitalById(id: string): Promise<ReferralHospital | undefined>;
+  createReferralHospital(hospital: InsertReferralHospital): Promise<ReferralHospital>;
+  
+  // Transport Services
+  getTransportServices(): Promise<TransportService[]>;
+  getTransportServiceById(id: string): Promise<TransportService | undefined>;
+  getTransportServicesByLocation(location: string): Promise<TransportService[]>;
+  createTransportService(service: InsertTransportService): Promise<TransportService>;
+  
   // Bookings
   getBookingsByUserId(userId: string): Promise<Booking[]>;
   getBookingById(id: string): Promise<Booking | undefined>;
@@ -55,6 +70,8 @@ export class MemStorage implements IStorage {
   private consultants: Map<string, Consultant>;
   private hospitals: Map<string, Hospital>;
   private criticalCareDoctors: Map<string, CriticalCareDoctor>;
+  private referralHospitals: Map<string, ReferralHospital>;
+  private transportServices: Map<string, TransportService>;
   private bookings: Map<string, Booking>;
 
   constructor() {
@@ -63,6 +80,8 @@ export class MemStorage implements IStorage {
     this.consultants = new Map();
     this.hospitals = new Map();
     this.criticalCareDoctors = new Map();
+    this.referralHospitals = new Map();
+    this.transportServices = new Map();
     this.bookings = new Map();
     
     this.seedData();
@@ -178,7 +197,7 @@ export class MemStorage implements IStorage {
         specialization: "Neurology",
         yearsExperience: 12,
         rating: "4.8",
-        consultationFee: "130.00",
+        consultationFee: "120.00",
         availableSlots: ["Tue 9:00 AM", "Thu 3:00 PM", "Sat 10:00 AM"],
         isActive: true,
       },
@@ -186,36 +205,36 @@ export class MemStorage implements IStorage {
         id: randomUUID(),
         providerId: null,
         name: "Dr. Meera Patel",
-        qualification: "MD (Pediatrics), DCH",
-        specialization: "Pediatrics",
+        qualification: "MD (Pulmonology)",
+        specialization: "Pulmonology",
         yearsExperience: 10,
         rating: "4.7",
         consultationFee: "100.00",
-        availableSlots: ["Mon 9:00 AM", "Tue 2:00 PM", "Wed 10:00 AM", "Thu 4:00 PM", "Fri 9:00 AM"],
+        availableSlots: ["Mon 2:00 PM", "Wed 10:00 AM", "Fri 4:00 PM"],
         isActive: true,
       },
       {
         id: randomUUID(),
         providerId: null,
-        name: "Dr. Anil Verma",
-        qualification: "MS (Orthopedics)",
-        specialization: "Orthopedics",
+        name: "Dr. Sanjay Reddy",
+        qualification: "MS, MCh (Oncology)",
+        specialization: "Oncology",
         yearsExperience: 18,
-        rating: "4.6",
-        consultationFee: "120.00",
-        availableSlots: ["Mon 11:00 AM", "Wed 9:00 AM", "Fri 2:00 PM"],
+        rating: "4.9",
+        consultationFee: "200.00",
+        availableSlots: ["Tue 11:00 AM", "Thu 9:00 AM"],
         isActive: true,
       },
       {
         id: randomUUID(),
         providerId: null,
-        name: "Dr. Sunita Reddy",
-        qualification: "MD (Dermatology)",
-        specialization: "Dermatology",
+        name: "Dr. Anjali Mehta",
+        qualification: "MD (Nephrology)",
+        specialization: "Nephrology",
         yearsExperience: 8,
-        rating: "4.5",
-        consultationFee: "90.00",
-        availableSlots: ["Tue 10:00 AM", "Thu 11:00 AM", "Sat 9:00 AM", "Sat 2:00 PM"],
+        rating: "4.6",
+        consultationFee: "110.00",
+        availableSlots: ["Mon 11:00 AM", "Wed 3:00 PM", "Fri 9:00 AM", "Sat 11:00 AM"],
         isActive: true,
       },
       {
@@ -335,6 +354,184 @@ export class MemStorage implements IStorage {
     criticalCareDoctorsData.forEach((doctor) => {
       this.criticalCareDoctors.set(doctor.id, doctor);
     });
+
+    // Seed Referral Hospitals
+    const referralHospitalsData: ReferralHospital[] = [
+      {
+        id: randomUUID(),
+        name: "AIIMS Delhi",
+        location: "Delhi",
+        departments: ["Cardiology", "Neurology", "Nephrology", "Oncology", "ICU"],
+        diagnoses: ["Heart Attack", "Stroke", "Kidney Failure", "Cancer", "Trauma"],
+        supportMechanicalVentilation: true,
+        supportEcmo: true,
+        supportCrrt: true,
+        rating: "4.9",
+        contactPhone: "+91-11-26588500",
+        isActive: true,
+      },
+      {
+        id: randomUUID(),
+        name: "Tata Memorial Hospital",
+        location: "Mumbai",
+        departments: ["Oncology", "Surgery", "Radiation Therapy", "ICU"],
+        diagnoses: ["Cancer", "Tumor", "Lymphoma", "Leukemia"],
+        supportMechanicalVentilation: true,
+        supportEcmo: false,
+        supportCrrt: true,
+        rating: "4.9",
+        contactPhone: "+91-22-24177000",
+        isActive: true,
+      },
+      {
+        id: randomUUID(),
+        name: "CMC Vellore",
+        location: "Vellore",
+        departments: ["Cardiology", "Neurology", "Gastroenterology", "Nephrology", "ICU"],
+        diagnoses: ["Heart Disease", "Neurological Disorders", "Liver Disease", "Kidney Disease"],
+        supportMechanicalVentilation: true,
+        supportEcmo: true,
+        supportCrrt: true,
+        rating: "4.8",
+        contactPhone: "+91-416-2281000",
+        isActive: true,
+      },
+      {
+        id: randomUUID(),
+        name: "NIMHANS",
+        location: "Bangalore",
+        departments: ["Neurology", "Psychiatry", "Neurosurgery", "ICU"],
+        diagnoses: ["Stroke", "Brain Tumor", "Epilepsy", "Mental Health Emergencies"],
+        supportMechanicalVentilation: true,
+        supportEcmo: false,
+        supportCrrt: false,
+        rating: "4.8",
+        contactPhone: "+91-80-26995000",
+        isActive: true,
+      },
+      {
+        id: randomUUID(),
+        name: "Narayana Health",
+        location: "Bangalore",
+        departments: ["Cardiology", "Cardiac Surgery", "Pediatric Cardiology", "ICU"],
+        diagnoses: ["Heart Attack", "Heart Failure", "Congenital Heart Disease", "Valve Disease"],
+        supportMechanicalVentilation: true,
+        supportEcmo: true,
+        supportCrrt: true,
+        rating: "4.7",
+        contactPhone: "+91-80-71222222",
+        isActive: true,
+      },
+      {
+        id: randomUUID(),
+        name: "Apollo Hospitals Chennai",
+        location: "Chennai",
+        departments: ["Cardiology", "Oncology", "Orthopedics", "Neurology", "ICU"],
+        diagnoses: ["Heart Disease", "Cancer", "Trauma", "Stroke", "Multi-organ Failure"],
+        supportMechanicalVentilation: true,
+        supportEcmo: true,
+        supportCrrt: true,
+        rating: "4.7",
+        contactPhone: "+91-44-28290200",
+        isActive: true,
+      },
+    ];
+
+    referralHospitalsData.forEach((hospital) => {
+      this.referralHospitals.set(hospital.id, hospital);
+    });
+
+    // Seed Transport Services
+    const transportServicesData: TransportService[] = [
+      {
+        id: randomUUID(),
+        providerId: null,
+        name: "Apollo Ambulance Services",
+        location: "Mumbai",
+        serviceType: "ALS",
+        transportMode: "road",
+        hasCloudPhysician: true,
+        rating: "4.8",
+        baseCost: "2500.00",
+        isActive: true,
+      },
+      {
+        id: randomUUID(),
+        providerId: null,
+        name: "LifeLine Emergency Transport",
+        location: "Delhi",
+        serviceType: "ALS",
+        transportMode: "road",
+        hasCloudPhysician: true,
+        rating: "4.7",
+        baseCost: "2200.00",
+        isActive: true,
+      },
+      {
+        id: randomUUID(),
+        providerId: null,
+        name: "MedFlight India",
+        location: "Mumbai",
+        serviceType: "ALS",
+        transportMode: "air",
+        hasCloudPhysician: true,
+        rating: "4.9",
+        baseCost: "150000.00",
+        isActive: true,
+      },
+      {
+        id: randomUUID(),
+        providerId: null,
+        name: "QuickCare Ambulance",
+        location: "Bangalore",
+        serviceType: "BLS",
+        transportMode: "road",
+        hasCloudPhysician: false,
+        rating: "4.5",
+        baseCost: "1500.00",
+        isActive: true,
+      },
+      {
+        id: randomUUID(),
+        providerId: null,
+        name: "CriticalCare Transport",
+        location: "Chennai",
+        serviceType: "ALS",
+        transportMode: "road",
+        hasCloudPhysician: true,
+        rating: "4.6",
+        baseCost: "2000.00",
+        isActive: true,
+      },
+      {
+        id: randomUUID(),
+        providerId: null,
+        name: "Vellore Emergency Services",
+        location: "Vellore",
+        serviceType: "ALS",
+        transportMode: "road",
+        hasCloudPhysician: false,
+        rating: "4.4",
+        baseCost: "1800.00",
+        isActive: true,
+      },
+      {
+        id: randomUUID(),
+        providerId: null,
+        name: "SkyMed Air Ambulance",
+        location: "Delhi",
+        serviceType: "ALS",
+        transportMode: "air",
+        hasCloudPhysician: true,
+        rating: "4.8",
+        baseCost: "175000.00",
+        isActive: true,
+      },
+    ];
+
+    transportServicesData.forEach((service) => {
+      this.transportServices.set(service.id, service);
+    });
   }
 
   // Labs
@@ -428,6 +625,44 @@ export class MemStorage implements IStorage {
     const doctor: CriticalCareDoctor = { ...insertDoctor, id };
     this.criticalCareDoctors.set(id, doctor);
     return doctor;
+  }
+
+  // Referral Hospitals
+  async getReferralHospitals(): Promise<ReferralHospital[]> {
+    return Array.from(this.referralHospitals.values());
+  }
+
+  async getReferralHospitalById(id: string): Promise<ReferralHospital | undefined> {
+    return this.referralHospitals.get(id);
+  }
+
+  async createReferralHospital(insertHospital: InsertReferralHospital): Promise<ReferralHospital> {
+    const id = randomUUID();
+    const hospital: ReferralHospital = { ...insertHospital, id };
+    this.referralHospitals.set(id, hospital);
+    return hospital;
+  }
+
+  // Transport Services
+  async getTransportServices(): Promise<TransportService[]> {
+    return Array.from(this.transportServices.values());
+  }
+
+  async getTransportServiceById(id: string): Promise<TransportService | undefined> {
+    return this.transportServices.get(id);
+  }
+
+  async getTransportServicesByLocation(location: string): Promise<TransportService[]> {
+    return Array.from(this.transportServices.values()).filter(
+      (s) => s.location.toLowerCase() === location.toLowerCase() || s.location.toLowerCase().includes(location.toLowerCase())
+    );
+  }
+
+  async createTransportService(insertService: InsertTransportService): Promise<TransportService> {
+    const id = randomUUID();
+    const service: TransportService = { ...insertService, id };
+    this.transportServices.set(id, service);
+    return service;
   }
 
   // Bookings

@@ -7,7 +7,7 @@ import { z } from "zod";
 export * from "./models/auth";
 
 // Provider types
-export type ProviderType = "lab" | "consultant" | "hospital";
+export type ProviderType = "lab" | "consultant" | "hospital" | "transport";
 
 // Providers table - for service provider accounts
 export const providers = pgTable("providers", {
@@ -56,7 +56,7 @@ export const consultants = pgTable("consultants", {
   isActive: boolean("is_active").default(true),
 });
 
-// Hospitals (Critical Care)
+// Hospitals (Emergency & Critical Care)
 export const hospitals = pgTable("hospitals", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   providerId: varchar("provider_id"),
@@ -81,9 +81,41 @@ export const criticalCareDoctors = pgTable("critical_care_doctors", {
   isActive: boolean("is_active").default(true),
 });
 
+// Referral Hospitals - hospitals that accept referrals
+export const referralHospitals = pgTable("referral_hospitals", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: varchar("name", { length: 255 }).notNull(),
+  location: varchar("location", { length: 255 }).notNull(),
+  departments: text("departments").array(),
+  diagnoses: text("diagnoses").array(),
+  supportMechanicalVentilation: boolean("support_mechanical_ventilation").default(false),
+  supportEcmo: boolean("support_ecmo").default(false),
+  supportCrrt: boolean("support_crrt").default(false),
+  rating: decimal("rating", { precision: 2, scale: 1 }).default("4.0"),
+  contactPhone: varchar("contact_phone", { length: 20 }),
+  isActive: boolean("is_active").default(true),
+});
+
+// Transport Services - ambulance providers
+export const transportServices = pgTable("transport_services", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  providerId: varchar("provider_id"),
+  name: varchar("name", { length: 255 }).notNull(),
+  location: varchar("location", { length: 255 }).notNull(),
+  serviceType: varchar("service_type", { length: 50 }).notNull(), // BLS, ALS
+  transportMode: varchar("transport_mode", { length: 50 }).notNull(), // road, air
+  hasCloudPhysician: boolean("has_cloud_physician").default(false),
+  rating: decimal("rating", { precision: 2, scale: 1 }).default("4.0"),
+  baseCost: decimal("base_cost", { precision: 10, scale: 2 }).notNull(),
+  isActive: boolean("is_active").default(true),
+});
+
 // Booking status type
-export type BookingStatus = "booked" | "sample_collected" | "processing" | "report_ready" | "completed" | "cancelled";
-export type BookingType = "lab" | "consultation" | "critical_care";
+export type BookingStatus = "booked" | "sample_collected" | "processing" | "report_ready" | "completed" | "cancelled" | "in_transit" | "arrived";
+export type BookingType = "lab" | "consultation" | "critical_care" | "referral";
+export type PatientCondition = "stable" | "borderline" | "critical";
+export type AmbulanceType = "BLS" | "ALS";
+export type TransportMode = "road" | "air";
 
 // Bookings table
 export const bookings = pgTable("bookings", {
@@ -101,6 +133,14 @@ export const bookings = pgTable("bookings", {
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
   status: varchar("status", { length: 30 }).notNull().default("booked").$type<BookingStatus>(),
   paymentStatus: varchar("payment_status", { length: 20 }).default("paid"),
+  // Referral-specific fields
+  referralHospitalId: varchar("referral_hospital_id"),
+  referralHospitalName: varchar("referral_hospital_name", { length: 255 }),
+  transportServiceId: varchar("transport_service_id"),
+  patientCondition: varchar("patient_condition", { length: 20 }).$type<PatientCondition>(),
+  ambulanceType: varchar("ambulance_type", { length: 10 }).$type<AmbulanceType>(),
+  transportMode: varchar("transport_mode", { length: 20 }).$type<TransportMode>(),
+  cloudPhysicianSupport: boolean("cloud_physician_support").default(false),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -112,6 +152,8 @@ export const insertLabTestSchema = createInsertSchema(labTests).omit({ id: true 
 export const insertConsultantSchema = createInsertSchema(consultants).omit({ id: true });
 export const insertHospitalSchema = createInsertSchema(hospitals).omit({ id: true });
 export const insertCriticalCareDoctorSchema = createInsertSchema(criticalCareDoctors).omit({ id: true });
+export const insertReferralHospitalSchema = createInsertSchema(referralHospitals).omit({ id: true });
+export const insertTransportServiceSchema = createInsertSchema(transportServices).omit({ id: true });
 export const insertBookingSchema = createInsertSchema(bookings).omit({ id: true, createdAt: true, updatedAt: true });
 
 // Types
@@ -132,6 +174,12 @@ export type Hospital = typeof hospitals.$inferSelect;
 
 export type InsertCriticalCareDoctor = z.infer<typeof insertCriticalCareDoctorSchema>;
 export type CriticalCareDoctor = typeof criticalCareDoctors.$inferSelect;
+
+export type InsertReferralHospital = z.infer<typeof insertReferralHospitalSchema>;
+export type ReferralHospital = typeof referralHospitals.$inferSelect;
+
+export type InsertTransportService = z.infer<typeof insertTransportServiceSchema>;
+export type TransportService = typeof transportServices.$inferSelect;
 
 export type InsertBooking = z.infer<typeof insertBookingSchema>;
 export type Booking = typeof bookings.$inferSelect;
@@ -154,4 +202,13 @@ export interface HospitalSearchParams {
   location?: string;
   sortBy?: "rating" | "responseTime" | "teamStrength";
   sortOrder?: "asc" | "desc";
+}
+
+export interface ReferralHospitalSearchParams {
+  location?: string;
+  department?: string;
+  diagnosis?: string;
+  supportMechanicalVentilation?: boolean;
+  supportEcmo?: boolean;
+  supportCrrt?: boolean;
 }

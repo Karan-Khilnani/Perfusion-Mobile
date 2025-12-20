@@ -191,5 +191,58 @@ export async function registerRoutes(
     }
   });
 
+  // Referral Hospitals
+  app.get("/api/referral/hospitals", async (req, res) => {
+    try {
+      const hospitals = await storage.getReferralHospitals();
+      res.json(hospitals);
+    } catch (error) {
+      console.error("Error fetching referral hospitals:", error);
+      res.status(500).json({ message: "Failed to fetch referral hospitals" });
+    }
+  });
+
+  app.get("/api/referral/hospitals/:id", async (req, res) => {
+    try {
+      const hospital = await storage.getReferralHospitalById(req.params.id);
+      if (!hospital) {
+        return res.status(404).json({ message: "Referral hospital not found" });
+      }
+      res.json(hospital);
+    } catch (error) {
+      console.error("Error fetching referral hospital:", error);
+      res.status(500).json({ message: "Failed to fetch referral hospital" });
+    }
+  });
+
+  // Transport Services
+  app.get("/api/transport/services", async (req, res) => {
+    try {
+      const location = req.query.location as string | undefined;
+      if (location) {
+        const services = await storage.getTransportServicesByLocation(location);
+        return res.json(services);
+      }
+      const services = await storage.getTransportServices();
+      res.json(services);
+    } catch (error) {
+      console.error("Error fetching transport services:", error);
+      res.status(500).json({ message: "Failed to fetch transport services" });
+    }
+  });
+
+  app.get("/api/transport/services/:id", async (req, res) => {
+    try {
+      const service = await storage.getTransportServiceById(req.params.id);
+      if (!service) {
+        return res.status(404).json({ message: "Transport service not found" });
+      }
+      res.json(service);
+    } catch (error) {
+      console.error("Error fetching transport service:", error);
+      res.status(500).json({ message: "Failed to fetch transport service" });
+    }
+  });
+
   return httpServer;
 }

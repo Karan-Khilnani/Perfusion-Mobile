@@ -1,0 +1,129 @@
+1. Logo Visibility
+
+Increase the Perfusion logo size on the homepage to at least 2× the current size.
+
+Increase the logo size on all inner pages (where it appears in the header) by 4–5×.
+
+The logo is currently too small and not clearly visible; it should be prominent and readable across the application.
+
+2. Rename and Reorganize Modules
+
+Rename “Critical Care” to “Emergency & Critical Care” across the platform.
+
+On the User Portal, the primary modules should be displayed at the same level and parallel to each other:
+
+Labs
+
+Consultation
+
+Emergency & Critical Care
+
+Referral
+
+Move “My Orders” away from the main module section.
+
+It can be placed in the top navigation bar or at the bottom of the page, wherever best fits the UI.
+
+It should NOT appear alongside Labs, Consultation, Emergency & Critical Care, and Referral.
+
+3. Add a New Module: Referral
+
+Add a new module named “Referral” with an ambulance icon.
+
+The Referral module should be built in the same structural manner as Labs, Consultation, and Emergency & Critical Care.
+
+4. Referral Module – User Flow
+Step 1: Hospital Selection
+
+User first selects:
+
+Hospital
+
+Hospital location
+
+Hospital list must support multiple filters, all selectable simultaneously:
+
+Department (e.g., Cardiology, Neurology, ICU)
+
+Diagnosis
+
+Support required:
+
+Mechanical ventilation
+
+ECMO
+
+CRRT
+
+The more filters/tags applied, the more refined the hospital list becomes.
+
+Filters must allow multiple selections, not single-choice only.
+
+Step 2: Transport Selection
+
+After selecting the hospital, the user selects a transport service.
+
+Ambulance options should be shown based on the selected hospital location.
+
+Step 3: Transport Booking Details
+
+While booking ambulance transport, user must enter:
+
+Patient details
+
+Diagnosis
+
+Patient condition:
+
+Stable
+
+Borderline
+
+Critical
+
+Type of ambulance:
+
+BLS
+
+ALS
+
+Mode of transport:
+
+Road ambulance
+
+Air ambulance
+
+Option to select:
+
+Cloud physician support during transport (Yes / No)
+
+Note:
+While booking transport, the selected hospital name should be auto-filled and locked, as it was chosen in Step 1.
+
+5. Provider Portal – Referral & Transport
+
+Referral and transport providers should have access similar to Labs and Consultation providers.
+
+A provider/facility can offer one, multiple, or all of the following services:
+
+Labs
+
+Consultation
+
+Emergency & Critical Care
+
+Referral
+
+Transport
+
+6. Summary of Intent (for Dev Clarity)
+
+Referral is a first-class module, not a sub-feature.
+
+Hospital selection comes before ambulance selection.
+
+Filters are multi-select, not exclusive.
+
+Transport booking is hospital-linked by default.
+
+Emergency & Critical Care is a 24/7 decision-support service, not just listing.
