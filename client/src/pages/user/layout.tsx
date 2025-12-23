@@ -85,9 +85,9 @@ export default function UserLayout({ children }: { children: React.ReactNode }) 
     <SidebarProvider style={sidebarStyle as React.CSSProperties}>
       <div className="flex h-screen w-full">
         <Sidebar>
-          <SidebarHeader className="border-b px-4 py-8">
+          <SidebarHeader className="border-b px-2 py-3">
             <Link href="/" className="flex items-center">
-              <img src={logoImage} alt="Perfusion" className="h-48 w-auto" />
+              <img src={logoImage} alt="Perfusion" className="w-full max-h-12 object-contain" />
             </Link>
           </SidebarHeader>
           <SidebarContent>
