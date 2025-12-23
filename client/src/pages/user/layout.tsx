@@ -37,7 +37,7 @@ import {
   ChevronUp,
   User,
 } from "lucide-react";
-import logoImage from "@assets/ChatGPT_Image_Dec_18,_2025,_09_45_03_PM_(1)_1766173209038.png";
+import logoImage from "@assets/ChatGPT_Image_Dec_23,_2025,_09_31_57_AM_1766462795050.png";
 
 const menuItems = [
   { title: "Dashboard", url: "/user", icon: Home },
