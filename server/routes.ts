@@ -1,8 +1,8 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
-import type { BookingStatus } from "@shared/schema";
+import { setupAuth, registerAuthRoutes, isAuthenticated, authStorage } from "./replit_integrations/auth";
+import type { BookingStatus, UserRole, ProviderType, ProviderStatus } from "@shared/schema";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -11,6 +11,252 @@ export async function registerRoutes(
   // Setup authentication
   await setupAuth(app);
   registerAuthRoutes(app);
+
+  // User Role Management
+  app.patch("/api/users/me/role", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      
+      const { role } = req.body as { role: UserRole };
+      if (!["care_seeker", "provider"].includes(role)) {
+        return res.status(400).json({ message: "Invalid role" });
+      }
+      
+      const user = await storage.updateUserRole(userId, role);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      res.json(user);
+    } catch (error) {
+      console.error("Error updating user role:", error);
+      res.status(500).json({ message: "Failed to update role" });
+    }
+  });
+
+  // Provider Profile Management
+  app.get("/api/providers/me", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      
+      const provider = await storage.getProviderByUserId(userId);
+      if (!provider) {
+        return res.status(404).json({ message: "Provider profile not found" });
+      }
+      
+      res.json(provider);
+    } catch (error) {
+      console.error("Error fetching provider profile:", error);
+      res.status(500).json({ message: "Failed to fetch provider profile" });
+    }
+  });
+
+  app.post("/api/providers", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      
+      // Check if provider already exists
+      const existing = await storage.getProviderByUserId(userId);
+      if (existing) {
+        return res.status(400).json({ message: "Provider profile already exists" });
+      }
+      
+      const providerData = {
+        ...req.body,
+        userId,
+        verificationStatus: "pending" as ProviderStatus,
+      };
+      
+      const provider = await storage.createProvider(providerData);
+      
+      // Update user role to provider
+      await storage.updateUserRole(userId, "provider");
+      
+      res.status(201).json(provider);
+    } catch (error) {
+      console.error("Error creating provider:", error);
+      res.status(500).json({ message: "Failed to create provider profile" });
+    }
+  });
+
+  app.patch("/api/providers/me", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      
+      const provider = await storage.getProviderByUserId(userId);
+      if (!provider) {
+        return res.status(404).json({ message: "Provider profile not found" });
+      }
+      
+      const updated = await storage.updateProvider(provider.id, req.body);
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating provider:", error);
+      res.status(500).json({ message: "Failed to update provider profile" });
+    }
+  });
+
+  // Provider Service Management - Labs
+  app.get("/api/provider/my-labs", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const provider = await storage.getProviderByUserId(userId);
+      if (!provider) {
+        return res.json([]);
+      }
+      const labs = await storage.getLabsByProvider(provider.id);
+      res.json(labs);
+    } catch (error) {
+      console.error("Error fetching provider labs:", error);
+      res.status(500).json({ message: "Failed to fetch labs" });
+    }
+  });
+
+  app.post("/api/provider/labs", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const provider = await storage.getProviderByUserId(userId);
+      if (!provider) {
+        return res.status(403).json({ message: "Provider profile required" });
+      }
+      
+      const labData = { ...req.body, providerId: provider.id };
+      const lab = await storage.createLab(labData);
+      res.status(201).json(lab);
+    } catch (error) {
+      console.error("Error creating lab:", error);
+      res.status(500).json({ message: "Failed to create lab" });
+    }
+  });
+
+  app.patch("/api/provider/labs/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const provider = await storage.getProviderByUserId(userId);
+      if (!provider) {
+        return res.status(403).json({ message: "Provider profile required" });
+      }
+      
+      const lab = await storage.getLabById(req.params.id);
+      if (!lab || lab.providerId !== provider.id) {
+        return res.status(404).json({ message: "Lab not found or access denied" });
+      }
+      
+      const updated = await storage.updateLab(req.params.id, req.body);
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating lab:", error);
+      res.status(500).json({ message: "Failed to update lab" });
+    }
+  });
+
+  app.delete("/api/provider/labs/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const provider = await storage.getProviderByUserId(userId);
+      if (!provider) {
+        return res.status(403).json({ message: "Provider profile required" });
+      }
+      
+      const lab = await storage.getLabById(req.params.id);
+      if (!lab || lab.providerId !== provider.id) {
+        return res.status(404).json({ message: "Lab not found or access denied" });
+      }
+      
+      await storage.deleteLab(req.params.id);
+      res.json({ message: "Lab deleted" });
+    } catch (error) {
+      console.error("Error deleting lab:", error);
+      res.status(500).json({ message: "Failed to delete lab" });
+    }
+  });
+
+  // Provider Service Management - Consultants
+  app.get("/api/provider/my-consultants", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const provider = await storage.getProviderByUserId(userId);
+      if (!provider) {
+        return res.json([]);
+      }
+      const consultants = await storage.getConsultantsByProvider(provider.id);
+      res.json(consultants);
+    } catch (error) {
+      console.error("Error fetching provider consultants:", error);
+      res.status(500).json({ message: "Failed to fetch consultants" });
+    }
+  });
+
+  app.post("/api/provider/consultants", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const provider = await storage.getProviderByUserId(userId);
+      if (!provider) {
+        return res.status(403).json({ message: "Provider profile required" });
+      }
+      
+      const consultantData = { ...req.body, providerId: provider.id };
+      const consultant = await storage.createConsultant(consultantData);
+      res.status(201).json(consultant);
+    } catch (error) {
+      console.error("Error creating consultant:", error);
+      res.status(500).json({ message: "Failed to create consultant" });
+    }
+  });
+
+  app.patch("/api/provider/consultants/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const provider = await storage.getProviderByUserId(userId);
+      if (!provider) {
+        return res.status(403).json({ message: "Provider profile required" });
+      }
+      
+      const consultant = await storage.getConsultantById(req.params.id);
+      if (!consultant || consultant.providerId !== provider.id) {
+        return res.status(404).json({ message: "Consultant not found or access denied" });
+      }
+      
+      const updated = await storage.updateConsultant(req.params.id, req.body);
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating consultant:", error);
+      res.status(500).json({ message: "Failed to update consultant" });
+    }
+  });
+
+  app.delete("/api/provider/consultants/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const provider = await storage.getProviderByUserId(userId);
+      if (!provider) {
+        return res.status(403).json({ message: "Provider profile required" });
+      }
+      
+      const consultant = await storage.getConsultantById(req.params.id);
+      if (!consultant || consultant.providerId !== provider.id) {
+        return res.status(404).json({ message: "Consultant not found or access denied" });
+      }
+      
+      await storage.deleteConsultant(req.params.id);
+      res.json({ message: "Consultant deleted" });
+    } catch (error) {
+      console.error("Error deleting consultant:", error);
+      res.status(500).json({ message: "Failed to delete consultant" });
+    }
+  });
 
   // Labs
   app.get("/api/labs", async (req, res) => {

@@ -22,6 +22,8 @@ import ProviderLayout from "@/pages/provider/layout";
 import ProviderDashboard from "@/pages/provider/dashboard";
 import ProviderBookingsPage from "@/pages/provider/bookings";
 import ProviderServicesPage from "@/pages/provider/services";
+import RoleSelectionPage from "@/pages/role-selection";
+import ProviderOnboardingPage from "@/pages/provider/onboarding";
 
 function withUserLayout(Component: React.ComponentType) {
   return function WrappedComponent() {
@@ -47,6 +49,8 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={Home} />
+      <Route path="/select-role" component={RoleSelectionPage} />
+      <Route path="/provider/onboarding" component={ProviderOnboardingPage} />
       
       <Route path="/user" component={withUserLayout(UserDashboard)} />
       <Route path="/user/labs" component={withUserLayout(LabsPage)} />
