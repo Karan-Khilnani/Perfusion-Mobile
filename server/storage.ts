@@ -8,6 +8,8 @@ import type {
   ReferralHospital,
   TransportService,
   Booking,
+  Provider,
+  User,
   InsertLab,
   InsertLabTest,
   InsertConsultant,
@@ -16,7 +18,10 @@ import type {
   InsertReferralHospital,
   InsertTransportService,
   InsertBooking,
+  InsertProvider,
   BookingStatus,
+  ProviderStatus,
+  UserRole,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -25,20 +30,29 @@ export interface IStorage {
   getLabById(id: string): Promise<(Lab & { tests: LabTest[] }) | undefined>;
   createLab(lab: InsertLab): Promise<Lab>;
   getLabsByProvider(providerId: string): Promise<(Lab & { tests: LabTest[] })[]>;
+  updateLab(id: string, data: Partial<InsertLab>): Promise<Lab | undefined>;
+  deleteLab(id: string): Promise<boolean>;
   
   // Lab Tests
   createLabTest(test: InsertLabTest): Promise<LabTest>;
   getTestsByLabId(labId: string): Promise<LabTest[]>;
+  updateLabTest(id: string, data: Partial<InsertLabTest>): Promise<LabTest | undefined>;
+  deleteLabTest(id: string): Promise<boolean>;
   
   // Consultants
   getConsultants(): Promise<Consultant[]>;
   getConsultantById(id: string): Promise<Consultant | undefined>;
   createConsultant(consultant: InsertConsultant): Promise<Consultant>;
+  updateConsultant(id: string, data: Partial<InsertConsultant>): Promise<Consultant | undefined>;
+  deleteConsultant(id: string): Promise<boolean>;
+  getConsultantsByProvider(providerId: string): Promise<Consultant[]>;
   
   // Hospitals
   getHospitals(): Promise<Hospital[]>;
   getHospitalById(id: string): Promise<Hospital | undefined>;
   createHospital(hospital: InsertHospital): Promise<Hospital>;
+  updateHospital(id: string, data: Partial<InsertHospital>): Promise<Hospital | undefined>;
+  deleteHospital(id: string): Promise<boolean>;
   
   // Critical Care Doctors
   getCriticalCareDoctors(): Promise<CriticalCareDoctor[]>;
@@ -62,6 +76,21 @@ export interface IStorage {
   createBooking(booking: InsertBooking): Promise<Booking>;
   updateBookingStatus(id: string, status: BookingStatus): Promise<Booking | undefined>;
   getAllBookings(): Promise<Booking[]>;
+  getBookingsByProviderId(providerId: string): Promise<Booking[]>;
+  
+  // Providers
+  getProviders(): Promise<Provider[]>;
+  getProviderById(id: string): Promise<Provider | undefined>;
+  getProviderByUserId(userId: string): Promise<Provider | undefined>;
+  createProvider(provider: InsertProvider): Promise<Provider>;
+  updateProvider(id: string, data: Partial<InsertProvider>): Promise<Provider | undefined>;
+  updateProviderStatus(id: string, status: ProviderStatus, notes?: string): Promise<Provider | undefined>;
+  getProvidersByStatus(status: ProviderStatus): Promise<Provider[]>;
+  
+  // Users
+  getUsers(): Promise<User[]>;
+  getUserById(id: string): Promise<User | undefined>;
+  updateUserRole(id: string, role: UserRole): Promise<User | undefined>;
 }
 
 export class MemStorage implements IStorage {
@@ -706,6 +735,121 @@ export class MemStorage implements IStorage {
     return Array.from(this.bookings.values())
       .sort((a, b) => new Date(b.createdAt!).getTime() - new Date(a.createdAt!).getTime());
   }
+
+  async getBookingsByProviderId(providerId: string): Promise<Booking[]> {
+    return Array.from(this.bookings.values())
+      .filter((b) => b.serviceId === providerId)
+      .sort((a, b) => new Date(b.createdAt!).getTime() - new Date(a.createdAt!).getTime());
+  }
+
+  // Additional methods for interface compliance
+  async updateLab(id: string, data: Partial<InsertLab>): Promise<Lab | undefined> {
+    const lab = this.labs.get(id);
+    if (!lab) return undefined;
+    const updated = { ...lab, ...data };
+    this.labs.set(id, updated);
+    return updated;
+  }
+
+  async deleteLab(id: string): Promise<boolean> {
+    const lab = this.labs.get(id);
+    if (!lab) return false;
+    lab.isActive = false;
+    this.labs.set(id, lab);
+    return true;
+  }
+
+  async updateLabTest(id: string, data: Partial<InsertLabTest>): Promise<LabTest | undefined> {
+    const test = this.labTests.get(id);
+    if (!test) return undefined;
+    const updated = { ...test, ...data };
+    this.labTests.set(id, updated);
+    return updated;
+  }
+
+  async deleteLabTest(id: string): Promise<boolean> {
+    return this.labTests.delete(id);
+  }
+
+  async updateConsultant(id: string, data: Partial<InsertConsultant>): Promise<Consultant | undefined> {
+    const consultant = this.consultants.get(id);
+    if (!consultant) return undefined;
+    const updated = { ...consultant, ...data };
+    this.consultants.set(id, updated);
+    return updated;
+  }
+
+  async deleteConsultant(id: string): Promise<boolean> {
+    const consultant = this.consultants.get(id);
+    if (!consultant) return false;
+    consultant.isActive = false;
+    this.consultants.set(id, consultant);
+    return true;
+  }
+
+  async getConsultantsByProvider(providerId: string): Promise<Consultant[]> {
+    return Array.from(this.consultants.values()).filter((c) => c.providerId === providerId);
+  }
+
+  async updateHospital(id: string, data: Partial<InsertHospital>): Promise<Hospital | undefined> {
+    const hospital = this.hospitals.get(id);
+    if (!hospital) return undefined;
+    const updated = { ...hospital, ...data };
+    this.hospitals.set(id, updated);
+    return updated;
+  }
+
+  async deleteHospital(id: string): Promise<boolean> {
+    const hospital = this.hospitals.get(id);
+    if (!hospital) return false;
+    hospital.isActive = false;
+    this.hospitals.set(id, hospital);
+    return true;
+  }
+
+  // Provider methods - stub implementations for MemStorage
+  async getProviders(): Promise<Provider[]> {
+    return [];
+  }
+
+  async getProviderById(id: string): Promise<Provider | undefined> {
+    return undefined;
+  }
+
+  async getProviderByUserId(userId: string): Promise<Provider | undefined> {
+    return undefined;
+  }
+
+  async createProvider(provider: InsertProvider): Promise<Provider> {
+    throw new Error("Provider operations require database storage");
+  }
+
+  async updateProvider(id: string, data: Partial<InsertProvider>): Promise<Provider | undefined> {
+    return undefined;
+  }
+
+  async updateProviderStatus(id: string, status: ProviderStatus, notes?: string): Promise<Provider | undefined> {
+    return undefined;
+  }
+
+  async getProvidersByStatus(status: ProviderStatus): Promise<Provider[]> {
+    return [];
+  }
+
+  // User methods - stub implementations for MemStorage
+  async getUsers(): Promise<User[]> {
+    return [];
+  }
+
+  async getUserById(id: string): Promise<User | undefined> {
+    return undefined;
+  }
+
+  async updateUserRole(id: string, role: UserRole): Promise<User | undefined> {
+    return undefined;
+  }
 }
 
-export const storage = new MemStorage();
+// Use database storage for production
+import { dbStorage } from "./dbStorage";
+export const storage: IStorage = dbStorage;

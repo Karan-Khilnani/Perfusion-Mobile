@@ -9,6 +9,9 @@ export * from "./models/auth";
 // Provider types
 export type ProviderType = "lab" | "consultant" | "hospital" | "transport";
 
+// Import ProviderStatus from auth
+import { ProviderStatus } from "./models/auth";
+
 // Providers table - for service provider accounts
 export const providers = pgTable("providers", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -17,8 +20,15 @@ export const providers = pgTable("providers", {
   name: varchar("name", { length: 255 }).notNull(),
   description: text("description"),
   location: varchar("location", { length: 255 }),
+  address: text("address"),
+  phone: varchar("phone", { length: 20 }),
+  email: varchar("email", { length: 255 }),
+  licenseNumber: varchar("license_number", { length: 100 }),
+  verificationStatus: varchar("verification_status", { length: 20 }).default("pending").$type<ProviderStatus>(),
+  verificationNotes: text("verification_notes"),
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 // Labs table
@@ -124,6 +134,7 @@ export const bookings = pgTable("bookings", {
   bookingType: varchar("booking_type", { length: 20 }).notNull().$type<BookingType>(),
   serviceId: varchar("service_id").notNull(),
   serviceName: varchar("service_name", { length: 255 }).notNull(),
+  providerId: varchar("provider_id"),
   providerName: varchar("provider_name", { length: 255 }).notNull(),
   patientName: varchar("patient_name", { length: 255 }).notNull(),
   patientAge: integer("patient_age").notNull(),
