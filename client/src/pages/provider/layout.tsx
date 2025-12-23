@@ -159,7 +159,18 @@ export default function ProviderLayout({ children }: { children: React.ReactNode
         <div className="flex flex-1 flex-col overflow-hidden">
           <header className="flex h-14 items-center justify-between gap-4 border-b bg-background px-4">
             <SidebarTrigger data-testid="button-provider-sidebar-toggle" />
-            <ThemeToggle />
+            <div className="flex items-center gap-2">
+              <ThemeToggle />
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => logout()}
+                data-testid="button-header-logout"
+              >
+                <LogOut className="mr-2 h-4 w-4" />
+                Logout
+              </Button>
+            </div>
           </header>
           <main className="flex-1 overflow-auto p-6">{children}</main>
         </div>
