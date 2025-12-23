@@ -4,16 +4,28 @@ import * as schema from "@shared/schema";
 
 const { Pool } = pg;
 
-function getDatabaseUrl(): string {
+function getPoolConfig(): pg.PoolConfig {
   if (process.env.DATABASE_URL) {
-    return process.env.DATABASE_URL;
+    return {
+      connectionString: process.env.DATABASE_URL,
+      max: 10,
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 10000,
+    };
   }
   
   const { PGHOST, PGPORT, PGUSER, PGPASSWORD, PGDATABASE } = process.env;
   if (PGHOST && PGUSER && PGDATABASE) {
-    const port = PGPORT || "5432";
-    const password = PGPASSWORD ? `:${PGPASSWORD}` : "";
-    return `postgresql://${PGUSER}${password}@${PGHOST}:${port}/${PGDATABASE}`;
+    return {
+      host: PGHOST,
+      port: Number(PGPORT ?? 5432),
+      user: PGUSER,
+      password: PGPASSWORD,
+      database: PGDATABASE,
+      max: 10,
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 10000,
+    };
   }
   
   throw new Error(
@@ -26,13 +38,8 @@ let pool: pg.Pool | null = null;
 export function getPool(): pg.Pool {
   if (!pool) {
     try {
-      const connectionString = getDatabaseUrl();
-      pool = new Pool({ 
-        connectionString,
-        max: 10,
-        idleTimeoutMillis: 30000,
-        connectionTimeoutMillis: 10000,
-      });
+      const config = getPoolConfig();
+      pool = new Pool(config);
       
       pool.on("error", (err) => {
         console.error("Unexpected database pool error:", err);
