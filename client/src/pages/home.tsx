@@ -1,6 +1,6 @@
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
-import logoImage from "@assets/ChatGPT_Image_Dec_23,_2025,_09_31_57_AM_1766462795050.png";
+import logoImage from "@assets/ChatGPT_Image_Dec_18,_2025,_09_45_03_PM_(1)_1766173209038.png";
 import heroImage from "@assets/ChatGPT_Image_Dec_20,_2025,_02_10_02_PM_1766220033119.png";
 
 export default function Home() {
