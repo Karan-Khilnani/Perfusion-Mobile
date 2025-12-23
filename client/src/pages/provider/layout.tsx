@@ -80,9 +80,9 @@ export default function ProviderLayout({ children }: { children: React.ReactNode
     <SidebarProvider style={sidebarStyle as React.CSSProperties}>
       <div className="flex h-screen w-full">
         <Sidebar>
-          <SidebarHeader className="border-b px-4 py-5">
+          <SidebarHeader className="border-b px-3 py-3">
             <Link href="/" className="flex items-center">
-              <img src={logoImage} alt="Perfusion" className="h-16 w-auto" />
+              <img src={logoImage} alt="Perfusion" className="h-10 w-auto" />
             </Link>
           </SidebarHeader>
           <SidebarContent>
