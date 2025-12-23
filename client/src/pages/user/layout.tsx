@@ -37,7 +37,7 @@ import {
   ChevronUp,
   User,
 } from "lucide-react";
-import logoImage from "@assets/Perfusion_website_logo_1766464222782.png";
+import logoImage from "@assets/ChatGPT_Image_Dec_18,_2025,_09_45_03_PM_(1)_1766173209038.png";
 
 const menuItems = [
   { title: "Dashboard", url: "/user", icon: Home },
@@ -85,9 +85,9 @@ export default function UserLayout({ children }: { children: React.ReactNode }) 
     <SidebarProvider style={sidebarStyle as React.CSSProperties}>
       <div className="flex h-screen w-full">
         <Sidebar>
-          <SidebarHeader className="border-b px-2 py-3 overflow-visible">
+          <SidebarHeader className="border-b px-4 py-5">
             <Link href="/" className="flex items-center">
-              <img src={logoImage} alt="Perfusion" className="w-full max-h-12 object-contain scale-150 origin-left" />
+              <img src={logoImage} alt="Perfusion" className="h-16 w-auto" />
             </Link>
           </SidebarHeader>
           <SidebarContent>
