@@ -37,27 +37,31 @@ export default function Home() {
           </p>
 
           <div className="flex flex-col gap-4 sm:flex-row sm:gap-6">
-            <Link href="/user">
+            <Link href="/login">
               <Button 
                 size="lg"
                 className="min-w-48 bg-[hsl(0,56%,46%)] font-semibold tracking-wide text-white border-[hsl(0,56%,52%)]"
-                data-testid="button-care-seeker"
+                data-testid="button-login"
               >
-                Care Seeker
+                Log In
               </Button>
             </Link>
             
-            <Link href="/provider">
+            <Link href="/register">
               <Button 
                 variant="outline"
                 size="lg"
                 className="min-w-48 border-white/30 bg-black/40 font-semibold tracking-wide text-white backdrop-blur-sm"
-                data-testid="button-care-provider"
+                data-testid="button-register"
               >
-                Care Provider
+                Create Account
               </Button>
             </Link>
           </div>
+
+          <p className="mt-8 text-sm text-white/60">
+            Care Seekers, Providers, and Administrators - all access through one portal
+          </p>
         </div>
       </div>
     </div>
