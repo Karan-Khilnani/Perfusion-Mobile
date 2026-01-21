@@ -1,7 +1,8 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { setupAuth, registerAuthRoutes, isAuthenticated, authStorage } from "./replit_integrations/auth";
+import { setupAuth, isAuthenticated, isAdmin, isProvider, updateUserRole } from "./auth";
+import { registerAuthRoutes } from "./auth/routes";
 import type { BookingStatus, UserRole, ProviderType, ProviderStatus } from "@shared/schema";
 
 export async function registerRoutes(
@@ -15,7 +16,7 @@ export async function registerRoutes(
   // User Role Management
   app.patch("/api/users/me/role", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user?.claims?.sub;
+      const userId = req.user?.id;
       if (!userId) {
         return res.status(401).json({ message: "Unauthorized" });
       }
@@ -25,7 +26,7 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Invalid role" });
       }
       
-      const user = await storage.updateUserRole(userId, role);
+      const user = await updateUserRole(userId, role);
       if (!user) {
         return res.status(404).json({ message: "User not found" });
       }
@@ -40,7 +41,7 @@ export async function registerRoutes(
   // Provider Profile Management
   app.get("/api/providers/me", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user?.claims?.sub;
+      const userId = req.user?.id;
       if (!userId) {
         return res.status(401).json({ message: "Unauthorized" });
       }
@@ -59,7 +60,7 @@ export async function registerRoutes(
 
   app.post("/api/providers", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user?.claims?.sub;
+      const userId = req.user?.id;
       if (!userId) {
         return res.status(401).json({ message: "Unauthorized" });
       }
@@ -90,7 +91,7 @@ export async function registerRoutes(
 
   app.patch("/api/providers/me", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user?.claims?.sub;
+      const userId = req.user?.id;
       if (!userId) {
         return res.status(401).json({ message: "Unauthorized" });
       }
@@ -111,7 +112,7 @@ export async function registerRoutes(
   // Provider Service Management - Labs
   app.get("/api/provider/my-labs", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user?.claims?.sub;
+      const userId = req.user?.id;
       const provider = await storage.getProviderByUserId(userId);
       if (!provider) {
         return res.json([]);
@@ -126,7 +127,7 @@ export async function registerRoutes(
 
   app.post("/api/provider/labs", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user?.claims?.sub;
+      const userId = req.user?.id;
       const provider = await storage.getProviderByUserId(userId);
       if (!provider) {
         return res.status(403).json({ message: "Provider profile required" });
@@ -143,7 +144,7 @@ export async function registerRoutes(
 
   app.patch("/api/provider/labs/:id", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user?.claims?.sub;
+      const userId = req.user?.id;
       const provider = await storage.getProviderByUserId(userId);
       if (!provider) {
         return res.status(403).json({ message: "Provider profile required" });
@@ -164,7 +165,7 @@ export async function registerRoutes(
 
   app.delete("/api/provider/labs/:id", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user?.claims?.sub;
+      const userId = req.user?.id;
       const provider = await storage.getProviderByUserId(userId);
       if (!provider) {
         return res.status(403).json({ message: "Provider profile required" });
@@ -186,7 +187,7 @@ export async function registerRoutes(
   // Provider Service Management - Consultants
   app.get("/api/provider/my-consultants", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user?.claims?.sub;
+      const userId = req.user?.id;
       const provider = await storage.getProviderByUserId(userId);
       if (!provider) {
         return res.json([]);
@@ -201,7 +202,7 @@ export async function registerRoutes(
 
   app.post("/api/provider/consultants", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user?.claims?.sub;
+      const userId = req.user?.id;
       const provider = await storage.getProviderByUserId(userId);
       if (!provider) {
         return res.status(403).json({ message: "Provider profile required" });
@@ -218,7 +219,7 @@ export async function registerRoutes(
 
   app.patch("/api/provider/consultants/:id", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user?.claims?.sub;
+      const userId = req.user?.id;
       const provider = await storage.getProviderByUserId(userId);
       if (!provider) {
         return res.status(403).json({ message: "Provider profile required" });
@@ -239,7 +240,7 @@ export async function registerRoutes(
 
   app.delete("/api/provider/consultants/:id", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user?.claims?.sub;
+      const userId = req.user?.id;
       const provider = await storage.getProviderByUserId(userId);
       if (!provider) {
         return res.status(403).json({ message: "Provider profile required" });
@@ -368,7 +369,7 @@ export async function registerRoutes(
   // Bookings (User)
   app.get("/api/bookings", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user?.claims?.sub;
+      const userId = req.user?.id;
       if (!userId) {
         return res.status(401).json({ message: "Unauthorized" });
       }
@@ -382,7 +383,7 @@ export async function registerRoutes(
 
   app.post("/api/bookings", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user?.claims?.sub;
+      const userId = req.user?.id;
       if (!userId) {
         return res.status(401).json({ message: "Unauthorized" });
       }
@@ -487,6 +488,69 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error fetching transport service:", error);
       res.status(500).json({ message: "Failed to fetch transport service" });
+    }
+  });
+
+  // Admin Routes
+  app.get("/api/admin/providers", isAdmin, async (req, res) => {
+    try {
+      const providers = await storage.getProviders();
+      res.json(providers);
+    } catch (error) {
+      console.error("Error fetching providers:", error);
+      res.status(500).json({ message: "Failed to fetch providers" });
+    }
+  });
+
+  app.patch("/api/admin/providers/:id/status", isAdmin, async (req, res) => {
+    try {
+      const { status, notes } = req.body as { status: ProviderStatus; notes?: string };
+      const provider = await storage.updateProviderStatus(req.params.id, status, notes);
+      if (!provider) {
+        return res.status(404).json({ message: "Provider not found" });
+      }
+      res.json(provider);
+    } catch (error) {
+      console.error("Error updating provider status:", error);
+      res.status(500).json({ message: "Failed to update provider status" });
+    }
+  });
+
+  app.get("/api/admin/users", isAdmin, async (req, res) => {
+    try {
+      const users = await storage.getUsers();
+      res.json(users);
+    } catch (error) {
+      console.error("Error fetching users:", error);
+      res.status(500).json({ message: "Failed to fetch users" });
+    }
+  });
+
+  app.patch("/api/admin/users/:id/role", isAdmin, async (req, res) => {
+    try {
+      const { role } = req.body as { role: UserRole };
+      const user = await updateUserRole(req.params.id, role);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      res.json(user);
+    } catch (error) {
+      console.error("Error updating user role:", error);
+      res.status(500).json({ message: "Failed to update user role" });
+    }
+  });
+
+  app.patch("/api/admin/users/:id/active", isAdmin, async (req, res) => {
+    try {
+      const { isActive } = req.body as { isActive: boolean };
+      const user = await storage.updateUserActive(req.params.id, isActive);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      res.json(user);
+    } catch (error) {
+      console.error("Error updating user status:", error);
+      res.status(500).json({ message: "Failed to update user status" });
     }
   });
 

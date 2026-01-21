@@ -91,6 +91,7 @@ export interface IStorage {
   getUsers(): Promise<User[]>;
   getUserById(id: string): Promise<User | undefined>;
   updateUserRole(id: string, role: UserRole): Promise<User | undefined>;
+  updateUserActive(id: string, isActive: boolean): Promise<User | undefined>;
 }
 
 export class MemStorage implements IStorage {
@@ -846,6 +847,10 @@ export class MemStorage implements IStorage {
   }
 
   async updateUserRole(id: string, role: UserRole): Promise<User | undefined> {
+    return undefined;
+  }
+
+  async updateUserActive(id: string, isActive: boolean): Promise<User | undefined> {
     return undefined;
   }
 }

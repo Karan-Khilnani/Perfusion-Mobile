@@ -1,0 +1,168 @@
+import session from "express-session";
+import type { Express, RequestHandler } from "express";
+import connectPg from "connect-pg-simple";
+import bcrypt from "bcryptjs";
+import { db } from "../db";
+import { users, type User, type SafeUser, type UserRole } from "@shared/models/auth";
+import { eq } from "drizzle-orm";
+
+declare module "express-session" {
+  interface SessionData {
+    userId?: string;
+  }
+}
+
+export function getSession(): RequestHandler {
+  const sessionTtl = 7 * 24 * 60 * 60 * 1000; // 1 week
+  const pgStore = connectPg(session);
+  const sessionStore = new pgStore({
+    conString: process.env.DATABASE_URL,
+    createTableIfMissing: true,
+    ttl: sessionTtl,
+    tableName: "sessions",
+  });
+  
+  return session({
+    secret: process.env.SESSION_SECRET || "development-secret-change-in-production",
+    store: sessionStore,
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      maxAge: sessionTtl,
+      sameSite: "lax",
+    },
+  });
+}
+
+export async function setupAuth(app: Express): Promise<void> {
+  app.set("trust proxy", 1);
+  app.use(getSession());
+}
+
+function excludePassword(user: User): SafeUser {
+  const { password, ...safeUser } = user;
+  return safeUser;
+}
+
+export async function getUserById(id: string): Promise<SafeUser | null> {
+  const [user] = await db.select().from(users).where(eq(users.id, id));
+  return user ? excludePassword(user) : null;
+}
+
+export async function getUserByEmail(email: string): Promise<User | null> {
+  const [user] = await db.select().from(users).where(eq(users.email, email.toLowerCase()));
+  return user || null;
+}
+
+export async function createUser(data: {
+  email: string;
+  password: string;
+  firstName: string;
+  lastName: string;
+  role?: UserRole;
+}): Promise<SafeUser> {
+  const hashedPassword = await bcrypt.hash(data.password, 10);
+  
+  const [user] = await db
+    .insert(users)
+    .values({
+      email: data.email.toLowerCase(),
+      password: hashedPassword,
+      firstName: data.firstName,
+      lastName: data.lastName,
+      role: data.role || "care_seeker",
+    })
+    .returning();
+  
+  return excludePassword(user);
+}
+
+export async function verifyPassword(plainPassword: string, hashedPassword: string): Promise<boolean> {
+  return bcrypt.compare(plainPassword, hashedPassword);
+}
+
+export async function updateUserRole(userId: string, role: UserRole): Promise<SafeUser | null> {
+  const [user] = await db
+    .update(users)
+    .set({ role, updatedAt: new Date() })
+    .where(eq(users.id, userId))
+    .returning();
+  
+  return user ? excludePassword(user) : null;
+}
+
+export const isAuthenticated: RequestHandler = async (req, res, next) => {
+  if (!req.session.userId) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+  
+  const user = await getUserById(req.session.userId);
+  if (!user || !user.isActive) {
+    req.session.destroy(() => {});
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+  
+  (req as any).user = user;
+  next();
+};
+
+export const isAdmin: RequestHandler = async (req, res, next) => {
+  if (!req.session.userId) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+  
+  const user = await getUserById(req.session.userId);
+  if (!user || !user.isActive) {
+    req.session.destroy(() => {});
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+  
+  if (user.role !== "admin") {
+    return res.status(403).json({ message: "Admin access required" });
+  }
+  
+  (req as any).user = user;
+  next();
+};
+
+export const isProvider: RequestHandler = async (req, res, next) => {
+  if (!req.session.userId) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+  
+  const user = await getUserById(req.session.userId);
+  if (!user || !user.isActive) {
+    req.session.destroy(() => {});
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+  
+  if (user.role !== "provider" && user.role !== "admin") {
+    return res.status(403).json({ message: "Provider access required" });
+  }
+  
+  (req as any).user = user;
+  next();
+};
+
+export const isUser: RequestHandler = async (req, res, next) => {
+  if (!req.session.userId) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+  
+  const user = await getUserById(req.session.userId);
+  if (!user || !user.isActive) {
+    req.session.destroy(() => {});
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+  
+  if (user.role !== "care_seeker" && user.role !== "admin") {
+    return res.status(403).json({ message: "User access required" });
+  }
+  
+  (req as any).user = user;
+  next();
+};
+
+export { excludePassword };

@@ -7,6 +7,8 @@ import { ThemeProvider } from "@/components/theme-provider";
 import NotFound from "@/pages/not-found";
 
 import Home from "@/pages/home";
+import LoginPage from "@/pages/login";
+import RegisterPage from "@/pages/register";
 import UserLayout from "@/pages/user/layout";
 import UserDashboard from "@/pages/user/dashboard";
 import LabsPage from "@/pages/user/labs";
@@ -22,8 +24,12 @@ import ProviderLayout from "@/pages/provider/layout";
 import ProviderDashboard from "@/pages/provider/dashboard";
 import ProviderBookingsPage from "@/pages/provider/bookings";
 import ProviderServicesPage from "@/pages/provider/services";
-import RoleSelectionPage from "@/pages/role-selection";
 import ProviderOnboardingPage from "@/pages/provider/onboarding";
+
+import AdminLayout from "@/pages/admin/layout";
+import AdminDashboard from "@/pages/admin/dashboard";
+import AdminProvidersPage from "@/pages/admin/providers";
+import AdminUsersPage from "@/pages/admin/users";
 
 function withUserLayout(Component: React.ComponentType) {
   return function WrappedComponent() {
@@ -45,11 +51,22 @@ function withProviderLayout(Component: React.ComponentType) {
   };
 }
 
+function withAdminLayout(Component: React.ComponentType) {
+  return function WrappedComponent() {
+    return (
+      <AdminLayout>
+        <Component />
+      </AdminLayout>
+    );
+  };
+}
+
 function Router() {
   return (
     <Switch>
       <Route path="/" component={Home} />
-      <Route path="/select-role" component={RoleSelectionPage} />
+      <Route path="/login" component={LoginPage} />
+      <Route path="/register" component={RegisterPage} />
       <Route path="/provider/onboarding" component={ProviderOnboardingPage} />
       
       <Route path="/user" component={withUserLayout(UserDashboard)} />
@@ -65,6 +82,10 @@ function Router() {
       <Route path="/provider" component={withProviderLayout(ProviderDashboard)} />
       <Route path="/provider/bookings" component={withProviderLayout(ProviderBookingsPage)} />
       <Route path="/provider/services" component={withProviderLayout(ProviderServicesPage)} />
+      
+      <Route path="/admin" component={withAdminLayout(AdminDashboard)} />
+      <Route path="/admin/providers" component={withAdminLayout(AdminProvidersPage)} />
+      <Route path="/admin/users" component={withAdminLayout(AdminUsersPage)} />
       
       <Route component={NotFound} />
     </Switch>
