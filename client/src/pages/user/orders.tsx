@@ -1,13 +1,18 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { StatusBadge } from "@/components/status-badge";
 import { BookingTimeline } from "@/components/booking-timeline";
-import { ClipboardList, FlaskConical, Stethoscope, Calendar, IndianRupee, ChevronRight, Video, Scan, Download, FileText } from "lucide-react";
+import { ClipboardList, FlaskConical, Stethoscope, Calendar, IndianRupee, ChevronRight, Video, Scan, Download, FileText, Upload, Paperclip } from "lucide-react";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import type { Booking, BookingType } from "@shared/schema";
 import { format } from "date-fns";
 
@@ -25,10 +30,43 @@ const typeLabels: Record<BookingType, string> = {
 
 export default function OrdersPage() {
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
+  const [showUploadDialog, setShowUploadDialog] = useState(false);
+  const [uploadBooking, setUploadBooking] = useState<Booking | null>(null);
+  const [documentUrl, setDocumentUrl] = useState("");
+  const { toast } = useToast();
 
   const { data: bookings, isLoading } = useQuery<Booking[]>({
     queryKey: ["/api/bookings"],
   });
+
+  const uploadDocumentMutation = useMutation({
+    mutationFn: async ({ id, documentUrl }: { id: string; documentUrl: string }) => {
+      const response = await apiRequest("PATCH", `/api/bookings/${id}/documents`, { documentUrl });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
+      setShowUploadDialog(false);
+      setUploadBooking(null);
+      setDocumentUrl("");
+      toast({
+        title: "Document Uploaded",
+        description: "Your document has been uploaded successfully.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Upload Failed",
+        description: "Failed to upload document.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleUploadDocument = () => {
+    if (!uploadBooking || !documentUrl) return;
+    uploadDocumentMutation.mutate({ id: uploadBooking.id, documentUrl });
+  };
 
   const labBookings = bookings?.filter((b) => b.bookingType === "lab") || [];
   const consultationBookings = bookings?.filter((b) => b.bookingType === "consultation") || [];
@@ -130,7 +168,7 @@ export default function OrdersPage() {
           </div>
         </dl>
 
-        {booking.bookingType === "consultation" && booking.videoRoomId && booking.status === "booked" && (
+        {booking.bookingType === "consultation" && booking.videoRoomId && !["completed", "cancelled"].includes(booking.status) && (
           <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
             <div className="flex items-center gap-2 text-primary">
               <Video className="h-5 w-5" />
@@ -145,6 +183,47 @@ export default function OrdersPage() {
                 Join Video Call
               </Button>
             </Link>
+          </div>
+        )}
+
+        {!["completed", "cancelled"].includes(booking.status) && (
+          <div className="rounded-lg border p-4">
+            <div className="flex items-center gap-2">
+              <Paperclip className="h-5 w-5 text-muted-foreground" />
+              <span className="font-medium">Upload Documents</span>
+            </div>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Upload medical records, prescriptions, or other relevant documents
+            </p>
+            {booking.documentUrls && booking.documentUrls.length > 0 && (
+              <div className="mt-3 space-y-2">
+                <p className="text-sm font-medium">Uploaded Documents:</p>
+                {booking.documentUrls.map((url, i) => (
+                  <a 
+                    key={i} 
+                    href={url} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 text-sm text-primary hover:underline"
+                  >
+                    <FileText className="h-4 w-4" />
+                    Document {i + 1}
+                  </a>
+                ))}
+              </div>
+            )}
+            <Button
+              className="mt-3"
+              variant="outline"
+              onClick={() => {
+                setUploadBooking(booking);
+                setShowUploadDialog(true);
+              }}
+              data-testid="button-upload-documents"
+            >
+              <Upload className="mr-2 h-4 w-4" />
+              Upload Document
+            </Button>
           </div>
         )}
 
@@ -293,6 +372,43 @@ export default function OrdersPage() {
           )}
         </div>
       </div>
+
+      <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Upload Document</DialogTitle>
+            <DialogDescription>
+              Upload medical records, prescriptions, or other relevant documents for your booking
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Document URL</Label>
+              <Input
+                placeholder="https://example.com/document.pdf"
+                value={documentUrl}
+                onChange={(e) => setDocumentUrl(e.target.value)}
+                data-testid="input-document-url"
+              />
+              <p className="text-xs text-muted-foreground">
+                Enter the URL where your document is hosted (e.g., Google Drive, Dropbox)
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowUploadDialog(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleUploadDocument}
+              disabled={!documentUrl || uploadDocumentMutation.isPending}
+              data-testid="button-submit-document"
+            >
+              {uploadDocumentMutation.isPending ? "Uploading..." : "Upload Document"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

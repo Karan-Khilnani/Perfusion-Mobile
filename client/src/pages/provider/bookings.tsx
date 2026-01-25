@@ -13,7 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { StatusBadge } from "@/components/status-badge";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { ClipboardList, RefreshCw, Video, Upload, Stethoscope, FlaskConical, ScanLine } from "lucide-react";
+import { ClipboardList, RefreshCw, Video, Upload, Stethoscope, FlaskConical, ScanLine, FileText, Download, Paperclip } from "lucide-react";
 import { Link } from "wouter";
 import type { Booking, BookingStatus } from "@shared/schema";
 import { format } from "date-fns";
@@ -33,6 +33,8 @@ export default function ProviderBookingsPage() {
   const [reportUrl, setReportUrl] = useState("");
   const [reportNotes, setReportNotes] = useState("");
   const [showReportDialog, setShowReportDialog] = useState(false);
+  const [showDocsDialog, setShowDocsDialog] = useState(false);
+  const [docsBooking, setDocsBooking] = useState<Booking | null>(null);
 
   const { data: bookings, isLoading, refetch } = useQuery<Booking[]>({
     queryKey: ["/api/provider/bookings"],
@@ -177,7 +179,26 @@ export default function ProviderBookingsPage() {
           </Button>
         )}
         {booking.reportUrl && (
-          <Badge className="bg-green-500">Report Uploaded</Badge>
+          <a href={booking.reportUrl} target="_blank" rel="noopener noreferrer">
+            <Button size="sm" variant="outline" className="text-green-600" data-testid={`button-view-report-${booking.id}`}>
+              <Download className="mr-2 h-3.5 w-3.5" />
+              View Report
+            </Button>
+          </a>
+        )}
+        {booking.documentUrls && booking.documentUrls.length > 0 && (
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => {
+              setDocsBooking(booking);
+              setShowDocsDialog(true);
+            }}
+            data-testid={`button-view-docs-${booking.id}`}
+          >
+            <Paperclip className="mr-1 h-3.5 w-3.5" />
+            {booking.documentUrls.length} doc(s)
+          </Button>
         )}
         <Select
           value={booking.status}
@@ -356,6 +377,41 @@ export default function ProviderBookingsPage() {
             >
               {uploadReportMutation.isPending ? "Uploading..." : "Upload Report"}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showDocsDialog} onOpenChange={setShowDocsDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Patient Documents</DialogTitle>
+            <DialogDescription>
+              Documents uploaded by {docsBooking?.patientName} for this booking
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            {docsBooking?.documentUrls?.map((url, i) => (
+              <a 
+                key={i}
+                href={url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 rounded-lg border p-3 hover:bg-muted"
+              >
+                <FileText className="h-5 w-5 text-primary" />
+                <div className="flex-1">
+                  <p className="font-medium">Document {i + 1}</p>
+                  <p className="text-xs text-muted-foreground truncate">{url}</p>
+                </div>
+                <Download className="h-4 w-4 text-muted-foreground" />
+              </a>
+            ))}
+            {(!docsBooking?.documentUrls || docsBooking.documentUrls.length === 0) && (
+              <p className="text-center text-muted-foreground py-4">No documents uploaded</p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setShowDocsDialog(false)}>Close</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

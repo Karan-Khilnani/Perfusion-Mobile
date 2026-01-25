@@ -906,5 +906,34 @@ export async function registerRoutes(
     }
   });
 
+  // Document upload endpoint for patients
+  app.patch("/api/bookings/:id/documents", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.id;
+      const booking = await storage.getBookingById(req.params.id);
+      
+      if (!booking) {
+        return res.status(404).json({ message: "Booking not found" });
+      }
+      
+      // Only allow the booking owner to upload documents
+      if (booking.userId !== userId) {
+        return res.status(403).json({ message: "Access denied. You can only upload documents to your own bookings." });
+      }
+      
+      const { documentUrl } = req.body as { documentUrl: string };
+      
+      // Append to existing document URLs array
+      const existingDocs = booking.documentUrls || [];
+      const newDocUrls = [...existingDocs, documentUrl];
+      
+      const updated = await storage.updateBooking(req.params.id, { documentUrls: newDocUrls } as any);
+      res.json(updated);
+    } catch (error) {
+      console.error("Error uploading document:", error);
+      res.status(500).json({ message: "Failed to upload document" });
+    }
+  });
+
   return httpServer;
 }
