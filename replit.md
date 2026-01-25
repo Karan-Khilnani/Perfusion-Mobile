@@ -4,11 +4,18 @@
 
 Perfusion is a healthcare operations platform designed to connect resource-limited hospitals with diagnostic labs, specialists, and critical care services. The platform offers 3 core services:
 
-1. **Super Speciality Consultation** - Video consultations with specialists via Jitsi Meet integration, with comprehensive patient details forms (name, age, gender, clinical summary, diagnosis, document upload)
+1. **Super Speciality Consultation** - Video consultations with specialists via embedded Jitsi Meet integration (iframe with full controls - mute/unmute, hangup, fullscreen, participant count), with comprehensive patient details forms (name, age, gender, clinical summary, diagnosis, document upload)
 2. **Lab Tests** - Direct diagnostic test catalog with 64+ tests across 9 categories (Hematology, Biochemistry, Thyroid, etc.) with category filtering and cart-based booking
-3. **Teleradiology Reporting** - Medical imaging interpretation service with 28 modalities, priority flags (routine/emergency), and file upload for DICOM/images
+3. **Teleradiology Reporting** - Medical imaging interpretation service with 28 modalities, priority flags (routine/emergency), mandatory accession number/Hospital ID field, and file upload for DICOM/images
 
-The platform features role-based access (Admin, Provider, Care Seeker), email/password authentication, and comprehensive admin controls to manage consultants, lab tests, and radiology modalities with Add/Pause/Delete functionality.
+The platform uses INR (₹) currency throughout, features role-based access (Admin, Provider, Care Seeker), Replit Auth for authentication, and comprehensive admin controls to manage consultants, lab tests, and radiology modalities with Add/Pause/Delete functionality.
+
+## Recent Changes
+
+- **Video Conferencing**: Embedded Jitsi Meet video calls with role-aware navigation (returnTo query parameter) - both users and providers return to their respective pages after calls
+- **Currency**: Changed from USD ($) to INR (₹) across all monetary displays
+- **Teleradiology**: Added mandatory accession number field for radiologist reference
+- **Specialization Filter**: Now dynamically builds filter options from actual consultant data instead of hardcoded list
 
 ## User Preferences
 
