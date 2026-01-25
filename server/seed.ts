@@ -1,155 +1,269 @@
 import { db } from "./db";
 import {
-  labs,
   labTests,
+  radiologyModalities,
   consultants,
-  hospitals,
-  criticalCareDoctors,
-  referralHospitals,
-  transportServices,
 } from "@shared/schema";
 
-async function seed() {
-  console.log("Seeding database...");
+// Radiology modalities extracted from the PDF (names only, no prices as per requirements)
+const radiologyModalitiesData = [
+  { name: "X-Ray Plain (per view)", category: "X-Ray" },
+  { name: "Special Procedures (HSG, Fluoro, Barium, MCU, RGU)", category: "Special Procedures" },
+  { name: "Mammogram - each side", category: "Mammography" },
+  { name: "Mammogram - both sides", category: "Mammography" },
+  { name: "OPG & Cephalometry", category: "Dental Imaging" },
+  { name: "CT Brain / PNS / Orbit - Plain", category: "CT Scan" },
+  { name: "CT Maxillofacial / Temporal Bone", category: "CT Scan" },
+  { name: "CT Chest / Neck", category: "CT Scan" },
+  { name: "CT KUB / Pelvis", category: "CT Scan" },
+  { name: "CT Spine (C / T / L)", category: "CT Scan" },
+  { name: "CT Abdomen & Pelvis / Uro / Extremities", category: "CT Scan" },
+  { name: "CT Angiography (Cerebral / Pulmonary / Neck)", category: "CT Angiography" },
+  { name: "CT Angiography (Peripheral / Aorta / Abdomen)", category: "CT Angiography" },
+  { name: "CT Any Region + 3D Reconstruction", category: "CT Scan" },
+  { name: "CT Others", category: "CT Scan" },
+  { name: "CT Contrast (add-on)", category: "CT Scan" },
+  { name: "MRI Brain - Plain", category: "MRI" },
+  { name: "MRI Brain + MRA / MRV / Spectro", category: "MRI" },
+  { name: "MRI Neck", category: "MRI" },
+  { name: "MRI Abdomen & Pelvis", category: "MRI" },
+  { name: "MRI Pelvis", category: "MRI" },
+  { name: "MRI Extremities / Joints (MSK)", category: "MRI" },
+  { name: "MRI Spine (C / T / L)", category: "MRI" },
+  { name: "MRI Screening (3 sequences)", category: "MRI" },
+  { name: "MRCP", category: "MRI" },
+  { name: "MRI Cardiac / Special Studies", category: "MRI" },
+  { name: "MRI Peripheral Angio (Dedicated)", category: "MRI Angiography" },
+  { name: "MRI Others", category: "MRI" },
+];
 
-  // Check if data already exists
-  const existingLabs = await db.select().from(labs);
-  if (existingLabs.length > 0) {
-    console.log("Database already seeded, skipping...");
-    return;
+// Sample lab tests (categorized by department)
+const labTestsData = [
+  // Hematology
+  { testName: "Complete Blood Count (CBC)", category: "Hematology", cost: "250.00", turnaroundTime: "4 hours" },
+  { testName: "Hemoglobin (Hb)", category: "Hematology", cost: "100.00", turnaroundTime: "2 hours" },
+  { testName: "ESR (Erythrocyte Sedimentation Rate)", category: "Hematology", cost: "120.00", turnaroundTime: "2 hours" },
+  { testName: "Platelet Count", category: "Hematology", cost: "150.00", turnaroundTime: "2 hours" },
+  { testName: "Peripheral Blood Smear", category: "Hematology", cost: "200.00", turnaroundTime: "4 hours" },
+  { testName: "Reticulocyte Count", category: "Hematology", cost: "180.00", turnaroundTime: "4 hours" },
+  { testName: "PT/INR (Prothrombin Time)", category: "Hematology", cost: "350.00", turnaroundTime: "4 hours" },
+  { testName: "APTT (Activated Partial Thromboplastin Time)", category: "Hematology", cost: "400.00", turnaroundTime: "4 hours" },
+  
+  // Biochemistry
+  { testName: "Blood Glucose Fasting", category: "Biochemistry", cost: "80.00", turnaroundTime: "2 hours" },
+  { testName: "Blood Glucose PP (Post Prandial)", category: "Biochemistry", cost: "80.00", turnaroundTime: "2 hours" },
+  { testName: "HbA1c (Glycated Hemoglobin)", category: "Biochemistry", cost: "450.00", turnaroundTime: "6 hours" },
+  { testName: "Lipid Profile", category: "Biochemistry", cost: "500.00", turnaroundTime: "6 hours" },
+  { testName: "Liver Function Test (LFT)", category: "Biochemistry", cost: "550.00", turnaroundTime: "6 hours" },
+  { testName: "Kidney Function Test (KFT/RFT)", category: "Biochemistry", cost: "500.00", turnaroundTime: "6 hours" },
+  { testName: "Serum Creatinine", category: "Biochemistry", cost: "150.00", turnaroundTime: "4 hours" },
+  { testName: "Blood Urea", category: "Biochemistry", cost: "120.00", turnaroundTime: "4 hours" },
+  { testName: "Serum Uric Acid", category: "Biochemistry", cost: "150.00", turnaroundTime: "4 hours" },
+  { testName: "Serum Electrolytes (Na, K, Cl)", category: "Biochemistry", cost: "350.00", turnaroundTime: "4 hours" },
+  { testName: "Calcium", category: "Biochemistry", cost: "150.00", turnaroundTime: "4 hours" },
+  { testName: "Phosphorus", category: "Biochemistry", cost: "150.00", turnaroundTime: "4 hours" },
+  { testName: "Magnesium", category: "Biochemistry", cost: "200.00", turnaroundTime: "4 hours" },
+  
+  // Thyroid
+  { testName: "TSH (Thyroid Stimulating Hormone)", category: "Thyroid", cost: "300.00", turnaroundTime: "6 hours" },
+  { testName: "T3 (Triiodothyronine)", category: "Thyroid", cost: "250.00", turnaroundTime: "6 hours" },
+  { testName: "T4 (Thyroxine)", category: "Thyroid", cost: "250.00", turnaroundTime: "6 hours" },
+  { testName: "Free T3", category: "Thyroid", cost: "300.00", turnaroundTime: "6 hours" },
+  { testName: "Free T4", category: "Thyroid", cost: "300.00", turnaroundTime: "6 hours" },
+  { testName: "Thyroid Profile (T3, T4, TSH)", category: "Thyroid", cost: "650.00", turnaroundTime: "6 hours" },
+  
+  // Cardiac Markers
+  { testName: "Troponin I", category: "Cardiac Markers", cost: "800.00", turnaroundTime: "2 hours" },
+  { testName: "Troponin T", category: "Cardiac Markers", cost: "850.00", turnaroundTime: "2 hours" },
+  { testName: "CPK-MB", category: "Cardiac Markers", cost: "450.00", turnaroundTime: "4 hours" },
+  { testName: "NT-proBNP", category: "Cardiac Markers", cost: "1500.00", turnaroundTime: "6 hours" },
+  { testName: "D-Dimer", category: "Cardiac Markers", cost: "800.00", turnaroundTime: "4 hours" },
+  
+  // Vitamins & Minerals
+  { testName: "Vitamin D (25-OH)", category: "Vitamins & Minerals", cost: "1200.00", turnaroundTime: "24 hours" },
+  { testName: "Vitamin B12", category: "Vitamins & Minerals", cost: "800.00", turnaroundTime: "24 hours" },
+  { testName: "Folic Acid", category: "Vitamins & Minerals", cost: "600.00", turnaroundTime: "24 hours" },
+  { testName: "Iron Studies (Serum Iron, TIBC, Ferritin)", category: "Vitamins & Minerals", cost: "900.00", turnaroundTime: "6 hours" },
+  
+  // Urine
+  { testName: "Urine Routine & Microscopy", category: "Urine", cost: "100.00", turnaroundTime: "2 hours" },
+  { testName: "Urine Culture & Sensitivity", category: "Urine", cost: "450.00", turnaroundTime: "48 hours" },
+  { testName: "24-Hour Urine Protein", category: "Urine", cost: "350.00", turnaroundTime: "24 hours" },
+  { testName: "Urine Microalbumin", category: "Urine", cost: "400.00", turnaroundTime: "6 hours" },
+  
+  // Serology
+  { testName: "HIV 1 & 2 Antibodies", category: "Serology", cost: "400.00", turnaroundTime: "6 hours" },
+  { testName: "HBsAg (Hepatitis B Surface Antigen)", category: "Serology", cost: "350.00", turnaroundTime: "6 hours" },
+  { testName: "Anti-HCV (Hepatitis C Antibodies)", category: "Serology", cost: "500.00", turnaroundTime: "6 hours" },
+  { testName: "VDRL/RPR (Syphilis)", category: "Serology", cost: "200.00", turnaroundTime: "4 hours" },
+  { testName: "Dengue NS1 Antigen", category: "Serology", cost: "600.00", turnaroundTime: "4 hours" },
+  { testName: "Dengue IgM/IgG", category: "Serology", cost: "700.00", turnaroundTime: "4 hours" },
+  { testName: "Malaria Antigen (Rapid)", category: "Serology", cost: "350.00", turnaroundTime: "2 hours" },
+  { testName: "Typhoid (Widal Test)", category: "Serology", cost: "250.00", turnaroundTime: "4 hours" },
+  { testName: "CRP (C-Reactive Protein)", category: "Serology", cost: "400.00", turnaroundTime: "4 hours" },
+  { testName: "RA Factor (Rheumatoid Factor)", category: "Serology", cost: "400.00", turnaroundTime: "4 hours" },
+  { testName: "ASO Titre", category: "Serology", cost: "350.00", turnaroundTime: "4 hours" },
+  
+  // Hormones
+  { testName: "Prolactin", category: "Hormones", cost: "500.00", turnaroundTime: "6 hours" },
+  { testName: "FSH (Follicle Stimulating Hormone)", category: "Hormones", cost: "450.00", turnaroundTime: "6 hours" },
+  { testName: "LH (Luteinizing Hormone)", category: "Hormones", cost: "450.00", turnaroundTime: "6 hours" },
+  { testName: "Testosterone", category: "Hormones", cost: "600.00", turnaroundTime: "6 hours" },
+  { testName: "Estradiol (E2)", category: "Hormones", cost: "550.00", turnaroundTime: "6 hours" },
+  { testName: "Cortisol (Morning)", category: "Hormones", cost: "500.00", turnaroundTime: "6 hours" },
+  { testName: "Insulin Fasting", category: "Hormones", cost: "600.00", turnaroundTime: "6 hours" },
+  { testName: "Beta HCG", category: "Hormones", cost: "550.00", turnaroundTime: "6 hours" },
+  
+  // Tumor Markers
+  { testName: "PSA (Prostate Specific Antigen)", category: "Tumor Markers", cost: "800.00", turnaroundTime: "24 hours" },
+  { testName: "CA-125", category: "Tumor Markers", cost: "1200.00", turnaroundTime: "24 hours" },
+  { testName: "CA 19-9", category: "Tumor Markers", cost: "1200.00", turnaroundTime: "24 hours" },
+  { testName: "CEA (Carcinoembryonic Antigen)", category: "Tumor Markers", cost: "900.00", turnaroundTime: "24 hours" },
+  { testName: "AFP (Alpha Fetoprotein)", category: "Tumor Markers", cost: "800.00", turnaroundTime: "24 hours" },
+];
+
+// Sample consultants with proper status field
+const consultantsData = [
+  {
+    name: "Dr. Priya Sharma",
+    qualification: "MD, DM (Cardiology)",
+    specialization: "Cardiology",
+    yearsExperience: 15,
+    rating: "4.9",
+    consultationFee: "1500.00",
+    availableSlots: ["Mon 10:00 AM", "Wed 2:00 PM", "Fri 11:00 AM", "Sat 9:00 AM"],
+    status: "active",
+  },
+  {
+    name: "Dr. Rajesh Kumar",
+    qualification: "MD, DM (Neurology)",
+    specialization: "Neurology",
+    yearsExperience: 12,
+    rating: "4.8",
+    consultationFee: "1200.00",
+    availableSlots: ["Tue 9:00 AM", "Thu 3:00 PM", "Sat 10:00 AM"],
+    status: "active",
+  },
+  {
+    name: "Dr. Meera Patel",
+    qualification: "MD (Pulmonology)",
+    specialization: "Pulmonology",
+    yearsExperience: 10,
+    rating: "4.7",
+    consultationFee: "1000.00",
+    availableSlots: ["Mon 2:00 PM", "Wed 10:00 AM", "Fri 4:00 PM"],
+    status: "active",
+  },
+  {
+    name: "Dr. Sanjay Reddy",
+    qualification: "MS, MCh (Oncology)",
+    specialization: "Oncology",
+    yearsExperience: 18,
+    rating: "4.9",
+    consultationFee: "2000.00",
+    availableSlots: ["Tue 11:00 AM", "Thu 9:00 AM"],
+    status: "active",
+  },
+  {
+    name: "Dr. Anjali Mehta",
+    qualification: "MD (Nephrology)",
+    specialization: "Nephrology",
+    yearsExperience: 8,
+    rating: "4.6",
+    consultationFee: "1100.00",
+    availableSlots: ["Mon 11:00 AM", "Wed 3:00 PM", "Fri 9:00 AM", "Sat 11:00 AM"],
+    status: "active",
+  },
+  {
+    name: "Dr. Vikram Singh",
+    qualification: "MD, DM (Gastroenterology)",
+    specialization: "Gastroenterology",
+    yearsExperience: 14,
+    rating: "4.8",
+    consultationFee: "1400.00",
+    availableSlots: ["Mon 3:00 PM", "Wed 11:00 AM", "Fri 10:00 AM"],
+    status: "active",
+  },
+  {
+    name: "Dr. Sunita Rao",
+    qualification: "MD, DM (Endocrinology)",
+    specialization: "Endocrinology",
+    yearsExperience: 11,
+    rating: "4.7",
+    consultationFee: "1300.00",
+    availableSlots: ["Tue 10:00 AM", "Thu 2:00 PM", "Sat 9:00 AM"],
+    status: "active",
+  },
+  {
+    name: "Dr. Arun Joshi",
+    qualification: "MD (Dermatology)",
+    specialization: "Dermatology",
+    yearsExperience: 9,
+    rating: "4.5",
+    consultationFee: "900.00",
+    availableSlots: ["Mon 9:00 AM", "Wed 4:00 PM", "Fri 2:00 PM"],
+    status: "active",
+  },
+];
+
+export async function seedDatabase() {
+  console.log("Starting database seed...");
+
+  try {
+    // Seed radiology modalities
+    const existingModalities = await db.select().from(radiologyModalities);
+    if (existingModalities.length === 0) {
+      console.log("Seeding radiology modalities...");
+      for (const modality of radiologyModalitiesData) {
+        await db.insert(radiologyModalities).values([{
+          name: modality.name,
+          category: modality.category,
+          status: "active",
+        } as any]);
+      }
+      console.log(`Seeded ${radiologyModalitiesData.length} radiology modalities`);
+    } else {
+      console.log(`Skipping radiology modalities (${existingModalities.length} already exist)`);
+    }
+
+    // Seed lab tests
+    const existingTests = await db.select().from(labTests);
+    if (existingTests.length === 0) {
+      console.log("Seeding lab tests...");
+      for (const test of labTestsData) {
+        await db.insert(labTests).values([{
+          testName: test.testName,
+          category: test.category,
+          cost: test.cost,
+          turnaroundTime: test.turnaroundTime,
+          status: "active",
+        } as any]);
+      }
+      console.log(`Seeded ${labTestsData.length} lab tests`);
+    } else {
+      console.log(`Skipping lab tests (${existingTests.length} already exist)`);
+    }
+
+    // Seed consultants
+    const existingConsultants = await db.select().from(consultants);
+    if (existingConsultants.length === 0) {
+      console.log("Seeding consultants...");
+      for (const consultant of consultantsData) {
+        await db.insert(consultants).values([consultant as any]);
+      }
+      console.log(`Seeded ${consultantsData.length} consultants`);
+    } else {
+      console.log(`Skipping consultants (${existingConsultants.length} already exist)`);
+    }
+
+    console.log("Database seed completed successfully!");
+  } catch (error) {
+    console.error("Error seeding database:", error);
+    throw error;
   }
-
-  // Seed Labs
-  const labsData = [
-    {
-      name: "HealthFirst Diagnostics",
-      location: "Mumbai",
-      description: "State-of-the-art diagnostic center with 24/7 service",
-      rating: "4.8",
-      isActive: true,
-    },
-    {
-      name: "MedLab Plus",
-      location: "Delhi",
-      description: "Trusted diagnostics with home sample collection",
-      rating: "4.6",
-      isActive: true,
-    },
-    {
-      name: "QuickDiagnostics",
-      location: "Bangalore",
-      description: "Fast and accurate results for urgent cases",
-      rating: "4.5",
-      isActive: true,
-    },
-    {
-      name: "Premier Path Labs",
-      location: "Chennai",
-      description: "NABL accredited with international quality standards",
-      rating: "4.9",
-      isActive: true,
-    },
-    {
-      name: "CityPath Diagnostics",
-      location: "Hyderabad",
-      description: "Affordable testing with quality assurance",
-      rating: "4.4",
-      isActive: true,
-    },
-  ];
-
-  const insertedLabs = await db.insert(labs).values(labsData).returning();
-  console.log(`Inserted ${insertedLabs.length} labs`);
-
-  // Seed Lab Tests
-  const testsData = [
-    { labId: insertedLabs[0].id, testName: "Complete Blood Count (CBC)", cost: "35.00", turnaroundTime: "4 hours", accuracyRating: "4.9" },
-    { labId: insertedLabs[0].id, testName: "Lipid Profile", cost: "55.00", turnaroundTime: "6 hours", accuracyRating: "4.8" },
-    { labId: insertedLabs[0].id, testName: "Liver Function Test", cost: "65.00", turnaroundTime: "8 hours", accuracyRating: "4.7" },
-    { labId: insertedLabs[1].id, testName: "Thyroid Profile (T3, T4, TSH)", cost: "45.00", turnaroundTime: "12 hours", accuracyRating: "4.8" },
-    { labId: insertedLabs[1].id, testName: "HbA1c Test", cost: "40.00", turnaroundTime: "6 hours", accuracyRating: "4.9" },
-    { labId: insertedLabs[1].id, testName: "Vitamin D Test", cost: "50.00", turnaroundTime: "24 hours", accuracyRating: "4.6" },
-    { labId: insertedLabs[2].id, testName: "COVID-19 RT-PCR", cost: "75.00", turnaroundTime: "6 hours", accuracyRating: "4.9" },
-    { labId: insertedLabs[2].id, testName: "Dengue NS1 Antigen", cost: "30.00", turnaroundTime: "2 hours", accuracyRating: "4.7" },
-    { labId: insertedLabs[2].id, testName: "Malaria Antigen Test", cost: "25.00", turnaroundTime: "1 hour", accuracyRating: "4.6" },
-    { labId: insertedLabs[3].id, testName: "Comprehensive Metabolic Panel", cost: "85.00", turnaroundTime: "8 hours", accuracyRating: "4.9" },
-    { labId: insertedLabs[3].id, testName: "Kidney Function Test", cost: "60.00", turnaroundTime: "6 hours", accuracyRating: "4.8" },
-    { labId: insertedLabs[3].id, testName: "Complete Urine Analysis", cost: "20.00", turnaroundTime: "2 hours", accuracyRating: "4.7" },
-    { labId: insertedLabs[4].id, testName: "Iron Studies", cost: "45.00", turnaroundTime: "12 hours", accuracyRating: "4.5" },
-    { labId: insertedLabs[4].id, testName: "Electrolyte Panel", cost: "35.00", turnaroundTime: "4 hours", accuracyRating: "4.6" },
-  ];
-
-  await db.insert(labTests).values(testsData);
-  console.log(`Inserted ${testsData.length} lab tests`);
-
-  // Seed Consultants
-  const consultantsData = [
-    { name: "Dr. Priya Sharma", qualification: "MD, DM (Cardiology)", specialization: "Cardiology", yearsExperience: 15, rating: "4.9", consultationFee: "150.00", availableSlots: ["Mon 10:00 AM", "Wed 2:00 PM", "Fri 11:00 AM", "Sat 9:00 AM"], isActive: true },
-    { name: "Dr. Rajesh Kumar", qualification: "MD, DM (Neurology)", specialization: "Neurology", yearsExperience: 12, rating: "4.8", consultationFee: "120.00", availableSlots: ["Tue 9:00 AM", "Thu 3:00 PM", "Sat 10:00 AM"], isActive: true },
-    { name: "Dr. Meera Patel", qualification: "MD (Pulmonology)", specialization: "Pulmonology", yearsExperience: 10, rating: "4.7", consultationFee: "100.00", availableSlots: ["Mon 2:00 PM", "Wed 10:00 AM", "Fri 4:00 PM"], isActive: true },
-    { name: "Dr. Sanjay Reddy", qualification: "MS, MCh (Oncology)", specialization: "Oncology", yearsExperience: 18, rating: "4.9", consultationFee: "200.00", availableSlots: ["Tue 11:00 AM", "Thu 9:00 AM"], isActive: true },
-    { name: "Dr. Anjali Mehta", qualification: "MD (Nephrology)", specialization: "Nephrology", yearsExperience: 8, rating: "4.6", consultationFee: "110.00", availableSlots: ["Mon 11:00 AM", "Wed 3:00 PM", "Fri 9:00 AM", "Sat 11:00 AM"], isActive: true },
-    { name: "Dr. Vikram Singh", qualification: "MD, DM (Gastroenterology)", specialization: "Gastroenterology", yearsExperience: 14, rating: "4.8", consultationFee: "140.00", availableSlots: ["Mon 3:00 PM", "Wed 11:00 AM", "Fri 10:00 AM"], isActive: true },
-  ];
-
-  await db.insert(consultants).values(consultantsData);
-  console.log(`Inserted ${consultantsData.length} consultants`);
-
-  // Seed Hospitals
-  const hospitalsData = [
-    { name: "Apollo Critical Care Center", location: "Mumbai", teamStrength: 45, emergencyResponseTime: "15 minutes", rating: "4.9", icuCapability: true, isActive: true },
-    { name: "Fortis Emergency Hospital", location: "Delhi", teamStrength: 38, emergencyResponseTime: "20 minutes", rating: "4.8", icuCapability: true, isActive: true },
-    { name: "Max Super Specialty", location: "Bangalore", teamStrength: 52, emergencyResponseTime: "12 minutes", rating: "4.7", icuCapability: true, isActive: true },
-    { name: "Medanta Critical Care", location: "Chennai", teamStrength: 30, emergencyResponseTime: "25 minutes", rating: "4.6", icuCapability: true, isActive: true },
-  ];
-
-  await db.insert(hospitals).values(hospitalsData);
-  console.log(`Inserted ${hospitalsData.length} hospitals`);
-
-  // Seed Critical Care Doctors
-  const doctorsData = [
-    { name: "Dr. Rakesh Gupta", qualification: "MD (Critical Care), FCCP", yearsExperience: 20, responseTime: "10 minutes", rating: "4.9", isActive: true },
-    { name: "Dr. Anita Desai", qualification: "MD (Anesthesiology), FNB (Critical Care)", yearsExperience: 15, responseTime: "15 minutes", rating: "4.8", isActive: true },
-    { name: "Dr. Suresh Menon", qualification: "MD (Medicine), IDCCM", yearsExperience: 18, responseTime: "12 minutes", rating: "4.7", isActive: true },
-    { name: "Dr. Kavitha Nair", qualification: "MD (Pulmonology), FCCP", yearsExperience: 12, responseTime: "20 minutes", rating: "4.6", isActive: true },
-  ];
-
-  await db.insert(criticalCareDoctors).values(doctorsData);
-  console.log(`Inserted ${doctorsData.length} critical care doctors`);
-
-  // Seed Referral Hospitals
-  const referralHospitalsData = [
-    { name: "AIIMS Delhi", location: "Delhi", departments: ["Cardiology", "Neurology", "Nephrology", "Oncology", "ICU"], diagnoses: ["Heart Attack", "Stroke", "Kidney Failure", "Cancer", "Trauma"], supportMechanicalVentilation: true, supportEcmo: true, supportCrrt: true, rating: "4.9", contactPhone: "+91-11-26588500", isActive: true },
-    { name: "Tata Memorial Hospital", location: "Mumbai", departments: ["Oncology", "Surgery", "Radiation Therapy", "ICU"], diagnoses: ["Cancer", "Tumor", "Lymphoma", "Leukemia"], supportMechanicalVentilation: true, supportEcmo: false, supportCrrt: true, rating: "4.9", contactPhone: "+91-22-24177000", isActive: true },
-    { name: "CMC Vellore", location: "Vellore", departments: ["Cardiology", "Neurology", "Gastroenterology", "Nephrology", "ICU"], diagnoses: ["Heart Disease", "Neurological Disorders", "Liver Disease", "Kidney Disease"], supportMechanicalVentilation: true, supportEcmo: true, supportCrrt: true, rating: "4.8", contactPhone: "+91-416-2281000", isActive: true },
-    { name: "NIMHANS", location: "Bangalore", departments: ["Neurology", "Psychiatry", "Neurosurgery", "ICU"], diagnoses: ["Stroke", "Brain Tumor", "Epilepsy", "Mental Health Emergencies"], supportMechanicalVentilation: true, supportEcmo: false, supportCrrt: false, rating: "4.8", contactPhone: "+91-80-26995000", isActive: true },
-    { name: "Narayana Health", location: "Bangalore", departments: ["Cardiology", "Cardiac Surgery", "Pediatric Cardiology", "ICU"], diagnoses: ["Heart Attack", "Heart Failure", "Congenital Heart Disease", "Valve Disease"], supportMechanicalVentilation: true, supportEcmo: true, supportCrrt: true, rating: "4.7", contactPhone: "+91-80-71222222", isActive: true },
-    { name: "Apollo Hospitals Chennai", location: "Chennai", departments: ["Cardiology", "Oncology", "Orthopedics", "Neurology", "ICU"], diagnoses: ["Heart Disease", "Cancer", "Trauma", "Stroke", "Multi-organ Failure"], supportMechanicalVentilation: true, supportEcmo: true, supportCrrt: true, rating: "4.7", contactPhone: "+91-44-28290200", isActive: true },
-  ];
-
-  await db.insert(referralHospitals).values(referralHospitalsData);
-  console.log(`Inserted ${referralHospitalsData.length} referral hospitals`);
-
-  // Seed Transport Services
-  const transportData = [
-    { name: "Apollo Ambulance Services", location: "Mumbai", serviceType: "ALS", transportMode: "road", hasCloudPhysician: true, rating: "4.8", baseCost: "2500.00", isActive: true },
-    { name: "LifeLine Emergency Transport", location: "Delhi", serviceType: "ALS", transportMode: "road", hasCloudPhysician: true, rating: "4.7", baseCost: "2200.00", isActive: true },
-    { name: "MedFlight India", location: "Mumbai", serviceType: "ALS", transportMode: "air", hasCloudPhysician: true, rating: "4.9", baseCost: "150000.00", isActive: true },
-    { name: "QuickCare Ambulance", location: "Bangalore", serviceType: "BLS", transportMode: "road", hasCloudPhysician: false, rating: "4.5", baseCost: "1500.00", isActive: true },
-    { name: "CriticalCare Transport", location: "Chennai", serviceType: "ALS", transportMode: "road", hasCloudPhysician: true, rating: "4.6", baseCost: "2000.00", isActive: true },
-    { name: "Vellore Emergency Services", location: "Vellore", serviceType: "ALS", transportMode: "road", hasCloudPhysician: false, rating: "4.4", baseCost: "1800.00", isActive: true },
-    { name: "SkyMed Air Ambulance", location: "Delhi", serviceType: "ALS", transportMode: "air", hasCloudPhysician: true, rating: "4.8", baseCost: "175000.00", isActive: true },
-  ];
-
-  await db.insert(transportServices).values(transportData);
-  console.log(`Inserted ${transportData.length} transport services`);
-
-  console.log("Database seeding completed!");
 }
 
-seed()
+// Run seed if called directly
+seedDatabase()
   .then(() => process.exit(0))
-  .catch((error) => {
-    console.error("Error seeding database:", error);
-    process.exit(1);
-  });
+  .catch(() => process.exit(1));

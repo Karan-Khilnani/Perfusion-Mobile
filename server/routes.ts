@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated, isAdmin, isProvider, updateUserRole } from "./auth";
 import { registerAuthRoutes } from "./auth/routes";
-import type { BookingStatus, UserRole, ProviderType, ProviderStatus } from "@shared/schema";
+import type { BookingStatus, UserRole, ProviderType, ProviderStatus, ServiceStatus } from "@shared/schema";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -259,7 +259,75 @@ export async function registerRoutes(
     }
   });
 
-  // Labs
+  // Lab Tests - Direct Catalog (no providers)
+  app.get("/api/lab-tests", async (req, res) => {
+    try {
+      const tests = await storage.getActiveLabTests();
+      res.json(tests);
+    } catch (error) {
+      console.error("Error fetching lab tests:", error);
+      res.status(500).json({ message: "Failed to fetch lab tests" });
+    }
+  });
+
+  app.get("/api/lab-tests/all", isAdmin, async (req, res) => {
+    try {
+      const tests = await storage.getLabTests();
+      res.json(tests);
+    } catch (error) {
+      console.error("Error fetching all lab tests:", error);
+      res.status(500).json({ message: "Failed to fetch lab tests" });
+    }
+  });
+
+  app.get("/api/lab-tests/:id", async (req, res) => {
+    try {
+      const test = await storage.getLabTestById(req.params.id);
+      if (!test) {
+        return res.status(404).json({ message: "Lab test not found" });
+      }
+      res.json(test);
+    } catch (error) {
+      console.error("Error fetching lab test:", error);
+      res.status(500).json({ message: "Failed to fetch lab test" });
+    }
+  });
+
+  // Radiology Modalities
+  app.get("/api/radiology-modalities", async (req, res) => {
+    try {
+      const modalities = await storage.getActiveRadiologyModalities();
+      res.json(modalities);
+    } catch (error) {
+      console.error("Error fetching radiology modalities:", error);
+      res.status(500).json({ message: "Failed to fetch modalities" });
+    }
+  });
+
+  app.get("/api/radiology-modalities/all", isAdmin, async (req, res) => {
+    try {
+      const modalities = await storage.getRadiologyModalities();
+      res.json(modalities);
+    } catch (error) {
+      console.error("Error fetching all radiology modalities:", error);
+      res.status(500).json({ message: "Failed to fetch modalities" });
+    }
+  });
+
+  app.get("/api/radiology-modalities/:id", async (req, res) => {
+    try {
+      const modality = await storage.getRadiologyModalityById(req.params.id);
+      if (!modality) {
+        return res.status(404).json({ message: "Modality not found" });
+      }
+      res.json(modality);
+    } catch (error) {
+      console.error("Error fetching radiology modality:", error);
+      res.status(500).json({ message: "Failed to fetch modality" });
+    }
+  });
+
+  // Labs (legacy - kept for backward compatibility)
   app.get("/api/labs", async (req, res) => {
     try {
       const labs = await storage.getLabs();
@@ -283,21 +351,10 @@ export async function registerRoutes(
     }
   });
 
-  // Lab Tests
-  app.post("/api/lab-tests", isAuthenticated, async (req, res) => {
-    try {
-      const test = await storage.createLabTest(req.body);
-      res.status(201).json(test);
-    } catch (error) {
-      console.error("Error creating lab test:", error);
-      res.status(500).json({ message: "Failed to create lab test" });
-    }
-  });
-
-  // Consultants
+  // Consultants (public - only active)
   app.get("/api/consultants", async (req, res) => {
     try {
-      const consultants = await storage.getConsultants();
+      const consultants = await storage.getActiveConsultants();
       res.json(consultants);
     } catch (error) {
       console.error("Error fetching consultants:", error);
@@ -551,6 +608,183 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error updating user status:", error);
       res.status(500).json({ message: "Failed to update user status" });
+    }
+  });
+
+  // Admin - Lab Tests CRUD
+  app.post("/api/admin/lab-tests", isAdmin, async (req, res) => {
+    try {
+      const test = await storage.createLabTest(req.body);
+      res.status(201).json(test);
+    } catch (error) {
+      console.error("Error creating lab test:", error);
+      res.status(500).json({ message: "Failed to create lab test" });
+    }
+  });
+
+  app.patch("/api/admin/lab-tests/:id", isAdmin, async (req, res) => {
+    try {
+      const test = await storage.updateLabTest(req.params.id, req.body);
+      if (!test) {
+        return res.status(404).json({ message: "Lab test not found" });
+      }
+      res.json(test);
+    } catch (error) {
+      console.error("Error updating lab test:", error);
+      res.status(500).json({ message: "Failed to update lab test" });
+    }
+  });
+
+  app.patch("/api/admin/lab-tests/:id/status", isAdmin, async (req, res) => {
+    try {
+      const { status } = req.body as { status: ServiceStatus };
+      const test = await storage.updateLabTestStatus(req.params.id, status);
+      if (!test) {
+        return res.status(404).json({ message: "Lab test not found" });
+      }
+      res.json(test);
+    } catch (error) {
+      console.error("Error updating lab test status:", error);
+      res.status(500).json({ message: "Failed to update lab test status" });
+    }
+  });
+
+  app.delete("/api/admin/lab-tests/:id", isAdmin, async (req, res) => {
+    try {
+      await storage.deleteLabTest(req.params.id);
+      res.json({ message: "Lab test deleted" });
+    } catch (error) {
+      console.error("Error deleting lab test:", error);
+      res.status(500).json({ message: "Failed to delete lab test" });
+    }
+  });
+
+  // Admin - Consultants CRUD
+  app.get("/api/admin/consultants", isAdmin, async (req, res) => {
+    try {
+      const consultants = await storage.getConsultants();
+      res.json(consultants);
+    } catch (error) {
+      console.error("Error fetching consultants:", error);
+      res.status(500).json({ message: "Failed to fetch consultants" });
+    }
+  });
+
+  app.post("/api/admin/consultants", isAdmin, async (req, res) => {
+    try {
+      const consultant = await storage.createConsultant(req.body);
+      res.status(201).json(consultant);
+    } catch (error) {
+      console.error("Error creating consultant:", error);
+      res.status(500).json({ message: "Failed to create consultant" });
+    }
+  });
+
+  app.patch("/api/admin/consultants/:id", isAdmin, async (req, res) => {
+    try {
+      const consultant = await storage.updateConsultant(req.params.id, req.body);
+      if (!consultant) {
+        return res.status(404).json({ message: "Consultant not found" });
+      }
+      res.json(consultant);
+    } catch (error) {
+      console.error("Error updating consultant:", error);
+      res.status(500).json({ message: "Failed to update consultant" });
+    }
+  });
+
+  app.patch("/api/admin/consultants/:id/status", isAdmin, async (req, res) => {
+    try {
+      const { status } = req.body as { status: ServiceStatus };
+      const consultant = await storage.updateConsultantStatus(req.params.id, status);
+      if (!consultant) {
+        return res.status(404).json({ message: "Consultant not found" });
+      }
+      res.json(consultant);
+    } catch (error) {
+      console.error("Error updating consultant status:", error);
+      res.status(500).json({ message: "Failed to update consultant status" });
+    }
+  });
+
+  app.delete("/api/admin/consultants/:id", isAdmin, async (req, res) => {
+    try {
+      await storage.deleteConsultant(req.params.id);
+      res.json({ message: "Consultant deleted" });
+    } catch (error) {
+      console.error("Error deleting consultant:", error);
+      res.status(500).json({ message: "Failed to delete consultant" });
+    }
+  });
+
+  // Admin - Radiology Modalities CRUD
+  app.post("/api/admin/radiology-modalities", isAdmin, async (req, res) => {
+    try {
+      const modality = await storage.createRadiologyModality(req.body);
+      res.status(201).json(modality);
+    } catch (error) {
+      console.error("Error creating radiology modality:", error);
+      res.status(500).json({ message: "Failed to create modality" });
+    }
+  });
+
+  app.patch("/api/admin/radiology-modalities/:id", isAdmin, async (req, res) => {
+    try {
+      const modality = await storage.updateRadiologyModality(req.params.id, req.body);
+      if (!modality) {
+        return res.status(404).json({ message: "Modality not found" });
+      }
+      res.json(modality);
+    } catch (error) {
+      console.error("Error updating radiology modality:", error);
+      res.status(500).json({ message: "Failed to update modality" });
+    }
+  });
+
+  app.patch("/api/admin/radiology-modalities/:id/status", isAdmin, async (req, res) => {
+    try {
+      const { status } = req.body as { status: ServiceStatus };
+      const modality = await storage.updateRadiologyModalityStatus(req.params.id, status);
+      if (!modality) {
+        return res.status(404).json({ message: "Modality not found" });
+      }
+      res.json(modality);
+    } catch (error) {
+      console.error("Error updating radiology modality status:", error);
+      res.status(500).json({ message: "Failed to update modality status" });
+    }
+  });
+
+  app.delete("/api/admin/radiology-modalities/:id", isAdmin, async (req, res) => {
+    try {
+      await storage.deleteRadiologyModality(req.params.id);
+      res.json({ message: "Radiology modality deleted" });
+    } catch (error) {
+      console.error("Error deleting radiology modality:", error);
+      res.status(500).json({ message: "Failed to delete modality" });
+    }
+  });
+
+  // Booking update endpoint (for patient details form)
+  app.patch("/api/bookings/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.id;
+      const booking = await storage.getBookingById(req.params.id);
+      
+      if (!booking) {
+        return res.status(404).json({ message: "Booking not found" });
+      }
+      
+      // Only allow the booking owner to update
+      if (booking.userId !== userId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      const updated = await storage.updateBooking(req.params.id, req.body);
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating booking:", error);
+      res.status(500).json({ message: "Failed to update booking" });
     }
   });
 

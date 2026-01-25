@@ -42,14 +42,18 @@ export const labs = pgTable("labs", {
   isActive: boolean("is_active").default(true),
 });
 
-// Lab tests offered
+// Service status type for items that can be paused/deleted
+export type ServiceStatus = "active" | "paused" | "deleted";
+
+// Lab tests offered - direct catalog (no provider dependency)
 export const labTests = pgTable("lab_tests", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  labId: varchar("lab_id").notNull(),
   testName: varchar("test_name", { length: 255 }).notNull(),
+  category: varchar("category", { length: 100 }).notNull(),
   cost: decimal("cost", { precision: 10, scale: 2 }).notNull(),
   turnaroundTime: varchar("turnaround_time", { length: 50 }).notNull(),
-  accuracyRating: decimal("accuracy_rating", { precision: 2, scale: 1 }).default("4.5"),
+  status: varchar("status", { length: 20 }).default("active").$type<ServiceStatus>(),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
 // Consultants table
@@ -63,7 +67,17 @@ export const consultants = pgTable("consultants", {
   rating: decimal("rating", { precision: 2, scale: 1 }).default("4.0"),
   consultationFee: decimal("consultation_fee", { precision: 10, scale: 2 }).notNull(),
   availableSlots: text("available_slots").array(),
-  isActive: boolean("is_active").default(true),
+  status: varchar("status", { length: 20 }).default("active").$type<ServiceStatus>(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Radiology Modalities table
+export const radiologyModalities = pgTable("radiology_modalities", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: varchar("name", { length: 255 }).notNull(),
+  category: varchar("category", { length: 100 }),
+  status: varchar("status", { length: 20 }).default("active").$type<ServiceStatus>(),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
 // Hospitals (Emergency & Critical Care)
@@ -122,10 +136,9 @@ export const transportServices = pgTable("transport_services", {
 
 // Booking status type
 export type BookingStatus = "booked" | "sample_collected" | "processing" | "report_ready" | "completed" | "cancelled" | "in_transit" | "arrived";
-export type BookingType = "lab" | "consultation" | "critical_care" | "referral";
-export type PatientCondition = "stable" | "borderline" | "critical";
-export type AmbulanceType = "BLS" | "ALS";
-export type TransportMode = "road" | "air";
+export type BookingType = "lab" | "consultation" | "teleradiology";
+export type PatientGender = "male" | "female" | "other";
+export type UrgencyType = "routine" | "emergency";
 
 // Bookings table
 export const bookings = pgTable("bookings", {
@@ -135,23 +148,27 @@ export const bookings = pgTable("bookings", {
   serviceId: varchar("service_id").notNull(),
   serviceName: varchar("service_name", { length: 255 }).notNull(),
   providerId: varchar("provider_id"),
-  providerName: varchar("provider_name", { length: 255 }).notNull(),
+  providerName: varchar("provider_name", { length: 255 }),
+  // Patient details
   patientName: varchar("patient_name", { length: 255 }).notNull(),
   patientAge: integer("patient_age").notNull(),
+  patientGender: varchar("patient_gender", { length: 10 }).$type<PatientGender>(),
+  patientContact: varchar("patient_contact", { length: 20 }),
+  clinicalSummary: text("clinical_summary"),
   provisionalDiagnosis: text("provisional_diagnosis"),
-  orderingPhysician: varchar("ordering_physician", { length: 255 }),
+  documentUrls: text("document_urls").array(),
+  // Appointment and payment
   appointmentSlot: varchar("appointment_slot", { length: 100 }),
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
   status: varchar("status", { length: 30 }).notNull().default("booked").$type<BookingStatus>(),
   paymentStatus: varchar("payment_status", { length: 20 }).default("paid"),
-  // Referral-specific fields
-  referralHospitalId: varchar("referral_hospital_id"),
-  referralHospitalName: varchar("referral_hospital_name", { length: 255 }),
-  transportServiceId: varchar("transport_service_id"),
-  patientCondition: varchar("patient_condition", { length: 20 }).$type<PatientCondition>(),
-  ambulanceType: varchar("ambulance_type", { length: 10 }).$type<AmbulanceType>(),
-  transportMode: varchar("transport_mode", { length: 20 }).$type<TransportMode>(),
-  cloudPhysicianSupport: boolean("cloud_physician_support").default(false),
+  // Consultation-specific: video room
+  videoRoomId: varchar("video_room_id", { length: 255 }),
+  // Teleradiology-specific fields
+  modalityId: varchar("modality_id"),
+  modalityName: varchar("modality_name", { length: 255 }),
+  urgency: varchar("urgency", { length: 20 }).$type<UrgencyType>(),
+  imageUrls: text("image_urls").array(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -159,8 +176,9 @@ export const bookings = pgTable("bookings", {
 // Insert schemas
 export const insertProviderSchema = createInsertSchema(providers).omit({ id: true, createdAt: true });
 export const insertLabSchema = createInsertSchema(labs).omit({ id: true });
-export const insertLabTestSchema = createInsertSchema(labTests).omit({ id: true });
-export const insertConsultantSchema = createInsertSchema(consultants).omit({ id: true });
+export const insertLabTestSchema = createInsertSchema(labTests).omit({ id: true, createdAt: true });
+export const insertConsultantSchema = createInsertSchema(consultants).omit({ id: true, createdAt: true });
+export const insertRadiologyModalitySchema = createInsertSchema(radiologyModalities).omit({ id: true, createdAt: true });
 export const insertHospitalSchema = createInsertSchema(hospitals).omit({ id: true });
 export const insertCriticalCareDoctorSchema = createInsertSchema(criticalCareDoctors).omit({ id: true });
 export const insertReferralHospitalSchema = createInsertSchema(referralHospitals).omit({ id: true });
@@ -179,6 +197,9 @@ export type LabTest = typeof labTests.$inferSelect;
 
 export type InsertConsultant = z.infer<typeof insertConsultantSchema>;
 export type Consultant = typeof consultants.$inferSelect;
+
+export type InsertRadiologyModality = z.infer<typeof insertRadiologyModalitySchema>;
+export type RadiologyModality = typeof radiologyModalities.$inferSelect;
 
 export type InsertHospital = z.infer<typeof insertHospitalSchema>;
 export type Hospital = typeof hospitals.$inferSelect;
