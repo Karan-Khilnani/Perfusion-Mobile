@@ -291,7 +291,7 @@ export default function LabBookingPage() {
                           {selectedTest.turnaroundTime}
                         </span>
                         <StarRating
-                          rating={parseFloat(selectedTest.accuracyRating || "4.5")}
+                          rating={4.5}
                           size="sm"
                         />
                       </div>

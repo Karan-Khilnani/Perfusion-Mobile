@@ -64,18 +64,26 @@ export default function TeleradiologyPage() {
 
   const createBookingMutation = useMutation({
     mutationFn: async (data: TeleradiologyFormData) => {
+      const selectedModality = modalities?.find(m => m.id === data.modalityId);
+      if (!selectedModality) throw new Error("Modality not found");
+      
       const response = await apiRequest("POST", "/api/bookings", {
-        serviceType: "teleradiology",
-        radiologyModalityId: data.modalityId,
-        status: "pending",
+        bookingType: "teleradiology",
+        serviceId: data.modalityId,
+        serviceName: selectedModality.name,
+        modalityId: data.modalityId,
+        modalityName: selectedModality.name,
         patientName: data.patientName,
         patientAge: data.patientAge,
         patientGender: data.patientGender,
+        patientContact: data.contactNumber,
         accessionNumber: data.accessionNumber,
         clinicalSummary: data.clinicalHistory,
         provisionalDiagnosis: data.provisionalDiagnosis,
-        contactNumber: data.contactNumber,
-        isEmergency: data.priority === "emergency",
+        urgency: data.priority,
+        amount: "0.00",
+        status: "pending",
+        paymentStatus: "pending",
       });
       return response;
     },

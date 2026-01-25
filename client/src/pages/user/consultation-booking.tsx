@@ -76,17 +76,21 @@ export default function ConsultationBookingPage() {
       setVideoRoomId(roomId);
 
       const response = await apiRequest("POST", "/api/bookings", {
-        serviceType: "consultation",
-        consultantId: consultant.id,
+        bookingType: "consultation",
+        serviceId: consultant.id,
+        serviceName: consultant.name,
+        providerName: consultant.qualification,
         patientName: data.patientName,
         patientAge: data.patientAge,
         patientGender: data.patientGender,
-        contactNumber: data.contactNumber,
+        patientContact: data.contactNumber,
         clinicalSummary: data.clinicalSummary,
         provisionalDiagnosis: data.provisionalDiagnosis || null,
         appointmentSlot: data.appointmentSlot,
         videoRoomId: roomId,
+        amount: consultant.consultationFee,
         status: "confirmed",
+        paymentStatus: "paid",
       });
       return response.json();
     },
