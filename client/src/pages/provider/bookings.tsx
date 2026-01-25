@@ -8,7 +8,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { StatusBadge } from "@/components/status-badge";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { ClipboardList, RefreshCw } from "lucide-react";
+import { ClipboardList, RefreshCw, Video } from "lucide-react";
+import { Link } from "wouter";
 import type { Booking, BookingStatus } from "@shared/schema";
 import { format } from "date-fns";
 
@@ -81,7 +82,15 @@ export default function ProviderBookingsPage() {
         </p>
       </div>
       <div className="flex flex-col items-start gap-2 sm:items-end">
-        <span className="font-medium">${booking.amount}</span>
+        <span className="font-medium">₹{booking.amount}</span>
+        {booking.bookingType === "consultation" && booking.videoRoomId && (
+          <Link href={`/video/${booking.videoRoomId}`}>
+            <Button size="sm" variant="outline" data-testid={`button-join-video-${booking.id}`}>
+              <Video className="mr-2 h-3.5 w-3.5" />
+              Join Call
+            </Button>
+          </Link>
+        )}
         <Select
           value={booking.status}
           onValueChange={(value) =>

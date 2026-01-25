@@ -230,14 +230,15 @@ export default function ConsultationBookingPage() {
                 <p className="mt-2 text-sm text-muted-foreground">
                   Join the video call at your scheduled appointment time
                 </p>
-                <Button
-                  className="mt-3"
-                  onClick={() => window.open(`https://meet.jit.si/${videoRoomId}`, "_blank")}
-                  data-testid="button-join-video"
-                >
-                  <Video className="mr-2 h-4 w-4" />
-                  Join Video Call
-                </Button>
+                <Link href={`/video/${videoRoomId}`}>
+                  <Button
+                    className="mt-3"
+                    data-testid="button-join-video"
+                  >
+                    <Video className="mr-2 h-4 w-4" />
+                    Join Video Call
+                  </Button>
+                </Link>
               </div>
             )}
 

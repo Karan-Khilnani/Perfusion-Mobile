@@ -1,0 +1,130 @@
+Modify the existing Perfusion web portal.
+The project already exists.
+Do NOT regenerate, refactor, or redesign the application.
+
+All changes must remain AWS deployable (no Replit-only dependencies).
+
+1. SERVICE SCOPE & NAVIGATION (CRITICAL)
+
+Update side panel/navigation to show ONLY:
+
+Super Speciality Consultation
+
+Lab Tests
+
+Teleradiology
+
+Remove/hide emergency referral and any old services.
+
+Fix Orders section so service names are correct and consistent.
+
+2. CURRENCY & BASIC UI
+
+Change currency from USD ($) to INR (₹) everywhere.
+
+Fix Light mode so it works (no redesign).
+
+3. CONSULTANT & SPECIALITY (BLOCKER)
+
+Fix mismatch between consultant speciality and speciality dropdown.
+
+Use one predefined speciality master list consistently for:
+
+Consultant creation
+
+Consultant search/filter
+
+Consultant display
+
+4. BOOKING & PAYMENT (TOP PRIORITY)
+
+Fix payment failure during booking.
+
+Booking must not fail silently.
+
+If payment is unstable, disable payment temporarily but ensure:
+
+Consultation booking
+
+Lab booking
+
+Teleradiology booking
+all complete successfully.
+
+Fix lab test booking error.
+
+Fix teleradiology booking so orders can be created.
+
+5. TELERADIOLOGY – ESSENTIAL FIXES
+
+Add mandatory ID Number / Hospital ID / Accession Number field during teleradiology booking.
+
+This ID must be visible to radiologists.
+
+Add a Scans & Reports section:
+
+Inside teleradiology order details
+
+Accessible from the order view.
+
+6. PROVIDER TEST SELECTION (MINIMAL)
+
+When provider adds services/tests:
+
+Show dropdown of predefined lab tests.
+
+If test not found:
+
+Provider selects “Other”
+
+Admin approves and creates test in master list.
+
+7. VIDEO CONSULTATION – VERIFICATION & FIX
+
+Check whether any video conferencing platform is already integrated:
+
+Zoom
+
+Google Meet
+
+Microsoft Teams
+
+Or any other provider
+
+Verify that:
+
+Video consultation opens inside the web portal
+
+Video screen is embedded (iframe or SDK)
+
+No redirection to external tabs
+
+If video integration exists but is broken:
+
+Fix the embedding so it works.
+
+If no video integration exists:
+
+Add basic placeholder integration with clear comments
+
+Do NOT build advanced video features.
+
+8. ADMIN VISIBILITY (MINIMUM REQUIRED)
+
+Admin must be able to:
+
+View all users and providers
+
+View all consultations
+
+View all lab orders
+
+View all teleradiology orders
+
+Pause or delete:
+
+Consultants
+
+Lab tests
+
+Radiology modalities

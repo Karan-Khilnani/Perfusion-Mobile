@@ -17,6 +17,7 @@ import ConsultationPage from "@/pages/user/consultation";
 import ConsultationBookingPage from "@/pages/user/consultation-booking";
 import TeleradiologyPage from "@/pages/user/teleradiology";
 import OrdersPage from "@/pages/user/orders";
+import VideoRoomPage from "@/pages/video-room";
 
 import ProviderLayout from "@/pages/provider/layout";
 import ProviderDashboard from "@/pages/provider/dashboard";
@@ -77,6 +78,7 @@ function Router() {
       <Route path="/user/consultation/:id/book" component={withUserLayout(ConsultationBookingPage)} />
       <Route path="/user/teleradiology" component={withUserLayout(TeleradiologyPage)} />
       <Route path="/user/orders" component={withUserLayout(OrdersPage)} />
+      <Route path="/video/:roomId" component={VideoRoomPage} />
       
       <Route path="/provider" component={withProviderLayout(ProviderDashboard)} />
       <Route path="/provider/bookings" component={withProviderLayout(ProviderBookingsPage)} />

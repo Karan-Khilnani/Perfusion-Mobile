@@ -7,20 +7,20 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { StatusBadge } from "@/components/status-badge";
 import { BookingTimeline } from "@/components/booking-timeline";
-import { ClipboardList, FlaskConical, Stethoscope, HeartPulse, Calendar, DollarSign, ChevronRight } from "lucide-react";
+import { ClipboardList, FlaskConical, Stethoscope, Calendar, IndianRupee, ChevronRight, Video, Scan } from "lucide-react";
 import type { Booking, BookingType } from "@shared/schema";
 import { format } from "date-fns";
 
 const typeIcons: Record<BookingType, typeof FlaskConical> = {
   lab: FlaskConical,
   consultation: Stethoscope,
-  critical_care: HeartPulse,
+  teleradiology: Scan,
 };
 
 const typeLabels: Record<BookingType, string> = {
   lab: "Lab Test",
   consultation: "Consultation",
-  critical_care: "Critical Care",
+  teleradiology: "Teleradiology",
 };
 
 export default function OrdersPage() {
@@ -32,7 +32,7 @@ export default function OrdersPage() {
 
   const labBookings = bookings?.filter((b) => b.bookingType === "lab") || [];
   const consultationBookings = bookings?.filter((b) => b.bookingType === "consultation") || [];
-  const criticalCareBookings = bookings?.filter((b) => b.bookingType === "critical_care") || [];
+  const teleradiologyBookings = bookings?.filter((b) => b.bookingType === "teleradiology") || [];
 
   const BookingCard = ({ booking }: { booking: Booking }) => {
     const Icon = typeIcons[booking.bookingType as BookingType];
@@ -61,7 +61,7 @@ export default function OrdersPage() {
                   </span>
                   {parseFloat(booking.amount) > 0 && (
                     <span className="flex items-center gap-1">
-                      <DollarSign className="h-3 w-3" />
+                      <IndianRupee className="h-3 w-3" />
                       {booking.amount}
                     </span>
                   )}
@@ -114,16 +114,10 @@ export default function OrdersPage() {
               <dd>{booking.appointmentSlot}</dd>
             </div>
           )}
-          {booking.orderingPhysician && (
-            <div className="flex justify-between border-b pb-2">
-              <dt className="text-muted-foreground">Ordering Physician</dt>
-              <dd>{booking.orderingPhysician}</dd>
-            </div>
-          )}
-          {parseFloat(booking.amount) > 0 && (
+                    {parseFloat(booking.amount) > 0 && (
             <div className="flex justify-between border-b pb-2">
               <dt className="text-muted-foreground">Amount</dt>
-              <dd className="font-semibold">${booking.amount}</dd>
+              <dd className="font-semibold">₹{booking.amount}</dd>
             </div>
           )}
           <div className="flex justify-between border-b pb-2">
@@ -135,6 +129,24 @@ export default function OrdersPage() {
             <dd>{format(new Date(booking.createdAt!), "PPpp")}</dd>
           </div>
         </dl>
+
+        {booking.bookingType === "consultation" && booking.videoRoomId && booking.status === "booked" && (
+          <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
+            <div className="flex items-center gap-2 text-primary">
+              <Video className="h-5 w-5" />
+              <span className="font-medium">Video Consultation</span>
+            </div>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Join the video call at your scheduled appointment time
+            </p>
+            <Link href={`/video/${booking.videoRoomId}`}>
+              <Button className="mt-3" data-testid="button-join-video-call">
+                <Video className="mr-2 h-4 w-4" />
+                Join Video Call
+              </Button>
+            </Link>
+          </div>
+        )}
 
         <div>
           <h4 className="mb-4 font-medium">Order Status</h4>
@@ -181,8 +193,8 @@ export default function OrdersPage() {
               <TabsTrigger value="consultation" data-testid="tab-consultation-orders">
                 Consult ({consultationBookings.length})
               </TabsTrigger>
-              <TabsTrigger value="critical" data-testid="tab-critical-orders">
-                Critical ({criticalCareBookings.length})
+              <TabsTrigger value="teleradiology" data-testid="tab-teleradiology-orders">
+                Radiology ({teleradiologyBookings.length})
               </TabsTrigger>
             </TabsList>
 
@@ -231,11 +243,11 @@ export default function OrdersPage() {
               )}
             </TabsContent>
 
-            <TabsContent value="critical" className="space-y-3">
-              {criticalCareBookings.length === 0 ? (
-                <EmptyState type="Critical Care" />
+            <TabsContent value="teleradiology" className="space-y-3">
+              {teleradiologyBookings.length === 0 ? (
+                <EmptyState type="Teleradiology" />
               ) : (
-                criticalCareBookings.map((booking) => (
+                teleradiologyBookings.map((booking) => (
                   <BookingCard key={booking.id} booking={booking} />
                 ))
               )}
