@@ -82,7 +82,7 @@ export default function ProviderDashboard() {
             {isLoading ? (
               <Skeleton className="h-8 w-24" />
             ) : (
-              <p className="text-2xl font-bold">${stats.revenue.toFixed(2)}</p>
+              <p className="text-2xl font-bold">₹{stats.revenue.toFixed(2)}</p>
             )}
           </CardContent>
         </Card>
@@ -130,7 +130,7 @@ export default function ProviderDashboard() {
                     </p>
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className="text-sm font-medium">${booking.amount}</span>
+                    <span className="text-sm font-medium">₹{booking.amount}</span>
                     <StatusBadge status={booking.status} />
                   </div>
                 </div>

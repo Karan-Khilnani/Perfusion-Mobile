@@ -167,6 +167,7 @@ export const bookings = pgTable("bookings", {
   // Teleradiology-specific fields
   modalityId: varchar("modality_id"),
   modalityName: varchar("modality_name", { length: 255 }),
+  accessionNumber: varchar("accession_number", { length: 100 }),
   urgency: varchar("urgency", { length: 20 }).$type<UrgencyType>(),
   imageUrls: text("image_urls").array(),
   createdAt: timestamp("created_at").defaultNow(),

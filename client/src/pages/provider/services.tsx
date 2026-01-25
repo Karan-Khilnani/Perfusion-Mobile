@@ -15,7 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { StarRating } from "@/components/star-rating";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Plus, Edit2, FlaskConical, DollarSign, Clock, Building2, Stethoscope, Loader2, AlertCircle } from "lucide-react";
+import { Plus, Edit2, FlaskConical, IndianRupee, Clock, Building2, Stethoscope, Loader2, AlertCircle } from "lucide-react";
 import type { Lab, LabTest, Consultant, Provider } from "@shared/schema";
 
 interface LabWithTests extends Lab {
@@ -378,7 +378,7 @@ export default function ProviderServicesPage() {
                             <p className="font-medium">{test.testName}</p>
                             <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
                               <span className="flex items-center gap-1">
-                                <DollarSign className="h-3.5 w-3.5" />${test.cost}
+                                <IndianRupee className="h-3.5 w-3.5" />₹{test.cost}
                               </span>
                               <span className="flex items-center gap-1">
                                 <Clock className="h-3.5 w-3.5" />{test.turnaroundTime}
@@ -509,7 +509,7 @@ export default function ProviderServicesPage() {
                       <div className="mt-1 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
                         <span>{consultant.specialization}</span>
                         <span>{consultant.yearsExperience} years exp.</span>
-                        <span>${consultant.consultationFee}</span>
+                        <span>₹{consultant.consultationFee}</span>
                       </div>
                     </div>
                     <StarRating rating={parseFloat(consultant.rating || "4.0")} />

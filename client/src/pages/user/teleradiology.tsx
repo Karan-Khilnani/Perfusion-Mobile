@@ -29,6 +29,7 @@ const teleradiologySchema = z.object({
   patientName: z.string().min(2, "Patient name is required"),
   patientAge: z.coerce.number().min(0, "Age must be positive").max(150, "Invalid age"),
   patientGender: z.enum(["male", "female", "other"], { required_error: "Gender is required" }),
+  accessionNumber: z.string().min(1, "Accession Number / Hospital ID is required"),
   modalityId: z.string().min(1, "Please select a modality"),
   priority: z.enum(["routine", "emergency"], { required_error: "Priority is required" }),
   clinicalHistory: z.string().min(10, "Please provide clinical history"),
@@ -52,6 +53,7 @@ export default function TeleradiologyPage() {
       patientName: "",
       patientAge: 0,
       patientGender: undefined,
+      accessionNumber: "",
       modalityId: "",
       priority: "routine",
       clinicalHistory: "",
@@ -69,6 +71,7 @@ export default function TeleradiologyPage() {
         patientName: data.patientName,
         patientAge: data.patientAge,
         patientGender: data.patientGender,
+        accessionNumber: data.accessionNumber,
         clinicalSummary: data.clinicalHistory,
         provisionalDiagnosis: data.provisionalDiagnosis,
         contactNumber: data.contactNumber,
@@ -196,23 +199,42 @@ export default function TeleradiologyPage() {
                         )}
                       />
                     </div>
-                    <FormField
-                      control={form.control}
-                      name="contactNumber"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Contact Number</FormLabel>
-                          <FormControl>
-                            <Input
-                              placeholder="+91 XXXXX XXXXX"
-                              {...field}
-                              data-testid="input-contact"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <FormField
+                        control={form.control}
+                        name="contactNumber"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Contact Number</FormLabel>
+                            <FormControl>
+                              <Input
+                                placeholder="+91 XXXXX XXXXX"
+                                {...field}
+                                data-testid="input-contact"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="accessionNumber"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Accession Number / Hospital ID *</FormLabel>
+                            <FormControl>
+                              <Input
+                                placeholder="Enter ID for radiologist reference"
+                                {...field}
+                                data-testid="input-accession-number"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
                   </div>
 
                   <div className="space-y-4">
