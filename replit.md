@@ -12,6 +12,9 @@ The platform uses INR (₹) currency throughout, features role-based access (Adm
 
 ## Recent Changes
 
+- **Admin Dashboard Enhanced**: Comprehensive monitoring dashboard with booking stats by type/status, revenue metrics (total/pending), service catalog counts (labs, tests, consultants, modalities), and recent activity feed. Stats endpoint at `/api/admin/stats`
+- **Admin Provider Editing**: Admin can now edit provider details (name, email, phone, location, description) via edit dialog on the providers page
+- **Provider Teleradiology Tab**: Provider services page now includes a Teleradiology tab showing available modalities with pricing and link to bookings
 - **Report Upload/Download**: Providers can upload report URLs for lab and teleradiology bookings; patients can download reports from their orders page
 - **Slot Management**: Admin can edit available appointment slots for consultants via the Admin Consultants page
 - **Provider Bookings Enhanced**: Provider bookings page now shows booking type icons (consultation/lab/teleradiology), accession numbers, and upload report button for lab/teleradiology bookings
@@ -20,7 +23,7 @@ The platform uses INR (₹) currency throughout, features role-based access (Adm
 - **Booking Fixes**: Fixed consultation and teleradiology booking forms to send correct field names (bookingType, serviceId, serviceName, amount, patientContact, urgency) matching the database schema
 - **Admin Auto-Seed**: Admin account (admin@perfusion.test / Admin@123) is automatically created/reset on server startup
 - **Video Conferencing**: Embedded Jitsi Meet video calls with role-aware navigation (returnTo query parameter) - both users and providers return to their respective pages after calls
-- **Currency**: Changed from USD ($) to INR (₹) across all monetary displays
+- **Currency**: Changed from USD ($) to INR (₹) across all monetary displays and form labels
 - **Teleradiology**: Added mandatory accession number field for radiologist reference
 - **Specialization Filter**: Now dynamically builds filter options from actual consultant data instead of hardcoded list
 
