@@ -15,8 +15,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { StarRating } from "@/components/star-rating";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Plus, Edit2, FlaskConical, IndianRupee, Clock, Building2, Stethoscope, Loader2, AlertCircle } from "lucide-react";
-import type { Lab, LabTest, Consultant, Provider } from "@shared/schema";
+import { Plus, Edit2, FlaskConical, IndianRupee, Clock, Building2, Stethoscope, Loader2, AlertCircle, ScanLine, CheckCircle2, ArrowRight } from "lucide-react";
+import type { Lab, LabTest, Consultant, Provider, RadiologyModality } from "@shared/schema";
+import { Link } from "wouter";
 
 interface LabWithTests extends Lab {
   tests: LabTest[];
@@ -65,6 +66,11 @@ export default function ProviderServicesPage() {
 
   const { data: consultants, isLoading: consultantsLoading } = useQuery<Consultant[]>({
     queryKey: ["/api/provider/my-consultants"],
+    enabled: !!provider,
+  });
+
+  const { data: modalities, isLoading: modalitiesLoading } = useQuery<RadiologyModality[]>({
+    queryKey: ["/api/radiology-modalities"],
     enabled: !!provider,
   });
 
@@ -195,7 +201,7 @@ export default function ProviderServicesPage() {
       {verificationBanner}
 
       <Tabs defaultValue="labs" className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="labs" data-testid="tab-labs">
             <FlaskConical className="mr-2 h-4 w-4" />
             Labs
@@ -203,6 +209,10 @@ export default function ProviderServicesPage() {
           <TabsTrigger value="consultants" data-testid="tab-consultants">
             <Stethoscope className="mr-2 h-4 w-4" />
             Consultants
+          </TabsTrigger>
+          <TabsTrigger value="teleradiology" data-testid="tab-teleradiology">
+            <ScanLine className="mr-2 h-4 w-4" />
+            Teleradiology
           </TabsTrigger>
         </TabsList>
 
@@ -518,6 +528,71 @@ export default function ProviderServicesPage() {
               ))}
             </div>
           )}
+        </TabsContent>
+
+        <TabsContent value="teleradiology" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <CardTitle>Teleradiology Services</CardTitle>
+                  <CardDescription>
+                    Provide remote radiology interpretations for hospitals and clinics
+                  </CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="rounded-lg border border-green-500/30 bg-green-500/10 p-4">
+                <div className="flex items-start gap-3">
+                  <CheckCircle2 className="mt-0.5 h-5 w-5 text-green-600" />
+                  <div>
+                    <p className="font-medium text-green-700 dark:text-green-300">Teleradiology Enabled</p>
+                    <p className="text-sm text-green-600 dark:text-green-400">
+                      You can receive and process teleradiology bookings from seekers. 
+                      Bookings will appear in your Bookings tab.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <h4 className="mb-3 font-medium">Available Modalities ({modalities?.length || 0})</h4>
+                {modalitiesLoading ? (
+                  <Skeleton className="h-24 w-full" />
+                ) : !modalities || modalities.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No modalities available</p>
+                ) : (
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {modalities.map((modality) => (
+                      <div
+                        key={modality.id}
+                        className="flex items-center justify-between rounded-lg border p-3"
+                        data-testid={`modality-row-${modality.id}`}
+                      >
+                        <div>
+                          <p className="font-medium">{modality.name}</p>
+                          {modality.category && (
+                            <p className="text-xs text-muted-foreground">{modality.category}</p>
+                          )}
+                        </div>
+                        <span className="text-sm font-medium">₹{modality.baseCost}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex justify-end">
+                <Link href="/provider/bookings">
+                  <Button variant="outline" data-testid="button-view-bookings">
+                    View Teleradiology Bookings
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
+                </Link>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
     </div>
