@@ -28,6 +28,9 @@ import AdminLayout from "@/pages/admin/layout";
 import AdminDashboard from "@/pages/admin/dashboard";
 import AdminProvidersPage from "@/pages/admin/providers";
 import AdminUsersPage from "@/pages/admin/users";
+import AdminConsultantsPage from "@/pages/admin/consultants";
+import AdminLabTestsPage from "@/pages/admin/lab-tests";
+import AdminRadiologyPage from "@/pages/admin/radiology";
 
 function withUserLayout(Component: React.ComponentType) {
   return function WrappedComponent() {
@@ -80,6 +83,9 @@ function Router() {
       <Route path="/provider/services" component={withProviderLayout(ProviderServicesPage)} />
       
       <Route path="/admin" component={withAdminLayout(AdminDashboard)} />
+      <Route path="/admin/consultants" component={withAdminLayout(AdminConsultantsPage)} />
+      <Route path="/admin/lab-tests" component={withAdminLayout(AdminLabTestsPage)} />
+      <Route path="/admin/radiology" component={withAdminLayout(AdminRadiologyPage)} />
       <Route path="/admin/providers" component={withAdminLayout(AdminProvidersPage)} />
       <Route path="/admin/users" component={withAdminLayout(AdminUsersPage)} />
       

@@ -21,7 +21,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Heart, LayoutDashboard, Building, Users, LogOut, Shield } from "lucide-react";
+import { LayoutDashboard, Building, Users, LogOut, Shield, Stethoscope, FlaskConical, FileImage } from "lucide-react";
 import { Loader2 } from "lucide-react";
 
 interface AdminLayoutProps {
@@ -52,6 +52,9 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
   const menuItems = [
     { href: "/admin", icon: LayoutDashboard, label: "Dashboard" },
+    { href: "/admin/consultants", icon: Stethoscope, label: "Consultants" },
+    { href: "/admin/lab-tests", icon: FlaskConical, label: "Lab Tests" },
+    { href: "/admin/radiology", icon: FileImage, label: "Radiology Modalities" },
     { href: "/admin/providers", icon: Building, label: "Provider Approvals" },
     { href: "/admin/users", icon: Users, label: "User Management" },
   ];
