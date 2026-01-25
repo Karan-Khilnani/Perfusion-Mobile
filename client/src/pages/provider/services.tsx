@@ -630,7 +630,7 @@ export default function ProviderServicesPage() {
                             <p className="text-xs text-muted-foreground">{modality.category}</p>
                           )}
                         </div>
-                        <span className="text-sm font-medium">₹{modality.baseCost}</span>
+                        <Badge variant="secondary">{modality.status}</Badge>
                       </div>
                     ))}
                   </div>
