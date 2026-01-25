@@ -2,9 +2,13 @@
 
 ## Overview
 
-Perfusion is a healthcare operations platform designed to connect resource-limited hospitals with diagnostic labs, specialists, and critical care services. The platform provides two main portals: a User Portal for patients/hospitals to book services, and a Service Provider Portal for labs, consultants, and hospitals to manage their offerings and bookings.
+Perfusion is a healthcare operations platform designed to connect resource-limited hospitals with diagnostic labs, specialists, and critical care services. The platform offers 3 core services:
 
-The application follows a functional MVP approach with real authentication, database persistence, and mock payment flows. It prioritizes workflow efficiency, data visibility, and functional clarity over visual complexity.
+1. **Super Speciality Consultation** - Video consultations with specialists via Jitsi Meet integration, with comprehensive patient details forms (name, age, gender, clinical summary, diagnosis, document upload)
+2. **Lab Tests** - Direct diagnostic test catalog with 64+ tests across 9 categories (Hematology, Biochemistry, Thyroid, etc.) with category filtering and cart-based booking
+3. **Teleradiology Reporting** - Medical imaging interpretation service with 28 modalities, priority flags (routine/emergency), and file upload for DICOM/images
+
+The platform features role-based access (Admin, Provider, Care Seeker), email/password authentication, and comprehensive admin controls to manage consultants, lab tests, and radiology modalities with Add/Pause/Delete functionality.
 
 ## User Preferences
 
