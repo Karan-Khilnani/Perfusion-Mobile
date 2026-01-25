@@ -12,6 +12,9 @@ The platform uses INR (₹) currency throughout, features role-based access (Adm
 
 ## Recent Changes
 
+- **Light/Dark Theme**: Added proper light theme with clean white backgrounds, dark text, and subtle shadows. Toggle using the sun/moon button in the header. Dark theme retains the cinematic black and crimson aesthetic.
+- **Booking Fixes**: Fixed consultation and teleradiology booking forms to send correct field names (bookingType, serviceId, serviceName, amount, patientContact, urgency) matching the database schema
+- **Admin Auto-Seed**: Admin account (admin@perfusion.test / Admin@123) is automatically created/reset on server startup
 - **Video Conferencing**: Embedded Jitsi Meet video calls with role-aware navigation (returnTo query parameter) - both users and providers return to their respective pages after calls
 - **Currency**: Changed from USD ($) to INR (₹) across all monetary displays
 - **Teleradiology**: Added mandatory accession number field for radiologist reference
