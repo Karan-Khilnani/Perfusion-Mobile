@@ -108,7 +108,7 @@ export default function ProviderBookingsPage() {
     }
   };
 
-  const pendingBookings = bookings?.filter((b) => b.status === "booked") || [];
+  const pendingBookings = bookings?.filter((b) => ["booked", "pending", "confirmed"].includes(b.status)) || [];
   const activeBookings = bookings?.filter((b) => ["sample_collected", "processing"].includes(b.status)) || [];
   const completedBookings = bookings?.filter((b) => ["report_ready", "completed", "cancelled"].includes(b.status)) || [];
 
