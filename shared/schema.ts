@@ -170,6 +170,9 @@ export const bookings = pgTable("bookings", {
   accessionNumber: varchar("accession_number", { length: 100 }),
   urgency: varchar("urgency", { length: 20 }).$type<UrgencyType>(),
   imageUrls: text("image_urls").array(),
+  // Report fields (for providers to upload, seekers to download)
+  reportUrl: varchar("report_url", { length: 500 }),
+  reportNotes: text("report_notes"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

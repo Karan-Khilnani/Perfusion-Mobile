@@ -2,13 +2,18 @@ import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 import { StatusBadge } from "@/components/status-badge";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { ClipboardList, RefreshCw, Video } from "lucide-react";
+import { ClipboardList, RefreshCw, Video, Upload, Stethoscope, FlaskConical, ScanLine } from "lucide-react";
 import { Link } from "wouter";
 import type { Booking, BookingStatus } from "@shared/schema";
 import { format } from "date-fns";
@@ -24,6 +29,10 @@ const statusOptions: { value: BookingStatus; label: string }[] = [
 
 export default function ProviderBookingsPage() {
   const { toast } = useToast();
+  const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
+  const [reportUrl, setReportUrl] = useState("");
+  const [reportNotes, setReportNotes] = useState("");
+  const [showReportDialog, setShowReportDialog] = useState(false);
 
   const { data: bookings, isLoading, refetch } = useQuery<Booking[]>({
     queryKey: ["/api/provider/bookings"],
@@ -50,6 +59,53 @@ export default function ProviderBookingsPage() {
     },
   });
 
+  const uploadReportMutation = useMutation({
+    mutationFn: async ({ id, reportUrl, reportNotes }: { id: string; reportUrl: string; reportNotes: string }) => {
+      const response = await apiRequest("PATCH", `/api/bookings/${id}/status`, { 
+        status: "report_ready",
+        reportUrl,
+        reportNotes 
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/provider/bookings"] });
+      setShowReportDialog(false);
+      setSelectedBooking(null);
+      setReportUrl("");
+      setReportNotes("");
+      toast({
+        title: "Report Uploaded",
+        description: "Report has been uploaded and is now available for the patient.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Upload Failed",
+        description: "Failed to upload report.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleUploadReport = () => {
+    if (!selectedBooking || !reportUrl) return;
+    uploadReportMutation.mutate({ 
+      id: selectedBooking.id, 
+      reportUrl,
+      reportNotes 
+    });
+  };
+
+  const getBookingIcon = (type: string) => {
+    switch (type) {
+      case "consultation": return <Stethoscope className="h-4 w-4" />;
+      case "lab": return <FlaskConical className="h-4 w-4" />;
+      case "teleradiology": return <ScanLine className="h-4 w-4" />;
+      default: return null;
+    }
+  };
+
   const pendingBookings = bookings?.filter((b) => b.status === "booked") || [];
   const activeBookings = bookings?.filter((b) => ["sample_collected", "processing"].includes(b.status)) || [];
   const completedBookings = bookings?.filter((b) => ["report_ready", "completed", "cancelled"].includes(b.status)) || [];
@@ -61,14 +117,29 @@ export default function ProviderBookingsPage() {
     >
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
-          <p className="font-medium">{booking.serviceName}</p>
-          <StatusBadge status={booking.status} />
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted">
+            {getBookingIcon(booking.bookingType)}
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <p className="font-medium">{booking.serviceName}</p>
+              <Badge variant="outline" className="text-xs capitalize">
+                {booking.bookingType}
+              </Badge>
+              <StatusBadge status={booking.status} />
+            </div>
+          </div>
         </div>
-        <p className="text-sm text-muted-foreground">
+        <p className="mt-1 text-sm text-muted-foreground">
           Patient: {booking.patientName} ({booking.patientAge} yrs)
         </p>
+        {booking.accessionNumber && (
+          <p className="text-sm text-muted-foreground">
+            Accession #: {booking.accessionNumber}
+          </p>
+        )}
         {booking.provisionalDiagnosis && (
-          <p className="mt-1 text-sm text-muted-foreground">
+          <p className="text-sm text-muted-foreground">
             Diagnosis: {booking.provisionalDiagnosis}
           </p>
         )}
@@ -90,6 +161,23 @@ export default function ProviderBookingsPage() {
               Join Call
             </Button>
           </Link>
+        )}
+        {(booking.bookingType === "lab" || booking.bookingType === "teleradiology") && !booking.reportUrl && (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              setSelectedBooking(booking);
+              setShowReportDialog(true);
+            }}
+            data-testid={`button-upload-report-${booking.id}`}
+          >
+            <Upload className="mr-2 h-3.5 w-3.5" />
+            Upload Report
+          </Button>
+        )}
+        {booking.reportUrl && (
+          <Badge className="bg-green-500">Report Uploaded</Badge>
         )}
         <Select
           value={booking.status}
@@ -225,6 +313,52 @@ export default function ProviderBookingsPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <Dialog open={showReportDialog} onOpenChange={setShowReportDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Upload Report</DialogTitle>
+            <DialogDescription>
+              Upload the report for {selectedBooking?.patientName}'s {selectedBooking?.serviceName}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Report URL</Label>
+              <Input
+                placeholder="https://example.com/report.pdf"
+                value={reportUrl}
+                onChange={(e) => setReportUrl(e.target.value)}
+                data-testid="input-report-url"
+              />
+              <p className="text-xs text-muted-foreground">
+                Enter the URL where the report PDF is hosted
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label>Notes (optional)</Label>
+              <Textarea
+                placeholder="Any additional notes for the patient..."
+                value={reportNotes}
+                onChange={(e) => setReportNotes(e.target.value)}
+                data-testid="input-report-notes"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowReportDialog(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleUploadReport}
+              disabled={!reportUrl || uploadReportMutation.isPending}
+              data-testid="button-submit-report"
+            >
+              {uploadReportMutation.isPending ? "Uploading..." : "Upload Report"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

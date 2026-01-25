@@ -30,8 +30,7 @@ import {
   Home,
   FlaskConical,
   Stethoscope,
-  HeartPulse,
-  Ambulance,
+  ScanLine,
   ClipboardList,
   LogOut,
   ChevronUp,
@@ -41,10 +40,10 @@ import logoImage from "@assets/Perfusion_website_logo_1766464970393.png";
 
 const menuItems = [
   { title: "Dashboard", url: "/user", icon: Home },
-  { title: "Labs", url: "/user/labs", icon: FlaskConical },
   { title: "Consultation", url: "/user/consultation", icon: Stethoscope },
-  { title: "Emergency & Critical Care", url: "/user/critical-care", icon: HeartPulse },
-  { title: "Referral", url: "/user/referral", icon: Ambulance },
+  { title: "Labs", url: "/user/labs", icon: FlaskConical },
+  { title: "Teleradiology", url: "/user/teleradiology", icon: ScanLine },
+  { title: "My Orders", url: "/user/orders", icon: ClipboardList },
 ];
 
 export default function UserLayout({ children }: { children: React.ReactNode }) {

@@ -27,6 +27,7 @@ import ProviderOnboardingPage from "@/pages/provider/onboarding";
 
 import AdminLayout from "@/pages/admin/layout";
 import AdminDashboard from "@/pages/admin/dashboard";
+import AdminBookingsPage from "@/pages/admin/bookings";
 import AdminProvidersPage from "@/pages/admin/providers";
 import AdminUsersPage from "@/pages/admin/users";
 import AdminConsultantsPage from "@/pages/admin/consultants";
@@ -85,6 +86,7 @@ function Router() {
       <Route path="/provider/services" component={withProviderLayout(ProviderServicesPage)} />
       
       <Route path="/admin" component={withAdminLayout(AdminDashboard)} />
+      <Route path="/admin/bookings" component={withAdminLayout(AdminBookingsPage)} />
       <Route path="/admin/consultants" component={withAdminLayout(AdminConsultantsPage)} />
       <Route path="/admin/lab-tests" component={withAdminLayout(AdminLabTestsPage)} />
       <Route path="/admin/radiology" component={withAdminLayout(AdminRadiologyPage)} />

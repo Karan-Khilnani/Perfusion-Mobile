@@ -38,7 +38,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Plus, MoreHorizontal, Pause, Play, Trash2, Stethoscope, Search } from "lucide-react";
+import { Plus, MoreHorizontal, Pause, Play, Trash2, Stethoscope, Search, Calendar, Edit } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Consultant } from "@shared/schema";
@@ -58,6 +58,8 @@ type ConsultantFormData = z.infer<typeof consultantSchema>;
 export default function AdminConsultantsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingSlotsFor, setEditingSlotsFor] = useState<Consultant | null>(null);
+  const [newSlots, setNewSlots] = useState("");
   const { toast } = useToast();
 
   const { data: consultants, isLoading } = useQuery<Consultant[]>({
@@ -124,6 +126,32 @@ export default function AdminConsultantsPage() {
       toast({ title: "Error", description: "Failed to delete consultant", variant: "destructive" });
     },
   });
+
+  const updateSlotsMutation = useMutation({
+    mutationFn: async ({ id, slots }: { id: string; slots: string[] }) => {
+      return apiRequest("PATCH", `/api/consultants/${id}/slots`, { slots });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/consultants"] });
+      setEditingSlotsFor(null);
+      setNewSlots("");
+      toast({ title: "Success", description: "Slots updated successfully" });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to update slots", variant: "destructive" });
+    },
+  });
+
+  const handleOpenSlotsEditor = (consultant: Consultant) => {
+    setEditingSlotsFor(consultant);
+    setNewSlots(consultant.availableSlots?.join(", ") || "");
+  };
+
+  const handleSaveSlots = () => {
+    if (!editingSlotsFor) return;
+    const slots = newSlots.split(",").map((s) => s.trim()).filter(Boolean);
+    updateSlotsMutation.mutate({ id: editingSlotsFor.id, slots });
+  };
 
   const onSubmit = (data: ConsultantFormData) => {
     createMutation.mutate(data);
@@ -338,6 +366,12 @@ export default function AdminConsultantsPage() {
                             </DropdownMenuItem>
                           )}
                           <DropdownMenuItem
+                            onClick={() => handleOpenSlotsEditor(consultant)}
+                          >
+                            <Calendar className="mr-2 h-4 w-4" />
+                            Edit Slots
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
                             className="text-destructive"
                             onClick={() => deleteMutation.mutate(consultant.id)}
                           >
@@ -354,6 +388,54 @@ export default function AdminConsultantsPage() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={!!editingSlotsFor} onOpenChange={() => setEditingSlotsFor(null)}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Edit Available Slots</DialogTitle>
+            <DialogDescription>
+              Manage appointment slots for {editingSlotsFor?.name}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <p className="text-sm text-muted-foreground">
+                Enter available slots separated by commas. Example format: Mon 10:00 AM, Wed 2:00 PM, Fri 11:00 AM
+              </p>
+              <Input
+                placeholder="Mon 10:00 AM, Wed 2:00 PM"
+                value={newSlots}
+                onChange={(e) => setNewSlots(e.target.value)}
+                data-testid="input-edit-slots"
+              />
+            </div>
+            {editingSlotsFor?.availableSlots && editingSlotsFor.availableSlots.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Current slots:</p>
+                <div className="flex flex-wrap gap-2">
+                  {editingSlotsFor.availableSlots.map((slot, i) => (
+                    <span key={i} className="rounded-md bg-muted px-2 py-1 text-sm">
+                      {slot}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+          <div className="flex justify-end gap-2 pt-4">
+            <Button variant="outline" onClick={() => setEditingSlotsFor(null)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSaveSlots}
+              disabled={updateSlotsMutation.isPending}
+              data-testid="button-save-slots"
+            >
+              {updateSlotsMutation.isPending ? "Saving..." : "Save Slots"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

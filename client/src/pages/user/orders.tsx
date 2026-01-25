@@ -7,7 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { StatusBadge } from "@/components/status-badge";
 import { BookingTimeline } from "@/components/booking-timeline";
-import { ClipboardList, FlaskConical, Stethoscope, Calendar, IndianRupee, ChevronRight, Video, Scan } from "lucide-react";
+import { ClipboardList, FlaskConical, Stethoscope, Calendar, IndianRupee, ChevronRight, Video, Scan, Download, FileText } from "lucide-react";
 import type { Booking, BookingType } from "@shared/schema";
 import { format } from "date-fns";
 
@@ -145,6 +145,29 @@ export default function OrdersPage() {
                 Join Video Call
               </Button>
             </Link>
+          </div>
+        )}
+
+        {booking.reportUrl && (
+          <div className="rounded-lg border border-green-500/20 bg-green-500/5 p-4">
+            <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
+              <FileText className="h-5 w-5" />
+              <span className="font-medium">Report Available</span>
+            </div>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Your report is ready for download
+            </p>
+            {booking.reportNotes && (
+              <p className="mt-2 text-sm italic text-muted-foreground">
+                Provider notes: {booking.reportNotes}
+              </p>
+            )}
+            <a href={booking.reportUrl} target="_blank" rel="noopener noreferrer">
+              <Button className="mt-3" variant="default" data-testid="button-download-report">
+                <Download className="mr-2 h-4 w-4" />
+                Download Report
+              </Button>
+            </a>
           </div>
         )}
 

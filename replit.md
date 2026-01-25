@@ -12,6 +12,10 @@ The platform uses INR (₹) currency throughout, features role-based access (Adm
 
 ## Recent Changes
 
+- **Report Upload/Download**: Providers can upload report URLs for lab and teleradiology bookings; patients can download reports from their orders page
+- **Slot Management**: Admin can edit available appointment slots for consultants via the Admin Consultants page
+- **Provider Bookings Enhanced**: Provider bookings page now shows booking type icons (consultation/lab/teleradiology), accession numbers, and upload report button for lab/teleradiology bookings
+- **User Orders Enhanced**: Orders page now shows download report button when reports are available with provider notes
 - **Light/Dark Theme**: Added proper light theme with clean white backgrounds, dark text, and subtle shadows. Toggle using the sun/moon button in the header. Dark theme retains the cinematic black and crimson aesthetic.
 - **Booking Fixes**: Fixed consultation and teleradiology booking forms to send correct field names (bookingType, serviceId, serviceName, amount, patientContact, urgency) matching the database schema
 - **Admin Auto-Seed**: Admin account (admin@perfusion.test / Admin@123) is automatically created/reset on server startup

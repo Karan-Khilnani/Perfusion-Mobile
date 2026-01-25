@@ -224,6 +224,14 @@ export class DatabaseStorage implements IStorage {
     return booking;
   }
 
+  async updateBooking(id: string, data: Partial<InsertBooking>): Promise<Booking | undefined> {
+    const [booking] = await db.update(bookings)
+      .set({ ...data, updatedAt: new Date() } as any)
+      .where(eq(bookings.id, id))
+      .returning();
+    return booking;
+  }
+
   async updateBookingStatus(id: string, status: BookingStatus): Promise<Booking | undefined> {
     const [booking] = await db.update(bookings)
       .set({ status, updatedAt: new Date() })

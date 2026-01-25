@@ -458,10 +458,44 @@ export async function registerRoutes(
     }
   });
 
-  app.patch("/api/bookings/:id/status", isAuthenticated, async (req, res) => {
+  app.patch("/api/bookings/:id/status", isAuthenticated, async (req: any, res) => {
     try {
-      const { status } = req.body as { status: BookingStatus };
-      const booking = await storage.updateBookingStatus(req.params.id, status);
+      const user = req.user;
+      
+      // Only admin or providers can update booking status
+      if (user.role !== "admin" && user.role !== "provider") {
+        return res.status(403).json({ message: "Access denied. Only admins and providers can update booking status." });
+      }
+      
+      // Fetch the booking first
+      const existingBooking = await storage.getBookingById(req.params.id);
+      if (!existingBooking) {
+        return res.status(404).json({ message: "Booking not found" });
+      }
+      
+      // If provider, verify they own this booking
+      if (user.role === "provider") {
+        const provider = await storage.getProviderByUserId(user.id);
+        if (!provider) {
+          return res.status(403).json({ message: "Provider profile not found" });
+        }
+        if (existingBooking.providerId !== provider.id) {
+          return res.status(403).json({ message: "Access denied. You can only update your own bookings." });
+        }
+      }
+      
+      const { status, reportUrl, reportNotes } = req.body as { 
+        status: BookingStatus; 
+        reportUrl?: string; 
+        reportNotes?: string;
+      };
+      
+      // Build update data
+      const updateData: any = { status };
+      if (reportUrl) updateData.reportUrl = reportUrl;
+      if (reportNotes) updateData.reportNotes = reportNotes;
+      
+      const booking = await storage.updateBooking(req.params.id, updateData);
       
       if (!booking) {
         return res.status(404).json({ message: "Booking not found" });
@@ -762,6 +796,90 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error deleting radiology modality:", error);
       res.status(500).json({ message: "Failed to delete modality" });
+    }
+  });
+
+  // Admin - Bookings Management (view all platform activity)
+  app.get("/api/admin/bookings", isAdmin, async (req, res) => {
+    try {
+      const bookings = await storage.getAllBookings();
+      res.json(bookings);
+    } catch (error) {
+      console.error("Error fetching admin bookings:", error);
+      res.status(500).json({ message: "Failed to fetch bookings" });
+    }
+  });
+
+  // Admin - Create booking on behalf of user
+  app.post("/api/admin/bookings", isAdmin, async (req: any, res) => {
+    try {
+      const booking = await storage.createBooking(req.body);
+      res.status(201).json(booking);
+    } catch (error) {
+      console.error("Error creating admin booking:", error);
+      res.status(500).json({ message: "Failed to create booking" });
+    }
+  });
+
+  // Admin - Update booking (full control)
+  app.patch("/api/admin/bookings/:id", isAdmin, async (req, res) => {
+    try {
+      const booking = await storage.updateBooking(req.params.id, req.body);
+      if (!booking) {
+        return res.status(404).json({ message: "Booking not found" });
+      }
+      res.json(booking);
+    } catch (error) {
+      console.error("Error updating admin booking:", error);
+      res.status(500).json({ message: "Failed to update booking" });
+    }
+  });
+
+  // Admin - Update provider details
+  app.patch("/api/admin/providers/:id", isAdmin, async (req, res) => {
+    try {
+      const provider = await storage.updateProvider(req.params.id, req.body);
+      if (!provider) {
+        return res.status(404).json({ message: "Provider not found" });
+      }
+      res.json(provider);
+    } catch (error) {
+      console.error("Error updating provider:", error);
+      res.status(500).json({ message: "Failed to update provider" });
+    }
+  });
+
+  // Consultant slots management (for admin and providers only)
+  app.patch("/api/consultants/:id/slots", isAuthenticated, async (req: any, res) => {
+    try {
+      const user = req.user;
+      
+      // Only admin or providers can update slots
+      if (user.role !== "admin" && user.role !== "provider") {
+        return res.status(403).json({ message: "Access denied. Only admins and providers can manage slots." });
+      }
+      
+      // If provider, verify consultant belongs to them
+      if (user.role === "provider") {
+        const provider = await storage.getProviderByUserId(user.id);
+        if (!provider) {
+          return res.status(403).json({ message: "Provider profile not found" });
+        }
+        const consultant = await storage.getConsultantById(req.params.id);
+        if (!consultant || consultant.providerId !== provider.id) {
+          return res.status(403).json({ message: "Access denied. You can only manage your own consultants." });
+        }
+      }
+      
+      const { slots } = req.body as { slots: string[] };
+      const consultant = await storage.updateConsultant(req.params.id, { availableSlots: slots });
+      if (!consultant) {
+        return res.status(404).json({ message: "Consultant not found" });
+      }
+      res.json(consultant);
+    } catch (error) {
+      console.error("Error updating consultant slots:", error);
+      res.status(500).json({ message: "Failed to update slots" });
     }
   });
 

@@ -28,13 +28,21 @@ export default function LabsPage() {
   const createBookingMutation = useMutation({
     mutationFn: async (testIds: string[]) => {
       const bookings = await Promise.all(
-        testIds.map((testId) =>
-          apiRequest("POST", "/api/bookings", {
-            serviceType: "lab",
-            labTestId: testId,
-            status: "pending",
-          })
-        )
+        testIds.map((testId) => {
+          const test = tests?.find((t) => t.id === testId);
+          if (!test) throw new Error("Test not found");
+          return apiRequest("POST", "/api/bookings", {
+            bookingType: "lab",
+            serviceId: test.id,
+            serviceName: test.testName,
+            providerName: "Perfusion Lab Services",
+            patientName: "Patient",
+            patientAge: 0,
+            amount: test.cost,
+            status: "booked",
+            paymentStatus: "pending",
+          });
+        })
       );
       return bookings;
     },
