@@ -186,20 +186,20 @@ export default function ProviderBookingsPage() {
             </Button>
           </a>
         )}
-        {booking.documentUrls && booking.documentUrls.length > 0 && (
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => {
-              setDocsBooking(booking);
-              setShowDocsDialog(true);
-            }}
-            data-testid={`button-view-docs-${booking.id}`}
-          >
-            <Paperclip className="mr-1 h-3.5 w-3.5" />
-            {booking.documentUrls.length} doc(s)
-          </Button>
-        )}
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={() => {
+            setDocsBooking(booking);
+            setShowDocsDialog(true);
+          }}
+          data-testid={`button-view-docs-${booking.id}`}
+        >
+          <Paperclip className="mr-1 h-3.5 w-3.5" />
+          {booking.documentUrls && booking.documentUrls.length > 0 
+            ? `${booking.documentUrls.length} doc(s)` 
+            : "Documents"}
+        </Button>
         <Select
           value={booking.status}
           onValueChange={(value) =>
