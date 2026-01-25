@@ -15,7 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { StarRating } from "@/components/star-rating";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Plus, Edit2, FlaskConical, IndianRupee, Clock, Building2, Stethoscope, Loader2, AlertCircle, ScanLine, CheckCircle2, ArrowRight } from "lucide-react";
+import { Plus, Edit2, FlaskConical, IndianRupee, Clock, Building2, Stethoscope, Loader2, AlertCircle, ScanLine, CheckCircle2, ArrowRight, Calendar } from "lucide-react";
 import type { Lab, LabTest, Consultant, Provider, RadiologyModality } from "@shared/schema";
 import { Link } from "wouter";
 
@@ -53,6 +53,8 @@ export default function ProviderServicesPage() {
   const [isTestDialogOpen, setIsTestDialogOpen] = useState(false);
   const [isConsultantDialogOpen, setIsConsultantDialogOpen] = useState(false);
   const [selectedLabId, setSelectedLabId] = useState<string | null>(null);
+  const [editingSlotsFor, setEditingSlotsFor] = useState<Consultant | null>(null);
+  const [newSlots, setNewSlots] = useState("");
 
   const { data: provider, isLoading: providerLoading } = useQuery<Provider>({
     queryKey: ["/api/providers/me"],
@@ -136,6 +138,33 @@ export default function ProviderServicesPage() {
       toast({ title: "Failed", description: "Failed to create consultant.", variant: "destructive" });
     },
   });
+
+  const updateSlotsMutation = useMutation({
+    mutationFn: async ({ id, slots }: { id: string; slots: string[] }) => {
+      const response = await apiRequest("PATCH", `/api/consultants/${id}/slots`, { slots });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/provider/my-consultants"] });
+      setEditingSlotsFor(null);
+      setNewSlots("");
+      toast({ title: "Slots Updated", description: "Booking slots have been saved." });
+    },
+    onError: () => {
+      toast({ title: "Failed", description: "Failed to update slots.", variant: "destructive" });
+    },
+  });
+
+  const handleOpenSlotsEditor = (consultant: Consultant) => {
+    setEditingSlotsFor(consultant);
+    setNewSlots(consultant.availableSlots?.join(", ") || "");
+  };
+
+  const handleSaveSlots = () => {
+    if (!editingSlotsFor) return;
+    const slots = newSlots.split(",").map((s) => s.trim()).filter(Boolean);
+    updateSlotsMutation.mutate({ id: editingSlotsFor.id, slots });
+  };
 
   const handleAddTest = (data: TestFormData) => {
     if (!selectedLabId) return;
@@ -512,8 +541,8 @@ export default function ProviderServicesPage() {
             <div className="space-y-3">
               {consultants.map((consultant) => (
                 <Card key={consultant.id}>
-                  <CardContent className="flex items-center justify-between py-4">
-                    <div>
+                  <CardContent className="flex items-center justify-between gap-4 py-4">
+                    <div className="flex-1">
                       <p className="font-medium">{consultant.name}</p>
                       <p className="text-sm text-muted-foreground">{consultant.qualification}</p>
                       <div className="mt-1 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
@@ -521,8 +550,33 @@ export default function ProviderServicesPage() {
                         <span>{consultant.yearsExperience} years exp.</span>
                         <span>₹{consultant.consultationFee}</span>
                       </div>
+                      {consultant.availableSlots && consultant.availableSlots.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-1">
+                          {consultant.availableSlots.slice(0, 3).map((slot, i) => (
+                            <Badge key={i} variant="secondary" className="text-xs">
+                              {slot}
+                            </Badge>
+                          ))}
+                          {consultant.availableSlots.length > 3 && (
+                            <Badge variant="outline" className="text-xs">
+                              +{consultant.availableSlots.length - 3} more
+                            </Badge>
+                          )}
+                        </div>
+                      )}
                     </div>
-                    <StarRating rating={parseFloat(consultant.rating || "4.0")} />
+                    <div className="flex items-center gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleOpenSlotsEditor(consultant)}
+                        data-testid={`button-manage-slots-${consultant.id}`}
+                      >
+                        <Calendar className="mr-1 h-3.5 w-3.5" />
+                        Slots
+                      </Button>
+                      <StarRating rating={parseFloat(consultant.rating || "4.0")} />
+                    </div>
                   </CardContent>
                 </Card>
               ))}
@@ -595,6 +649,52 @@ export default function ProviderServicesPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <Dialog open={!!editingSlotsFor} onOpenChange={(open) => !open && setEditingSlotsFor(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Manage Booking Slots</DialogTitle>
+            <DialogDescription>
+              {editingSlotsFor?.name} - Add or edit available appointment slots
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Available Slots (comma separated)</label>
+              <Input
+                value={newSlots}
+                onChange={(e) => setNewSlots(e.target.value)}
+                placeholder="Mon 10:00 AM, Wed 2:00 PM, Fri 4:00 PM"
+                data-testid="input-edit-slots"
+              />
+              <p className="text-xs text-muted-foreground">
+                Enter time slots separated by commas, e.g., "Mon 10:00 AM, Tue 3:00 PM"
+              </p>
+            </div>
+            {editingSlotsFor?.availableSlots && editingSlotsFor.availableSlots.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Current slots:</p>
+                <div className="flex flex-wrap gap-2">
+                  {editingSlotsFor.availableSlots.map((slot, i) => (
+                    <Badge key={i} variant="secondary">
+                      {slot}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setEditingSlotsFor(null)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveSlots} disabled={updateSlotsMutation.isPending} data-testid="button-save-slots">
+              {updateSlotsMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Save Slots
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
