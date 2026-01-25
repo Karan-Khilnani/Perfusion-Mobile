@@ -4,6 +4,12 @@ import {
   radiologyModalities,
   consultants,
 } from "@shared/schema";
+import { users } from "@shared/models/auth";
+import { eq } from "drizzle-orm";
+import bcrypt from "bcryptjs";
+
+const ADMIN_EMAIL = "admin@perfusion.test";
+const ADMIN_PASSWORD = "Admin@123";
 
 // Radiology modalities extracted from the PDF (names only, no prices as per requirements)
 const radiologyModalitiesData = [
@@ -210,6 +216,33 @@ export async function seedDatabase() {
   console.log("Starting database seed...");
 
   try {
+    // Seed admin account
+    console.log("Checking admin account...");
+    const [existingAdmin] = await db
+      .select()
+      .from(users)
+      .where(eq(users.email, ADMIN_EMAIL));
+
+    const hashedPassword = await bcrypt.hash(ADMIN_PASSWORD, 10);
+    
+    if (!existingAdmin) {
+      await db.insert(users).values({
+        email: ADMIN_EMAIL,
+        password: hashedPassword,
+        firstName: "System",
+        lastName: "Admin",
+        role: "admin",
+        isActive: true,
+      });
+      console.log("Admin account created: admin@perfusion.test / Admin@123");
+    } else {
+      await db
+        .update(users)
+        .set({ password: hashedPassword })
+        .where(eq(users.email, ADMIN_EMAIL));
+      console.log("Admin password reset: admin@perfusion.test / Admin@123");
+    }
+
     // Seed radiology modalities
     const existingModalities = await db.select().from(radiologyModalities);
     if (existingModalities.length === 0) {
@@ -263,7 +296,4 @@ export async function seedDatabase() {
   }
 }
 
-// Run seed if called directly
-seedDatabase()
-  .then(() => process.exit(0))
-  .catch(() => process.exit(1));
+// Export for use in server startup
