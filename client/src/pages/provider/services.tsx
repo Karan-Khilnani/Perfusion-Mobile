@@ -338,7 +338,7 @@ export default function ProviderServicesPage() {
                               name="cost"
                               render={({ field }) => (
                                 <FormItem>
-                                  <FormLabel>Cost ($)</FormLabel>
+                                  <FormLabel>Cost (INR)</FormLabel>
                                   <FormControl>
                                     <Input placeholder="e.g., 50.00" {...field} data-testid="input-test-cost" />
                                   </FormControl>
@@ -469,7 +469,7 @@ export default function ProviderServicesPage() {
                         name="consultationFee"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Consultation Fee ($)</FormLabel>
+                            <FormLabel>Consultation Fee (INR)</FormLabel>
                             <FormControl>
                               <Input placeholder="e.g., 100.00" {...field} data-testid="input-consultant-fee" />
                             </FormControl>

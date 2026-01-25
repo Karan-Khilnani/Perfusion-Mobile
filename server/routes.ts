@@ -810,6 +810,75 @@ export async function registerRoutes(
     }
   });
 
+  // Admin dashboard stats
+  app.get("/api/admin/stats", isAdmin, async (req, res) => {
+    try {
+      const bookings = await storage.getAllBookings();
+      const providers = await storage.getProviders();
+      const users = await storage.getUsers();
+      const consultants = await storage.getConsultants();
+      const labTests = await storage.getLabTests();
+      const modalities = await storage.getRadiologyModalities();
+
+      // Booking stats by type
+      const consultationBookings = bookings.filter(b => b.bookingType === "consultation");
+      const labBookings = bookings.filter(b => b.bookingType === "lab");
+      const teleradiologyBookings = bookings.filter(b => b.bookingType === "teleradiology");
+
+      // Status breakdown
+      const pendingBookings = bookings.filter(b => b.status === "pending");
+      const bookedBookings = bookings.filter(b => b.status === "booked");
+      const confirmedBookings = bookings.filter(b => b.status === "confirmed");
+      const completedBookings = bookings.filter(b => b.status === "completed");
+      const cancelledBookings = bookings.filter(b => b.status === "cancelled");
+
+      // Revenue calculation
+      const totalRevenue = bookings
+        .filter(b => b.status === "completed" && b.paymentStatus === "paid")
+        .reduce((sum, b) => sum + parseFloat(b.amount || "0"), 0);
+      
+      const pendingRevenue = bookings
+        .filter(b => b.status !== "cancelled" && b.paymentStatus !== "paid")
+        .reduce((sum, b) => sum + parseFloat(b.amount || "0"), 0);
+
+      // Recent bookings (last 10)
+      const recentBookings = bookings
+        .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
+        .slice(0, 10);
+
+      res.json({
+        overview: {
+          totalBookings: bookings.length,
+          totalProviders: providers.length,
+          totalUsers: users.length,
+          totalRevenue,
+          pendingRevenue,
+        },
+        byType: {
+          consultation: consultationBookings.length,
+          lab: labBookings.length,
+          teleradiology: teleradiologyBookings.length,
+        },
+        byStatus: {
+          pending: pendingBookings.length,
+          booked: bookedBookings.length,
+          confirmed: confirmedBookings.length,
+          completed: completedBookings.length,
+          cancelled: cancelledBookings.length,
+        },
+        services: {
+          consultants: consultants.length,
+          labTests: labTests.length,
+          modalities: modalities.length,
+        },
+        recentBookings,
+      });
+    } catch (error) {
+      console.error("Error fetching admin stats:", error);
+      res.status(500).json({ message: "Failed to fetch stats" });
+    }
+  });
+
   // Admin - Create booking on behalf of user
   app.post("/api/admin/bookings", isAdmin, async (req: any, res) => {
     try {

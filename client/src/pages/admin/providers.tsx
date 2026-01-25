@@ -14,7 +14,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Building, CheckCircle, XCircle, Clock, Loader2 } from "lucide-react";
+import { Building, CheckCircle, XCircle, Clock, Loader2, Edit } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { apiRequest } from "@/lib/queryClient";
 
 export default function AdminProvidersPage() {
   const { toast } = useToast();
@@ -22,6 +25,8 @@ export default function AdminProvidersPage() {
   const [selectedProvider, setSelectedProvider] = useState<any>(null);
   const [actionType, setActionType] = useState<"approve" | "reject" | null>(null);
   const [notes, setNotes] = useState("");
+  const [editProvider, setEditProvider] = useState<any>(null);
+  const [editForm, setEditForm] = useState({ name: "", email: "", phone: "", location: "", description: "" });
 
   const { data: providers = [], isLoading } = useQuery<any[]>({
     queryKey: ["/api/admin/providers"],
@@ -49,6 +54,37 @@ export default function AdminProvidersPage() {
       toast({ title: "Failed to update status", description: error.message, variant: "destructive" });
     },
   });
+
+  const editProviderMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: any }) => {
+      const response = await apiRequest("PATCH", `/api/admin/providers/${id}`, data);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/providers"] });
+      toast({ title: "Provider updated successfully" });
+      setEditProvider(null);
+    },
+    onError: () => {
+      toast({ title: "Failed to update provider", variant: "destructive" });
+    },
+  });
+
+  const openEditDialog = (provider: any) => {
+    setEditProvider(provider);
+    setEditForm({
+      name: provider.name || "",
+      email: provider.email || "",
+      phone: provider.phone || "",
+      location: provider.location || "",
+      description: provider.description || "",
+    });
+  };
+
+  const handleEditSubmit = () => {
+    if (!editProvider) return;
+    editProviderMutation.mutate({ id: editProvider.id, data: editForm });
+  };
 
   const handleAction = (provider: any, action: "approve" | "reject") => {
     setSelectedProvider(provider);
@@ -107,26 +143,36 @@ export default function AdminProvidersPage() {
             <p><span className="font-medium">Notes:</span> {provider.verificationNotes}</p>
           )}
         </div>
-        {provider.verificationStatus === "pending" && (
-          <div className="flex gap-2 mt-4">
-            <Button 
-              onClick={() => handleAction(provider, "approve")}
-              className="bg-green-600 hover:bg-green-700"
-              data-testid={`button-approve-${provider.id}`}
-            >
-              <CheckCircle className="mr-2 h-4 w-4" />
-              Approve
-            </Button>
-            <Button 
-              variant="destructive"
-              onClick={() => handleAction(provider, "reject")}
-              data-testid={`button-reject-${provider.id}`}
-            >
-              <XCircle className="mr-2 h-4 w-4" />
-              Reject
-            </Button>
-          </div>
-        )}
+        <div className="flex gap-2 mt-4">
+          <Button 
+            variant="outline"
+            onClick={() => openEditDialog(provider)}
+            data-testid={`button-edit-${provider.id}`}
+          >
+            <Edit className="mr-2 h-4 w-4" />
+            Edit
+          </Button>
+          {provider.verificationStatus === "pending" && (
+            <>
+              <Button 
+                onClick={() => handleAction(provider, "approve")}
+                className="bg-green-600 hover:bg-green-700"
+                data-testid={`button-approve-${provider.id}`}
+              >
+                <CheckCircle className="mr-2 h-4 w-4" />
+                Approve
+              </Button>
+              <Button 
+                variant="destructive"
+                onClick={() => handleAction(provider, "reject")}
+                data-testid={`button-reject-${provider.id}`}
+              >
+                <XCircle className="mr-2 h-4 w-4" />
+                Reject
+              </Button>
+            </>
+          )}
+        </div>
       </CardContent>
     </Card>
   );
@@ -243,6 +289,73 @@ export default function AdminProvidersPage() {
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : null}
               {actionType === "approve" ? "Approve" : "Reject"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!editProvider} onOpenChange={() => setEditProvider(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Provider</DialogTitle>
+            <DialogDescription>Update provider details</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-name">Name</Label>
+              <Input
+                id="edit-name"
+                value={editForm.name}
+                onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                data-testid="input-edit-name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-email">Email</Label>
+              <Input
+                id="edit-email"
+                type="email"
+                value={editForm.email}
+                onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                data-testid="input-edit-email"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-phone">Phone</Label>
+              <Input
+                id="edit-phone"
+                value={editForm.phone}
+                onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                data-testid="input-edit-phone"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-location">Location</Label>
+              <Input
+                id="edit-location"
+                value={editForm.location}
+                onChange={(e) => setEditForm({ ...editForm, location: e.target.value })}
+                data-testid="input-edit-location"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-description">Description</Label>
+              <Textarea
+                id="edit-description"
+                value={editForm.description}
+                onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                data-testid="input-edit-description"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditProvider(null)}>Cancel</Button>
+            <Button
+              onClick={handleEditSubmit}
+              disabled={editProviderMutation.isPending}
+              data-testid="button-save-edit"
+            >
+              {editProviderMutation.isPending ? "Saving..." : "Save Changes"}
             </Button>
           </DialogFooter>
         </DialogContent>
