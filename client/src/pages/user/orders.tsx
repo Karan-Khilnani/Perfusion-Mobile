@@ -139,7 +139,7 @@ export default function OrdersPage() {
             <p className="mt-1 text-sm text-muted-foreground">
               Join the video call at your scheduled appointment time
             </p>
-            <Link href={`/video/${booking.videoRoomId}`}>
+            <Link href={`/video/${booking.videoRoomId}?returnTo=/user/orders`}>
               <Button className="mt-3" data-testid="button-join-video-call">
                 <Video className="mr-2 h-4 w-4" />
                 Join Video Call

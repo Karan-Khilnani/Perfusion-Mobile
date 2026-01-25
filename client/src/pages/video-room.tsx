@@ -25,6 +25,10 @@ export default function VideoRoomPage() {
   const [participantCount, setParticipantCount] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Get return path from URL query param (for role-aware navigation)
+  const urlParams = new URLSearchParams(window.location.search);
+  const returnTo = urlParams.get("returnTo") || "/user/orders";
+
   const { data: booking } = useQuery<Booking>({
     queryKey: ["/api/bookings/room", roomId],
     enabled: !!roomId,
@@ -134,7 +138,7 @@ export default function VideoRoomPage() {
         });
 
         api.addListener("readyToClose", () => {
-          navigate("/user/orders");
+          navigate(returnTo);
         });
 
       } catch (error) {
@@ -169,7 +173,7 @@ export default function VideoRoomPage() {
     if (jitsiApiRef.current) {
       jitsiApiRef.current.executeCommand("hangup");
     }
-    navigate("/user/orders");
+    navigate(returnTo);
   };
 
   const toggleFullscreen = () => {
@@ -200,7 +204,7 @@ export default function VideoRoomPage() {
             <p className="mb-4 text-muted-foreground">
               No video room ID was provided.
             </p>
-            <Link href="/user/orders">
+            <Link href={returnTo}>
               <Button data-testid="button-back-orders">Back to Orders</Button>
             </Link>
           </CardContent>
@@ -213,7 +217,7 @@ export default function VideoRoomPage() {
     <div className="flex h-screen flex-col bg-background">
       <header className="flex items-center justify-between border-b px-4 py-3">
         <div className="flex items-center gap-4">
-          <Link href="/user/orders">
+          <Link href={returnTo}>
             <Button variant="ghost" size="icon" data-testid="button-back">
               <ArrowLeft className="h-5 w-5" />
             </Button>

@@ -230,7 +230,7 @@ export default function ConsultationBookingPage() {
                 <p className="mt-2 text-sm text-muted-foreground">
                   Join the video call at your scheduled appointment time
                 </p>
-                <Link href={`/video/${videoRoomId}`}>
+                <Link href={`/video/${videoRoomId}?returnTo=/user/orders`}>
                   <Button
                     className="mt-3"
                     data-testid="button-join-video"

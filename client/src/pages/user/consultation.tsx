@@ -9,20 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { StarRating } from "@/components/star-rating";
-import { Search, DollarSign, Stethoscope, ArrowUpDown, Briefcase, Calendar } from "lucide-react";
+import { Search, Stethoscope, ArrowUpDown, Briefcase, Calendar } from "lucide-react";
 import type { Consultant } from "@shared/schema";
-
-const specializations = [
-  "All Specializations",
-  "Cardiology",
-  "Neurology",
-  "Oncology",
-  "Pediatrics",
-  "Orthopedics",
-  "Dermatology",
-  "Gastroenterology",
-  "Pulmonology",
-];
 
 type SortOption = "rating" | "cost" | "availability";
 
@@ -34,6 +22,17 @@ export default function ConsultationPage() {
   const { data: consultants, isLoading } = useQuery<Consultant[]>({
     queryKey: ["/api/consultants"],
   });
+
+  // Build dynamic specializations list from actual consultant data
+  const specializations = useMemo(() => {
+    if (!consultants) return ["All Specializations"];
+    const uniqueSpecs = new Set(
+      consultants
+        .map((c) => c.specialization)
+        .filter((s): s is string => !!s && s.trim() !== "")
+    );
+    return ["All Specializations", ...Array.from(uniqueSpecs).sort()];
+  }, [consultants]);
 
   const filteredConsultants = useMemo(() => {
     if (!consultants) return [];
@@ -184,8 +183,7 @@ export default function ConsultationPage() {
                     {consultant.yearsExperience} years exp
                   </span>
                   <span className="flex items-center gap-1">
-                    <DollarSign className="h-3.5 w-3.5" />
-                    ${consultant.consultationFee}
+                    ₹{consultant.consultationFee}
                   </span>
                 </div>
 
