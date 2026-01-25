@@ -450,6 +450,11 @@ export async function registerRoutes(
         userId,
       };
       
+      // Generate videoRoomId for consultation bookings
+      if (bookingData.bookingType === "consultation") {
+        bookingData.videoRoomId = `perfusion-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      }
+      
       const booking = await storage.createBooking(bookingData);
       res.status(201).json(booking);
     } catch (error) {
