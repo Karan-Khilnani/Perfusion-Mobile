@@ -1,95 +1,157 @@
 import { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { Link } from "wouter";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { StarRating } from "@/components/star-rating";
-import { Search, Clock, DollarSign, MapPin, FlaskConical, ArrowUpDown } from "lucide-react";
-import type { Lab, LabTest } from "@shared/schema";
+import { Badge } from "@/components/ui/badge";
+import { Search, Clock, FlaskConical, ArrowUpDown, ShoppingCart, Check } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import type { LabTest } from "@shared/schema";
 
-interface LabWithTests extends Lab {
-  tests: LabTest[];
-}
-
-const locations = [
-  "All Locations",
-  "Mumbai",
-  "Delhi",
-  "Bangalore",
-  "Chennai",
-  "Hyderabad",
-  "Kolkata",
-  "Pune",
-  "Ahmedabad",
-];
-
-type SortOption = "cost" | "turnaroundTime" | "accuracyRating";
+type SortOption = "name" | "cost" | "turnaroundTime";
 
 export default function LabsPage() {
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedLocation, setSelectedLocation] = useState("All Locations");
-  const [sortBy, setSortBy] = useState<SortOption>("cost");
+  const [selectedCategory, setSelectedCategory] = useState("All Categories");
+  const [sortBy, setSortBy] = useState<SortOption>("name");
+  const [cart, setCart] = useState<string[]>([]);
+  const { toast } = useToast();
 
-  const { data: labs, isLoading } = useQuery<LabWithTests[]>({
-    queryKey: ["/api/labs"],
+  const { data: tests, isLoading } = useQuery<LabTest[]>({
+    queryKey: ["/api/lab-tests"],
   });
 
-  const filteredLabs = useMemo(() => {
-    if (!labs) return [];
+  const createBookingMutation = useMutation({
+    mutationFn: async (testIds: string[]) => {
+      const bookings = await Promise.all(
+        testIds.map((testId) =>
+          apiRequest("POST", "/api/bookings", {
+            serviceType: "lab",
+            labTestId: testId,
+            status: "pending",
+          })
+        )
+      );
+      return bookings;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
+      setCart([]);
+      toast({
+        title: "Tests Booked",
+        description: "Your lab test booking has been created successfully.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to book tests. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
 
-    let filtered = labs.filter((lab) => {
-      const locationMatch =
-        selectedLocation === "All Locations" ||
-        lab.location.toLowerCase().includes(selectedLocation.toLowerCase());
+  const categories = useMemo(() => {
+    if (!tests) return ["All Categories"];
+    const catSet = new Set(tests.map((t) => t.category).filter(Boolean));
+    const cats = Array.from(catSet);
+    return ["All Categories", ...cats.sort()];
+  }, [tests]);
+
+  const filteredTests = useMemo(() => {
+    if (!tests) return [];
+
+    let filtered = tests.filter((test) => {
+      const categoryMatch =
+        selectedCategory === "All Categories" ||
+        test.category === selectedCategory;
 
       const searchMatch =
         !searchTerm ||
-        lab.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        lab.tests.some((test) =>
-          test.testName.toLowerCase().includes(searchTerm.toLowerCase())
-        );
+        test.testName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (test.category && test.category.toLowerCase().includes(searchTerm.toLowerCase()));
 
-      return locationMatch && searchMatch;
+      return categoryMatch && searchMatch;
     });
 
-    // Sort labs
     filtered.sort((a, b) => {
-      const aTest = a.tests[0];
-      const bTest = b.tests[0];
-      if (!aTest || !bTest) return 0;
-
       switch (sortBy) {
+        case "name":
+          return a.testName.localeCompare(b.testName);
         case "cost":
-          return parseFloat(aTest.cost) - parseFloat(bTest.cost);
+          return parseFloat(a.cost) - parseFloat(b.cost);
         case "turnaroundTime":
-          return parseInt(aTest.turnaroundTime) - parseInt(bTest.turnaroundTime);
-        case "accuracyRating":
-          return parseFloat(bTest.accuracyRating || "0") - parseFloat(aTest.accuracyRating || "0");
+          return parseInt(a.turnaroundTime) - parseInt(b.turnaroundTime);
         default:
           return 0;
       }
     });
 
     return filtered;
-  }, [labs, searchTerm, selectedLocation, sortBy]);
+  }, [tests, searchTerm, selectedCategory, sortBy]);
+
+  const toggleCart = (testId: string) => {
+    setCart((prev) =>
+      prev.includes(testId)
+        ? prev.filter((id) => id !== testId)
+        : [...prev, testId]
+    );
+  };
+
+  const handleBookTests = () => {
+    if (cart.length === 0) {
+      toast({
+        title: "No tests selected",
+        description: "Please select at least one test to book.",
+        variant: "destructive",
+      });
+      return;
+    }
+    createBookingMutation.mutate(cart);
+  };
+
+  const cartTotal = useMemo(() => {
+    if (!tests) return 0;
+    return cart.reduce((sum, id) => {
+      const test = tests.find((t) => t.id === id);
+      return sum + (test ? parseFloat(test.cost) : 0);
+    }, 0);
+  }, [tests, cart]);
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Lab Services</h1>
-        <p className="text-muted-foreground">
-          Search for diagnostic tests and book sample collections
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Lab Tests</h1>
+          <p className="text-muted-foreground">
+            Browse and book diagnostic tests
+          </p>
+        </div>
+        {cart.length > 0 && (
+          <div className="flex items-center gap-3">
+            <Badge variant="secondary" className="px-3 py-1">
+              <ShoppingCart className="mr-2 h-4 w-4" />
+              {cart.length} tests selected
+            </Badge>
+            <Button
+              onClick={handleBookTests}
+              disabled={createBookingMutation.isPending}
+              data-testid="button-book-selected"
+            >
+              Book Selected (₹{cartTotal.toFixed(2)})
+            </Button>
+          </div>
+        )}
       </div>
 
       <Card>
         <CardContent className="pt-6">
-          <div className="grid gap-4 md:grid-cols-4">
-            <div className="md:col-span-2">
+          <div className="grid gap-4 md:grid-cols-3">
+            <div>
               <Label htmlFor="search" className="sr-only">
                 Search tests
               </Label>
@@ -97,7 +159,7 @@ export default function LabsPage() {
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   id="search"
-                  placeholder="Search lab or test name..."
+                  placeholder="Search tests..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-9"
@@ -106,18 +168,18 @@ export default function LabsPage() {
               </div>
             </div>
             <div>
-              <Label htmlFor="location" className="sr-only">
-                Location
+              <Label htmlFor="category" className="sr-only">
+                Category
               </Label>
-              <Select value={selectedLocation} onValueChange={setSelectedLocation}>
-                <SelectTrigger data-testid="select-location">
-                  <MapPin className="mr-2 h-4 w-4 text-muted-foreground" />
-                  <SelectValue placeholder="Select location" />
+              <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                <SelectTrigger data-testid="select-category">
+                  <FlaskConical className="mr-2 h-4 w-4 text-muted-foreground" />
+                  <SelectValue placeholder="Select category" />
                 </SelectTrigger>
                 <SelectContent>
-                  {locations.map((loc) => (
-                    <SelectItem key={loc} value={loc}>
-                      {loc}
+                  {categories.map((cat) => (
+                    <SelectItem key={cat} value={cat}>
+                      {cat}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -133,9 +195,9 @@ export default function LabsPage() {
                   <SelectValue placeholder="Sort by" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="name">Sort by Name</SelectItem>
                   <SelectItem value="cost">Sort by Cost</SelectItem>
                   <SelectItem value="turnaroundTime">Sort by TAT</SelectItem>
-                  <SelectItem value="accuracyRating">Sort by Accuracy</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -153,17 +215,16 @@ export default function LabsPage() {
               </CardHeader>
               <CardContent className="space-y-3">
                 <Skeleton className="h-4 w-full" />
-                <Skeleton className="h-4 w-2/3" />
                 <Skeleton className="h-10 w-full" />
               </CardContent>
             </Card>
           ))}
         </div>
-      ) : filteredLabs.length === 0 ? (
+      ) : filteredTests.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12 text-center">
             <FlaskConical className="mb-4 h-12 w-12 text-muted-foreground/50" />
-            <h3 className="mb-2 text-lg font-medium">No labs found</h3>
+            <h3 className="mb-2 text-lg font-medium">No tests found</h3>
             <p className="text-sm text-muted-foreground">
               Try adjusting your search or filter criteria
             </p>
@@ -171,55 +232,57 @@ export default function LabsPage() {
         </Card>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {filteredLabs.map((lab) => (
-            <Card key={lab.id} className="overflow-visible" data-testid={`card-lab-${lab.id}`}>
-              <CardHeader className="pb-3">
-                <div className="flex items-start justify-between gap-2">
-                  <CardTitle className="text-lg">{lab.name}</CardTitle>
-                  <StarRating rating={parseFloat(lab.rating || "4.0")} size="sm" />
-                </div>
-                <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                  <MapPin className="h-3.5 w-3.5" />
-                  {lab.location}
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {lab.tests.slice(0, 2).map((test) => (
-                  <div
-                    key={test.id}
-                    className="rounded-md border bg-muted/30 p-3"
-                  >
-                    <p className="mb-2 font-medium">{test.testName}</p>
-                    <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-                      <span className="flex items-center gap-1">
-                        <DollarSign className="h-3.5 w-3.5" />
-                        {test.cost}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Clock className="h-3.5 w-3.5" />
-                        {test.turnaroundTime}
-                      </span>
-                      <StarRating
-                        rating={parseFloat(test.accuracyRating || "4.5")}
-                        size="sm"
-                        showValue={false}
-                      />
-                    </div>
+          {filteredTests.map((test) => {
+            const isInCart = cart.includes(test.id);
+            return (
+              <Card
+                key={test.id}
+                className={`overflow-visible transition-colors ${
+                  isInCart ? "border-primary bg-primary/5" : ""
+                }`}
+                data-testid={`card-test-${test.id}`}
+              >
+                <CardHeader className="pb-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <CardTitle className="text-base leading-tight">
+                      {test.testName}
+                    </CardTitle>
+                    {test.category && (
+                      <Badge variant="outline" className="shrink-0 text-xs">
+                        {test.category}
+                      </Badge>
+                    )}
                   </div>
-                ))}
-                {lab.tests.length > 2 && (
-                  <p className="text-sm text-muted-foreground">
-                    +{lab.tests.length - 2} more tests available
-                  </p>
-                )}
-                <Link href={`/user/labs/${lab.id}/book`}>
-                  <Button className="w-full" data-testid={`button-book-lab-${lab.id}`}>
-                    Book Test
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
+                    <span className="font-medium text-foreground">
+                      ₹{parseFloat(test.cost).toFixed(2)}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <Clock className="h-3.5 w-3.5" />
+                      {test.turnaroundTime}
+                    </span>
+                  </div>
+                  <Button
+                    variant={isInCart ? "default" : "outline"}
+                    className="w-full"
+                    onClick={() => toggleCart(test.id)}
+                    data-testid={`button-add-test-${test.id}`}
+                  >
+                    {isInCart ? (
+                      <>
+                        <Check className="mr-2 h-4 w-4" />
+                        Added to Cart
+                      </>
+                    ) : (
+                      "Add to Cart"
+                    )}
                   </Button>
-                </Link>
-              </CardContent>
-            </Card>
-          ))}
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       )}
     </div>
