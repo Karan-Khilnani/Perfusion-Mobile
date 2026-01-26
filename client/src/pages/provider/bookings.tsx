@@ -13,7 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { StatusBadge } from "@/components/status-badge";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { ClipboardList, RefreshCw, Video, Upload, Stethoscope, FlaskConical, ScanLine, FileText, Download, Paperclip } from "lucide-react";
+import { ClipboardList, RefreshCw, Video, Upload, Stethoscope, FlaskConical, ScanLine, FileText, Download, Paperclip, FileSignature, Loader2 } from "lucide-react";
 import { Link } from "wouter";
 import type { Booking, BookingStatus } from "@shared/schema";
 import { format } from "date-fns";
@@ -35,6 +35,12 @@ export default function ProviderBookingsPage() {
   const [showReportDialog, setShowReportDialog] = useState(false);
   const [showDocsDialog, setShowDocsDialog] = useState(false);
   const [docsBooking, setDocsBooking] = useState<Booking | null>(null);
+  const [showPrescriptionDialog, setShowPrescriptionDialog] = useState(false);
+  const [prescriptionBooking, setPrescriptionBooking] = useState<Booking | null>(null);
+  const [prescriptionDiagnosis, setPrescriptionDiagnosis] = useState("");
+  const [prescriptionMedications, setPrescriptionMedications] = useState("");
+  const [prescriptionAdvice, setPrescriptionAdvice] = useState("");
+  const [prescriptionFollowUp, setPrescriptionFollowUp] = useState("");
 
   const { data: bookings, isLoading, refetch } = useQuery<Booking[]>({
     queryKey: ["/api/provider/bookings"],
@@ -96,6 +102,64 @@ export default function ProviderBookingsPage() {
       id: selectedBooking.id, 
       reportUrl,
       reportNotes 
+    });
+  };
+
+  const prescriptionMutation = useMutation({
+    mutationFn: async ({ id, diagnosis, medications, advice, followUp }: { 
+      id: string; 
+      diagnosis: string; 
+      medications: string; 
+      advice: string; 
+      followUp: string;
+    }) => {
+      const response = await apiRequest("PATCH", `/api/bookings/${id}/prescription`, { 
+        diagnosis, 
+        medications, 
+        advice, 
+        followUp 
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/provider/bookings"] });
+      setShowPrescriptionDialog(false);
+      setPrescriptionBooking(null);
+      setPrescriptionDiagnosis("");
+      setPrescriptionMedications("");
+      setPrescriptionAdvice("");
+      setPrescriptionFollowUp("");
+      toast({
+        title: "Prescription Generated",
+        description: "Prescription has been saved and is available for download.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Failed",
+        description: "Failed to generate prescription.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const openPrescriptionDialog = (booking: Booking) => {
+    setPrescriptionBooking(booking);
+    setPrescriptionDiagnosis((booking as any).prescriptionDiagnosis || "");
+    setPrescriptionMedications((booking as any).prescriptionMedications || "");
+    setPrescriptionAdvice((booking as any).prescriptionAdvice || "");
+    setPrescriptionFollowUp((booking as any).prescriptionFollowUp || "");
+    setShowPrescriptionDialog(true);
+  };
+
+  const handleSavePrescription = () => {
+    if (!prescriptionBooking || !prescriptionDiagnosis || !prescriptionMedications) return;
+    prescriptionMutation.mutate({
+      id: prescriptionBooking.id,
+      diagnosis: prescriptionDiagnosis,
+      medications: prescriptionMedications,
+      advice: prescriptionAdvice,
+      followUp: prescriptionFollowUp,
     });
   };
 
@@ -163,6 +227,17 @@ export default function ProviderBookingsPage() {
               Join Call
             </Button>
           </Link>
+        )}
+        {booking.bookingType === "consultation" && (
+          <Button
+            size="sm"
+            variant={(booking as any).prescriptionGeneratedAt ? "secondary" : "default"}
+            onClick={() => openPrescriptionDialog(booking)}
+            data-testid={`button-prescription-${booking.id}`}
+          >
+            <FileSignature className="mr-2 h-3.5 w-3.5" />
+            {(booking as any).prescriptionGeneratedAt ? "Edit Prescription" : "Generate Prescription"}
+          </Button>
         )}
         {(booking.bookingType === "lab" || booking.bookingType === "teleradiology") && !booking.reportUrl && (
           <Button
@@ -412,6 +487,79 @@ export default function ProviderBookingsPage() {
           </div>
           <DialogFooter>
             <Button onClick={() => setShowDocsDialog(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showPrescriptionDialog} onOpenChange={setShowPrescriptionDialog}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>
+              {(prescriptionBooking as any)?.prescriptionGeneratedAt ? "Edit Prescription" : "Generate Prescription"}
+            </DialogTitle>
+            <DialogDescription>
+              Prescription for {prescriptionBooking?.patientName} - {prescriptionBooking?.serviceName}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 max-h-[60vh] overflow-y-auto">
+            <div className="space-y-2">
+              <Label>Diagnosis <span className="text-destructive">*</span></Label>
+              <Textarea
+                placeholder="Enter diagnosis details..."
+                value={prescriptionDiagnosis}
+                onChange={(e) => setPrescriptionDiagnosis(e.target.value)}
+                rows={3}
+                data-testid="input-prescription-diagnosis"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Medications <span className="text-destructive">*</span></Label>
+              <Textarea
+                placeholder="List medications with dosage and frequency...&#10;e.g., Tab. Paracetamol 500mg - 1 tablet twice daily after meals for 5 days"
+                value={prescriptionMedications}
+                onChange={(e) => setPrescriptionMedications(e.target.value)}
+                rows={5}
+                data-testid="input-prescription-medications"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Advice / Instructions</Label>
+              <Textarea
+                placeholder="Diet, lifestyle, precautions, etc..."
+                value={prescriptionAdvice}
+                onChange={(e) => setPrescriptionAdvice(e.target.value)}
+                rows={3}
+                data-testid="input-prescription-advice"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Follow-up</Label>
+              <Input
+                placeholder="e.g., After 1 week, or if symptoms persist"
+                value={prescriptionFollowUp}
+                onChange={(e) => setPrescriptionFollowUp(e.target.value)}
+                data-testid="input-prescription-followup"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowPrescriptionDialog(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSavePrescription}
+              disabled={!prescriptionDiagnosis || !prescriptionMedications || prescriptionMutation.isPending}
+              data-testid="button-save-prescription"
+            >
+              {prescriptionMutation.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                "Save Prescription"
+              )}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

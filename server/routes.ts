@@ -513,6 +513,69 @@ export async function registerRoutes(
     }
   });
 
+  // Generate/update prescription for consultation bookings
+  app.patch("/api/bookings/:id/prescription", isAuthenticated, async (req: any, res) => {
+    try {
+      const user = req.user;
+      const booking = await storage.getBookingById(req.params.id);
+      
+      if (!booking) {
+        return res.status(404).json({ message: "Booking not found" });
+      }
+      
+      // Only allow providers and admins to generate prescriptions
+      if (user.role !== "provider" && user.role !== "admin") {
+        return res.status(403).json({ message: "Only providers can generate prescriptions" });
+      }
+      
+      // For providers, verify they own this booking (via consultant ownership)
+      if (user.role === "provider") {
+        const provider = await storage.getProviderByUserId(user.id);
+        if (!provider) {
+          return res.status(403).json({ message: "Provider profile not found" });
+        }
+        // Check if this consultant belongs to this provider
+        const consultant = await storage.getConsultantById(booking.serviceId);
+        if (!consultant || consultant.providerId !== provider.id) {
+          return res.status(403).json({ message: "You can only generate prescriptions for your own consultations" });
+        }
+      }
+      
+      // Only for consultation bookings
+      if (booking.bookingType !== "consultation") {
+        return res.status(400).json({ message: "Prescriptions can only be generated for consultations" });
+      }
+      
+      const { diagnosis, medications, advice, followUp } = req.body as {
+        diagnosis: string;
+        medications: string;
+        advice: string;
+        followUp?: string;
+      };
+      
+      // Validate required fields
+      if (!diagnosis || diagnosis.trim().length === 0) {
+        return res.status(400).json({ message: "Diagnosis is required" });
+      }
+      if (!medications || medications.trim().length === 0) {
+        return res.status(400).json({ message: "Medications are required" });
+      }
+      
+      const updated = await storage.updateBooking(req.params.id, {
+        prescriptionDiagnosis: diagnosis.trim(),
+        prescriptionMedications: medications.trim(),
+        prescriptionAdvice: advice?.trim() || null,
+        prescriptionFollowUp: followUp?.trim() || null,
+        prescriptionGeneratedAt: new Date(),
+      } as any);
+      
+      res.json(updated);
+    } catch (error) {
+      console.error("Error generating prescription:", error);
+      res.status(500).json({ message: "Failed to generate prescription" });
+    }
+  });
+
   // Provider endpoints
   app.get("/api/provider/bookings", isAuthenticated, async (req: any, res) => {
     try {

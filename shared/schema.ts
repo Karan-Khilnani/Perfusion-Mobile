@@ -173,6 +173,12 @@ export const bookings = pgTable("bookings", {
   // Report fields (for providers to upload, seekers to download)
   reportUrl: varchar("report_url", { length: 500 }),
   reportNotes: text("report_notes"),
+  // Prescription fields (for consultation bookings)
+  prescriptionDiagnosis: text("prescription_diagnosis"),
+  prescriptionMedications: text("prescription_medications"),
+  prescriptionAdvice: text("prescription_advice"),
+  prescriptionFollowUp: varchar("prescription_follow_up", { length: 255 }),
+  prescriptionGeneratedAt: timestamp("prescription_generated_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

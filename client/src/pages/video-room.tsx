@@ -239,18 +239,22 @@ export default function VideoRoomPage() {
         </div>
       </header>
 
-      <div className="relative flex-1">
+      <div className="relative flex-1 min-h-[400px]" style={{ height: "calc(100vh - 140px)" }}>
         {isLoading && (
           <div className="absolute inset-0 z-10 flex items-center justify-center bg-background">
             <div className="text-center">
               <div className="mb-4 h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto" />
               <p className="text-muted-foreground">Connecting to video room...</p>
+              <p className="mt-2 text-xs text-muted-foreground max-w-sm">
+                Note: If prompted, click "I am the host" to start the meeting. The first person to join becomes the moderator.
+              </p>
             </div>
           </div>
         )}
         <div
           ref={jitsiContainerRef}
-          className="h-full w-full"
+          className="absolute inset-0"
+          style={{ minHeight: "400px" }}
           data-testid="video-container"
         />
       </div>
