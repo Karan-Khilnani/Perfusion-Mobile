@@ -1,20 +1,23 @@
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Phone, Mail, MapPin, Stethoscope, FlaskConical, Radio, HeartPulse, Clock, Award, ArrowRight } from "lucide-react";
+import { Phone, Mail, MapPin, ArrowRight } from "lucide-react";
+import { ThemeToggle } from "@/components/theme-toggle";
 import logoImage from "@assets/ChatGPT_Image_Dec_18,_2025,_09_45_03_PM_(1)_1766173209038.png";
 import indiaMapImage from "@assets/ChatGPT_Image_Dec_18__2025__08_43_37_PM-removebg-preview_1769521462134.png";
 
 export default function LandingPage() {
   return (
-    <div className="min-h-screen w-full bg-black text-white overflow-x-hidden">
+    <div className="min-h-screen w-full bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-gray-950 dark:via-gray-900 dark:to-black text-gray-900 dark:text-white overflow-x-hidden transition-colors duration-500">
+      {/* Theme Toggle - Fixed position using global component */}
+      <div className="fixed top-6 right-6 z-50" data-testid="container-theme-toggle">
+        <ThemeToggle />
+      </div>
+
       {/* Hero Section */}
       <section className="relative min-h-screen flex items-center overflow-hidden">
-        {/* Background gradient */}
-        <div className="absolute inset-0 bg-gradient-to-br from-black via-gray-900 to-black" />
-        
         {/* Animated artery SVG overlay */}
         <svg 
-          className="absolute inset-0 w-full h-full pointer-events-none z-10"
+          className="absolute inset-0 w-full h-full pointer-events-none z-10 motion-reduce:hidden"
           viewBox="0 0 1920 1080"
           preserveAspectRatio="xMidYMid slice"
           aria-hidden="true"
@@ -35,106 +38,89 @@ export default function LandingPage() {
             </filter>
           </defs>
           
-          {/* Main artery path - flows from India map to logo */}
+          {/* Main artery path - curves from India map through center to logo area with curved underline */}
           <path
             id="arteryPath"
-            d="M 1400 200 
-               C 1350 250 1300 300 1250 350
-               Q 1150 450 1050 500
-               C 950 550 850 520 750 540
-               Q 650 560 550 540
-               C 450 520 400 500 350 480
-               L 200 460
-               Q 180 455 160 460
-               L 100 480"
+            d="M 1350 280 
+               C 1280 350 1200 420 1100 480
+               Q 950 560 800 540
+               C 650 520 500 480 380 460
+               Q 280 445 200 480
+               C 150 500 120 540 100 560
+               Q 80 580 90 600
+               C 120 630 200 640 320 635"
             fill="none"
             stroke="rgba(180, 50, 50, 0.15)"
             strokeWidth="3"
-            className="artery-base"
+            className="artery-base dark:stroke-[rgba(180,50,50,0.2)]"
           />
           
-          {/* Animated blood flow */}
-          <circle r="8" fill="url(#arteryGradient)" filter="url(#glow)">
+          {/* Animated blood cells */}
+          <circle r="10" fill="url(#arteryGradient)" filter="url(#glow)">
             <animateMotion
               dur="4s"
               repeatCount="indefinite"
-              path="M 1400 200 
-                    C 1350 250 1300 300 1250 350
-                    Q 1150 450 1050 500
-                    C 950 550 850 520 750 540
-                    Q 650 560 550 540
-                    C 450 520 400 500 350 480
-                    L 200 460
-                    Q 180 455 160 460
-                    L 100 480"
+              path="M 1350 280 
+                    C 1280 350 1200 420 1100 480
+                    Q 950 560 800 540
+                    C 650 520 500 480 380 460
+                    Q 280 445 200 480
+                    C 150 500 120 540 100 560
+                    Q 80 580 90 600
+                    C 120 630 200 640 320 635"
             />
           </circle>
           
-          {/* Secondary pulse */}
-          <circle r="6" fill="hsl(0, 70%, 55%)" opacity="0.7" filter="url(#glow)">
+          <circle r="7" fill="hsl(0, 70%, 55%)" opacity="0.8" filter="url(#glow)">
             <animateMotion
               dur="4s"
               repeatCount="indefinite"
-              begin="1s"
-              path="M 1400 200 
-                    C 1350 250 1300 300 1250 350
-                    Q 1150 450 1050 500
-                    C 950 550 850 520 750 540
-                    Q 650 560 550 540
-                    C 450 520 400 500 350 480
-                    L 200 460
-                    Q 180 455 160 460
-                    L 100 480"
+              begin="1.3s"
+              path="M 1350 280 
+                    C 1280 350 1200 420 1100 480
+                    Q 950 560 800 540
+                    C 650 520 500 480 380 460
+                    Q 280 445 200 480
+                    C 150 500 120 540 100 560
+                    Q 80 580 90 600
+                    C 120 630 200 640 320 635"
             />
           </circle>
           
-          {/* Third pulse */}
-          <circle r="5" fill="hsl(0, 60%, 45%)" opacity="0.5" filter="url(#glow)">
+          <circle r="5" fill="hsl(0, 60%, 45%)" opacity="0.6" filter="url(#glow)">
             <animateMotion
               dur="4s"
               repeatCount="indefinite"
-              begin="2s"
-              path="M 1400 200 
-                    C 1350 250 1300 300 1250 350
-                    Q 1150 450 1050 500
-                    C 950 550 850 520 750 540
-                    Q 650 560 550 540
-                    C 450 520 400 500 350 480
-                    L 200 460
-                    Q 180 455 160 460
-                    L 100 480"
+              begin="2.6s"
+              path="M 1350 280 
+                    C 1280 350 1200 420 1100 480
+                    Q 950 560 800 540
+                    C 650 520 500 480 380 460
+                    Q 280 445 200 480
+                    C 150 500 120 540 100 560
+                    Q 80 580 90 600
+                    C 120 630 200 640 320 635"
             />
           </circle>
-          
-          {/* Underline animation at logo */}
-          <line x1="80" y1="520" x2="280" y2="520" stroke="transparent" strokeWidth="3">
-            <animate
-              attributeName="stroke"
-              values="transparent;hsl(0, 70%, 50%);hsl(0, 80%, 60%);hsl(0, 70%, 50%);transparent"
-              dur="4s"
-              repeatCount="indefinite"
-              begin="3.5s"
-            />
-          </line>
         </svg>
         
         <div className="relative z-20 container mx-auto px-6 lg:px-12 grid lg:grid-cols-2 gap-12 items-center">
-          {/* Left side - Logo and tagline */}
-          <div className="flex flex-col items-start space-y-8">
+          {/* Left side - Logo (2-3x larger) and tagline */}
+          <div className="flex flex-col items-start space-y-6">
             <img
               src={logoImage}
               alt="Perfusion"
-              className="h-auto w-[20rem] md:w-[26rem] lg:w-[32rem] drop-shadow-2xl"
+              className="h-auto w-[28rem] md:w-[36rem] lg:w-[44rem] drop-shadow-2xl"
               data-testid="img-landing-logo"
             />
             
-            <p className="text-xl md:text-2xl lg:text-3xl font-light tracking-wide text-white/90">
+            <p className="text-xl md:text-2xl lg:text-3xl font-light tracking-wide text-gray-600 dark:text-white/70">
               Connecting Remote Healthcare
             </p>
             
-            <div className="relative mt-6">
+            <div className="relative mt-4">
               <div className="absolute -left-4 top-0 bottom-0 w-1 bg-gradient-to-b from-red-600 via-red-500 to-red-700 rounded-full" />
-              <blockquote className="pl-6 text-2xl md:text-3xl lg:text-4xl font-semibold italic text-white leading-relaxed">
+              <blockquote className="pl-6 text-2xl md:text-3xl lg:text-4xl font-semibold italic leading-relaxed">
                 "Because geography shouldn't decide survival."
               </blockquote>
             </div>
@@ -142,7 +128,7 @@ export default function LandingPage() {
             <Link href="/home">
               <Button 
                 size="lg"
-                className="mt-8 min-w-56 bg-gradient-to-r from-red-700 via-red-600 to-red-700 text-white font-semibold tracking-wide shadow-lg shadow-red-900/30 border border-red-500/30"
+                className="mt-6 bg-gradient-to-r from-red-700 via-red-600 to-red-700 text-white font-semibold tracking-wide shadow-lg shadow-red-900/30 border border-red-500/30"
                 data-testid="button-enter-perfusion"
               >
                 Enter Perfusion
@@ -157,130 +143,264 @@ export default function LandingPage() {
               <img
                 src={indiaMapImage}
                 alt="Healthcare across India"
-                className="h-auto w-[22rem] md:w-[28rem] lg:w-[36rem] drop-shadow-2xl opacity-90"
+                className="h-auto w-[24rem] md:w-[30rem] lg:w-[38rem] drop-shadow-2xl opacity-90"
                 data-testid="img-india-map"
               />
-              {/* Subtle glow behind map */}
               <div className="absolute inset-0 -z-10 blur-3xl bg-red-900/20 rounded-full scale-75" />
             </div>
           </div>
         </div>
         
         {/* Scroll indicator */}
-        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center animate-bounce" aria-hidden="true">
-          <span className="text-white/50 text-sm mb-2">Scroll to explore</span>
-          <div className="w-6 h-10 border-2 border-white/30 rounded-full flex justify-center">
-            <div className="w-1.5 h-3 bg-white/50 rounded-full mt-2 animate-pulse" />
+        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center animate-bounce motion-reduce:animate-none" aria-hidden="true">
+          <span className="text-gray-600 dark:text-white/70 text-sm mb-2">Scroll to explore</span>
+          <div className="w-6 h-10 border-2 border-gray-400 dark:border-white/30 rounded-full flex justify-center">
+            <div className="w-1.5 h-3 bg-gray-500 dark:bg-white/50 rounded-full mt-2 animate-pulse motion-reduce:animate-none" />
           </div>
         </div>
       </section>
 
-      {/* Services Section */}
-      <section className="py-24 bg-gradient-to-b from-black via-gray-900 to-black">
+      {/* Platform Connection Visual Section */}
+      <section className="py-24 relative overflow-hidden bg-gray-50 dark:bg-gray-950">
         <div className="container mx-auto px-6 lg:px-12">
           <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-6">
+            <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-4">
               Bridging the Healthcare Gap
             </h2>
-            <p className="text-lg md:text-xl text-white/70 max-w-3xl mx-auto">
-              Perfusion connects peripheral hospitals to mainstream healthcare, ensuring every patient has access to quality care
+            <p className="text-lg text-gray-600 dark:text-white/70 max-w-2xl mx-auto">
+              Perfusion connects peripheral hospitals to mainstream healthcare
             </p>
           </div>
           
-          <div className="grid md:grid-cols-3 gap-8 lg:gap-12">
-            {/* Superspeciality Consultations */}
-            <div className="group relative p-8 rounded-2xl bg-gradient-to-br from-gray-800/50 to-gray-900/50 border border-gray-700/50 hover:border-red-600/50 transition-all duration-300" data-testid="card-service-consultations">
-              <div className="absolute inset-0 bg-gradient-to-br from-red-900/10 to-transparent rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-              <div className="relative z-10">
-                <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-red-600 to-red-800 flex items-center justify-center mb-6 shadow-lg shadow-red-900/30">
-                  <Stethoscope className="h-8 w-8 text-white" />
+          {/* Visual Flow Diagram - Not boxes, creative vector style */}
+          <div className="relative max-w-6xl mx-auto">
+            {/* Connection lines SVG background */}
+            <svg className="absolute inset-0 w-full h-full pointer-events-none motion-reduce:hidden" viewBox="0 0 1000 300" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+              {/* Left connection line */}
+              <path 
+                d="M 150 150 Q 300 100 400 150" 
+                fill="none" 
+                stroke="rgba(220, 38, 38, 0.3)"
+                className="dark:stroke-[rgba(220,38,38,0.4)]"
+                strokeWidth="3"
+                strokeDasharray="8 4"
+              >
+                <animate attributeName="stroke-dashoffset" from="24" to="0" dur="1s" repeatCount="indefinite" />
+              </path>
+              {/* Right connection line */}
+              <path 
+                d="M 600 150 Q 700 100 850 150" 
+                fill="none" 
+                stroke="rgba(220, 38, 38, 0.3)"
+                className="dark:stroke-[rgba(220,38,38,0.4)]"
+                strokeWidth="3"
+                strokeDasharray="8 4"
+              >
+                <animate attributeName="stroke-dashoffset" from="0" to="24" dur="1s" repeatCount="indefinite" />
+              </path>
+            </svg>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-center relative z-10">
+              {/* Remote Hospitals */}
+              <div className="text-center">
+                <div className="relative mx-auto w-40 h-40 rounded-full bg-gradient-to-br from-gray-100 to-white dark:from-gray-800 dark:to-gray-900 shadow-xl flex items-center justify-center border-2 border-gray-200 dark:border-gray-700">
+                  <div className="text-center">
+                    <svg className="w-16 h-16 mx-auto mb-2" viewBox="0 0 64 64" fill="none" role="img" aria-label="Remote hospital building">
+                      <title>Remote Hospital</title>
+                      <rect x="16" y="24" width="32" height="32" rx="2" className="fill-gray-200 dark:fill-gray-700" stroke="#dc2626" strokeWidth="2"/>
+                      <rect x="26" y="8" width="12" height="24" rx="1" className="fill-gray-100 dark:fill-gray-600" stroke="#dc2626" strokeWidth="2"/>
+                      <rect x="28" y="34" width="8" height="12" fill="#dc2626"/>
+                      <line x1="32" y1="14" x2="32" y2="26" stroke="#dc2626" strokeWidth="2"/>
+                      <line x1="26" y1="20" x2="38" y2="20" stroke="#dc2626" strokeWidth="2"/>
+                    </svg>
+                  </div>
                 </div>
-                <h3 className="text-xl font-semibold mb-4" data-testid="text-service-consultations-title">Superspeciality Consultations</h3>
-                <p className="text-white/70 leading-relaxed">
-                  Connect with leading specialists through secure video consultations. Access expert medical opinions from anywhere in India, bringing world-class healthcare to your doorstep.
-                </p>
+                <h3 className="mt-6 text-xl font-bold">Remote Hospitals</h3>
+                <p className="mt-2 text-gray-600 dark:text-white/70 text-sm">Resource-limited facilities seeking quality care</p>
               </div>
+              
+              {/* Perfusion Platform - Center */}
+              <div className="text-center">
+                <div className="relative mx-auto w-48 h-48 rounded-full bg-gradient-to-br from-red-700 via-red-600 to-red-800 shadow-2xl shadow-red-900/50 flex items-center justify-center">
+                  <div className="absolute inset-2 rounded-full bg-gradient-to-br from-red-600 to-red-700 flex items-center justify-center">
+                    <img 
+                      src={logoImage} 
+                      alt="Perfusion" 
+                      className="w-32 h-auto drop-shadow-lg"
+                    />
+                  </div>
+                  {/* Pulse rings - uses motion-reduce for accessibility */}
+                  <div className="absolute inset-0 rounded-full border-2 border-red-500/30 animate-ping motion-reduce:animate-none" style={{ animationDuration: '2s' }} />
+                </div>
+                <h3 className="mt-6 text-2xl font-bold">Perfusion Platform</h3>
+                <p className="mt-2 text-gray-600 dark:text-white/70 text-sm">Your bridge to quality healthcare</p>
+              </div>
+              
+              {/* Mainstream Healthcare */}
+              <div className="text-center">
+                <div className="relative mx-auto w-40 h-40 rounded-full bg-gradient-to-br from-gray-100 to-white dark:from-gray-800 dark:to-gray-900 shadow-xl flex items-center justify-center border-2 border-gray-200 dark:border-gray-700">
+                  <div className="text-center">
+                    <svg className="w-16 h-16 mx-auto mb-2" viewBox="0 0 64 64" fill="none" role="img" aria-label="Mainstream healthcare facility">
+                      <title>Mainstream Healthcare</title>
+                      <rect x="8" y="20" width="48" height="36" rx="2" className="fill-gray-200 dark:fill-gray-700" stroke="#dc2626" strokeWidth="2"/>
+                      <rect x="22" y="8" width="20" height="20" rx="1" className="fill-gray-100 dark:fill-gray-600" stroke="#dc2626" strokeWidth="2"/>
+                      <rect x="26" y="36" width="12" height="20" fill="#dc2626"/>
+                      <circle cx="32" cy="14" r="4" fill="#dc2626"/>
+                      <rect x="14" y="28" width="8" height="8" fill="#dc2626" opacity="0.6"/>
+                      <rect x="42" y="28" width="8" height="8" fill="#dc2626" opacity="0.6"/>
+                    </svg>
+                  </div>
+                </div>
+                <h3 className="mt-6 text-xl font-bold">Mainstream Healthcare</h3>
+                <p className="mt-2 text-gray-600 dark:text-white/70 text-sm">Specialists & advanced diagnostics</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Services Section - Visual Cards with Graphics */}
+      <section className="py-24 bg-white dark:bg-gray-900" data-testid="section-services">
+        <div className="container mx-auto px-6 lg:px-12">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-4">
+              Our Services
+            </h2>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-10 lg:gap-16">
+            {/* Superspeciality Consultations */}
+            <div className="text-center" data-testid="card-service-consultations">
+              <div className="relative mx-auto w-56 h-56 rounded-3xl bg-white/80 dark:bg-gray-900/50 shadow-xl overflow-hidden mb-8">
+                <div className="absolute inset-0 bg-gradient-to-br from-red-600/20 to-transparent" />
+                <div className="h-full flex items-center justify-center p-6">
+                  <svg className="w-32 h-32" viewBox="0 0 120 120" fill="none" role="img" aria-label="Doctor video consultation">
+                    <title>Video Consultation</title>
+                    <circle cx="60" cy="35" r="20" fill="#dc2626"/>
+                    <ellipse cx="60" cy="80" rx="35" ry="25" fill="#dc2626" opacity="0.8"/>
+                    <rect x="75" y="15" width="30" height="25" rx="3" className="fill-gray-100 dark:fill-gray-800" stroke="#dc2626" strokeWidth="2"/>
+                    <circle cx="90" cy="27" r="6" fill="#dc2626" opacity="0.6"/>
+                    <path d="M85 35 L95 35" stroke="#dc2626" strokeWidth="2" strokeLinecap="round"/>
+                  </svg>
+                </div>
+              </div>
+              <h3 className="text-2xl font-bold mb-3" data-testid="text-service-consultations-title">Superspeciality Consultations</h3>
+              <p className="text-gray-600 dark:text-white/70 leading-relaxed max-w-xs mx-auto">
+                Video consultations with leading specialists. Expert opinions from anywhere in India.
+              </p>
             </div>
             
             {/* Advanced Diagnostics */}
-            <div className="group relative p-8 rounded-2xl bg-gradient-to-br from-gray-800/50 to-gray-900/50 border border-gray-700/50 hover:border-red-600/50 transition-all duration-300" data-testid="card-service-diagnostics">
-              <div className="absolute inset-0 bg-gradient-to-br from-red-900/10 to-transparent rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-              <div className="relative z-10">
-                <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-red-600 to-red-800 flex items-center justify-center mb-6 shadow-lg shadow-red-900/30">
-                  <FlaskConical className="h-8 w-8 text-white" />
+            <div className="text-center" data-testid="card-service-diagnostics">
+              <div className="relative mx-auto w-56 h-56 rounded-3xl bg-white/80 dark:bg-gray-900/50 shadow-xl overflow-hidden mb-8">
+                <div className="absolute inset-0 bg-gradient-to-br from-red-600/20 to-transparent" />
+                <div className="h-full flex items-center justify-center p-6">
+                  <svg className="w-32 h-32" viewBox="0 0 120 120" fill="none" role="img" aria-label="Lab diagnostic equipment">
+                    <title>Lab Diagnostics</title>
+                    <rect x="30" y="40" width="40" height="55" rx="3" fill="#dc2626" opacity="0.9"/>
+                    <rect x="35" y="50" width="30" height="35" rx="2" className="fill-gray-100 dark:fill-gray-800"/>
+                    <circle cx="50" cy="67" r="10" fill="#dc2626" opacity="0.5"/>
+                    <rect x="70" y="25" width="25" height="40" rx="8" fill="#dc2626" opacity="0.7"/>
+                    <ellipse cx="82" cy="22" rx="5" ry="3" fill="#dc2626"/>
+                    <path d="M20 95 L40 75 L50 85 L80 55 L100 75" stroke="#dc2626" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
                 </div>
-                <h3 className="text-xl font-semibold mb-4" data-testid="text-service-diagnostics-title">Advanced Diagnostics</h3>
-                <p className="text-white/70 leading-relaxed">
-                  Comprehensive lab testing with doorstep sample pickup. 64+ diagnostic tests across 9 categories, ensuring accurate results with fastest turnaround times.
-                </p>
               </div>
+              <h3 className="text-2xl font-bold mb-3" data-testid="text-service-diagnostics-title">Advanced Diagnostics</h3>
+              <p className="text-gray-600 dark:text-white/70 leading-relaxed max-w-xs mx-auto">
+                64+ diagnostic tests with doorstep sample pickup. Accurate results, fastest turnaround.
+              </p>
             </div>
             
             {/* Teleradiology */}
-            <div className="group relative p-8 rounded-2xl bg-gradient-to-br from-gray-800/50 to-gray-900/50 border border-gray-700/50 hover:border-red-600/50 transition-all duration-300" data-testid="card-service-teleradiology">
-              <div className="absolute inset-0 bg-gradient-to-br from-red-900/10 to-transparent rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-              <div className="relative z-10">
-                <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-red-600 to-red-800 flex items-center justify-center mb-6 shadow-lg shadow-red-900/30">
-                  <Radio className="h-8 w-8 text-white" />
+            <div className="text-center" data-testid="card-service-teleradiology">
+              <div className="relative mx-auto w-56 h-56 rounded-3xl bg-white/80 dark:bg-gray-900/50 shadow-xl overflow-hidden mb-8">
+                <div className="absolute inset-0 bg-gradient-to-br from-red-600/20 to-transparent" />
+                <div className="h-full flex items-center justify-center p-6">
+                  <svg className="w-32 h-32" viewBox="0 0 120 120" fill="none" role="img" aria-label="X-ray and radiology imaging">
+                    <title>Teleradiology</title>
+                    <rect x="20" y="20" width="80" height="80" rx="8" className="fill-gray-200 dark:fill-gray-800" stroke="#dc2626" strokeWidth="3"/>
+                    <ellipse cx="60" cy="55" rx="25" ry="30" fill="#dc2626" opacity="0.3"/>
+                    <path d="M60 35 L60 75" stroke="#dc2626" strokeWidth="4" strokeLinecap="round"/>
+                    <path d="M45 50 L75 50" stroke="#dc2626" strokeWidth="4" strokeLinecap="round"/>
+                    <circle cx="85" cy="35" r="10" fill="#dc2626"/>
+                    <path d="M82 35 L88 35 M85 32 L85 38" stroke="white" strokeWidth="2"/>
+                  </svg>
                 </div>
-                <h3 className="text-xl font-semibold mb-4" data-testid="text-service-teleradiology-title">Teleradiology Services</h3>
-                <p className="text-white/70 leading-relaxed">
-                  Expert medical imaging interpretation with 28 modalities supported. Get accurate radiology reports from certified radiologists, with priority handling for emergencies.
-                </p>
               </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Bedside Assistance Section */}
-      <section className="py-24 bg-black relative overflow-hidden" data-testid="section-bedside-assistance">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-red-950/20 via-transparent to-transparent" />
-        
-        <div className="container mx-auto px-6 lg:px-12 relative z-10">
-          <div className="grid lg:grid-cols-2 gap-12 items-center">
-            <div>
-              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-red-900/30 border border-red-700/30 mb-6">
-                <HeartPulse className="h-5 w-5 text-red-500" />
-                <span className="text-sm font-medium text-red-400">Critical Care Support</span>
-              </div>
-              
-              <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-6 leading-tight">
-                Bedside Assistance for Critically Ill Patients
-              </h2>
-              
-              <p className="text-lg text-white/70 mb-8 leading-relaxed">
-                When every second counts, Perfusion provides real-time expert guidance to healthcare providers treating critically ill patients. Our specialists work alongside your team, ensuring optimal care decisions at the bedside.
+              <h3 className="text-2xl font-bold mb-3" data-testid="text-service-teleradiology-title">Teleradiology Services</h3>
+              <p className="text-gray-600 dark:text-white/70 leading-relaxed max-w-xs mx-auto">
+                28 modalities supported. Expert radiology reports with priority emergency handling.
               </p>
-              
-              <ul className="space-y-4">
-                <li className="flex items-start gap-3">
-                  <div className="w-6 h-6 rounded-full bg-red-600 flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <span className="text-xs font-bold">1</span>
-                  </div>
-                  <span className="text-white/80">24/7 access to critical care specialists</span>
-                </li>
-                <li className="flex items-start gap-3">
-                  <div className="w-6 h-6 rounded-full bg-red-600 flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <span className="text-xs font-bold">2</span>
-                  </div>
-                  <span className="text-white/80">Real-time consultation during emergencies</span>
-                </li>
-                <li className="flex items-start gap-3">
-                  <div className="w-6 h-6 rounded-full bg-red-600 flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <span className="text-xs font-bold">3</span>
-                  </div>
-                  <span className="text-white/80">Protocol-driven treatment guidance</span>
-                </li>
-              </ul>
             </div>
-            
-            <div className="relative">
-              <div className="aspect-square rounded-2xl bg-gradient-to-br from-gray-800/50 to-gray-900/80 border border-gray-700/50 p-8 flex items-center justify-center">
-                <div className="text-center">
-                  <HeartPulse className="h-24 w-24 text-red-500 mx-auto mb-6 animate-pulse" />
-                  <p className="text-2xl font-semibold text-white/90">Life-saving support</p>
-                  <p className="text-white/60 mt-2">When distance isn't an option</p>
+          </div>
+        </div>
+      </section>
+
+      {/* Bedside Assistance Section - Minimal text, visual focus */}
+      <section className="py-24 relative overflow-hidden bg-gray-50 dark:bg-gray-950" data-testid="section-bedside-assistance">
+        <div className="container mx-auto px-6 lg:px-12 relative z-10">
+          <div className="max-w-5xl mx-auto">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+              {/* Visual side */}
+              <div className="relative order-2 lg:order-1">
+                <div className="relative">
+                  {/* Heartbeat line visual */}
+                  <svg className="w-full h-48 motion-reduce:hidden" viewBox="0 0 400 150" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Heartbeat monitor line">
+                    <title>Heartbeat Monitor</title>
+                    <path 
+                      d="M0 75 L80 75 L100 75 L120 30 L140 120 L160 45 L180 105 L200 75 L400 75" 
+                      fill="none" 
+                      stroke="#dc2626" 
+                      strokeWidth="4"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <animate 
+                        attributeName="stroke-dasharray" 
+                        from="0 1000" 
+                        to="1000 0" 
+                        dur="2s" 
+                        repeatCount="indefinite"
+                      />
+                    </path>
+                  </svg>
+                  {/* Static heartbeat for reduced motion */}
+                  <svg className="w-full h-48 hidden motion-reduce:block" viewBox="0 0 400 150" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Heartbeat monitor line">
+                    <title>Heartbeat Monitor</title>
+                    <path 
+                      d="M0 75 L80 75 L100 75 L120 30 L140 120 L160 45 L180 105 L200 75 L400 75" 
+                      fill="none" 
+                      stroke="#dc2626" 
+                      strokeWidth="4"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                  {/* Bed icon */}
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <svg className="w-32 h-32 opacity-20" viewBox="0 0 100 80" fill="#dc2626" aria-hidden="true">
+                      <rect x="10" y="50" width="80" height="10" rx="2"/>
+                      <rect x="5" y="55" width="10" height="20" rx="2"/>
+                      <rect x="85" y="55" width="10" height="20" rx="2"/>
+                      <ellipse cx="30" cy="40" rx="15" ry="12"/>
+                      <rect x="45" y="35" width="40" height="20" rx="3"/>
+                    </svg>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Text side - Minimal */}
+              <div className="order-1 lg:order-2">
+                <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-6">
+                  Bedside Assistance
+                </h2>
+                <p className="text-xl text-gray-600 dark:text-white/70 mb-8 leading-relaxed">
+                  For critically ill patients when expert guidance matters most.
+                </p>
+                <div className="flex flex-wrap items-center gap-4">
+                  <div className="w-3 h-3 rounded-full bg-red-600 animate-pulse motion-reduce:animate-none" />
+                  <span className="text-lg text-gray-600 dark:text-white/70">Real-time specialist support at the bedside</span>
                 </div>
               </div>
             </div>
@@ -288,42 +408,38 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Clinician-Led Platform Section */}
-      <section className="py-24 bg-gradient-to-b from-black to-gray-900" data-testid="section-clinician-led">
+      {/* Clinician-Led Section - Creative, no boxes */}
+      <section className="py-24 relative bg-white dark:bg-gray-900" data-testid="section-clinician-led">
         <div className="container mx-auto px-6 lg:px-12">
           <div className="max-w-4xl mx-auto text-center">
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-red-900/30 border border-red-700/30 mb-6">
-              <Award className="h-5 w-5 text-red-500" />
-              <span className="text-sm font-medium text-red-400">Clinician-Led Excellence</span>
+            {/* Large quote-style presentation */}
+            <div className="relative">
+              <span className="absolute -top-16 left-1/2 -translate-x-1/2 text-[200px] font-serif text-red-600/10 leading-none select-none" aria-hidden="true">"</span>
+              <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-8 relative z-10">
+                Built by Clinicians,<br/>for Clinicians
+              </h2>
             </div>
             
-            <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-6">
-              Built by Clinicians, for Clinicians
-            </h2>
-            
-            <p className="text-lg md:text-xl text-white/70 mb-12 leading-relaxed">
-              Perfusion is a clinician-led platform that understands the real impact of delayed investigations and inaccurate reporting. We've experienced it firsthand, and we're here to change it.
+            <p className="text-xl md:text-2xl text-gray-600 dark:text-white/70 mb-12 leading-relaxed max-w-3xl mx-auto">
+              We understand the real impact of delayed investigations and inaccurate reporting. 
+              We've experienced it. We're here to change it.
             </p>
-          </div>
-          
-          <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
-            <div className="flex items-start gap-4 p-6 rounded-xl bg-gray-800/30 border border-gray-700/30">
-              <div className="w-12 h-12 rounded-lg bg-red-600/20 flex items-center justify-center flex-shrink-0">
-                <Clock className="h-6 w-6 text-red-500" />
-              </div>
-              <div>
-                <h4 className="font-semibold text-lg mb-2">Fastest Turnaround Times</h4>
-                <p className="text-white/60">Critical results delivered when they matter most, not when it's convenient.</p>
-              </div>
-            </div>
             
-            <div className="flex items-start gap-4 p-6 rounded-xl bg-gray-800/30 border border-gray-700/30">
-              <div className="w-12 h-12 rounded-lg bg-red-600/20 flex items-center justify-center flex-shrink-0">
-                <Award className="h-6 w-6 text-red-500" />
+            {/* Visual stats without boxes */}
+            <div className="flex flex-wrap justify-center gap-8 md:gap-16 mt-16">
+              <div className="text-center">
+                <div className="text-5xl md:text-6xl font-bold text-red-600 mb-2">Fast</div>
+                <p className="text-gray-600 dark:text-white/70">Turnaround Times</p>
               </div>
-              <div>
-                <h4 className="font-semibold text-lg mb-2">High-Quality Reports</h4>
-                <p className="text-white/60">Accurate, detailed reports from certified specialists you can trust.</p>
+              <div className="w-px bg-gradient-to-b from-transparent via-red-600/50 to-transparent hidden md:block" />
+              <div className="text-center">
+                <div className="text-5xl md:text-6xl font-bold text-red-600 mb-2">Quality</div>
+                <p className="text-gray-600 dark:text-white/70">Accurate Reports</p>
+              </div>
+              <div className="w-px bg-gradient-to-b from-transparent via-red-600/50 to-transparent hidden md:block" />
+              <div className="text-center">
+                <div className="text-5xl md:text-6xl font-bold text-red-600 mb-2">Trust</div>
+                <p className="text-gray-600 dark:text-white/70">Certified Specialists</p>
               </div>
             </div>
           </div>
@@ -331,47 +447,44 @@ export default function LandingPage() {
       </section>
 
       {/* Call to Action Section */}
-      <section className="py-24 bg-gradient-to-b from-gray-900 to-black relative overflow-hidden" data-testid="section-cta">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom,_var(--tw-gradient-stops))] from-red-950/30 via-transparent to-transparent" />
+      <section className="py-24 relative overflow-hidden bg-gray-50 dark:bg-gray-950" data-testid="section-cta">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-red-950/20 via-transparent to-transparent" />
         
         <div className="container mx-auto px-6 lg:px-12 relative z-10">
           <div className="max-w-3xl mx-auto text-center">
-            <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-6">
-              Ready to Transform Healthcare Access?
+            <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-8">
+              Book a Demo
             </h2>
-            <p className="text-lg text-white/70 mb-10">
-              Join hospitals and healthcare providers across India who are bridging the gap with Perfusion
-            </p>
             
-            <div className="inline-flex flex-col sm:flex-row items-center gap-4 p-6 rounded-2xl bg-gradient-to-r from-red-900/40 to-red-800/40 border border-red-600/30">
-              <div className="flex items-center gap-3">
-                <div className="w-14 h-14 rounded-full bg-red-600 flex items-center justify-center">
-                  <Phone className="h-7 w-7 text-white" />
-                </div>
-                <div className="text-left">
-                  <p className="text-sm text-white/60">Book a Demo</p>
-                  <a href="tel:9244893295" className="text-2xl font-bold text-white hover:text-red-400 transition-colors" data-testid="link-phone">
-                    9244893295
-                  </a>
-                </div>
-              </div>
+            <div className="flex flex-wrap justify-center gap-4">
+              <Button
+                size="lg"
+                asChild
+                className="bg-gradient-to-r from-red-700 to-red-600 text-white shadow-2xl shadow-red-900/40 border border-red-500/30"
+                data-testid="button-cta-phone"
+              >
+                <a href="tel:9244893295" className="flex flex-wrap items-center gap-3">
+                  <Phone className="h-6 w-6" />
+                  <span className="text-xl font-bold">Call 9244893295</span>
+                </a>
+              </Button>
             </div>
           </div>
         </div>
       </section>
 
       {/* Contact Footer */}
-      <footer className="py-16 bg-black border-t border-gray-800" data-testid="section-footer">
+      <footer className="py-16 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-black" data-testid="section-footer">
         <div className="container mx-auto px-6 lg:px-12">
-          <div className="grid md:grid-cols-3 gap-12">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
             {/* Logo & tagline */}
             <div>
               <img
                 src={logoImage}
                 alt="Perfusion"
-                className="h-auto w-40 mb-4"
+                className="h-auto w-48 mb-4"
               />
-              <p className="text-white/60">
+              <p className="text-gray-600 dark:text-white/70">
                 Connecting Remote Healthcare
               </p>
             </div>
@@ -380,19 +493,19 @@ export default function LandingPage() {
             <div>
               <h4 className="font-semibold text-lg mb-4">Contact Us</h4>
               <ul className="space-y-3">
-                <li className="flex items-start gap-3">
+                <li className="flex flex-wrap items-start gap-3">
                   <MapPin className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5" />
-                  <span className="text-white/70" data-testid="text-contact-address">Sundernagar, Raipur (CG)</span>
+                  <span className="text-gray-600 dark:text-white/70" data-testid="text-contact-address">Sundernagar, Raipur (CG)</span>
                 </li>
-                <li className="flex items-center gap-3">
+                <li className="flex flex-wrap items-center gap-3">
                   <Mail className="h-5 w-5 text-red-500 flex-shrink-0" />
-                  <a href="mailto:mail@perfusionhealth.in" className="text-white/70 hover:text-red-400 transition-colors" data-testid="link-email">
+                  <a href="mailto:mail@perfusionhealth.in" className="text-gray-600 dark:text-white/70" data-testid="link-email">
                     mail@perfusionhealth.in
                   </a>
                 </li>
-                <li className="flex items-center gap-3">
+                <li className="flex flex-wrap items-center gap-3">
                   <Phone className="h-5 w-5 text-red-500 flex-shrink-0" />
-                  <a href="tel:9244893295" className="text-white/70 hover:text-red-400 transition-colors">
+                  <a href="tel:9244893295" className="text-gray-600 dark:text-white/70" data-testid="link-phone-footer">
                     9244893295
                   </a>
                 </li>
@@ -414,8 +527,8 @@ export default function LandingPage() {
             </div>
           </div>
           
-          <div className="mt-12 pt-8 border-t border-gray-800 text-center">
-            <p className="text-white/40 text-sm">
+          <div className="mt-12 pt-8 border-t border-gray-200 dark:border-gray-800 text-center">
+            <p className="text-gray-400 dark:text-white/40 text-sm">
               © {new Date().getFullYear()} Perfusion Healthcare. All rights reserved.
             </p>
           </div>
