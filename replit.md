@@ -12,6 +12,8 @@ The platform uses INR (₹) currency throughout, features role-based access (Adm
 
 ## Recent Changes
 
+- **New Landing Page**: Premium public-facing landing page at root (/) with animated artery SVG flowing across India map to Perfusion logo. Features hero section with tagline "Connecting Remote Healthcare" and quote "Because geography shouldn't decide survival", services section (consultations, diagnostics, teleradiology), bedside assistance section, clinician-led platform section, call-to-action with demo phone (9244893295), and contact footer. Original login page moved to /home, accessible via "Enter Perfusion" button.
+- **Prescription System**: Providers can generate prescriptions for consultation bookings with diagnosis, medications, advice, and follow-up. Care seekers can view and download prescriptions as text files from their orders page.
 - **Admin Dashboard Enhanced**: Comprehensive monitoring dashboard with booking stats by type/status, revenue metrics (total/pending), service catalog counts (labs, tests, consultants, modalities), and recent activity feed. Stats endpoint at `/api/admin/stats`
 - **Admin Provider Editing**: Admin can now edit provider details (name, email, phone, location, description) via edit dialog on the providers page
 - **Provider Teleradiology Tab**: Provider services page now includes a Teleradiology tab showing available modalities with pricing and link to bookings
