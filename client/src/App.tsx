@@ -7,6 +7,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import NotFound from "@/pages/not-found";
 
 import Home from "@/pages/home";
+import LandingPage from "@/pages/landing";
 import LoginPage from "@/pages/login";
 import RegisterPage from "@/pages/register";
 import UserLayout from "@/pages/user/layout";
@@ -67,7 +68,8 @@ function withAdminLayout(Component: React.ComponentType) {
 function Router() {
   return (
     <Switch>
-      <Route path="/" component={Home} />
+      <Route path="/" component={LandingPage} />
+      <Route path="/home" component={Home} />
       <Route path="/login" component={LoginPage} />
       <Route path="/register" component={RegisterPage} />
       <Route path="/provider/onboarding" component={ProviderOnboardingPage} />
