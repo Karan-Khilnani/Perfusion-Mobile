@@ -410,14 +410,17 @@ export default function LandingPage() {
                   {/* Decorative frame */}
                   <div className="absolute -inset-1 bg-gradient-to-r from-red-600 to-red-400 rounded-2xl opacity-20 blur-sm" />
                   <video 
-                    src={labVideo}
                     autoPlay
                     loop
                     muted
                     playsInline
-                    className="relative w-full h-auto rounded-2xl"
+                    controls
+                    className="relative w-full h-auto rounded-2xl bg-gray-900"
                     data-testid="video-lab-diagnostics"
-                  />
+                  >
+                    <source src={labVideo} type="video/mp4" />
+                    Your browser does not support the video tag.
+                  </video>
                 </div>
                 {/* Corner accents */}
                 <div className="absolute -top-3 -left-3 w-16 h-16 border-t-4 border-l-4 border-red-600/40 rounded-tl-2xl" />
