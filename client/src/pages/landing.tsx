@@ -5,8 +5,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import logoImage from "@assets/Pitchdeck_logo_1769590061051.png";
 import indiaMapImage from "@assets/ChatGPT_Image_Dec_18__2025__08_43_37_PM-removebg-preview_1769521462134.png";
 import bedsideImage from "@assets/ChatGPT_Image_Dec_22,_2025,_09_07_53_PM_1769597609254.png";
-import doctorPrescribingImage from "@assets/doctor-prescribing.png";
-import deliveryAgentImage from "@assets/delivery-agent-pickup.png";
+import labVideo from "@assets/perfusion_video-1_1769634248549.mp4";
 
 export default function LandingPage() {
   return (
@@ -400,108 +399,57 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Advanced Lab Diagnostics Section - Logistics Animation */}
+      {/* Advanced Lab Diagnostics Section - Video and Text Layout */}
       <section className="py-24 relative overflow-hidden bg-white dark:bg-gray-900" data-testid="section-lab-diagnostics">
         <div className="container mx-auto px-6 lg:px-12 relative z-10">
           <div className="max-w-6xl mx-auto">
-            {/* Section header with tagline */}
-            <div className="text-center mb-16">
-              <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-6">
-                Advanced Lab <span className="text-red-600">Diagnostics</span>
-              </h2>
-              <p className="text-2xl md:text-3xl lg:text-4xl font-light text-gray-600 dark:text-white/70 italic">
-                "Prescribe once. Everything else moves."
-              </p>
-            </div>
-            
-            {/* Two image cards with animated connection */}
-            <div className="relative">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-16">
-                {/* Doctor prescribing */}
-                <div className="relative group">
-                  <div className="relative rounded-2xl overflow-hidden shadow-2xl">
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent z-10" />
-                    <img 
-                      src={doctorPrescribingImage} 
-                      alt="Doctor prescribing lab test in ICU"
-                      className="w-full h-80 md:h-96 object-cover"
-                      data-testid="img-doctor-prescribing"
-                    />
-                    <div className="absolute bottom-0 left-0 right-0 z-20 p-6">
-                      <div className="bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm rounded-lg p-4 shadow-lg">
-                        <div className="border-b-2 border-red-600 pb-2 mb-2">
-                          <span className="text-red-600 font-bold">Rx</span>
-                        </div>
-                        <p className="text-gray-800 dark:text-white font-medium animate-pulse motion-reduce:animate-none">Serum ANA</p>
-                      </div>
-                    </div>
-                  </div>
-                  <p className="text-center mt-4 text-lg font-medium text-gray-600 dark:text-white/70">Doctor prescribes the test</p>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center">
+              {/* Video side */}
+              <div className="relative order-2 lg:order-1">
+                <div className="relative rounded-2xl overflow-hidden shadow-2xl">
+                  {/* Decorative frame */}
+                  <div className="absolute -inset-1 bg-gradient-to-r from-red-600 to-red-400 rounded-2xl opacity-20 blur-sm" />
+                  <video 
+                    src={labVideo}
+                    autoPlay
+                    loop
+                    muted
+                    playsInline
+                    className="relative w-full h-auto rounded-2xl"
+                    data-testid="video-lab-diagnostics"
+                  />
                 </div>
-                
-                {/* Animated arrow between cards - visible on large screens */}
-                <div className="hidden lg:flex absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-20">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <div className="w-24 h-1 bg-gradient-to-r from-red-600 to-red-400 rounded-full relative overflow-hidden">
-                      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white to-transparent animate-pulse motion-reduce:animate-none" style={{ animation: 'shimmer 1.5s infinite' }} />
-                    </div>
-                    <ArrowRight className="w-8 h-8 text-red-600 animate-pulse motion-reduce:animate-none" />
-                  </div>
-                </div>
-                
-                {/* Mobile arrow */}
-                <div className="flex lg:hidden justify-center -my-4 z-20 relative">
-                  <div className="bg-red-600 rounded-full p-3 shadow-lg">
-                    <ArrowRight className="w-6 h-6 text-white rotate-90" />
-                  </div>
-                </div>
-                
-                {/* Delivery agent pickup */}
-                <div className="relative group">
-                  <div className="relative rounded-2xl overflow-hidden shadow-2xl">
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent z-10" />
-                    <img 
-                      src={deliveryAgentImage} 
-                      alt="Perfusion delivery agent picking up sample at hospital"
-                      className="w-full h-80 md:h-96 object-cover"
-                      data-testid="img-delivery-agent"
-                    />
-                    <div className="absolute bottom-0 left-0 right-0 z-20 p-6">
-                      <div className="flex flex-wrap items-center gap-3 bg-red-600/90 backdrop-blur-sm px-4 py-2 rounded-full w-fit">
-                        <div className="w-2 h-2 rounded-full bg-white animate-pulse motion-reduce:animate-none" />
-                        <span className="text-white font-medium">Sample Pickup</span>
-                      </div>
-                    </div>
-                  </div>
-                  <p className="text-center mt-4 text-lg font-medium text-gray-600 dark:text-white/70">We handle the rest</p>
-                </div>
+                {/* Corner accents */}
+                <div className="absolute -top-3 -left-3 w-16 h-16 border-t-4 border-l-4 border-red-600/40 rounded-tl-2xl" />
+                <div className="absolute -bottom-3 -right-3 w-16 h-16 border-b-4 border-r-4 border-red-600/40 rounded-br-2xl" />
               </div>
               
-              {/* Fast turnaround badge */}
-              <div className="flex justify-center mt-12">
-                <div className="flex flex-wrap items-center gap-3 bg-red-600 text-white px-8 py-4 rounded-full shadow-xl">
-                  <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              {/* Text side */}
+              <div className="order-1 lg:order-2">
+                <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-6">
+                  Advanced Lab <span className="text-red-600">Diagnostics</span>
+                </h2>
+                
+                <p className="text-xl md:text-2xl lg:text-3xl font-light text-gray-600 dark:text-white/70 italic mb-8">
+                  "Prescribe what you need, Perfusion will move it"
+                </p>
+                
+                <p className="text-lg text-gray-600 dark:text-white/60 mb-8 leading-relaxed">
+                  Our dedicated logistics team ensures samples reach the lab swiftly, so you get results when they matter most.
+                </p>
+                
+                {/* Fast turnaround badge */}
+                <div className="flex flex-wrap items-center gap-3 bg-red-600 text-white px-6 py-3 rounded-full shadow-lg w-fit">
+                  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <circle cx="12" cy="12" r="10" />
                     <path d="M12 6 L12 12 L16 14" />
                   </svg>
-                  <span className="font-bold text-lg">Fast Turnaround Time</span>
+                  <span className="font-semibold">Fast Turnaround Time</span>
                 </div>
               </div>
             </div>
-            
-            {/* Bottom description */}
-            <p className="text-center text-lg md:text-xl text-gray-600 dark:text-white/60 mt-8 max-w-2xl mx-auto">
-              Our dedicated logistics team ensures samples reach the lab swiftly, so you get results when they matter most.
-            </p>
           </div>
         </div>
-        
-        <style>{`
-          @keyframes shimmer {
-            0% { transform: translateX(-100%); }
-            100% { transform: translateX(100%); }
-          }
-        `}</style>
       </section>
 
       {/* Clinician-Led Section - Creative, no boxes */}
