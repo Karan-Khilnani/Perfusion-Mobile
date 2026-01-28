@@ -4,6 +4,7 @@ import { Phone, Mail, MapPin, ArrowRight } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import logoImage from "@assets/Pitchdeck_logo_1769590061051.png";
 import indiaMapImage from "@assets/ChatGPT_Image_Dec_18__2025__08_43_37_PM-removebg-preview_1769521462134.png";
+import bedsideImage from "@assets/ChatGPT_Image_Dec_22,_2025,_09_07_53_PM_1769597609254.png";
 
 export default function LandingPage() {
   return (
@@ -337,72 +338,61 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Bedside Assistance Section - Minimal text, visual focus */}
-      <section className="py-24 relative overflow-hidden bg-gray-50 dark:bg-gray-950" data-testid="section-bedside-assistance">
+      {/* Bedside Assistance Section - Premium visual with integrated image */}
+      <section className="py-24 relative overflow-hidden bg-gradient-to-b from-gray-100 via-gray-50 to-white dark:from-gray-900 dark:via-gray-950 dark:to-black" data-testid="section-bedside-assistance">
+        {/* Subtle background pattern */}
+        <div className="absolute inset-0 opacity-5 dark:opacity-10">
+          <div className="absolute inset-0" style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, currentColor 1px, transparent 0)', backgroundSize: '40px 40px' }} />
+        </div>
+        
         <div className="container mx-auto px-6 lg:px-12 relative z-10">
-          <div className="max-w-5xl mx-auto">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
-              {/* Visual side */}
-              <div className="relative order-2 lg:order-1">
-                <div className="relative">
-                  {/* Heartbeat line visual */}
-                  <svg className="w-full h-48 motion-reduce:hidden" viewBox="0 0 400 150" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Heartbeat monitor line">
-                    <title>Heartbeat Monitor</title>
-                    <path 
-                      d="M0 75 L80 75 L100 75 L120 30 L140 120 L160 45 L180 105 L200 75 L400 75" 
-                      fill="none" 
-                      stroke="#dc2626" 
-                      strokeWidth="4"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <animate 
-                        attributeName="stroke-dasharray" 
-                        from="0 1000" 
-                        to="1000 0" 
-                        dur="2s" 
-                        repeatCount="indefinite"
-                      />
-                    </path>
-                  </svg>
-                  {/* Static heartbeat for reduced motion */}
-                  <svg className="w-full h-48 hidden motion-reduce:block" viewBox="0 0 400 150" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Heartbeat monitor line">
-                    <title>Heartbeat Monitor</title>
-                    <path 
-                      d="M0 75 L80 75 L100 75 L120 30 L140 120 L160 45 L180 105 L200 75 L400 75" 
-                      fill="none" 
-                      stroke="#dc2626" 
-                      strokeWidth="4"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                  {/* Bed icon */}
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <svg className="w-32 h-32 opacity-20" viewBox="0 0 100 80" fill="#dc2626" aria-hidden="true">
-                      <rect x="10" y="50" width="80" height="10" rx="2"/>
-                      <rect x="5" y="55" width="10" height="20" rx="2"/>
-                      <rect x="85" y="55" width="10" height="20" rx="2"/>
-                      <ellipse cx="30" cy="40" rx="15" ry="12"/>
-                      <rect x="45" y="35" width="40" height="20" rx="3"/>
-                    </svg>
+          <div className="max-w-6xl mx-auto">
+            {/* Section header */}
+            <div className="text-center mb-16">
+              <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-4">
+                Superspeciality Support at Patient's <span className="text-red-600">Bedside</span>
+              </h2>
+              <p className="text-lg md:text-xl text-gray-600 dark:text-white/60 max-w-2xl mx-auto">
+                When expert guidance matters most, we bring specialists directly to the patient
+              </p>
+            </div>
+            
+            {/* Premium image showcase */}
+            <div className="relative">
+              {/* Main image container with premium framing */}
+              <div className="relative rounded-2xl overflow-hidden shadow-2xl shadow-black/20 dark:shadow-black/50">
+                {/* Gradient overlay for premium feel */}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent z-10" />
+                <div className="absolute inset-0 bg-gradient-to-r from-red-900/20 to-transparent z-10" />
+                
+                {/* The image */}
+                <img 
+                  src={bedsideImage} 
+                  alt="Specialist providing remote consultation to a patient at bedside via video call"
+                  className="w-full h-auto object-cover"
+                  data-testid="img-bedside-support"
+                />
+                
+                {/* Content overlay at bottom */}
+                <div className="absolute bottom-0 left-0 right-0 z-20 p-8 md:p-12">
+                  <div className="flex flex-wrap items-center gap-4 mb-4">
+                    <div className="flex flex-wrap items-center gap-3 bg-red-600/90 backdrop-blur-sm px-4 py-2 rounded-full">
+                      <div className="w-2 h-2 rounded-full bg-white animate-pulse motion-reduce:animate-none" />
+                      <span className="text-white text-sm font-medium">Live Consultation</span>
+                    </div>
                   </div>
+                  <p className="text-white text-xl md:text-2xl font-light max-w-xl leading-relaxed">
+                    Real-time specialist guidance for critically ill patients, right where care happens
+                  </p>
                 </div>
               </div>
               
-              {/* Text side - Minimal */}
-              <div className="order-1 lg:order-2">
-                <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-6">
-                  Bedside Assistance
-                </h2>
-                <p className="text-xl text-gray-600 dark:text-white/70 mb-8 leading-relaxed">
-                  For critically ill patients when expert guidance matters most.
-                </p>
-                <div className="flex flex-wrap items-center gap-4">
-                  <div className="w-3 h-3 rounded-full bg-red-600 animate-pulse motion-reduce:animate-none" />
-                  <span className="text-lg text-gray-600 dark:text-white/70">Real-time specialist support at the bedside</span>
-                </div>
-              </div>
+              {/* Decorative elements */}
+              <div className="absolute -top-4 -right-4 w-24 h-24 border-t-4 border-r-4 border-red-600/30 rounded-tr-3xl" />
+              <div className="absolute -bottom-4 -left-4 w-24 h-24 border-b-4 border-l-4 border-red-600/30 rounded-bl-3xl" />
+              
+              {/* Floating accent */}
+              <div className="absolute -right-2 top-1/2 -translate-y-1/2 w-1 h-32 bg-gradient-to-b from-transparent via-red-600 to-transparent rounded-full hidden lg:block" />
             </div>
           </div>
         </div>
