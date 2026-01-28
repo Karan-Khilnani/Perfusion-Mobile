@@ -9,13 +9,7 @@ import labVideo from "@assets/perfusion_video_h264.mp4";
 
 export default function LandingPage() {
   return (
-    <div className="min-h-screen w-full bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:bg-[#0a0a0a] text-gray-900 dark:text-white overflow-x-hidden transition-colors duration-500 relative">
-      {/* Premium dark theme background with subtle depth */}
-      <div className="hidden dark:block fixed inset-0 z-0">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(120,40,40,0.15),transparent)]" />
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_50%_80%_at_80%_50%,rgba(60,20,20,0.1),transparent)]" />
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_60%_60%_at_20%_80%,rgba(40,40,50,0.08),transparent)]" />
-      </div>
+    <div className="min-h-screen w-full bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-gray-950 dark:via-gray-900 dark:to-black text-gray-900 dark:text-white overflow-x-hidden transition-colors duration-500">
       {/* Theme Toggle - Fixed position using global component */}
       <div className="fixed top-6 right-6 z-50" data-testid="container-theme-toggle">
         <ThemeToggle />
@@ -211,12 +205,12 @@ export default function LandingPage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-center relative z-10">
               {/* Remote Hospitals */}
               <div className="text-center">
-                <div className="relative mx-auto w-40 h-40 rounded-full bg-gradient-to-br from-gray-100 to-white dark:from-[#151515] dark:to-[#0a0a0a] shadow-xl flex items-center justify-center border border-gray-200 dark:border-white/10">
+                <div className="relative mx-auto w-40 h-40 rounded-full bg-gradient-to-br from-gray-100 to-white dark:from-gray-800 dark:to-gray-900 shadow-xl flex items-center justify-center border-2 border-gray-200 dark:border-gray-700">
                   <div className="text-center">
                     <svg className="w-16 h-16 mx-auto mb-2" viewBox="0 0 64 64" fill="none" role="img" aria-label="Remote hospital building">
                       <title>Remote Hospital</title>
-                      <rect x="16" y="24" width="32" height="32" rx="2" className="fill-gray-200 dark:fill-[#1a1a1a]" stroke="#dc2626" strokeWidth="2"/>
-                      <rect x="26" y="8" width="12" height="24" rx="1" className="fill-gray-100 dark:fill-[#222]" stroke="#dc2626" strokeWidth="2"/>
+                      <rect x="16" y="24" width="32" height="32" rx="2" className="fill-gray-200 dark:fill-gray-700" stroke="#dc2626" strokeWidth="2"/>
+                      <rect x="26" y="8" width="12" height="24" rx="1" className="fill-gray-100 dark:fill-gray-600" stroke="#dc2626" strokeWidth="2"/>
                       <rect x="28" y="34" width="8" height="12" fill="#dc2626"/>
                       <line x1="32" y1="14" x2="32" y2="26" stroke="#dc2626" strokeWidth="2"/>
                       <line x1="26" y1="20" x2="38" y2="20" stroke="#dc2626" strokeWidth="2"/>
@@ -229,8 +223,8 @@ export default function LandingPage() {
               
               {/* Perfusion Platform - Center */}
               <div className="text-center">
-                <div className="relative mx-auto w-48 h-48 rounded-full bg-gradient-to-br from-gray-100 to-white dark:from-[#1a1a1a] dark:to-[#0a0a0a] shadow-2xl shadow-red-900/30 flex items-center justify-center border-2 border-gray-200 dark:border-red-800/40">
-                  <div className="absolute inset-3 rounded-full bg-white dark:bg-[#0a0a0a] flex items-center justify-center">
+                <div className="relative mx-auto w-48 h-48 rounded-full bg-gradient-to-br from-red-700 via-red-600 to-red-800 shadow-2xl shadow-red-900/50 flex items-center justify-center">
+                  <div className="absolute inset-2 rounded-full bg-gradient-to-br from-red-600 to-red-700 flex items-center justify-center">
                     <img 
                       src={logoImage} 
                       alt="Perfusion" 
@@ -246,12 +240,12 @@ export default function LandingPage() {
               
               {/* Mainstream Healthcare */}
               <div className="text-center">
-                <div className="relative mx-auto w-40 h-40 rounded-full bg-gradient-to-br from-gray-100 to-white dark:from-[#151515] dark:to-[#0a0a0a] shadow-xl flex items-center justify-center border border-gray-200 dark:border-white/10">
+                <div className="relative mx-auto w-40 h-40 rounded-full bg-gradient-to-br from-gray-100 to-white dark:from-gray-800 dark:to-gray-900 shadow-xl flex items-center justify-center border-2 border-gray-200 dark:border-gray-700">
                   <div className="text-center">
                     <svg className="w-16 h-16 mx-auto mb-2" viewBox="0 0 64 64" fill="none" role="img" aria-label="Mainstream healthcare facility">
                       <title>Mainstream Healthcare</title>
-                      <rect x="8" y="20" width="48" height="36" rx="2" className="fill-gray-200 dark:fill-[#1a1a1a]" stroke="#dc2626" strokeWidth="2"/>
-                      <rect x="22" y="8" width="20" height="20" rx="1" className="fill-gray-100 dark:fill-[#222]" stroke="#dc2626" strokeWidth="2"/>
+                      <rect x="8" y="20" width="48" height="36" rx="2" className="fill-gray-200 dark:fill-gray-700" stroke="#dc2626" strokeWidth="2"/>
+                      <rect x="22" y="8" width="20" height="20" rx="1" className="fill-gray-100 dark:fill-gray-600" stroke="#dc2626" strokeWidth="2"/>
                       <rect x="26" y="36" width="12" height="20" fill="#dc2626"/>
                       <circle cx="32" cy="14" r="4" fill="#dc2626"/>
                       <rect x="14" y="28" width="8" height="8" fill="#dc2626" opacity="0.6"/>
@@ -277,9 +271,15 @@ export default function LandingPage() {
                 <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-6">
                   Superspeciality Support at Patient's <span className="text-red-600">Bedside</span>
                 </h2>
-                <p className="text-lg md:text-xl text-gray-600 dark:text-white/60 leading-relaxed">
+                <p className="text-lg md:text-xl text-gray-600 dark:text-white/60 mb-8 leading-relaxed">
                   When expert guidance matters most, we bring specialists directly to the patient. Real-time consultations for critically ill patients, right where care happens.
                 </p>
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="flex flex-wrap items-center gap-2 bg-red-600/10 dark:bg-red-600/20 px-4 py-2 rounded-full border border-red-600/20">
+                    <div className="w-2 h-2 rounded-full bg-red-600 animate-pulse motion-reduce:animate-none" />
+                    <span className="text-red-600 dark:text-red-400 text-sm font-medium">Live Consultation Available</span>
+                  </div>
+                </div>
               </div>
               
               {/* Image side - color-matched with overlay */}
@@ -296,12 +296,6 @@ export default function LandingPage() {
                     className="w-full h-[280px] md:h-[320px] lg:h-[380px] object-cover grayscale-[30%] contrast-[1.1]"
                     data-testid="img-bedside-support"
                   />
-                  
-                  {/* Live consultation badge inside image */}
-                  <div className="absolute bottom-4 left-4 z-20 flex flex-wrap items-center gap-2 bg-red-600/90 backdrop-blur-sm px-4 py-2 rounded-full">
-                    <div className="w-2 h-2 rounded-full bg-white animate-pulse motion-reduce:animate-none" />
-                    <span className="text-white text-sm font-medium">Live Consultation</span>
-                  </div>
                 </div>
                 {/* Subtle corner accents */}
                 <div className="absolute -top-3 -left-3 w-12 h-12 border-t-2 border-l-2 border-red-600/30 rounded-tl-xl" />
