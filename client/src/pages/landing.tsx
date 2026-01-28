@@ -9,9 +9,9 @@ import labVideo from "@assets/perfusion_video_h264.mp4";
 
 export default function LandingPage() {
   return (
-    <div className="min-h-screen w-full bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-[#0d0e10] dark:via-[#121315] dark:to-[#0a0b0c] text-gray-900 dark:text-white overflow-x-hidden transition-colors duration-500 relative">
-      {/* Dark theme texture overlay - grainy charcoal texture */}
-      <div className="hidden dark:block fixed inset-0 opacity-[0.15] pointer-events-none z-0" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=\'0 0 512 512\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'noise\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.65\' numOctaves=\'3\' stitchTiles=\'stitch\'/%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23noise)\'/%3E%3C/svg%3E")' }} />
+    <div className="min-h-screen w-full bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-[#0f1011] dark:via-[#131416] dark:to-[#0c0d0e] text-gray-900 dark:text-white overflow-x-hidden transition-colors duration-500 relative">
+      {/* Dark theme texture overlay - intense grainy charcoal texture */}
+      <div className="hidden dark:block fixed inset-0 opacity-40 pointer-events-none z-0" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=\'0 0 256 256\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'noise\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.8\' numOctaves=\'4\' stitchTiles=\'stitch\'/%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23noise)\'/%3E%3C/svg%3E")' }} />
       {/* Theme Toggle - Fixed position using global component */}
       <div className="fixed top-6 right-6 z-50" data-testid="container-theme-toggle">
         <ThemeToggle />
@@ -207,7 +207,7 @@ export default function LandingPage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-center relative z-10">
               {/* Remote Hospitals */}
               <div className="text-center">
-                <div className="relative mx-auto w-40 h-40 rounded-full bg-gradient-to-br from-gray-100 to-white dark:from-gray-800 dark:to-gray-900 shadow-xl flex items-center justify-center border-2 border-gray-200 dark:border-gray-700">
+                <div className="relative mx-auto w-40 h-40 rounded-full bg-gradient-to-br from-gray-100 to-white dark:from-[#1a1b1d] dark:to-[#0f1011] shadow-xl flex items-center justify-center border-2 border-gray-200 dark:border-red-900/30">
                   <div className="text-center">
                     <svg className="w-16 h-16 mx-auto mb-2" viewBox="0 0 64 64" fill="none" role="img" aria-label="Remote hospital building">
                       <title>Remote Hospital</title>
@@ -225,8 +225,8 @@ export default function LandingPage() {
               
               {/* Perfusion Platform - Center */}
               <div className="text-center">
-                <div className="relative mx-auto w-48 h-48 rounded-full bg-gradient-to-br from-gray-100 to-white dark:from-gray-800 dark:to-gray-900 shadow-2xl shadow-red-900/30 flex items-center justify-center border-4 border-red-600/50">
-                  <div className="absolute inset-3 rounded-full bg-white dark:bg-gray-900 flex items-center justify-center">
+                <div className="relative mx-auto w-48 h-48 rounded-full bg-gradient-to-br from-gray-100 to-white dark:from-[#1a1b1d] dark:to-[#0f1011] shadow-2xl shadow-red-900/30 flex items-center justify-center border-4 border-red-600/50">
+                  <div className="absolute inset-3 rounded-full bg-white dark:bg-[#0f1011] flex items-center justify-center">
                     <img 
                       src={logoImage} 
                       alt="Perfusion" 
@@ -242,7 +242,7 @@ export default function LandingPage() {
               
               {/* Mainstream Healthcare */}
               <div className="text-center">
-                <div className="relative mx-auto w-40 h-40 rounded-full bg-gradient-to-br from-gray-100 to-white dark:from-gray-800 dark:to-gray-900 shadow-xl flex items-center justify-center border-2 border-gray-200 dark:border-gray-700">
+                <div className="relative mx-auto w-40 h-40 rounded-full bg-gradient-to-br from-gray-100 to-white dark:from-[#1a1b1d] dark:to-[#0f1011] shadow-xl flex items-center justify-center border-2 border-gray-200 dark:border-red-900/30">
                   <div className="text-center">
                     <svg className="w-16 h-16 mx-auto mb-2" viewBox="0 0 64 64" fill="none" role="img" aria-label="Mainstream healthcare facility">
                       <title>Mainstream Healthcare</title>
