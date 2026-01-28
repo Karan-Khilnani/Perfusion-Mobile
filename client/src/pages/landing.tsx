@@ -5,7 +5,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import logoImage from "@assets/Pitchdeck_logo_1769590061051.png";
 import indiaMapImage from "@assets/ChatGPT_Image_Dec_18__2025__08_43_37_PM-removebg-preview_1769521462134.png";
 import bedsideImage from "@assets/ChatGPT_Image_Dec_22,_2025,_09_07_53_PM_1769597609254.png";
-import labVideo from "@assets/perfusion_video-1_1769634248549.mp4";
+import labVideo from "@assets/perfusion_video_h264.mp4";
 
 export default function LandingPage() {
   return (
@@ -404,18 +404,17 @@ export default function LandingPage() {
         <div className="container mx-auto px-6 lg:px-12 relative z-10">
           <div className="max-w-6xl mx-auto">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center">
-              {/* Video side */}
+              {/* Video side - larger */}
               <div className="relative order-2 lg:order-1">
                 <div className="relative rounded-2xl overflow-hidden shadow-2xl">
                   {/* Decorative frame */}
-                  <div className="absolute -inset-1 bg-gradient-to-r from-red-600 to-red-400 rounded-2xl opacity-20 blur-sm" />
+                  <div className="absolute -inset-2 bg-gradient-to-r from-red-600 to-red-400 rounded-3xl opacity-20 blur-md" />
                   <video 
                     autoPlay
                     loop
                     muted
                     playsInline
-                    controls
-                    className="relative w-full h-auto rounded-2xl bg-gray-900"
+                    className="relative w-full h-[350px] md:h-[450px] lg:h-[500px] object-cover rounded-2xl bg-gray-900"
                     data-testid="video-lab-diagnostics"
                   >
                     <source src={labVideo} type="video/mp4" />
@@ -423,8 +422,8 @@ export default function LandingPage() {
                   </video>
                 </div>
                 {/* Corner accents */}
-                <div className="absolute -top-3 -left-3 w-16 h-16 border-t-4 border-l-4 border-red-600/40 rounded-tl-2xl" />
-                <div className="absolute -bottom-3 -right-3 w-16 h-16 border-b-4 border-r-4 border-red-600/40 rounded-br-2xl" />
+                <div className="absolute -top-4 -left-4 w-20 h-20 border-t-4 border-l-4 border-red-600/50 rounded-tl-3xl" />
+                <div className="absolute -bottom-4 -right-4 w-20 h-20 border-b-4 border-r-4 border-red-600/50 rounded-br-3xl" />
               </div>
               
               {/* Text side */}
