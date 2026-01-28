@@ -5,6 +5,8 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import logoImage from "@assets/Pitchdeck_logo_1769590061051.png";
 import indiaMapImage from "@assets/ChatGPT_Image_Dec_18__2025__08_43_37_PM-removebg-preview_1769521462134.png";
 import bedsideImage from "@assets/ChatGPT_Image_Dec_22,_2025,_09_07_53_PM_1769597609254.png";
+import doctorPrescribingImage from "@assets/images/doctor-prescribing.png";
+import deliveryAgentImage from "@assets/images/delivery-agent-pickup.png";
 
 export default function LandingPage() {
   return (
@@ -412,151 +414,77 @@ export default function LandingPage() {
               </p>
             </div>
             
-            {/* Animated logistics flow */}
-            <div className="relative bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 rounded-3xl p-8 md:p-12 shadow-xl overflow-hidden">
-              {/* Background grid pattern */}
-              <div className="absolute inset-0 opacity-5" style={{ backgroundImage: 'linear-gradient(90deg, currentColor 1px, transparent 1px), linear-gradient(currentColor 1px, transparent 1px)', backgroundSize: '40px 40px' }} />
-              
-              {/* The animated scene */}
-              <div className="relative h-[400px] md:h-[500px]">
-                
-                {/* Hospital/ICU Room Background */}
-                <div className="absolute inset-0 flex items-end justify-center">
-                  <svg className="w-full h-full" viewBox="0 0 800 400" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
-                    {/* ICU Room walls */}
-                    <rect x="50" y="100" width="700" height="280" fill="none" stroke="currentColor" strokeWidth="2" opacity="0.2" rx="4" />
-                    
-                    {/* Door frame */}
-                    <rect x="620" y="120" width="100" height="240" fill="none" stroke="currentColor" strokeWidth="3" opacity="0.3" rx="2" />
-                    <rect x="665" y="230" width="8" height="20" fill="currentColor" opacity="0.3" rx="2" />
-                    
-                    {/* Patient bed */}
-                    <rect x="150" y="280" width="180" height="15" fill="#dc2626" opacity="0.3" rx="3" />
-                    <rect x="140" y="295" width="10" height="40" fill="#dc2626" opacity="0.2" rx="2" />
-                    <rect x="320" y="295" width="10" height="40" fill="#dc2626" opacity="0.2" rx="2" />
-                    <ellipse cx="180" cy="265" rx="25" ry="18" fill="currentColor" opacity="0.15" />
-                    <rect x="200" y="250" width="100" height="35" fill="currentColor" opacity="0.1" rx="3" />
-                    
-                    {/* IV stand */}
-                    <line x1="350" y1="180" x2="350" y2="300" stroke="currentColor" strokeWidth="2" opacity="0.2" />
-                    <rect x="340" y="170" width="20" height="30" fill="currentColor" opacity="0.15" rx="3" />
-                  </svg>
-                </div>
-                
-                {/* Doctor with prescription - Left side */}
-                <div className="absolute left-[10%] md:left-[15%] top-1/2 -translate-y-1/2">
-                  <div className="relative">
-                    {/* Doctor figure */}
-                    <svg className="w-24 h-36 md:w-32 md:h-48" viewBox="0 0 80 120" fill="none" aria-hidden="true">
-                      {/* Head */}
-                      <circle cx="40" cy="20" r="15" fill="#f5d0c5" />
-                      {/* Hair */}
-                      <path d="M28 15 Q40 5 52 15 Q50 10 40 10 Q30 10 28 15" fill="#4a3728" />
-                      {/* Body - white coat */}
-                      <path d="M25 35 L55 35 L60 100 L20 100 Z" fill="white" stroke="#e5e5e5" strokeWidth="1" />
-                      {/* Stethoscope */}
-                      <path d="M35 40 Q30 50 35 60" stroke="#374151" strokeWidth="2" fill="none" />
-                      <circle cx="35" cy="62" r="4" fill="#374151" />
-                      {/* Arms */}
-                      <path d="M25 40 L10 70" stroke="#f5d0c5" strokeWidth="6" strokeLinecap="round" />
-                      <path d="M55 40 L70 55" stroke="#f5d0c5" strokeWidth="6" strokeLinecap="round" />
-                    </svg>
-                    
-                    {/* Prescription pad with animation */}
-                    <div className="absolute -right-16 top-8 md:-right-20 md:top-12">
-                      <div className="bg-white dark:bg-gray-100 rounded-lg shadow-lg p-3 w-32 md:w-40 transform rotate-6">
-                        <div className="border-b-2 border-red-600 pb-1 mb-2">
-                          <span className="text-[8px] md:text-[10px] text-red-600 font-bold">Rx</span>
+            {/* Two image cards with animated connection */}
+            <div className="relative">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-16">
+                {/* Doctor prescribing */}
+                <div className="relative group">
+                  <div className="relative rounded-2xl overflow-hidden shadow-2xl">
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent z-10" />
+                    <img 
+                      src={doctorPrescribingImage} 
+                      alt="Doctor prescribing lab test in ICU"
+                      className="w-full h-80 md:h-96 object-cover"
+                      data-testid="img-doctor-prescribing"
+                    />
+                    <div className="absolute bottom-0 left-0 right-0 z-20 p-6">
+                      <div className="bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm rounded-lg p-4 shadow-lg">
+                        <div className="border-b-2 border-red-600 pb-2 mb-2">
+                          <span className="text-red-600 font-bold">Rx</span>
                         </div>
-                        <div className="space-y-1">
-                          <div className="h-1.5 bg-gray-300 rounded w-3/4" />
-                          <div className="flex flex-wrap items-center gap-1">
-                            <span className="text-[10px] md:text-xs text-gray-800 font-medium animate-pulse motion-reduce:animate-none">Serum ANA</span>
-                          </div>
-                          <div className="h-1 bg-gray-200 rounded w-1/2" />
-                        </div>
+                        <p className="text-gray-800 dark:text-white font-medium animate-pulse motion-reduce:animate-none">Serum ANA</p>
                       </div>
                     </div>
                   </div>
+                  <p className="text-center mt-4 text-lg font-medium text-gray-600 dark:text-white/70">Doctor prescribes the test</p>
                 </div>
                 
-                {/* Animated path - dotted line from prescription to door */}
-                <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 800 400" preserveAspectRatio="xMidYMid meet">
-                  <path 
-                    d="M280 200 C350 200 400 180 500 200 S600 220 670 240"
-                    stroke="#dc2626"
-                    strokeWidth="3"
-                    strokeDasharray="10 10"
-                    fill="none"
-                    opacity="0.4"
-                  >
-                    <animate 
-                      attributeName="stroke-dashoffset"
-                      from="100"
-                      to="0"
-                      dur="2s"
-                      repeatCount="indefinite"
-                    />
-                  </path>
-                </svg>
-                
-                {/* Moving sample/package along the path */}
-                <div className="absolute motion-reduce:hidden" style={{ animation: 'movePackage 4s ease-in-out infinite' }}>
-                  <svg className="w-8 h-8 md:w-10 md:h-10" viewBox="0 0 40 40" fill="none">
-                    <rect x="5" y="10" width="30" height="25" rx="3" fill="#dc2626" />
-                    <rect x="10" y="15" width="20" height="3" rx="1" fill="white" opacity="0.8" />
-                    <path d="M15 5 L20 10 L25 5" stroke="#dc2626" strokeWidth="2" fill="none" />
-                  </svg>
-                </div>
-                
-                {/* Delivery agent at door - Right side */}
-                <div className="absolute right-[8%] md:right-[12%] top-1/2 -translate-y-1/2">
-                  <div className="relative">
-                    {/* Agent figure with Perfusion uniform */}
-                    <svg className="w-20 h-32 md:w-28 md:h-44" viewBox="0 0 70 110" fill="none" aria-hidden="true">
-                      {/* Head with cap */}
-                      <circle cx="35" cy="18" r="13" fill="#e8c4b8" />
-                      <path d="M22 12 Q35 0 48 12 L48 16 L22 16 Z" fill="#dc2626" />
-                      
-                      {/* Body - Perfusion red uniform */}
-                      <path d="M22 30 L48 30 L52 95 L18 95 Z" fill="#dc2626" />
-                      
-                      {/* Perfusion logo on chest */}
-                      <rect x="28" y="40" width="14" height="8" rx="1" fill="white" opacity="0.9" />
-                      <text x="35" y="47" fontSize="5" fill="#dc2626" textAnchor="middle" fontWeight="bold">P</text>
-                      
-                      {/* Arms */}
-                      <path d="M22 35 L8 60" stroke="#dc2626" strokeWidth="8" strokeLinecap="round" />
-                      <path d="M48 35 L58 55" stroke="#dc2626" strokeWidth="8" strokeLinecap="round" />
-                      
-                      {/* Hands */}
-                      <circle cx="8" cy="62" r="5" fill="#e8c4b8" />
-                      <circle cx="60" cy="57" r="5" fill="#e8c4b8" />
-                      
-                      {/* Legs */}
-                      <rect x="24" y="95" width="10" height="12" fill="#374151" rx="2" />
-                      <rect x="38" y="95" width="10" height="12" fill="#374151" rx="2" />
-                      
-                      {/* Collection bag */}
-                      <rect x="0" y="50" width="18" height="22" rx="3" fill="white" stroke="#dc2626" strokeWidth="2" />
-                      <text x="9" y="64" fontSize="6" fill="#dc2626" textAnchor="middle" fontWeight="bold">LAB</text>
-                    </svg>
-                    
-                    {/* Speech bubble */}
-                    <div className="absolute -top-8 -left-4 md:-top-10 md:-left-8 bg-white dark:bg-gray-100 rounded-xl px-3 py-2 shadow-lg">
-                      <p className="text-[10px] md:text-xs text-gray-800 font-medium whitespace-nowrap">Sample pickup!</p>
-                      <div className="absolute -bottom-2 left-4 w-0 h-0 border-l-4 border-r-4 border-t-8 border-transparent border-t-white dark:border-t-gray-100" />
+                {/* Animated arrow between cards - visible on large screens */}
+                <div className="hidden lg:flex absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-20">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="w-24 h-1 bg-gradient-to-r from-red-600 to-red-400 rounded-full relative overflow-hidden">
+                      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white to-transparent animate-pulse motion-reduce:animate-none" style={{ animation: 'shimmer 1.5s infinite' }} />
                     </div>
+                    <ArrowRight className="w-8 h-8 text-red-600 animate-pulse motion-reduce:animate-none" />
                   </div>
                 </div>
                 
-                {/* Fast turnaround badge */}
-                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex flex-wrap items-center gap-3 bg-red-600 text-white px-6 py-3 rounded-full shadow-lg">
-                  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                {/* Mobile arrow */}
+                <div className="flex lg:hidden justify-center -my-4 z-20 relative">
+                  <div className="bg-red-600 rounded-full p-3 shadow-lg">
+                    <ArrowRight className="w-6 h-6 text-white rotate-90" />
+                  </div>
+                </div>
+                
+                {/* Delivery agent pickup */}
+                <div className="relative group">
+                  <div className="relative rounded-2xl overflow-hidden shadow-2xl">
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent z-10" />
+                    <img 
+                      src={deliveryAgentImage} 
+                      alt="Perfusion delivery agent picking up sample at hospital"
+                      className="w-full h-80 md:h-96 object-cover"
+                      data-testid="img-delivery-agent"
+                    />
+                    <div className="absolute bottom-0 left-0 right-0 z-20 p-6">
+                      <div className="flex flex-wrap items-center gap-3 bg-red-600/90 backdrop-blur-sm px-4 py-2 rounded-full w-fit">
+                        <div className="w-2 h-2 rounded-full bg-white animate-pulse motion-reduce:animate-none" />
+                        <span className="text-white font-medium">Sample Pickup</span>
+                      </div>
+                    </div>
+                  </div>
+                  <p className="text-center mt-4 text-lg font-medium text-gray-600 dark:text-white/70">We handle the rest</p>
+                </div>
+              </div>
+              
+              {/* Fast turnaround badge */}
+              <div className="flex justify-center mt-12">
+                <div className="flex flex-wrap items-center gap-3 bg-red-600 text-white px-8 py-4 rounded-full shadow-xl">
+                  <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <circle cx="12" cy="12" r="10" />
                     <path d="M12 6 L12 12 L16 14" />
                   </svg>
-                  <span className="font-semibold text-sm md:text-base">Fast Turnaround Time</span>
+                  <span className="font-bold text-lg">Fast Turnaround Time</span>
                 </div>
               </div>
             </div>
@@ -568,14 +496,10 @@ export default function LandingPage() {
           </div>
         </div>
         
-        {/* CSS animation for package movement */}
         <style>{`
-          @keyframes movePackage {
-            0% { left: 30%; top: 45%; opacity: 0; }
-            10% { opacity: 1; }
-            50% { left: 55%; top: 42%; }
-            90% { opacity: 1; }
-            100% { left: 75%; top: 50%; opacity: 0; }
+          @keyframes shimmer {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
           }
         `}</style>
       </section>
