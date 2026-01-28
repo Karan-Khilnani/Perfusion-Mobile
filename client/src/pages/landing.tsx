@@ -9,9 +9,9 @@ import labVideo from "@assets/perfusion_video_h264.mp4";
 
 export default function LandingPage() {
   return (
-    <div className="min-h-screen w-full bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-[#1a1d23] dark:via-[#1e2128] dark:to-[#14161a] text-gray-900 dark:text-white overflow-x-hidden transition-colors duration-500 relative">
-      {/* Dark theme texture overlay */}
-      <div className="hidden dark:block fixed inset-0 opacity-[0.03] pointer-events-none z-0" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=\'0 0 256 256\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'noise\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.9\' numOctaves=\'4\' stitchTiles=\'stitch\'/%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23noise)\'/%3E%3C/svg%3E")' }} />
+    <div className="min-h-screen w-full bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-[#0d0e10] dark:via-[#121315] dark:to-[#0a0b0c] text-gray-900 dark:text-white overflow-x-hidden transition-colors duration-500 relative">
+      {/* Dark theme texture overlay - grainy charcoal texture */}
+      <div className="hidden dark:block fixed inset-0 opacity-[0.15] pointer-events-none z-0" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=\'0 0 512 512\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'noise\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.65\' numOctaves=\'3\' stitchTiles=\'stitch\'/%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23noise)\'/%3E%3C/svg%3E")' }} />
       {/* Theme Toggle - Fixed position using global component */}
       <div className="fixed top-6 right-6 z-50" data-testid="container-theme-toggle">
         <ThemeToggle />
@@ -273,15 +273,9 @@ export default function LandingPage() {
                 <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-6">
                   Superspeciality Support at Patient's <span className="text-red-600">Bedside</span>
                 </h2>
-                <p className="text-lg md:text-xl text-gray-600 dark:text-white/60 mb-8 leading-relaxed">
+                <p className="text-lg md:text-xl text-gray-600 dark:text-white/60 leading-relaxed">
                   When expert guidance matters most, we bring specialists directly to the patient. Real-time consultations for critically ill patients, right where care happens.
                 </p>
-                <div className="flex flex-wrap items-center gap-3">
-                  <div className="flex flex-wrap items-center gap-2 bg-red-600/10 dark:bg-red-600/20 px-4 py-2 rounded-full border border-red-600/20">
-                    <div className="w-2 h-2 rounded-full bg-red-600 animate-pulse motion-reduce:animate-none" />
-                    <span className="text-red-600 dark:text-red-400 text-sm font-medium">Live Consultation Available</span>
-                  </div>
-                </div>
               </div>
               
               {/* Image side - color-matched with overlay */}
@@ -298,6 +292,12 @@ export default function LandingPage() {
                     className="w-full h-[280px] md:h-[320px] lg:h-[380px] object-cover grayscale-[30%] contrast-[1.1]"
                     data-testid="img-bedside-support"
                   />
+                  
+                  {/* Live consultation badge inside image */}
+                  <div className="absolute bottom-4 left-4 z-20 flex flex-wrap items-center gap-2 bg-red-600/90 backdrop-blur-sm px-4 py-2 rounded-full">
+                    <div className="w-2 h-2 rounded-full bg-white animate-pulse motion-reduce:animate-none" />
+                    <span className="text-white text-sm font-medium">Live Consultation</span>
+                  </div>
                 </div>
                 {/* Subtle corner accents */}
                 <div className="absolute -top-3 -left-3 w-12 h-12 border-t-2 border-l-2 border-red-600/30 rounded-tl-xl" />
