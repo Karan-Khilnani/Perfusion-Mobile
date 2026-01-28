@@ -5,8 +5,8 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import logoImage from "@assets/Pitchdeck_logo_1769590061051.png";
 import indiaMapImage from "@assets/ChatGPT_Image_Dec_18__2025__08_43_37_PM-removebg-preview_1769521462134.png";
 import bedsideImage from "@assets/ChatGPT_Image_Dec_22,_2025,_09_07_53_PM_1769597609254.png";
-import doctorPrescribingImage from "@assets/images/doctor-prescribing.png";
-import deliveryAgentImage from "@assets/images/delivery-agent-pickup.png";
+import doctorPrescribingImage from "@assets/doctor-prescribing.png";
+import deliveryAgentImage from "@assets/delivery-agent-pickup.png";
 
 export default function LandingPage() {
   return (
