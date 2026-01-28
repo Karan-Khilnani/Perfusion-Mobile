@@ -110,7 +110,7 @@ export default function LandingPage() {
             <img
               src={logoImage}
               alt="Perfusion"
-              className="h-auto w-[28rem] md:w-[36rem] lg:w-[44rem] drop-shadow-2xl"
+              className="h-auto w-[14rem] md:w-[18rem] lg:w-[22rem] drop-shadow-2xl"
               data-testid="img-landing-logo"
             />
             
