@@ -163,7 +163,7 @@ export default function LandingPage() {
       </section>
 
       {/* Platform Connection Visual Section */}
-      <section className="py-24 relative overflow-hidden bg-gray-50 dark:bg-gray-950">
+      <section className="py-24 relative overflow-hidden">
         <div className="container mx-auto px-6 lg:px-12">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-4">
@@ -261,146 +261,53 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Services Section - Visual Cards with Graphics */}
-      <section className="py-24 bg-white dark:bg-gray-900" data-testid="section-services">
-        <div className="container mx-auto px-6 lg:px-12">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-4">
-              Our Services
-            </h2>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-10 lg:gap-16">
-            {/* Superspeciality Consultations */}
-            <div className="text-center" data-testid="card-service-consultations">
-              <div className="relative mx-auto w-56 h-56 rounded-3xl bg-white/80 dark:bg-gray-900/50 shadow-xl overflow-hidden mb-8">
-                <div className="absolute inset-0 bg-gradient-to-br from-red-600/20 to-transparent" />
-                <div className="h-full flex items-center justify-center p-6">
-                  <svg className="w-32 h-32" viewBox="0 0 120 120" fill="none" role="img" aria-label="Doctor video consultation">
-                    <title>Video Consultation</title>
-                    <circle cx="60" cy="35" r="20" fill="#dc2626"/>
-                    <ellipse cx="60" cy="80" rx="35" ry="25" fill="#dc2626" opacity="0.8"/>
-                    <rect x="75" y="15" width="30" height="25" rx="3" className="fill-gray-100 dark:fill-gray-800" stroke="#dc2626" strokeWidth="2"/>
-                    <circle cx="90" cy="27" r="6" fill="#dc2626" opacity="0.6"/>
-                    <path d="M85 35 L95 35" stroke="#dc2626" strokeWidth="2" strokeLinecap="round"/>
-                  </svg>
-                </div>
-              </div>
-              <h3 className="text-2xl font-bold mb-3" data-testid="text-service-consultations-title">Superspeciality Consultations</h3>
-              <p className="text-gray-600 dark:text-white/70 leading-relaxed max-w-xs mx-auto">
-                Video consultations with leading specialists. Expert opinions from anywhere in India.
-              </p>
-            </div>
-            
-            {/* Advanced Diagnostics */}
-            <div className="text-center" data-testid="card-service-diagnostics">
-              <div className="relative mx-auto w-56 h-56 rounded-3xl bg-white/80 dark:bg-gray-900/50 shadow-xl overflow-hidden mb-8">
-                <div className="absolute inset-0 bg-gradient-to-br from-red-600/20 to-transparent" />
-                <div className="h-full flex items-center justify-center p-6">
-                  <svg className="w-32 h-32" viewBox="0 0 120 120" fill="none" role="img" aria-label="Lab diagnostic equipment">
-                    <title>Lab Diagnostics</title>
-                    <rect x="30" y="40" width="40" height="55" rx="3" fill="#dc2626" opacity="0.9"/>
-                    <rect x="35" y="50" width="30" height="35" rx="2" className="fill-gray-100 dark:fill-gray-800"/>
-                    <circle cx="50" cy="67" r="10" fill="#dc2626" opacity="0.5"/>
-                    <rect x="70" y="25" width="25" height="40" rx="8" fill="#dc2626" opacity="0.7"/>
-                    <ellipse cx="82" cy="22" rx="5" ry="3" fill="#dc2626"/>
-                    <path d="M20 95 L40 75 L50 85 L80 55 L100 75" stroke="#dc2626" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                </div>
-              </div>
-              <h3 className="text-2xl font-bold mb-3" data-testid="text-service-diagnostics-title">Advanced Diagnostics</h3>
-              <p className="text-gray-600 dark:text-white/70 leading-relaxed max-w-xs mx-auto">
-                64+ diagnostic tests with doorstep sample pickup. Accurate results, fastest turnaround.
-              </p>
-            </div>
-            
-            {/* Teleradiology */}
-            <div className="text-center" data-testid="card-service-teleradiology">
-              <div className="relative mx-auto w-56 h-56 rounded-3xl bg-white/80 dark:bg-gray-900/50 shadow-xl overflow-hidden mb-8">
-                <div className="absolute inset-0 bg-gradient-to-br from-red-600/20 to-transparent" />
-                <div className="h-full flex items-center justify-center p-6">
-                  <svg className="w-32 h-32" viewBox="0 0 120 120" fill="none" role="img" aria-label="X-ray and radiology imaging">
-                    <title>Teleradiology</title>
-                    <rect x="20" y="20" width="80" height="80" rx="8" className="fill-gray-200 dark:fill-gray-800" stroke="#dc2626" strokeWidth="3"/>
-                    <ellipse cx="60" cy="55" rx="25" ry="30" fill="#dc2626" opacity="0.3"/>
-                    <path d="M60 35 L60 75" stroke="#dc2626" strokeWidth="4" strokeLinecap="round"/>
-                    <path d="M45 50 L75 50" stroke="#dc2626" strokeWidth="4" strokeLinecap="round"/>
-                    <circle cx="85" cy="35" r="10" fill="#dc2626"/>
-                    <path d="M82 35 L88 35 M85 32 L85 38" stroke="white" strokeWidth="2"/>
-                  </svg>
-                </div>
-              </div>
-              <h3 className="text-2xl font-bold mb-3" data-testid="text-service-teleradiology-title">Teleradiology Services</h3>
-              <p className="text-gray-600 dark:text-white/70 leading-relaxed max-w-xs mx-auto">
-                28 modalities supported. Expert radiology reports with priority emergency handling.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Bedside Assistance Section - Premium visual with integrated image */}
-      <section className="py-24 relative overflow-hidden bg-gradient-to-b from-gray-100 via-gray-50 to-white dark:from-gray-900 dark:via-gray-950 dark:to-black" data-testid="section-bedside-assistance">
-        {/* Subtle background pattern */}
-        <div className="absolute inset-0 opacity-5 dark:opacity-10">
-          <div className="absolute inset-0" style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, currentColor 1px, transparent 0)', backgroundSize: '40px 40px' }} />
-        </div>
-        
+      {/* Bedside Assistance Section - Refined with color-matched image */}
+      <section className="py-24 relative" data-testid="section-bedside-assistance">
         <div className="container mx-auto px-6 lg:px-12 relative z-10">
           <div className="max-w-6xl mx-auto">
-            {/* Section header */}
-            <div className="text-center mb-16">
-              <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-4">
-                Superspeciality Support at Patient's <span className="text-red-600">Bedside</span>
-              </h2>
-              <p className="text-lg md:text-xl text-gray-600 dark:text-white/60 max-w-2xl mx-auto">
-                When expert guidance matters most, we bring specialists directly to the patient
-              </p>
-            </div>
-            
-            {/* Premium image showcase */}
-            <div className="relative">
-              {/* Main image container with premium framing */}
-              <div className="relative rounded-2xl overflow-hidden shadow-2xl shadow-black/20 dark:shadow-black/50">
-                {/* Gradient overlay for premium feel */}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent z-10" />
-                <div className="absolute inset-0 bg-gradient-to-r from-red-900/20 to-transparent z-10" />
-                
-                {/* The image */}
-                <img 
-                  src={bedsideImage} 
-                  alt="Specialist providing remote consultation to a patient at bedside via video call"
-                  className="w-full h-auto object-cover"
-                  data-testid="img-bedside-support"
-                />
-                
-                {/* Content overlay at bottom */}
-                <div className="absolute bottom-0 left-0 right-0 z-20 p-8 md:p-12">
-                  <div className="flex flex-wrap items-center gap-4 mb-4">
-                    <div className="flex flex-wrap items-center gap-3 bg-red-600/90 backdrop-blur-sm px-4 py-2 rounded-full">
-                      <div className="w-2 h-2 rounded-full bg-white animate-pulse motion-reduce:animate-none" />
-                      <span className="text-white text-sm font-medium">Live Consultation</span>
-                    </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center">
+              {/* Text side */}
+              <div>
+                <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-6">
+                  Superspeciality Support at Patient's <span className="text-red-600">Bedside</span>
+                </h2>
+                <p className="text-lg md:text-xl text-gray-600 dark:text-white/60 mb-8 leading-relaxed">
+                  When expert guidance matters most, we bring specialists directly to the patient. Real-time consultations for critically ill patients, right where care happens.
+                </p>
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="flex flex-wrap items-center gap-2 bg-red-600/10 dark:bg-red-600/20 px-4 py-2 rounded-full border border-red-600/20">
+                    <div className="w-2 h-2 rounded-full bg-red-600 animate-pulse motion-reduce:animate-none" />
+                    <span className="text-red-600 dark:text-red-400 text-sm font-medium">Live Consultation Available</span>
                   </div>
-                  <p className="text-white text-xl md:text-2xl font-light max-w-xl leading-relaxed">
-                    Real-time specialist guidance for critically ill patients, right where care happens
-                  </p>
                 </div>
               </div>
               
-              {/* Decorative elements */}
-              <div className="absolute -top-4 -right-4 w-24 h-24 border-t-4 border-r-4 border-red-600/30 rounded-tr-3xl" />
-              <div className="absolute -bottom-4 -left-4 w-24 h-24 border-b-4 border-l-4 border-red-600/30 rounded-bl-3xl" />
-              
-              {/* Floating accent */}
-              <div className="absolute -right-2 top-1/2 -translate-y-1/2 w-1 h-32 bg-gradient-to-b from-transparent via-red-600 to-transparent rounded-full hidden lg:block" />
+              {/* Image side - color-matched with overlay */}
+              <div className="relative">
+                <div className="relative rounded-2xl overflow-hidden shadow-xl max-w-md mx-auto lg:max-w-none">
+                  {/* Color tinting overlays to match theme */}
+                  <div className="absolute inset-0 bg-gradient-to-br from-gray-900/40 via-gray-900/20 to-red-900/30 z-10 mix-blend-multiply dark:mix-blend-normal" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-gray-950/60 via-transparent to-transparent z-10" />
+                  
+                  {/* Sepia/desaturate filter for cohesive color tone */}
+                  <img 
+                    src={bedsideImage} 
+                    alt="Specialist providing remote consultation to a patient at bedside via video call"
+                    className="w-full h-[280px] md:h-[320px] lg:h-[380px] object-cover grayscale-[30%] contrast-[1.1]"
+                    data-testid="img-bedside-support"
+                  />
+                </div>
+                {/* Subtle corner accents */}
+                <div className="absolute -top-3 -left-3 w-12 h-12 border-t-2 border-l-2 border-red-600/30 rounded-tl-xl" />
+                <div className="absolute -bottom-3 -right-3 w-12 h-12 border-b-2 border-r-2 border-red-600/30 rounded-br-xl" />
+              </div>
             </div>
           </div>
         </div>
       </section>
 
       {/* Advanced Lab Diagnostics Section - Video and Text Layout */}
-      <section className="py-24 relative overflow-hidden bg-white dark:bg-gray-900" data-testid="section-lab-diagnostics">
+      <section className="py-24 relative overflow-hidden" data-testid="section-lab-diagnostics">
         <div className="container mx-auto px-6 lg:px-12 relative z-10">
           <div className="max-w-6xl mx-auto">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center">
@@ -455,7 +362,7 @@ export default function LandingPage() {
       </section>
 
       {/* Clinician-Led Section - Creative, no boxes */}
-      <section className="py-24 relative bg-gray-50 dark:bg-gray-950" data-testid="section-clinician-led">
+      <section className="py-24 relative" data-testid="section-clinician-led">
         <div className="container mx-auto px-6 lg:px-12">
           <div className="max-w-4xl mx-auto text-center">
             {/* Large quote-style presentation */}
@@ -493,8 +400,8 @@ export default function LandingPage() {
       </section>
 
       {/* Call to Action Section */}
-      <section className="py-24 relative overflow-hidden bg-gray-50 dark:bg-gray-950" data-testid="section-cta">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-red-950/20 via-transparent to-transparent" />
+      <section className="py-24 relative overflow-hidden" data-testid="section-cta">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-red-900/10 via-transparent to-transparent dark:from-red-950/20" />
         
         <div className="container mx-auto px-6 lg:px-12 relative z-10">
           <div className="max-w-3xl mx-auto text-center">
@@ -520,7 +427,7 @@ export default function LandingPage() {
       </section>
 
       {/* Contact Footer */}
-      <footer className="py-16 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-black" data-testid="section-footer">
+      <footer className="py-16 border-t border-gray-200/50 dark:border-gray-800/50" data-testid="section-footer">
         <div className="container mx-auto px-6 lg:px-12">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
             {/* Logo & tagline */}
