@@ -6,7 +6,6 @@ import logoImage from "@assets/Pitchdeck_logo_1769590061051.png";
 import indiaMapImage from "@assets/ChatGPT_Image_Dec_18__2025__08_43_37_PM-removebg-preview_1769521462134.png";
 import bedsideImage from "@assets/ChatGPT_Image_Jan_29,_2026,_01_37_39_PM_1769674310991.png";
 import labVideo from "@assets/perfusion_video_h264.mp4";
-import portalLaptopImage from "@assets/ChatGPT_Image_Jan_29,_2026,_01_58_26_PM_1769675402188.png";
 
 export default function LandingPage() {
   return (
@@ -166,7 +165,7 @@ export default function LandingPage() {
       {/* Platform Connection Visual Section */}
       <section className="py-24 relative overflow-hidden">
         <div className="container mx-auto px-6 lg:px-12">
-          <div className="text-center mb-12">
+          <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-4">
               Bridging the Healthcare Gap
             </h2>
@@ -175,20 +174,40 @@ export default function LandingPage() {
             </p>
           </div>
           
-          {/* Triangle layout: Left side (Remote top, Mainstream bottom) → Right side (Laptop) */}
-          <div className="relative max-w-5xl mx-auto">
-            <div className="flex flex-col md:flex-row items-center justify-center gap-8 md:gap-12 lg:gap-16">
-              
-              {/* Left column - Remote (top) and Mainstream (bottom) */}
-              <div className="flex flex-col gap-12 md:gap-16 items-center md:items-end">
-                {/* Remote Hospitals - Upper Left */}
-                <div className="flex items-center gap-4">
-                  <div className="text-center md:text-right">
-                    <h3 className="text-base md:text-lg font-bold text-gray-900 dark:text-white">Remote Hospitals</h3>
-                    <p className="text-gray-600 dark:text-white/60 text-xs md:text-sm">Resource-limited facilities</p>
-                  </div>
-                  <div className="relative w-20 h-20 md:w-24 md:h-24 rounded-2xl bg-gradient-to-br from-gray-100 to-white dark:from-gray-800 dark:to-gray-900 shadow-lg flex items-center justify-center border border-gray-200 dark:border-gray-700 flex-shrink-0">
-                    <svg className="w-10 h-10 md:w-12 md:h-12" viewBox="0 0 64 64" fill="none" role="img" aria-label="Remote hospital building">
+          {/* Visual Flow Diagram - Not boxes, creative vector style */}
+          <div className="relative max-w-6xl mx-auto">
+            {/* Connection lines SVG background */}
+            <svg className="absolute inset-0 w-full h-full pointer-events-none motion-reduce:hidden" viewBox="0 0 1000 300" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+              {/* Left connection line */}
+              <path 
+                d="M 150 150 Q 300 100 400 150" 
+                fill="none" 
+                stroke="rgba(220, 38, 38, 0.3)"
+                className="dark:stroke-[rgba(220,38,38,0.4)]"
+                strokeWidth="3"
+                strokeDasharray="8 4"
+              >
+                <animate attributeName="stroke-dashoffset" from="24" to="0" dur="1s" repeatCount="indefinite" />
+              </path>
+              {/* Right connection line */}
+              <path 
+                d="M 600 150 Q 700 100 850 150" 
+                fill="none" 
+                stroke="rgba(220, 38, 38, 0.3)"
+                className="dark:stroke-[rgba(220,38,38,0.4)]"
+                strokeWidth="3"
+                strokeDasharray="8 4"
+              >
+                <animate attributeName="stroke-dashoffset" from="0" to="24" dur="1s" repeatCount="indefinite" />
+              </path>
+            </svg>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-center relative z-10">
+              {/* Remote Hospitals */}
+              <div className="text-center">
+                <div className="relative mx-auto w-40 h-40 rounded-full bg-gradient-to-br from-gray-100 to-white dark:from-gray-800 dark:to-gray-900 shadow-xl flex items-center justify-center border-2 border-gray-200 dark:border-gray-700">
+                  <div className="text-center">
+                    <svg className="w-16 h-16 mx-auto mb-2" viewBox="0 0 64 64" fill="none" role="img" aria-label="Remote hospital building">
                       <title>Remote Hospital</title>
                       <rect x="16" y="24" width="32" height="32" rx="2" className="fill-gray-200 dark:fill-gray-700" stroke="#dc2626" strokeWidth="2"/>
                       <rect x="26" y="8" width="12" height="24" rx="1" className="fill-gray-100 dark:fill-gray-600" stroke="#dc2626" strokeWidth="2"/>
@@ -198,15 +217,32 @@ export default function LandingPage() {
                     </svg>
                   </div>
                 </div>
-                
-                {/* Mainstream Healthcare - Lower Left */}
-                <div className="flex items-center gap-4">
-                  <div className="text-center md:text-right">
-                    <h3 className="text-base md:text-lg font-bold text-gray-900 dark:text-white">Mainstream Healthcare</h3>
-                    <p className="text-gray-600 dark:text-white/60 text-xs md:text-sm">Specialists & diagnostics</p>
+                <h3 className="mt-6 text-xl font-bold">Remote Hospitals</h3>
+                <p className="mt-2 text-gray-600 dark:text-white/70 text-sm">Resource-limited facilities seeking quality care</p>
+              </div>
+              
+              {/* Perfusion Platform - Center */}
+              <div className="text-center">
+                <div className="relative mx-auto w-48 h-48 rounded-full bg-gradient-to-br from-red-700 via-red-600 to-red-800 shadow-2xl shadow-red-900/50 flex items-center justify-center">
+                  <div className="absolute inset-2 rounded-full bg-gradient-to-br from-red-600 to-red-700 flex items-center justify-center">
+                    <img 
+                      src={logoImage} 
+                      alt="Perfusion" 
+                      className="w-32 h-auto drop-shadow-lg"
+                    />
                   </div>
-                  <div className="relative w-20 h-20 md:w-24 md:h-24 rounded-2xl bg-gradient-to-br from-gray-100 to-white dark:from-gray-800 dark:to-gray-900 shadow-lg flex items-center justify-center border border-gray-200 dark:border-gray-700 flex-shrink-0">
-                    <svg className="w-10 h-10 md:w-12 md:h-12" viewBox="0 0 64 64" fill="none" role="img" aria-label="Mainstream healthcare facility">
+                  {/* Pulse rings - uses motion-reduce for accessibility */}
+                  <div className="absolute inset-0 rounded-full border-2 border-red-500/30 animate-ping motion-reduce:animate-none" style={{ animationDuration: '2s' }} />
+                </div>
+                <h3 className="mt-6 text-2xl font-bold">Perfusion Platform</h3>
+                <p className="mt-2 text-gray-600 dark:text-white/70 text-sm">Your bridge to quality healthcare</p>
+              </div>
+              
+              {/* Mainstream Healthcare */}
+              <div className="text-center">
+                <div className="relative mx-auto w-40 h-40 rounded-full bg-gradient-to-br from-gray-100 to-white dark:from-gray-800 dark:to-gray-900 shadow-xl flex items-center justify-center border-2 border-gray-200 dark:border-gray-700">
+                  <div className="text-center">
+                    <svg className="w-16 h-16 mx-auto mb-2" viewBox="0 0 64 64" fill="none" role="img" aria-label="Mainstream healthcare facility">
                       <title>Mainstream Healthcare</title>
                       <rect x="8" y="20" width="48" height="36" rx="2" className="fill-gray-200 dark:fill-gray-700" stroke="#dc2626" strokeWidth="2"/>
                       <rect x="22" y="8" width="20" height="20" rx="1" className="fill-gray-100 dark:fill-gray-600" stroke="#dc2626" strokeWidth="2"/>
@@ -217,61 +253,8 @@ export default function LandingPage() {
                     </svg>
                   </div>
                 </div>
-              </div>
-              
-              {/* Connection arrows - desktop only */}
-              <div className="hidden md:flex flex-col gap-8 items-center justify-center">
-                {/* Arrow from Remote to Perfusion (flowing right) */}
-                <svg className="w-20 lg:w-28 h-8" viewBox="0 0 100 30" fill="none" aria-hidden="true">
-                  <path 
-                    d="M 5 15 L 75 15" 
-                    stroke="rgba(220, 38, 38, 0.5)"
-                    className="dark:stroke-[rgba(220,38,38,0.6)]"
-                    strokeWidth="3"
-                    strokeDasharray="6 4"
-                  >
-                    <animate attributeName="stroke-dashoffset" from="20" to="0" dur="1s" repeatCount="indefinite" />
-                  </path>
-                  <polygon points="75,8 90,15 75,22" fill="#dc2626" opacity="0.7" />
-                </svg>
-                
-                {/* Arrow from Perfusion to Mainstream (flowing left) */}
-                <svg className="w-20 lg:w-28 h-8 rotate-180" viewBox="0 0 100 30" fill="none" aria-hidden="true">
-                  <path 
-                    d="M 5 15 L 75 15" 
-                    stroke="rgba(220, 38, 38, 0.5)"
-                    className="dark:stroke-[rgba(220,38,38,0.6)]"
-                    strokeWidth="3"
-                    strokeDasharray="6 4"
-                  >
-                    <animate attributeName="stroke-dashoffset" from="20" to="0" dur="1s" repeatCount="indefinite" />
-                  </path>
-                  <polygon points="75,8 90,15 75,22" fill="#dc2626" opacity="0.7" />
-                </svg>
-              </div>
-              
-              {/* Mobile arrows */}
-              <div className="md:hidden flex items-center justify-center">
-                <svg className="w-8 h-12" viewBox="0 0 30 50" fill="none" aria-hidden="true">
-                  <path d="M 15 5 L 15 35" stroke="rgba(220, 38, 38, 0.5)" strokeWidth="3" strokeDasharray="6 4">
-                    <animate attributeName="stroke-dashoffset" from="20" to="0" dur="1s" repeatCount="indefinite" />
-                  </path>
-                  <polygon points="8,35 15,48 22,35" fill="#dc2626" opacity="0.7" />
-                </svg>
-              </div>
-              
-              {/* Right side - Perfusion Portal Laptop */}
-              <div className="flex flex-col items-center">
-                <div className="relative">
-                  <img 
-                    src={portalLaptopImage} 
-                    alt="Perfusion Portal on laptop" 
-                    className="w-[300px] md:w-[400px] lg:w-[500px] h-auto drop-shadow-2xl"
-                    data-testid="img-portal-laptop"
-                  />
-                  {/* Subtle glow effect */}
-                  <div className="absolute inset-0 -z-10 blur-3xl bg-red-600/20 scale-110 rounded-full" />
-                </div>
+                <h3 className="mt-6 text-xl font-bold">Mainstream Healthcare</h3>
+                <p className="mt-2 text-gray-600 dark:text-white/70 text-sm">Specialists & advanced diagnostics</p>
               </div>
             </div>
           </div>
