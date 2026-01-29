@@ -9,7 +9,7 @@ import labVideo from "@assets/perfusion_video_h264.mp4";
 
 export default function LandingPage() {
   return (
-    <div className="min-h-screen w-full bg-white dark:bg-black text-gray-900 dark:text-white overflow-x-hidden transition-colors duration-500">
+    <div className="min-h-screen w-full bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-gray-950 dark:via-gray-900 dark:to-black text-gray-900 dark:text-white overflow-x-hidden transition-colors duration-500">
       {/* Theme Toggle - Fixed position using global component */}
       <div className="fixed top-6 right-6 z-50" data-testid="container-theme-toggle">
         <ThemeToggle />
@@ -54,7 +54,7 @@ export default function LandingPage() {
             fill="none"
             stroke="rgba(180, 50, 50, 0.15)"
             strokeWidth="3"
-            className="artery-base"
+            className="artery-base dark:stroke-[rgba(180,50,50,0.2)]"
           />
           
           {/* Animated blood cells */}
@@ -155,9 +155,9 @@ export default function LandingPage() {
         
         {/* Scroll indicator */}
         <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center animate-bounce motion-reduce:animate-none" aria-hidden="true">
-          <span className="text-gray-500 dark:text-white/70 text-sm mb-2">Scroll to explore</span>
+          <span className="text-gray-600 dark:text-white/70 text-sm mb-2">Scroll to explore</span>
           <div className="w-6 h-10 border-2 border-gray-400 dark:border-white/30 rounded-full flex justify-center">
-            <div className="w-1.5 h-3 bg-gray-400 dark:bg-white/50 rounded-full mt-2 animate-pulse motion-reduce:animate-none" />
+            <div className="w-1.5 h-3 bg-gray-500 dark:bg-white/50 rounded-full mt-2 animate-pulse motion-reduce:animate-none" />
           </div>
         </div>
       </section>
@@ -182,7 +182,8 @@ export default function LandingPage() {
               <path 
                 d="M 150 150 Q 300 100 400 150" 
                 fill="none" 
-                stroke="rgba(220, 38, 38, 0.4)"
+                stroke="rgba(220, 38, 38, 0.3)"
+                className="dark:stroke-[rgba(220,38,38,0.4)]"
                 strokeWidth="3"
                 strokeDasharray="8 4"
               >
@@ -192,7 +193,8 @@ export default function LandingPage() {
               <path 
                 d="M 600 150 Q 700 100 850 150" 
                 fill="none" 
-                stroke="rgba(220, 38, 38, 0.4)"
+                stroke="rgba(220, 38, 38, 0.3)"
+                className="dark:stroke-[rgba(220,38,38,0.4)]"
                 strokeWidth="3"
                 strokeDasharray="8 4"
               >
@@ -221,7 +223,7 @@ export default function LandingPage() {
               
               {/* Perfusion Platform - Center */}
               <div className="text-center">
-                <div className="relative mx-auto w-48 h-48 rounded-full bg-gradient-to-br from-gray-100 via-white to-gray-100 dark:from-gray-800 dark:via-gray-900 dark:to-gray-800 shadow-2xl shadow-black/20 dark:shadow-black/50 flex items-center justify-center border-4 border-red-600">
+                <div className="relative mx-auto w-48 h-48 rounded-full bg-gradient-to-br from-gray-200 via-white to-gray-100 dark:from-gray-800 dark:via-gray-900 dark:to-gray-800 shadow-2xl shadow-black/20 dark:shadow-black/50 flex items-center justify-center border-4 border-red-600">
                   <img 
                     src={logoImage} 
                     alt="Perfusion" 
@@ -394,7 +396,7 @@ export default function LandingPage() {
 
       {/* Call to Action Section */}
       <section className="py-24 relative overflow-hidden" data-testid="section-cta">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-red-100 dark:from-red-950/20 via-transparent to-transparent" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-red-900/10 via-transparent to-transparent dark:from-red-950/20" />
         
         <div className="container mx-auto px-6 lg:px-12 relative z-10">
           <div className="max-w-3xl mx-auto text-center">
@@ -420,7 +422,7 @@ export default function LandingPage() {
       </section>
 
       {/* Contact Footer */}
-      <footer className="py-16 border-t border-gray-200 dark:border-gray-800/50" data-testid="section-footer">
+      <footer className="py-16 border-t border-gray-200/50 dark:border-gray-800/50" data-testid="section-footer">
         <div className="container mx-auto px-6 lg:px-12">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
             {/* Logo & tagline */}
