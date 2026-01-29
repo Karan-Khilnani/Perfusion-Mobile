@@ -9,7 +9,7 @@ import labVideo from "@assets/perfusion_video_h264.mp4";
 
 export default function LandingPage() {
   return (
-    <div className="min-h-screen w-full bg-black text-white overflow-x-hidden transition-colors duration-500">
+    <div className="min-h-screen w-full bg-white dark:bg-black text-gray-900 dark:text-white overflow-x-hidden transition-colors duration-500">
       {/* Theme Toggle - Fixed position using global component */}
       <div className="fixed top-6 right-6 z-50" data-testid="container-theme-toggle">
         <ThemeToggle />
@@ -116,7 +116,7 @@ export default function LandingPage() {
               data-testid="img-landing-logo"
             />
             
-            <p className="text-xl md:text-2xl lg:text-3xl font-light tracking-wide text-white/70">
+            <p className="text-xl md:text-2xl lg:text-3xl font-light tracking-wide text-gray-600 dark:text-white/70">
               Connecting Remote Healthcare
             </p>
             
@@ -155,9 +155,9 @@ export default function LandingPage() {
         
         {/* Scroll indicator */}
         <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center animate-bounce motion-reduce:animate-none" aria-hidden="true">
-          <span className="text-white/70 text-sm mb-2">Scroll to explore</span>
-          <div className="w-6 h-10 border-2 border-white/30 rounded-full flex justify-center">
-            <div className="w-1.5 h-3 bg-white/50 rounded-full mt-2 animate-pulse motion-reduce:animate-none" />
+          <span className="text-gray-500 dark:text-white/70 text-sm mb-2">Scroll to explore</span>
+          <div className="w-6 h-10 border-2 border-gray-400 dark:border-white/30 rounded-full flex justify-center">
+            <div className="w-1.5 h-3 bg-gray-400 dark:bg-white/50 rounded-full mt-2 animate-pulse motion-reduce:animate-none" />
           </div>
         </div>
       </section>
@@ -169,7 +169,7 @@ export default function LandingPage() {
             <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-4">
               Bridging the Healthcare Gap
             </h2>
-            <p className="text-lg text-white/70 max-w-2xl mx-auto">
+            <p className="text-lg text-gray-600 dark:text-white/70 max-w-2xl mx-auto">
               Perfusion connects peripheral hospitals to mainstream healthcare
             </p>
           </div>
@@ -203,12 +203,12 @@ export default function LandingPage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-center relative z-10">
               {/* Remote Hospitals */}
               <div className="text-center">
-                <div className="relative mx-auto w-40 h-40 rounded-full bg-gradient-to-br from-gray-800 to-gray-900 shadow-xl flex items-center justify-center border-2 border-gray-700">
+                <div className="relative mx-auto w-40 h-40 rounded-full bg-gradient-to-br from-gray-100 to-white dark:from-gray-800 dark:to-gray-900 shadow-xl flex items-center justify-center border-2 border-gray-200 dark:border-gray-700">
                   <div className="text-center">
                     <svg className="w-16 h-16 mx-auto mb-2" viewBox="0 0 64 64" fill="none" role="img" aria-label="Remote hospital building">
                       <title>Remote Hospital</title>
-                      <rect x="16" y="24" width="32" height="32" rx="2" className="fill-gray-700" stroke="#dc2626" strokeWidth="2"/>
-                      <rect x="26" y="8" width="12" height="24" rx="1" className="fill-gray-600" stroke="#dc2626" strokeWidth="2"/>
+                      <rect x="16" y="24" width="32" height="32" rx="2" className="fill-gray-200 dark:fill-gray-700" stroke="#dc2626" strokeWidth="2"/>
+                      <rect x="26" y="8" width="12" height="24" rx="1" className="fill-gray-100 dark:fill-gray-600" stroke="#dc2626" strokeWidth="2"/>
                       <rect x="28" y="34" width="8" height="12" fill="#dc2626"/>
                       <line x1="32" y1="14" x2="32" y2="26" stroke="#dc2626" strokeWidth="2"/>
                       <line x1="26" y1="20" x2="38" y2="20" stroke="#dc2626" strokeWidth="2"/>
@@ -216,12 +216,12 @@ export default function LandingPage() {
                   </div>
                 </div>
                 <h3 className="mt-6 text-xl font-bold">Remote Hospitals</h3>
-                <p className="mt-2 text-white/70 text-sm">Resource-limited facilities seeking quality care</p>
+                <p className="mt-2 text-gray-600 dark:text-white/70 text-sm">Resource-limited facilities seeking quality care</p>
               </div>
               
               {/* Perfusion Platform - Center */}
               <div className="text-center">
-                <div className="relative mx-auto w-48 h-48 rounded-full bg-gradient-to-br from-gray-800 via-gray-900 to-gray-800 shadow-2xl shadow-black/50 flex items-center justify-center border-4 border-red-600">
+                <div className="relative mx-auto w-48 h-48 rounded-full bg-gradient-to-br from-gray-100 via-white to-gray-100 dark:from-gray-800 dark:via-gray-900 dark:to-gray-800 shadow-2xl shadow-black/20 dark:shadow-black/50 flex items-center justify-center border-4 border-red-600">
                   <img 
                     src={logoImage} 
                     alt="Perfusion" 
@@ -231,17 +231,17 @@ export default function LandingPage() {
                   <div className="absolute inset-0 rounded-full border-2 border-red-500/50 animate-ping motion-reduce:animate-none" style={{ animationDuration: '2s' }} />
                 </div>
                 <h3 className="mt-6 text-2xl font-bold">Perfusion Platform</h3>
-                <p className="mt-2 text-white/70 text-sm">Your bridge to quality healthcare</p>
+                <p className="mt-2 text-gray-600 dark:text-white/70 text-sm">Your bridge to quality healthcare</p>
               </div>
               
               {/* Mainstream Healthcare */}
               <div className="text-center">
-                <div className="relative mx-auto w-40 h-40 rounded-full bg-gradient-to-br from-gray-800 to-gray-900 shadow-xl flex items-center justify-center border-2 border-gray-700">
+                <div className="relative mx-auto w-40 h-40 rounded-full bg-gradient-to-br from-gray-100 to-white dark:from-gray-800 dark:to-gray-900 shadow-xl flex items-center justify-center border-2 border-gray-200 dark:border-gray-700">
                   <div className="text-center">
                     <svg className="w-16 h-16 mx-auto mb-2" viewBox="0 0 64 64" fill="none" role="img" aria-label="Mainstream healthcare facility">
                       <title>Mainstream Healthcare</title>
-                      <rect x="8" y="20" width="48" height="36" rx="2" className="fill-gray-700" stroke="#dc2626" strokeWidth="2"/>
-                      <rect x="22" y="8" width="20" height="20" rx="1" className="fill-gray-600" stroke="#dc2626" strokeWidth="2"/>
+                      <rect x="8" y="20" width="48" height="36" rx="2" className="fill-gray-200 dark:fill-gray-700" stroke="#dc2626" strokeWidth="2"/>
+                      <rect x="22" y="8" width="20" height="20" rx="1" className="fill-gray-100 dark:fill-gray-600" stroke="#dc2626" strokeWidth="2"/>
                       <rect x="26" y="36" width="12" height="20" fill="#dc2626"/>
                       <circle cx="32" cy="14" r="4" fill="#dc2626"/>
                       <rect x="14" y="28" width="8" height="8" fill="#dc2626" opacity="0.6"/>
@@ -250,7 +250,7 @@ export default function LandingPage() {
                   </div>
                 </div>
                 <h3 className="mt-6 text-xl font-bold">Mainstream Healthcare</h3>
-                <p className="mt-2 text-white/70 text-sm">Specialists & advanced diagnostics</p>
+                <p className="mt-2 text-gray-600 dark:text-white/70 text-sm">Specialists & advanced diagnostics</p>
               </div>
             </div>
           </div>
@@ -267,7 +267,7 @@ export default function LandingPage() {
                 <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-6">
                   Superspeciality Support at Patient's <span className="text-red-600">Bedside</span>
                 </h2>
-                <p className="text-lg md:text-xl text-white/60 leading-relaxed">
+                <p className="text-lg md:text-xl text-gray-600 dark:text-white/60 leading-relaxed">
                   When expert guidance matters most, we bring specialists directly to the patient. Real-time consultations for critically ill patients, right where care happens.
                 </p>
               </div>
@@ -332,11 +332,11 @@ export default function LandingPage() {
                   Advanced Lab <span className="text-red-600">Diagnostics</span>
                 </h2>
                 
-                <p className="text-xl md:text-2xl lg:text-3xl font-light text-white/70 italic mb-8">
+                <p className="text-xl md:text-2xl lg:text-3xl font-light text-gray-600 dark:text-white/70 italic mb-8">
                   "Prescribe what you need, Perfusion will move it"
                 </p>
                 
-                <p className="text-lg text-white/60 mb-8 leading-relaxed">
+                <p className="text-lg text-gray-600 dark:text-white/60 mb-8 leading-relaxed">
                   Our dedicated logistics team ensures samples reach the lab swiftly, so you get results when they matter most.
                 </p>
                 
@@ -366,7 +366,7 @@ export default function LandingPage() {
               </h2>
             </div>
             
-            <p className="text-xl md:text-2xl text-white/70 mb-12 leading-relaxed max-w-3xl mx-auto">
+            <p className="text-xl md:text-2xl text-gray-600 dark:text-white/70 mb-12 leading-relaxed max-w-3xl mx-auto">
               We understand the real impact of delayed investigations and inaccurate reporting. 
               We've experienced it. We're here to change it.
             </p>
@@ -375,17 +375,17 @@ export default function LandingPage() {
             <div className="flex flex-wrap justify-center gap-8 md:gap-16 mt-16">
               <div className="text-center">
                 <div className="text-5xl md:text-6xl font-bold text-red-600 mb-2">Fast</div>
-                <p className="text-white/70">Turnaround Times</p>
+                <p className="text-gray-600 dark:text-white/70">Turnaround Times</p>
               </div>
               <div className="w-px bg-gradient-to-b from-transparent via-red-600/50 to-transparent hidden md:block" />
               <div className="text-center">
                 <div className="text-5xl md:text-6xl font-bold text-red-600 mb-2">Quality</div>
-                <p className="text-white/70">Accurate Reports</p>
+                <p className="text-gray-600 dark:text-white/70">Accurate Reports</p>
               </div>
               <div className="w-px bg-gradient-to-b from-transparent via-red-600/50 to-transparent hidden md:block" />
               <div className="text-center">
                 <div className="text-5xl md:text-6xl font-bold text-red-600 mb-2">Trust</div>
-                <p className="text-white/70">Certified Specialists</p>
+                <p className="text-gray-600 dark:text-white/70">Certified Specialists</p>
               </div>
             </div>
           </div>
@@ -394,7 +394,7 @@ export default function LandingPage() {
 
       {/* Call to Action Section */}
       <section className="py-24 relative overflow-hidden" data-testid="section-cta">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-red-950/20 via-transparent to-transparent" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-red-100 dark:from-red-950/20 via-transparent to-transparent" />
         
         <div className="container mx-auto px-6 lg:px-12 relative z-10">
           <div className="max-w-3xl mx-auto text-center">
@@ -420,7 +420,7 @@ export default function LandingPage() {
       </section>
 
       {/* Contact Footer */}
-      <footer className="py-16 border-t border-gray-800/50" data-testid="section-footer">
+      <footer className="py-16 border-t border-gray-200 dark:border-gray-800/50" data-testid="section-footer">
         <div className="container mx-auto px-6 lg:px-12">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
             {/* Logo & tagline */}
@@ -430,7 +430,7 @@ export default function LandingPage() {
                 alt="Perfusion"
                 className="h-auto w-48 mb-4"
               />
-              <p className="text-white/70">
+              <p className="text-gray-600 dark:text-white/70">
                 Connecting Remote Healthcare
               </p>
             </div>
@@ -441,17 +441,17 @@ export default function LandingPage() {
               <ul className="space-y-3">
                 <li className="flex flex-wrap items-start gap-3">
                   <MapPin className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5" />
-                  <span className="text-white/70" data-testid="text-contact-address">Sundernagar, Raipur (CG)</span>
+                  <span className="text-gray-600 dark:text-white/70" data-testid="text-contact-address">Sundernagar, Raipur (CG)</span>
                 </li>
                 <li className="flex flex-wrap items-center gap-3">
                   <Mail className="h-5 w-5 text-red-500 flex-shrink-0" />
-                  <a href="mailto:mail@perfusionhealth.in" className="text-white/70" data-testid="link-email">
+                  <a href="mailto:mail@perfusionhealth.in" className="text-gray-600 dark:text-white/70" data-testid="link-email">
                     mail@perfusionhealth.in
                   </a>
                 </li>
                 <li className="flex flex-wrap items-center gap-3">
                   <Phone className="h-5 w-5 text-red-500 flex-shrink-0" />
-                  <a href="tel:9244893295" className="text-white/70" data-testid="link-phone-footer">
+                  <a href="tel:9244893295" className="text-gray-600 dark:text-white/70" data-testid="link-phone-footer">
                     9244893295
                   </a>
                 </li>
@@ -473,8 +473,8 @@ export default function LandingPage() {
             </div>
           </div>
           
-          <div className="mt-12 pt-8 border-t border-gray-800 text-center">
-            <p className="text-white/40 text-sm">
+          <div className="mt-12 pt-8 border-t border-gray-200 dark:border-gray-800 text-center">
+            <p className="text-gray-400 dark:text-white/40 text-sm">
               © {new Date().getFullYear()} Perfusion Healthcare. All rights reserved.
             </p>
           </div>
