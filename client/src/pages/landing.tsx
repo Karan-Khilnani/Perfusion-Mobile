@@ -266,7 +266,7 @@ export default function LandingPage() {
                   <img 
                     src={portalLaptopImage} 
                     alt="Perfusion Portal on laptop" 
-                    className="w-[260px] md:w-[320px] lg:w-[400px] h-auto drop-shadow-2xl"
+                    className="w-[300px] md:w-[400px] lg:w-[500px] h-auto drop-shadow-2xl"
                     data-testid="img-portal-laptop"
                   />
                   {/* Subtle glow effect */}
