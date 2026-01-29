@@ -6,6 +6,7 @@ import logoImage from "@assets/Pitchdeck_logo_1769590061051.png";
 import indiaMapImage from "@assets/ChatGPT_Image_Dec_18__2025__08_43_37_PM-removebg-preview_1769521462134.png";
 import bedsideImage from "@assets/ChatGPT_Image_Jan_29,_2026,_01_37_39_PM_1769674310991.png";
 import labVideo from "@assets/perfusion_video_h264.mp4";
+import portalLaptopImage from "@assets/ChatGPT_Image_Jan_29,_2026,_01_58_26_PM_1769675402188.png";
 
 export default function LandingPage() {
   return (
@@ -165,7 +166,7 @@ export default function LandingPage() {
       {/* Platform Connection Visual Section */}
       <section className="py-24 relative overflow-hidden">
         <div className="container mx-auto px-6 lg:px-12">
-          <div className="text-center mb-16">
+          <div className="text-center mb-12">
             <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-4">
               Bridging the Healthcare Gap
             </h2>
@@ -174,87 +175,93 @@ export default function LandingPage() {
             </p>
           </div>
           
-          {/* Visual Flow Diagram - Not boxes, creative vector style */}
-          <div className="relative max-w-6xl mx-auto">
-            {/* Connection lines SVG background */}
-            <svg className="absolute inset-0 w-full h-full pointer-events-none motion-reduce:hidden" viewBox="0 0 1000 300" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
-              {/* Left connection line */}
-              <path 
-                d="M 150 150 Q 300 100 400 150" 
-                fill="none" 
-                stroke="rgba(220, 38, 38, 0.3)"
-                className="dark:stroke-[rgba(220,38,38,0.4)]"
-                strokeWidth="3"
-                strokeDasharray="8 4"
-              >
-                <animate attributeName="stroke-dashoffset" from="24" to="0" dur="1s" repeatCount="indefinite" />
-              </path>
-              {/* Right connection line */}
-              <path 
-                d="M 600 150 Q 700 100 850 150" 
-                fill="none" 
-                stroke="rgba(220, 38, 38, 0.3)"
-                className="dark:stroke-[rgba(220,38,38,0.4)]"
-                strokeWidth="3"
-                strokeDasharray="8 4"
-              >
-                <animate attributeName="stroke-dashoffset" from="0" to="24" dur="1s" repeatCount="indefinite" />
-              </path>
-            </svg>
+          {/* Creative hub-and-spoke layout with laptop center */}
+          <div className="relative max-w-5xl mx-auto">
+            {/* Perfusion Platform - Center laptop image */}
+            <div className="flex justify-center mb-8">
+              <div className="relative">
+                <img 
+                  src={portalLaptopImage} 
+                  alt="Perfusion Portal on laptop" 
+                  className="w-[280px] md:w-[380px] lg:w-[450px] h-auto drop-shadow-2xl"
+                  data-testid="img-portal-laptop"
+                />
+                {/* Subtle glow effect */}
+                <div className="absolute inset-0 -z-10 blur-3xl bg-red-600/20 scale-110 rounded-full" />
+              </div>
+            </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-center relative z-10">
-              {/* Remote Hospitals */}
-              <div className="text-center">
-                <div className="relative mx-auto w-40 h-40 rounded-full bg-gradient-to-br from-gray-100 to-white dark:from-gray-800 dark:to-gray-900 shadow-xl flex items-center justify-center border-2 border-gray-200 dark:border-gray-700">
-                  <div className="text-center">
-                    <svg className="w-16 h-16 mx-auto mb-2" viewBox="0 0 64 64" fill="none" role="img" aria-label="Remote hospital building">
-                      <title>Remote Hospital</title>
-                      <rect x="16" y="24" width="32" height="32" rx="2" className="fill-gray-200 dark:fill-gray-700" stroke="#dc2626" strokeWidth="2"/>
-                      <rect x="26" y="8" width="12" height="24" rx="1" className="fill-gray-100 dark:fill-gray-600" stroke="#dc2626" strokeWidth="2"/>
-                      <rect x="28" y="34" width="8" height="12" fill="#dc2626"/>
-                      <line x1="32" y1="14" x2="32" y2="26" stroke="#dc2626" strokeWidth="2"/>
-                      <line x1="26" y1="20" x2="38" y2="20" stroke="#dc2626" strokeWidth="2"/>
-                    </svg>
-                  </div>
+            {/* Two sides flowing into the platform */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-16 relative">
+              {/* Animated connection lines */}
+              <svg className="absolute inset-0 w-full h-full pointer-events-none motion-reduce:hidden hidden md:block" viewBox="0 0 800 150" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+                {/* Left upward flowing line */}
+                <path 
+                  d="M 150 80 Q 250 40 400 0" 
+                  fill="none" 
+                  stroke="rgba(220, 38, 38, 0.3)"
+                  className="dark:stroke-[rgba(220,38,38,0.4)]"
+                  strokeWidth="2"
+                  strokeDasharray="6 4"
+                >
+                  <animate attributeName="stroke-dashoffset" from="20" to="0" dur="1.5s" repeatCount="indefinite" />
+                </path>
+                {/* Right upward flowing line */}
+                <path 
+                  d="M 650 80 Q 550 40 400 0" 
+                  fill="none" 
+                  stroke="rgba(220, 38, 38, 0.3)"
+                  className="dark:stroke-[rgba(220,38,38,0.4)]"
+                  strokeWidth="2"
+                  strokeDasharray="6 4"
+                >
+                  <animate attributeName="stroke-dashoffset" from="0" to="20" dur="1.5s" repeatCount="indefinite" />
+                </path>
+              </svg>
+              
+              {/* Remote Hospitals - Left */}
+              <div className="flex flex-wrap items-center gap-6 justify-center md:justify-end">
+                <div className="text-right hidden md:block">
+                  <h3 className="text-xl font-bold text-gray-900 dark:text-white">Remote Hospitals</h3>
+                  <p className="text-gray-600 dark:text-white/60 text-sm mt-1">Resource-limited facilities<br/>seeking quality care</p>
                 </div>
-                <h3 className="mt-6 text-xl font-bold">Remote Hospitals</h3>
-                <p className="mt-2 text-gray-600 dark:text-white/70 text-sm">Resource-limited facilities seeking quality care</p>
+                <div className="relative w-24 h-24 md:w-28 md:h-28 rounded-2xl bg-gradient-to-br from-gray-100 to-white dark:from-gray-800 dark:to-gray-900 shadow-lg flex items-center justify-center border border-gray-200 dark:border-gray-700">
+                  <svg className="w-12 h-12" viewBox="0 0 64 64" fill="none" role="img" aria-label="Remote hospital building">
+                    <title>Remote Hospital</title>
+                    <rect x="16" y="24" width="32" height="32" rx="2" className="fill-gray-200 dark:fill-gray-700" stroke="#dc2626" strokeWidth="2"/>
+                    <rect x="26" y="8" width="12" height="24" rx="1" className="fill-gray-100 dark:fill-gray-600" stroke="#dc2626" strokeWidth="2"/>
+                    <rect x="28" y="34" width="8" height="12" fill="#dc2626"/>
+                    <line x1="32" y1="14" x2="32" y2="26" stroke="#dc2626" strokeWidth="2"/>
+                    <line x1="26" y1="20" x2="38" y2="20" stroke="#dc2626" strokeWidth="2"/>
+                  </svg>
+                </div>
+                <div className="text-center md:hidden">
+                  <h3 className="text-lg font-bold">Remote Hospitals</h3>
+                  <p className="text-gray-600 dark:text-white/60 text-sm">Resource-limited facilities</p>
+                </div>
               </div>
               
-              {/* Perfusion Platform - Center */}
-              <div className="text-center">
-                <div className="relative mx-auto w-48 h-48 rounded-full bg-gradient-to-br from-red-700 via-red-600 to-red-800 shadow-2xl shadow-red-900/50 flex items-center justify-center">
-                  <div className="absolute inset-2 rounded-full bg-gradient-to-br from-red-600 to-red-700 flex items-center justify-center">
-                    <img 
-                      src={logoImage} 
-                      alt="Perfusion" 
-                      className="w-32 h-auto drop-shadow-lg"
-                    />
-                  </div>
-                  {/* Pulse rings - uses motion-reduce for accessibility */}
-                  <div className="absolute inset-0 rounded-full border-2 border-red-500/30 animate-ping motion-reduce:animate-none" style={{ animationDuration: '2s' }} />
+              {/* Mainstream Healthcare - Right */}
+              <div className="flex flex-wrap items-center gap-6 justify-center md:justify-start">
+                <div className="relative w-24 h-24 md:w-28 md:h-28 rounded-2xl bg-gradient-to-br from-gray-100 to-white dark:from-gray-800 dark:to-gray-900 shadow-lg flex items-center justify-center border border-gray-200 dark:border-gray-700">
+                  <svg className="w-12 h-12" viewBox="0 0 64 64" fill="none" role="img" aria-label="Mainstream healthcare facility">
+                    <title>Mainstream Healthcare</title>
+                    <rect x="8" y="20" width="48" height="36" rx="2" className="fill-gray-200 dark:fill-gray-700" stroke="#dc2626" strokeWidth="2"/>
+                    <rect x="22" y="8" width="20" height="20" rx="1" className="fill-gray-100 dark:fill-gray-600" stroke="#dc2626" strokeWidth="2"/>
+                    <rect x="26" y="36" width="12" height="20" fill="#dc2626"/>
+                    <circle cx="32" cy="14" r="4" fill="#dc2626"/>
+                    <rect x="14" y="28" width="8" height="8" fill="#dc2626" opacity="0.6"/>
+                    <rect x="42" y="28" width="8" height="8" fill="#dc2626" opacity="0.6"/>
+                  </svg>
                 </div>
-                <h3 className="mt-6 text-2xl font-bold">Perfusion Platform</h3>
-                <p className="mt-2 text-gray-600 dark:text-white/70 text-sm">Your bridge to quality healthcare</p>
-              </div>
-              
-              {/* Mainstream Healthcare */}
-              <div className="text-center">
-                <div className="relative mx-auto w-40 h-40 rounded-full bg-gradient-to-br from-gray-100 to-white dark:from-gray-800 dark:to-gray-900 shadow-xl flex items-center justify-center border-2 border-gray-200 dark:border-gray-700">
-                  <div className="text-center">
-                    <svg className="w-16 h-16 mx-auto mb-2" viewBox="0 0 64 64" fill="none" role="img" aria-label="Mainstream healthcare facility">
-                      <title>Mainstream Healthcare</title>
-                      <rect x="8" y="20" width="48" height="36" rx="2" className="fill-gray-200 dark:fill-gray-700" stroke="#dc2626" strokeWidth="2"/>
-                      <rect x="22" y="8" width="20" height="20" rx="1" className="fill-gray-100 dark:fill-gray-600" stroke="#dc2626" strokeWidth="2"/>
-                      <rect x="26" y="36" width="12" height="20" fill="#dc2626"/>
-                      <circle cx="32" cy="14" r="4" fill="#dc2626"/>
-                      <rect x="14" y="28" width="8" height="8" fill="#dc2626" opacity="0.6"/>
-                      <rect x="42" y="28" width="8" height="8" fill="#dc2626" opacity="0.6"/>
-                    </svg>
-                  </div>
+                <div className="text-left hidden md:block">
+                  <h3 className="text-xl font-bold text-gray-900 dark:text-white">Mainstream Healthcare</h3>
+                  <p className="text-gray-600 dark:text-white/60 text-sm mt-1">Specialists & advanced<br/>diagnostics</p>
                 </div>
-                <h3 className="mt-6 text-xl font-bold">Mainstream Healthcare</h3>
-                <p className="mt-2 text-gray-600 dark:text-white/70 text-sm">Specialists & advanced diagnostics</p>
+                <div className="text-center md:hidden">
+                  <h3 className="text-lg font-bold">Mainstream Healthcare</h3>
+                  <p className="text-gray-600 dark:text-white/60 text-sm">Specialists & diagnostics</p>
+                </div>
               </div>
             </div>
           </div>
