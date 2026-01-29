@@ -4,7 +4,7 @@ import { Phone, Mail, MapPin, ArrowRight } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import logoImage from "@assets/Pitchdeck_logo_1769590061051.png";
 import indiaMapImage from "@assets/ChatGPT_Image_Dec_18__2025__08_43_37_PM-removebg-preview_1769521462134.png";
-import bedsideImage from "@assets/ChatGPT_Image_Dec_22,_2025,_09_07_53_PM_1769597609254.png";
+import bedsideImage from "@assets/ChatGPT_Image_Jan_29,_2026,_01_37_39_PM_1769674310991.png";
 import labVideo from "@assets/perfusion_video_h264.mp4";
 
 export default function LandingPage() {
@@ -271,31 +271,28 @@ export default function LandingPage() {
                 <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-6">
                   Superspeciality Support at Patient's <span className="text-red-600">Bedside</span>
                 </h2>
-                <p className="text-lg md:text-xl text-gray-600 dark:text-white/60 mb-8 leading-relaxed">
+                <p className="text-lg md:text-xl text-gray-600 dark:text-white/60 leading-relaxed">
                   When expert guidance matters most, we bring specialists directly to the patient. Real-time consultations for critically ill patients, right where care happens.
                 </p>
-                <div className="flex flex-wrap items-center gap-3">
-                  <div className="flex flex-wrap items-center gap-2 bg-red-600/10 dark:bg-red-600/20 px-4 py-2 rounded-full border border-red-600/20">
-                    <div className="w-2 h-2 rounded-full bg-red-600 animate-pulse motion-reduce:animate-none" />
-                    <span className="text-red-600 dark:text-red-400 text-sm font-medium">Live Consultation Available</span>
-                  </div>
-                </div>
               </div>
               
-              {/* Image side - color-matched with overlay */}
+              {/* Image side with live consultation badge overlay */}
               <div className="relative">
                 <div className="relative rounded-2xl overflow-hidden shadow-xl max-w-md mx-auto lg:max-w-none">
-                  {/* Color tinting overlays to match theme */}
-                  <div className="absolute inset-0 bg-gradient-to-br from-gray-900/40 via-gray-900/20 to-red-900/30 z-10 mix-blend-multiply dark:mix-blend-normal" />
-                  <div className="absolute inset-0 bg-gradient-to-t from-gray-950/60 via-transparent to-transparent z-10" />
-                  
-                  {/* Sepia/desaturate filter for cohesive color tone */}
                   <img 
                     src={bedsideImage} 
                     alt="Specialist providing remote consultation to a patient at bedside via video call"
-                    className="w-full h-[280px] md:h-[320px] lg:h-[380px] object-cover grayscale-[30%] contrast-[1.1]"
+                    className="w-full h-[280px] md:h-[320px] lg:h-[380px] object-cover"
                     data-testid="img-bedside-support"
                   />
+                  
+                  {/* Live Consultation badge on image */}
+                  <div className="absolute top-4 left-4 z-20">
+                    <div className="flex flex-wrap items-center gap-2 bg-red-600/90 backdrop-blur-sm px-4 py-2 rounded-full shadow-lg">
+                      <div className="w-2 h-2 rounded-full bg-white animate-pulse motion-reduce:animate-none" />
+                      <span className="text-white text-sm font-medium">Live Consultation</span>
+                    </div>
+                  </div>
                 </div>
                 {/* Subtle corner accents */}
                 <div className="absolute -top-3 -left-3 w-12 h-12 border-t-2 border-l-2 border-red-600/30 rounded-tl-xl" />
