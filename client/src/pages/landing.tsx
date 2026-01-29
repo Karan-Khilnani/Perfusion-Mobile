@@ -287,7 +287,7 @@ export default function LandingPage() {
                   />
                   
                   {/* Live Consultation badge on image */}
-                  <div className="absolute top-4 left-4 z-20">
+                  <div className="absolute bottom-4 left-4 z-20">
                     <div className="flex flex-wrap items-center gap-2 bg-red-600/90 backdrop-blur-sm px-4 py-2 rounded-full shadow-lg">
                       <div className="w-2 h-2 rounded-full bg-white animate-pulse motion-reduce:animate-none" />
                       <span className="text-white text-sm font-medium">Live Consultation</span>
