@@ -175,58 +175,15 @@ export default function LandingPage() {
             </p>
           </div>
           
-          {/* Creative hub-and-spoke layout with laptop center */}
-          <div className="relative max-w-5xl mx-auto">
-            {/* Perfusion Platform - Center laptop image */}
-            <div className="flex justify-center mb-8">
-              <div className="relative">
-                <img 
-                  src={portalLaptopImage} 
-                  alt="Perfusion Portal on laptop" 
-                  className="w-[280px] md:w-[380px] lg:w-[450px] h-auto drop-shadow-2xl"
-                  data-testid="img-portal-laptop"
-                />
-                {/* Subtle glow effect */}
-                <div className="absolute inset-0 -z-10 blur-3xl bg-red-600/20 scale-110 rounded-full" />
-              </div>
-            </div>
-            
-            {/* Two sides flowing into the platform */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-16 relative">
-              {/* Animated connection lines */}
-              <svg className="absolute inset-0 w-full h-full pointer-events-none motion-reduce:hidden hidden md:block" viewBox="0 0 800 150" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
-                {/* Left upward flowing line */}
-                <path 
-                  d="M 150 80 Q 250 40 400 0" 
-                  fill="none" 
-                  stroke="rgba(220, 38, 38, 0.3)"
-                  className="dark:stroke-[rgba(220,38,38,0.4)]"
-                  strokeWidth="2"
-                  strokeDasharray="6 4"
-                >
-                  <animate attributeName="stroke-dashoffset" from="20" to="0" dur="1.5s" repeatCount="indefinite" />
-                </path>
-                {/* Right upward flowing line */}
-                <path 
-                  d="M 650 80 Q 550 40 400 0" 
-                  fill="none" 
-                  stroke="rgba(220, 38, 38, 0.3)"
-                  className="dark:stroke-[rgba(220,38,38,0.4)]"
-                  strokeWidth="2"
-                  strokeDasharray="6 4"
-                >
-                  <animate attributeName="stroke-dashoffset" from="0" to="20" dur="1.5s" repeatCount="indefinite" />
-                </path>
-              </svg>
+          {/* Horizontal flow layout: Remote → Perfusion → Mainstream */}
+          <div className="relative max-w-6xl mx-auto">
+            {/* Three column layout with flow direction */}
+            <div className="flex flex-col md:flex-row items-center justify-center gap-6 md:gap-4 lg:gap-8 relative">
               
               {/* Remote Hospitals - Left */}
-              <div className="flex flex-wrap items-center gap-6 justify-center md:justify-end">
-                <div className="text-right hidden md:block">
-                  <h3 className="text-xl font-bold text-gray-900 dark:text-white">Remote Hospitals</h3>
-                  <p className="text-gray-600 dark:text-white/60 text-sm mt-1">Resource-limited facilities<br/>seeking quality care</p>
-                </div>
-                <div className="relative w-24 h-24 md:w-28 md:h-28 rounded-2xl bg-gradient-to-br from-gray-100 to-white dark:from-gray-800 dark:to-gray-900 shadow-lg flex items-center justify-center border border-gray-200 dark:border-gray-700">
-                  <svg className="w-12 h-12" viewBox="0 0 64 64" fill="none" role="img" aria-label="Remote hospital building">
+              <div className="flex flex-col items-center text-center md:w-1/4">
+                <div className="relative w-20 h-20 md:w-24 md:h-24 rounded-2xl bg-gradient-to-br from-gray-100 to-white dark:from-gray-800 dark:to-gray-900 shadow-lg flex items-center justify-center border border-gray-200 dark:border-gray-700">
+                  <svg className="w-10 h-10 md:w-12 md:h-12" viewBox="0 0 64 64" fill="none" role="img" aria-label="Remote hospital building">
                     <title>Remote Hospital</title>
                     <rect x="16" y="24" width="32" height="32" rx="2" className="fill-gray-200 dark:fill-gray-700" stroke="#dc2626" strokeWidth="2"/>
                     <rect x="26" y="8" width="12" height="24" rx="1" className="fill-gray-100 dark:fill-gray-600" stroke="#dc2626" strokeWidth="2"/>
@@ -235,16 +192,78 @@ export default function LandingPage() {
                     <line x1="26" y1="20" x2="38" y2="20" stroke="#dc2626" strokeWidth="2"/>
                   </svg>
                 </div>
-                <div className="text-center md:hidden">
-                  <h3 className="text-lg font-bold">Remote Hospitals</h3>
-                  <p className="text-gray-600 dark:text-white/60 text-sm">Resource-limited facilities</p>
+                <h3 className="mt-3 text-base md:text-lg font-bold text-gray-900 dark:text-white">Remote Hospitals</h3>
+                <p className="text-gray-600 dark:text-white/60 text-xs md:text-sm">Resource-limited facilities</p>
+              </div>
+              
+              {/* Arrow flowing INTO Perfusion */}
+              <div className="hidden md:flex items-center">
+                <svg className="w-16 lg:w-24 h-8" viewBox="0 0 80 30" fill="none" aria-hidden="true">
+                  <path 
+                    d="M 5 15 L 60 15" 
+                    stroke="rgba(220, 38, 38, 0.5)"
+                    className="dark:stroke-[rgba(220,38,38,0.6)]"
+                    strokeWidth="3"
+                    strokeDasharray="6 4"
+                  >
+                    <animate attributeName="stroke-dashoffset" from="20" to="0" dur="1s" repeatCount="indefinite" />
+                  </path>
+                  <polygon points="60,8 75,15 60,22" fill="#dc2626" opacity="0.7" />
+                </svg>
+              </div>
+              {/* Mobile arrow down */}
+              <div className="md:hidden flex items-center justify-center">
+                <svg className="w-8 h-12" viewBox="0 0 30 50" fill="none" aria-hidden="true">
+                  <path d="M 15 5 L 15 35" stroke="rgba(220, 38, 38, 0.5)" strokeWidth="3" strokeDasharray="6 4">
+                    <animate attributeName="stroke-dashoffset" from="20" to="0" dur="1s" repeatCount="indefinite" />
+                  </path>
+                  <polygon points="8,35 15,48 22,35" fill="#dc2626" opacity="0.7" />
+                </svg>
+              </div>
+              
+              {/* Perfusion Platform - Center laptop */}
+              <div className="flex flex-col items-center md:w-2/5">
+                <div className="relative">
+                  <img 
+                    src={portalLaptopImage} 
+                    alt="Perfusion Portal on laptop" 
+                    className="w-[240px] md:w-[300px] lg:w-[380px] h-auto drop-shadow-2xl"
+                    data-testid="img-portal-laptop"
+                  />
+                  {/* Subtle glow effect */}
+                  <div className="absolute inset-0 -z-10 blur-3xl bg-red-600/20 scale-110 rounded-full" />
                 </div>
               </div>
               
+              {/* Arrow flowing OUT of Perfusion */}
+              <div className="hidden md:flex items-center">
+                <svg className="w-16 lg:w-24 h-8" viewBox="0 0 80 30" fill="none" aria-hidden="true">
+                  <path 
+                    d="M 5 15 L 60 15" 
+                    stroke="rgba(220, 38, 38, 0.5)"
+                    className="dark:stroke-[rgba(220,38,38,0.6)]"
+                    strokeWidth="3"
+                    strokeDasharray="6 4"
+                  >
+                    <animate attributeName="stroke-dashoffset" from="0" to="-20" dur="1s" repeatCount="indefinite" />
+                  </path>
+                  <polygon points="60,8 75,15 60,22" fill="#dc2626" opacity="0.7" />
+                </svg>
+              </div>
+              {/* Mobile arrow down */}
+              <div className="md:hidden flex items-center justify-center">
+                <svg className="w-8 h-12" viewBox="0 0 30 50" fill="none" aria-hidden="true">
+                  <path d="M 15 5 L 15 35" stroke="rgba(220, 38, 38, 0.5)" strokeWidth="3" strokeDasharray="6 4">
+                    <animate attributeName="stroke-dashoffset" from="0" to="-20" dur="1s" repeatCount="indefinite" />
+                  </path>
+                  <polygon points="8,35 15,48 22,35" fill="#dc2626" opacity="0.7" />
+                </svg>
+              </div>
+              
               {/* Mainstream Healthcare - Right */}
-              <div className="flex flex-wrap items-center gap-6 justify-center md:justify-start">
-                <div className="relative w-24 h-24 md:w-28 md:h-28 rounded-2xl bg-gradient-to-br from-gray-100 to-white dark:from-gray-800 dark:to-gray-900 shadow-lg flex items-center justify-center border border-gray-200 dark:border-gray-700">
-                  <svg className="w-12 h-12" viewBox="0 0 64 64" fill="none" role="img" aria-label="Mainstream healthcare facility">
+              <div className="flex flex-col items-center text-center md:w-1/4">
+                <div className="relative w-20 h-20 md:w-24 md:h-24 rounded-2xl bg-gradient-to-br from-gray-100 to-white dark:from-gray-800 dark:to-gray-900 shadow-lg flex items-center justify-center border border-gray-200 dark:border-gray-700">
+                  <svg className="w-10 h-10 md:w-12 md:h-12" viewBox="0 0 64 64" fill="none" role="img" aria-label="Mainstream healthcare facility">
                     <title>Mainstream Healthcare</title>
                     <rect x="8" y="20" width="48" height="36" rx="2" className="fill-gray-200 dark:fill-gray-700" stroke="#dc2626" strokeWidth="2"/>
                     <rect x="22" y="8" width="20" height="20" rx="1" className="fill-gray-100 dark:fill-gray-600" stroke="#dc2626" strokeWidth="2"/>
@@ -254,14 +273,8 @@ export default function LandingPage() {
                     <rect x="42" y="28" width="8" height="8" fill="#dc2626" opacity="0.6"/>
                   </svg>
                 </div>
-                <div className="text-left hidden md:block">
-                  <h3 className="text-xl font-bold text-gray-900 dark:text-white">Mainstream Healthcare</h3>
-                  <p className="text-gray-600 dark:text-white/60 text-sm mt-1">Specialists & advanced<br/>diagnostics</p>
-                </div>
-                <div className="text-center md:hidden">
-                  <h3 className="text-lg font-bold">Mainstream Healthcare</h3>
-                  <p className="text-gray-600 dark:text-white/60 text-sm">Specialists & diagnostics</p>
-                </div>
+                <h3 className="mt-3 text-base md:text-lg font-bold text-gray-900 dark:text-white">Mainstream Healthcare</h3>
+                <p className="text-gray-600 dark:text-white/60 text-xs md:text-sm">Specialists & diagnostics</p>
               </div>
             </div>
           </div>
