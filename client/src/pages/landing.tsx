@@ -223,16 +223,14 @@ export default function LandingPage() {
               
               {/* Perfusion Platform - Center */}
               <div className="text-center">
-                <div className="relative mx-auto w-48 h-48 rounded-full bg-gradient-to-br from-red-700 via-red-600 to-red-800 shadow-2xl shadow-red-900/50 flex items-center justify-center">
-                  <div className="absolute inset-2 rounded-full bg-gradient-to-br from-red-600 to-red-700 flex items-center justify-center">
-                    <img 
-                      src={logoImage} 
-                      alt="Perfusion" 
-                      className="w-32 h-auto drop-shadow-lg"
-                    />
-                  </div>
+                <div className="relative mx-auto w-48 h-48 rounded-full bg-gradient-to-br from-gray-200 via-white to-gray-100 dark:from-gray-800 dark:via-gray-900 dark:to-gray-800 shadow-2xl shadow-black/20 dark:shadow-black/50 flex items-center justify-center border-4 border-red-600">
+                  <img 
+                    src={logoImage} 
+                    alt="Perfusion" 
+                    className="w-32 h-auto drop-shadow-lg"
+                  />
                   {/* Pulse rings - uses motion-reduce for accessibility */}
-                  <div className="absolute inset-0 rounded-full border-2 border-red-500/30 animate-ping motion-reduce:animate-none" style={{ animationDuration: '2s' }} />
+                  <div className="absolute inset-0 rounded-full border-2 border-red-500/50 animate-ping motion-reduce:animate-none" style={{ animationDuration: '2s' }} />
                 </div>
                 <h3 className="mt-6 text-2xl font-bold">Perfusion Platform</h3>
                 <p className="mt-2 text-gray-600 dark:text-white/70 text-sm">Your bridge to quality healthcare</p>
