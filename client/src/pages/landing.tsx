@@ -40,7 +40,7 @@ export default function LandingPage() {
             </filter>
           </defs>
           
-          {/* Main artery path - curves from India map through center to logo area with curved underline */}
+          {/* Multiple artery paths - curves from India map through center to logo area */}
           <path
             id="arteryPath"
             d="M 1350 280 
@@ -52,9 +52,33 @@ export default function LandingPage() {
                Q 80 580 90 600
                C 120 630 200 640 320 635"
             fill="none"
-            stroke="rgba(180, 50, 50, 0.25)"
-            strokeWidth="6"
-            className="artery-base dark:stroke-[rgba(180,50,50,0.35)]"
+            stroke="rgba(180, 50, 50, 0.15)"
+            strokeWidth="3"
+            className="artery-base dark:stroke-[rgba(180,50,50,0.2)]"
+          />
+          <path
+            d="M 1380 320 
+               C 1300 380 1220 440 1120 500
+               Q 970 570 820 550
+               C 670 530 520 490 400 470
+               Q 300 455 220 490
+               C 170 510 140 550 120 570"
+            fill="none"
+            stroke="rgba(180, 50, 50, 0.12)"
+            strokeWidth="2"
+            className="dark:stroke-[rgba(180,50,50,0.18)]"
+          />
+          <path
+            d="M 1320 240 
+               C 1250 320 1180 400 1080 460
+               Q 930 550 780 530
+               C 630 510 480 470 360 450
+               Q 260 435 180 470
+               C 130 490 100 530 80 550"
+            fill="none"
+            stroke="rgba(180, 50, 50, 0.1)"
+            strokeWidth="2"
+            className="dark:stroke-[rgba(180,50,50,0.15)]"
           />
           
           {/* Animated blood cells */}
