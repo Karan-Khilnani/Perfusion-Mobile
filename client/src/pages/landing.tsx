@@ -52,9 +52,9 @@ export default function LandingPage() {
                Q 80 580 90 600
                C 120 630 200 640 320 635"
             fill="none"
-            stroke="rgba(180, 50, 50, 0.15)"
-            strokeWidth="3"
-            className="artery-base dark:stroke-[rgba(180,50,50,0.2)]"
+            stroke="rgba(180, 50, 50, 0.25)"
+            strokeWidth="6"
+            className="artery-base dark:stroke-[rgba(180,50,50,0.35)]"
           />
           
           {/* Animated blood cells */}
