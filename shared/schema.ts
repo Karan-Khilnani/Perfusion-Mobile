@@ -48,10 +48,12 @@ export type ServiceStatus = "active" | "paused" | "deleted";
 // Lab tests offered - direct catalog (no provider dependency)
 export const labTests = pgTable("lab_tests", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  labId: varchar("lab_id"),
   testName: varchar("test_name", { length: 255 }).notNull(),
-  category: varchar("category", { length: 100 }).notNull(),
+  category: varchar("category", { length: 100 }),
   cost: decimal("cost", { precision: 10, scale: 2 }).notNull(),
   turnaroundTime: varchar("turnaround_time", { length: 50 }).notNull(),
+  accuracyRating: decimal("accuracy_rating", { precision: 3, scale: 2 }),
   status: varchar("status", { length: 20 }).default("active").$type<ServiceStatus>(),
   createdAt: timestamp("created_at").defaultNow(),
 });
