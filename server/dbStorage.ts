@@ -65,18 +65,15 @@ export class DatabaseStorage implements IStorage {
 
   async getLabsByProvider(providerId: string): Promise<(Lab & { tests: LabTest[] })[]> {
     const providerLabs = await db.select().from(labs).where(eq(labs.providerId, providerId));
-    const allTests = await db.select().from(labTests);
     
-    console.log(`[getLabsByProvider] Provider: ${providerId}, Labs: ${providerLabs.length}, All Tests: ${allTests.length}`);
-    
-    const result = providerLabs.map((lab) => {
-      const labTestsFiltered = allTests.filter((t) => t.labId === lab.id);
-      console.log(`[getLabsByProvider] Lab ${lab.id} (${lab.name}) has ${labTestsFiltered.length} tests`);
+    // For each lab, fetch its tests
+    const result = await Promise.all(providerLabs.map(async (lab) => {
+      const labTestsForLab = await db.select().from(labTests).where(eq(labTests.labId, lab.id));
       return {
         ...lab,
-        tests: labTestsFiltered,
+        tests: labTestsForLab,
       };
-    });
+    }));
     
     return result;
   }
