@@ -293,6 +293,49 @@ export async function registerRoutes(
     }
   });
 
+  // Provider - Add Lab Test to their lab
+  app.post("/api/lab-tests", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+      const provider = await storage.getProviderByUserId(userId);
+      
+      if (!provider) {
+        return res.status(403).json({ message: "Provider profile required" });
+      }
+
+      const { labId, testName, cost, turnaroundTime } = req.body;
+      
+      if (!labId) {
+        return res.status(400).json({ message: "Lab ID is required" });
+      }
+
+      // Verify the lab belongs to this provider
+      const labs = await storage.getLabsByProvider(provider.id);
+      const lab = labs.find(l => l.id === labId);
+      
+      if (!lab) {
+        return res.status(403).json({ message: "Lab not found or not owned by you" });
+      }
+
+      const test = await storage.createLabTest({
+        labId,
+        testName,
+        cost,
+        turnaroundTime,
+        category: "General",
+        status: "active",
+      });
+      
+      res.status(201).json(test);
+    } catch (error) {
+      console.error("Error creating lab test:", error);
+      res.status(500).json({ message: "Failed to create lab test" });
+    }
+  });
+
   // Radiology Modalities
   app.get("/api/radiology-modalities", async (req, res) => {
     try {
