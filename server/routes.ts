@@ -4,6 +4,46 @@ import { storage } from "./storage";
 import { setupAuth, isAuthenticated, isAdmin, isProvider, updateUserRole } from "./auth";
 import { registerAuthRoutes } from "./auth/routes";
 import type { BookingStatus, UserRole, ProviderType, ProviderStatus, ServiceStatus } from "@shared/schema";
+import multer from "multer";
+import path from "path";
+import fs from "fs";
+
+// Configure multer for file uploads
+const uploadDir = path.join(process.cwd(), "uploads", "reports");
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+const reportStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, uploadDir);
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    const ext = path.extname(file.originalname);
+    cb(null, `report-${uniqueSuffix}${ext}`);
+  },
+});
+
+const uploadReport = multer({
+  storage: reportStorage,
+  limits: { fileSize: 50 * 1024 * 1024 }, // 50MB limit
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = [
+      "application/pdf",
+      "image/jpeg",
+      "image/png",
+      "image/gif",
+      "application/dicom",
+      "application/octet-stream",
+    ];
+    if (allowedTypes.includes(file.mimetype) || file.originalname.endsWith(".dcm")) {
+      cb(null, true);
+    } else {
+      cb(new Error("Invalid file type. Allowed: PDF, JPEG, PNG, GIF, DICOM"));
+    }
+  },
+});
 
 export async function registerRoutes(
   httpServer: Server,
@@ -521,13 +561,15 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Booking not found" });
       }
       
-      // If provider, verify they own this booking
+      // If provider, verify they have access to this booking
+      // Providers can update bookings where providerId is null (unassigned) or matches their id
       if (user.role === "provider") {
         const provider = await storage.getProviderByUserId(user.id);
         if (!provider) {
           return res.status(403).json({ message: "Provider profile not found" });
         }
-        if (existingBooking.providerId !== provider.id) {
+        // Allow if booking is unassigned (providerId is null) or belongs to this provider
+        if (existingBooking.providerId !== null && existingBooking.providerId !== provider.id) {
           return res.status(403).json({ message: "Access denied. You can only update your own bookings." });
         }
       }
@@ -1112,6 +1154,41 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error uploading document:", error);
       res.status(500).json({ message: "Failed to upload document" });
+    }
+  });
+
+  // Serve uploaded report files
+  app.use("/uploads/reports", (req, res, next) => {
+    const express = require("express");
+    express.static(uploadDir)(req, res, next);
+  });
+
+  // File upload endpoint for reports
+  app.post("/api/upload/report", isAuthenticated, uploadReport.single("file"), async (req: any, res) => {
+    try {
+      const user = req.user;
+      
+      // Only admin or providers can upload reports
+      if (user.role !== "admin" && user.role !== "provider") {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      if (!req.file) {
+        return res.status(400).json({ message: "No file uploaded" });
+      }
+
+      // Generate the URL for the uploaded file
+      const fileUrl = `/uploads/reports/${req.file.filename}`;
+      
+      res.json({ 
+        success: true, 
+        url: fileUrl,
+        filename: req.file.originalname,
+        size: req.file.size
+      });
+    } catch (error) {
+      console.error("Error uploading report file:", error);
+      res.status(500).json({ message: "Failed to upload file" });
     }
   });
 

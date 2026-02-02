@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,7 @@ import { StatusBadge } from "@/components/status-badge";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { format } from "date-fns";
-import { Search, Plus, Edit, Eye, Filter, Stethoscope, FlaskConical, ScanLine, Download } from "lucide-react";
+import { Search, Plus, Edit, Eye, Filter, Stethoscope, FlaskConical, ScanLine, Download, Upload, File, Loader2 } from "lucide-react";
 import type { Booking, Consultant, LabTest, RadiologyModality, BookingStatus } from "@shared/schema";
 
 type BookingFilter = "all" | "consultation" | "lab" | "teleradiology";
@@ -25,6 +25,16 @@ export default function AdminBookingsPage() {
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [createType, setCreateType] = useState<"consultation" | "lab" | "teleradiology">("consultation");
+  
+  // Report upload state
+  const [showReportDialog, setShowReportDialog] = useState(false);
+  const [reportBooking, setReportBooking] = useState<Booking | null>(null);
+  const [uploadMethod, setUploadMethod] = useState<"file" | "url">("file");
+  const [reportUrl, setReportUrl] = useState("");
+  const [reportNotes, setReportNotes] = useState("");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: bookings = [], isLoading } = useQuery<Booking[]>({
     queryKey: ["/api/admin/bookings"],
@@ -147,6 +157,92 @@ export default function AdminBookingsPage() {
 
   const handleUpdateStatus = (id: string, status: BookingStatus) => {
     updateBookingMutation.mutate({ id, data: { status } });
+  };
+
+  const resetReportDialog = () => {
+    setShowReportDialog(false);
+    setReportBooking(null);
+    setReportUrl("");
+    setReportNotes("");
+    setSelectedFile(null);
+    setUploadMethod("file");
+    setIsUploading(false);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setSelectedFile(file);
+    }
+  };
+
+  const openReportDialog = (booking: Booking) => {
+    setReportBooking(booking);
+    setShowReportDialog(true);
+  };
+
+  const handleUploadReport = async () => {
+    if (!reportBooking) return;
+    
+    setIsUploading(true);
+    try {
+      let finalReportUrl = reportUrl;
+      
+      if (uploadMethod === "file" && selectedFile) {
+        const formData = new FormData();
+        formData.append("file", selectedFile);
+        
+        const response = await fetch("/api/upload/report", {
+          method: "POST",
+          body: formData,
+          credentials: "include",
+        });
+        
+        if (!response.ok) {
+          throw new Error("Failed to upload file");
+        }
+        
+        const data = await response.json();
+        finalReportUrl = data.url;
+      }
+      
+      if (!finalReportUrl) {
+        toast({
+          title: "Error",
+          description: "Please select a file or enter a URL",
+          variant: "destructive",
+        });
+        setIsUploading(false);
+        return;
+      }
+      
+      // Update booking with report URL and status
+      updateBookingMutation.mutate({
+        id: reportBooking.id,
+        data: {
+          status: "report_ready" as BookingStatus,
+          reportUrl: finalReportUrl,
+          reportNotes,
+        },
+      }, {
+        onSuccess: () => {
+          resetReportDialog();
+        },
+        onError: () => {
+          setIsUploading(false);
+        }
+      });
+    } catch (error) {
+      toast({
+        title: "Upload Failed",
+        description: "Failed to upload the report file",
+        variant: "destructive",
+      });
+      setIsUploading(false);
+    }
   };
 
   return (
@@ -375,6 +471,26 @@ export default function AdminBookingsPage() {
                   </div>
                   <div className="flex items-center gap-3">
                     <StatusBadge status={booking.status} />
+                    {(booking.bookingType === "lab" || booking.bookingType === "teleradiology") && (
+                      booking.reportUrl ? (
+                        <a href={booking.reportUrl} target="_blank" rel="noopener noreferrer">
+                          <Button size="sm" variant="outline" className="text-green-600" data-testid={`button-view-report-${booking.id}`}>
+                            <Download className="mr-1 h-3.5 w-3.5" />
+                            View Report
+                          </Button>
+                        </a>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => openReportDialog(booking)}
+                          data-testid={`button-upload-report-${booking.id}`}
+                        >
+                          <Upload className="mr-1 h-3.5 w-3.5" />
+                          Upload Report
+                        </Button>
+                      )
+                    )}
                     <Select
                       value={booking.status}
                       onValueChange={(v) => handleUpdateStatus(booking.id, v as BookingStatus)}
@@ -398,6 +514,102 @@ export default function AdminBookingsPage() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={showReportDialog} onOpenChange={(open) => !open && resetReportDialog()}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Upload Report</DialogTitle>
+            <DialogDescription>
+              Upload report for {reportBooking?.patientName}'s {reportBooking?.serviceName}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="flex gap-2">
+              <Button
+                variant={uploadMethod === "file" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setUploadMethod("file")}
+                data-testid="button-upload-file-method"
+              >
+                <File className="mr-2 h-4 w-4" />
+                Upload File
+              </Button>
+              <Button
+                variant={uploadMethod === "url" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setUploadMethod("url")}
+                data-testid="button-upload-url-method"
+              >
+                <Download className="mr-2 h-4 w-4" />
+                Enter URL
+              </Button>
+            </div>
+
+            {uploadMethod === "file" ? (
+              <div className="space-y-2">
+                <Label>Select Report File</Label>
+                <Input
+                  type="file"
+                  accept=".pdf,.jpg,.jpeg,.png,.gif,.dcm"
+                  onChange={handleFileSelect}
+                  ref={fileInputRef}
+                  data-testid="input-report-file"
+                />
+                {selectedFile && (
+                  <p className="text-sm text-muted-foreground">
+                    Selected: {selectedFile.name} ({(selectedFile.size / 1024).toFixed(1)} KB)
+                  </p>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  Accepted formats: PDF, JPEG, PNG, GIF, DICOM (max 50MB)
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <Label>Report URL</Label>
+                <Input
+                  placeholder="https://example.com/report.pdf"
+                  value={reportUrl}
+                  onChange={(e) => setReportUrl(e.target.value)}
+                  data-testid="input-report-url"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Enter the URL where the report PDF is hosted
+                </p>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label>Notes (optional)</Label>
+              <Textarea
+                placeholder="Any additional notes for the patient..."
+                value={reportNotes}
+                onChange={(e) => setReportNotes(e.target.value)}
+                data-testid="input-report-notes"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={resetReportDialog}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleUploadReport}
+              disabled={(uploadMethod === "file" ? !selectedFile : !reportUrl) || isUploading || updateBookingMutation.isPending}
+              data-testid="button-submit-report"
+            >
+              {isUploading || updateBookingMutation.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Uploading...
+                </>
+              ) : (
+                "Upload Report"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

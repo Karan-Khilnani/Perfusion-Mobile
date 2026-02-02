@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { StatusBadge } from "@/components/status-badge";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { ClipboardList, RefreshCw, Video, Upload, Stethoscope, FlaskConical, ScanLine, FileText, Download, Paperclip, FileSignature, Loader2 } from "lucide-react";
+import { ClipboardList, RefreshCw, Video, Upload, Stethoscope, FlaskConical, ScanLine, FileText, Download, Paperclip, FileSignature, Loader2, File } from "lucide-react";
 import { Link } from "wouter";
 import type { Booking, BookingStatus } from "@shared/schema";
 import { format } from "date-fns";
@@ -41,6 +41,10 @@ export default function ProviderBookingsPage() {
   const [prescriptionMedications, setPrescriptionMedications] = useState("");
   const [prescriptionAdvice, setPrescriptionAdvice] = useState("");
   const [prescriptionFollowUp, setPrescriptionFollowUp] = useState("");
+  const [uploadMethod, setUploadMethod] = useState<"file" | "url">("file");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: bookings, isLoading, refetch } = useQuery<Booking[]>({
     queryKey: ["/api/provider/bookings"],
@@ -78,16 +82,14 @@ export default function ProviderBookingsPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/provider/bookings"] });
-      setShowReportDialog(false);
-      setSelectedBooking(null);
-      setReportUrl("");
-      setReportNotes("");
+      resetReportDialog();
       toast({
         title: "Report Uploaded",
         description: "Report has been uploaded and is now available for the patient.",
       });
     },
     onError: () => {
+      setIsUploading(false);
       toast({
         title: "Upload Failed",
         description: "Failed to upload report.",
@@ -96,13 +98,76 @@ export default function ProviderBookingsPage() {
     },
   });
 
-  const handleUploadReport = () => {
-    if (!selectedBooking || !reportUrl) return;
-    uploadReportMutation.mutate({ 
-      id: selectedBooking.id, 
-      reportUrl,
-      reportNotes 
-    });
+  const handleUploadReport = async () => {
+    if (!selectedBooking) return;
+    
+    setIsUploading(true);
+    try {
+      let finalReportUrl = reportUrl;
+      
+      // If file upload method and file is selected, upload the file first
+      if (uploadMethod === "file" && selectedFile) {
+        const formData = new FormData();
+        formData.append("file", selectedFile);
+        
+        const response = await fetch("/api/upload/report", {
+          method: "POST",
+          body: formData,
+          credentials: "include",
+        });
+        
+        if (!response.ok) {
+          throw new Error("Failed to upload file");
+        }
+        
+        const data = await response.json();
+        finalReportUrl = data.url;
+      }
+      
+      if (!finalReportUrl) {
+        toast({
+          title: "Error",
+          description: "Please select a file or enter a URL",
+          variant: "destructive",
+        });
+        setIsUploading(false);
+        return;
+      }
+      
+      uploadReportMutation.mutate({ 
+        id: selectedBooking.id, 
+        reportUrl: finalReportUrl,
+        reportNotes 
+      });
+      // Note: resetReportDialog is called in mutation onSuccess
+    } catch (error) {
+      toast({
+        title: "Upload Failed",
+        description: "Failed to upload the report file",
+        variant: "destructive",
+      });
+      setIsUploading(false);
+    }
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setSelectedFile(file);
+    }
+  };
+
+  const resetReportDialog = () => {
+    setShowReportDialog(false);
+    setSelectedBooking(null);
+    setReportUrl("");
+    setReportNotes("");
+    setSelectedFile(null);
+    setUploadMethod("file");
+    setIsUploading(false);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
   };
 
   const prescriptionMutation = useMutation({
@@ -410,7 +475,7 @@ export default function ProviderBookingsPage() {
         </TabsContent>
       </Tabs>
 
-      <Dialog open={showReportDialog} onOpenChange={setShowReportDialog}>
+      <Dialog open={showReportDialog} onOpenChange={(open) => !open && resetReportDialog()}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Upload Report</DialogTitle>
@@ -419,18 +484,61 @@ export default function ProviderBookingsPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>Report URL</Label>
-              <Input
-                placeholder="https://example.com/report.pdf"
-                value={reportUrl}
-                onChange={(e) => setReportUrl(e.target.value)}
-                data-testid="input-report-url"
-              />
-              <p className="text-xs text-muted-foreground">
-                Enter the URL where the report PDF is hosted
-              </p>
+            <div className="flex gap-2">
+              <Button
+                variant={uploadMethod === "file" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setUploadMethod("file")}
+                data-testid="button-upload-file-method"
+              >
+                <File className="mr-2 h-4 w-4" />
+                Upload File
+              </Button>
+              <Button
+                variant={uploadMethod === "url" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setUploadMethod("url")}
+                data-testid="button-upload-url-method"
+              >
+                <Download className="mr-2 h-4 w-4" />
+                Enter URL
+              </Button>
             </div>
+
+            {uploadMethod === "file" ? (
+              <div className="space-y-2">
+                <Label>Select Report File</Label>
+                <Input
+                  type="file"
+                  accept=".pdf,.jpg,.jpeg,.png,.gif,.dcm"
+                  onChange={handleFileSelect}
+                  ref={fileInputRef}
+                  data-testid="input-report-file"
+                />
+                {selectedFile && (
+                  <p className="text-sm text-muted-foreground">
+                    Selected: {selectedFile.name} ({(selectedFile.size / 1024).toFixed(1)} KB)
+                  </p>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  Accepted formats: PDF, JPEG, PNG, GIF, DICOM (max 50MB)
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <Label>Report URL</Label>
+                <Input
+                  placeholder="https://example.com/report.pdf"
+                  value={reportUrl}
+                  onChange={(e) => setReportUrl(e.target.value)}
+                  data-testid="input-report-url"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Enter the URL where the report PDF is hosted
+                </p>
+              </div>
+            )}
+
             <div className="space-y-2">
               <Label>Notes (optional)</Label>
               <Textarea
@@ -442,15 +550,22 @@ export default function ProviderBookingsPage() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowReportDialog(false)}>
+            <Button variant="outline" onClick={resetReportDialog}>
               Cancel
             </Button>
             <Button
               onClick={handleUploadReport}
-              disabled={!reportUrl || uploadReportMutation.isPending}
+              disabled={(uploadMethod === "file" ? !selectedFile : !reportUrl) || isUploading || uploadReportMutation.isPending}
               data-testid="button-submit-report"
             >
-              {uploadReportMutation.isPending ? "Uploading..." : "Upload Report"}
+              {isUploading || uploadReportMutation.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Uploading...
+                </>
+              ) : (
+                "Upload Report"
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
