@@ -56,6 +56,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     { href: "/admin/consultants", icon: Stethoscope, label: "Consultants" },
     { href: "/admin/lab-tests", icon: FlaskConical, label: "Lab Tests" },
     { href: "/admin/radiology", icon: FileImage, label: "Radiology Modalities" },
+    { href: "/admin/suggestions", icon: ClipboardList, label: "Provider Suggestions" },
     { href: "/admin/providers", icon: Building, label: "Provider Approvals" },
     { href: "/admin/users", icon: Users, label: "User Management" },
   ];

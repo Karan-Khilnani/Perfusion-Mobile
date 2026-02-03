@@ -34,12 +34,6 @@ const labSchema = z.object({
   description: z.string().optional(),
 });
 
-const testSchema = z.object({
-  testName: z.string().min(2, "Test name is required"),
-  cost: z.string().min(1, "Cost is required"),
-  turnaroundTime: z.string().min(1, "Turnaround time is required"),
-});
-
 const consultantSchema = z.object({
   name: z.string().min(2, "Name is required"),
   qualification: z.string().min(2, "Qualification is required"),
@@ -49,15 +43,12 @@ const consultantSchema = z.object({
 });
 
 type LabFormData = z.infer<typeof labSchema>;
-type TestFormData = z.infer<typeof testSchema>;
 type ConsultantFormData = z.infer<typeof consultantSchema>;
 
 export default function ProviderServicesPage() {
   const { toast } = useToast();
   const [isLabDialogOpen, setIsLabDialogOpen] = useState(false);
-  const [isTestDialogOpen, setIsTestDialogOpen] = useState(false);
   const [isConsultantDialogOpen, setIsConsultantDialogOpen] = useState(false);
-  const [selectedLabId, setSelectedLabId] = useState<string | null>(null);
   const [editingSlotsFor, setEditingSlotsFor] = useState<Consultant | null>(null);
   const [newSlots, setNewSlots] = useState("");
   const [isAddTestDialogOpen, setIsAddTestDialogOpen] = useState(false);
@@ -111,11 +102,6 @@ export default function ProviderServicesPage() {
     defaultValues: { name: "", location: "", description: "" },
   });
 
-  const testForm = useForm<TestFormData>({
-    resolver: zodResolver(testSchema),
-    defaultValues: { testName: "", cost: "", turnaroundTime: "" },
-  });
-
   const consultantForm = useForm<ConsultantFormData>({
     resolver: zodResolver(consultantSchema),
     defaultValues: { name: "", qualification: "", specialization: "", yearsExperience: 0, consultationFee: "" },
@@ -134,22 +120,6 @@ export default function ProviderServicesPage() {
     },
     onError: () => {
       toast({ title: "Failed", description: "Failed to create lab.", variant: "destructive" });
-    },
-  });
-
-  const addTestMutation = useMutation({
-    mutationFn: async (data: TestFormData & { labId: string }) => {
-      const response = await apiRequest("POST", "/api/lab-tests", data);
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/provider/my-labs"] });
-      setIsTestDialogOpen(false);
-      testForm.reset();
-      toast({ title: "Test Added", description: "Lab test has been added successfully." });
-    },
-    onError: () => {
-      toast({ title: "Failed", description: "Failed to add lab test.", variant: "destructive" });
     },
   });
 
@@ -252,11 +222,6 @@ export default function ProviderServicesPage() {
     if (!editingSlotsFor) return;
     const slots = newSlots.split(",").map((s) => s.trim()).filter(Boolean);
     updateSlotsMutation.mutate({ id: editingSlotsFor.id, slots });
-  };
-
-  const handleAddTest = (data: TestFormData) => {
-    if (!selectedLabId) return;
-    addTestMutation.mutate({ ...data, labId: selectedLabId });
   };
 
   const isLoading = providerLoading || labsLoading;

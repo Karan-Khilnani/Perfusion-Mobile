@@ -34,6 +34,7 @@ import AdminUsersPage from "@/pages/admin/users";
 import AdminConsultantsPage from "@/pages/admin/consultants";
 import AdminLabTestsPage from "@/pages/admin/lab-tests";
 import AdminRadiologyPage from "@/pages/admin/radiology";
+import AdminSuggestionsPage from "@/pages/admin/suggestions";
 
 function withUserLayout(Component: React.ComponentType) {
   return function WrappedComponent() {
@@ -92,6 +93,7 @@ function Router() {
       <Route path="/admin/consultants" component={withAdminLayout(AdminConsultantsPage)} />
       <Route path="/admin/lab-tests" component={withAdminLayout(AdminLabTestsPage)} />
       <Route path="/admin/radiology" component={withAdminLayout(AdminRadiologyPage)} />
+      <Route path="/admin/suggestions" component={withAdminLayout(AdminSuggestionsPage)} />
       <Route path="/admin/providers" component={withAdminLayout(AdminProvidersPage)} />
       <Route path="/admin/users" component={withAdminLayout(AdminUsersPage)} />
       
