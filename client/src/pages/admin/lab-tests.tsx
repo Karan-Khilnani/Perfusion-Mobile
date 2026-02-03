@@ -45,10 +45,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, MoreHorizontal, Pause, Play, Trash2, FlaskConical, Search } from "lucide-react";
+import { Plus, MoreHorizontal, Pause, Play, Trash2, FlaskConical, Search, Users } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import type { LabTest } from "@shared/schema";
+import type { LabTest, Provider, ProviderLabTest } from "@shared/schema";
 
 const labTestSchema = z.object({
   testName: z.string().min(2, "Test name is required"),
@@ -58,6 +58,18 @@ const labTestSchema = z.object({
 });
 
 type LabTestFormData = z.infer<typeof labTestSchema>;
+
+const providerAssignSchema = z.object({
+  providerId: z.string().min(1, "Select a provider"),
+  price: z.string().min(1, "Price is required"),
+  turnaroundTime: z.string().optional(),
+});
+
+type ProviderAssignFormData = z.infer<typeof providerAssignSchema>;
+
+type ProviderLabTestWithDetails = ProviderLabTest & {
+  provider?: Provider;
+};
 
 const categories = [
   "Hematology",
@@ -76,10 +88,26 @@ export default function AdminLabTestsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterCategory, setFilterCategory] = useState("All");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isProviderDialogOpen, setIsProviderDialogOpen] = useState(false);
+  const [selectedTest, setSelectedTest] = useState<LabTest | null>(null);
   const { toast } = useToast();
 
   const { data: tests, isLoading } = useQuery<LabTest[]>({
     queryKey: ["/api/lab-tests/all"],
+  });
+
+  const { data: providers } = useQuery<Provider[]>({
+    queryKey: ["/api/admin/providers"],
+  });
+
+  const { data: testProviders, refetch: refetchTestProviders } = useQuery<ProviderLabTestWithDetails[]>({
+    queryKey: ["/api/admin/lab-tests", selectedTest?.id, "providers"],
+    enabled: !!selectedTest,
+    queryFn: async () => {
+      if (!selectedTest) return [];
+      const res = await fetch(`/api/admin/lab-tests/${selectedTest.id}/providers`, { credentials: "include" });
+      return res.json();
+    },
   });
 
   const form = useForm<LabTestFormData>({
@@ -88,6 +116,15 @@ export default function AdminLabTestsPage() {
       testName: "",
       category: "",
       cost: "",
+      turnaroundTime: "",
+    },
+  });
+
+  const providerForm = useForm<ProviderAssignFormData>({
+    resolver: zodResolver(providerAssignSchema),
+    defaultValues: {
+      providerId: "",
+      price: "",
       turnaroundTime: "",
     },
   });
@@ -136,9 +173,54 @@ export default function AdminLabTestsPage() {
     },
   });
 
+  const assignProviderMutation = useMutation({
+    mutationFn: async (data: ProviderAssignFormData) => {
+      return apiRequest("POST", "/api/admin/provider-lab-tests", {
+        providerId: data.providerId,
+        labTestId: selectedTest?.id,
+        price: data.price,
+        turnaroundTime: data.turnaroundTime,
+        isActive: true,
+      });
+    },
+    onSuccess: () => {
+      refetchTestProviders();
+      providerForm.reset();
+      toast({ title: "Success", description: "Provider assigned to test" });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to assign provider", variant: "destructive" });
+    },
+  });
+
+  const removeProviderMutation = useMutation({
+    mutationFn: async (assignmentId: string) => {
+      return apiRequest("DELETE", `/api/admin/provider-lab-tests/${assignmentId}`);
+    },
+    onSuccess: () => {
+      refetchTestProviders();
+      toast({ title: "Success", description: "Provider removed from test" });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to remove provider", variant: "destructive" });
+    },
+  });
+
   const onSubmit = (data: LabTestFormData) => {
     createMutation.mutate(data);
   };
+
+  const onAssignProvider = (data: ProviderAssignFormData) => {
+    assignProviderMutation.mutate(data);
+  };
+
+  const openProviderDialog = (test: LabTest) => {
+    setSelectedTest(test);
+    setIsProviderDialogOpen(true);
+  };
+
+  const assignedProviderIds = testProviders?.map(tp => tp.providerId) || [];
+  const availableProviders = providers?.filter(p => !assignedProviderIds.includes(p.id)) || [];
 
   const filteredTests = tests?.filter((t) => {
     const matchesSearch =
@@ -330,6 +412,10 @@ export default function AdminLabTestsPage() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => openProviderDialog(test)}>
+                            <Users className="mr-2 h-4 w-4" />
+                            Manage Providers
+                          </DropdownMenuItem>
                           {test.status === "active" ? (
                             <DropdownMenuItem
                               onClick={() => updateStatusMutation.mutate({ id: test.id, status: "paused" })}
@@ -362,6 +448,127 @@ export default function AdminLabTestsPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Provider Assignment Dialog */}
+      <Dialog open={isProviderDialogOpen} onOpenChange={setIsProviderDialogOpen}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>Manage Providers for {selectedTest?.testName}</DialogTitle>
+            <DialogDescription>
+              Assign which provider will handle bookings for this test
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            {/* Current Assigned Providers */}
+            <div>
+              <h4 className="font-medium mb-2">Assigned Providers</h4>
+              {testProviders?.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No providers assigned yet</p>
+              ) : (
+                <div className="space-y-2">
+                  {testProviders?.map((tp) => (
+                    <div key={tp.id} className="flex items-center justify-between p-3 border rounded-md">
+                      <div>
+                        <p className="font-medium">{tp.provider?.name || "Unknown Provider"}</p>
+                        <p className="text-sm text-muted-foreground">
+                          Price: ₹{tp.price} • TAT: {tp.turnaroundTime || "N/A"}
+                        </p>
+                      </div>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => removeProviderMutation.mutate(tp.id)}
+                        disabled={removeProviderMutation.isPending}
+                        data-testid={`button-remove-provider-${tp.id}`}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Add New Provider */}
+            {availableProviders.length > 0 && (
+              <div className="border-t pt-4">
+                <h4 className="font-medium mb-2">Add Provider</h4>
+                <Form {...providerForm}>
+                  <form onSubmit={providerForm.handleSubmit(onAssignProvider)} className="space-y-3">
+                    <FormField
+                      control={providerForm.control}
+                      name="providerId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Select Provider</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger data-testid="select-provider">
+                                <SelectValue placeholder="Choose a provider" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {availableProviders.map((p) => (
+                                <SelectItem key={p.id} value={p.id}>
+                                  {p.name} ({p.location || "No location"})
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <div className="grid gap-3 grid-cols-2">
+                      <FormField
+                        control={providerForm.control}
+                        name="price"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Price (₹)</FormLabel>
+                            <FormControl>
+                              <Input placeholder="250" {...field} data-testid="input-provider-price" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={providerForm.control}
+                        name="turnaroundTime"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Turnaround Time</FormLabel>
+                            <FormControl>
+                              <Input placeholder="4 hours" {...field} data-testid="input-provider-tat" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    <Button 
+                      type="submit" 
+                      className="w-full" 
+                      disabled={assignProviderMutation.isPending}
+                      data-testid="button-assign-provider"
+                    >
+                      {assignProviderMutation.isPending ? "Assigning..." : "Assign Provider"}
+                    </Button>
+                  </form>
+                </Form>
+              </div>
+            )}
+
+            {availableProviders.length === 0 && testProviders && testProviders.length > 0 && (
+              <p className="text-sm text-muted-foreground text-center py-2">
+                All available providers have been assigned
+              </p>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

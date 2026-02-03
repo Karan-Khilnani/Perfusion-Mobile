@@ -16,8 +16,13 @@ import { useToast } from "@/hooks/use-toast";
 import { StarRating } from "@/components/star-rating";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Plus, Edit2, FlaskConical, IndianRupee, Clock, Building2, Stethoscope, Loader2, AlertCircle, ScanLine, CheckCircle2, ArrowRight, Calendar } from "lucide-react";
-import type { Lab, LabTest, Consultant, Provider, RadiologyModality } from "@shared/schema";
+import type { Lab, LabTest, Consultant, Provider, RadiologyModality, ProviderLabTest } from "@shared/schema";
 import { Link } from "wouter";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+type ProviderLabTestWithDetails = ProviderLabTest & {
+  labTest?: LabTest;
+};
 
 interface LabWithTests extends Lab {
   tests: LabTest[];
@@ -55,6 +60,14 @@ export default function ProviderServicesPage() {
   const [selectedLabId, setSelectedLabId] = useState<string | null>(null);
   const [editingSlotsFor, setEditingSlotsFor] = useState<Consultant | null>(null);
   const [newSlots, setNewSlots] = useState("");
+  const [isAddTestDialogOpen, setIsAddTestDialogOpen] = useState(false);
+  const [isSuggestTestDialogOpen, setIsSuggestTestDialogOpen] = useState(false);
+  const [selectedPredefinedTest, setSelectedPredefinedTest] = useState<string>("");
+  const [testPrice, setTestPrice] = useState("");
+  const [testTAT, setTestTAT] = useState("");
+  const [suggestTestName, setSuggestTestName] = useState("");
+  const [suggestTestDesc, setSuggestTestDesc] = useState("");
+  const [suggestTestPrice, setSuggestTestPrice] = useState("");
 
   const { data: provider, isLoading: providerLoading } = useQuery<Provider>({
     queryKey: ["/api/providers/me"],
@@ -75,6 +88,23 @@ export default function ProviderServicesPage() {
     queryKey: ["/api/radiology-modalities"],
     enabled: !!provider,
   });
+
+  // Predefined lab tests from admin
+  const { data: predefinedLabTests } = useQuery<LabTest[]>({
+    queryKey: ["/api/lab-tests"],
+    enabled: !!provider,
+  });
+
+  // Provider's assigned lab tests
+  const { data: myLabTests, isLoading: myLabTestsLoading } = useQuery<ProviderLabTestWithDetails[]>({
+    queryKey: ["/api/provider/my-lab-tests"],
+    enabled: !!provider,
+  });
+
+  // Filter out already assigned tests
+  const availablePredefinedTests = predefinedLabTests?.filter(
+    t => !myLabTests?.some(mt => mt.labTestId === t.id)
+  ) || [];
 
   const labForm = useForm<LabFormData>({
     resolver: zodResolver(labSchema),
@@ -152,6 +182,64 @@ export default function ProviderServicesPage() {
     },
     onError: () => {
       toast({ title: "Failed", description: "Failed to update slots.", variant: "destructive" });
+    },
+  });
+
+  // Add predefined test to provider's catalog
+  const addPredefinedTestMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("POST", "/api/provider/lab-tests", {
+        labTestId: selectedPredefinedTest,
+        price: testPrice,
+        turnaroundTime: testTAT,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/provider/my-lab-tests"] });
+      setIsAddTestDialogOpen(false);
+      setSelectedPredefinedTest("");
+      setTestPrice("");
+      setTestTAT("");
+      toast({ title: "Test Added", description: "Lab test added to your catalog." });
+    },
+    onError: () => {
+      toast({ title: "Failed", description: "Failed to add test.", variant: "destructive" });
+    },
+  });
+
+  // Suggest new test for admin approval
+  const suggestTestMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("POST", "/api/provider/suggest-lab-test", {
+        testName: suggestTestName,
+        description: suggestTestDesc,
+        suggestedPrice: suggestTestPrice,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/provider/my-suggestions"] });
+      setIsSuggestTestDialogOpen(false);
+      setSuggestTestName("");
+      setSuggestTestDesc("");
+      setSuggestTestPrice("");
+      toast({ title: "Suggestion Sent", description: "Your test suggestion has been sent to admin for approval." });
+    },
+    onError: () => {
+      toast({ title: "Failed", description: "Failed to submit suggestion.", variant: "destructive" });
+    },
+  });
+
+  // Remove test from provider's catalog
+  const removeTestMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return apiRequest("DELETE", `/api/provider/lab-tests/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/provider/my-lab-tests"] });
+      toast({ title: "Test Removed", description: "Test removed from your catalog." });
+    },
+    onError: () => {
+      toast({ title: "Failed", description: "Failed to remove test.", variant: "destructive" });
     },
   });
 
@@ -246,191 +334,166 @@ export default function ProviderServicesPage() {
         </TabsList>
 
         <TabsContent value="labs" className="space-y-4">
-          <div className="flex justify-end">
-            <Dialog open={isLabDialogOpen} onOpenChange={setIsLabDialogOpen}>
-              <DialogTrigger asChild>
-                <Button data-testid="button-add-lab">
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add Lab
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Add New Lab</DialogTitle>
-                  <DialogDescription>Create a new diagnostic lab</DialogDescription>
-                </DialogHeader>
-                <Form {...labForm}>
-                  <form onSubmit={labForm.handleSubmit((data) => createLabMutation.mutate(data))} className="space-y-4">
-                    <FormField
-                      control={labForm.control}
-                      name="name"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Lab Name</FormLabel>
-                          <FormControl>
-                            <Input placeholder="e.g., Premier Diagnostics" {...field} data-testid="input-lab-name" />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={labForm.control}
-                      name="location"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Location</FormLabel>
-                          <FormControl>
-                            <Input placeholder="e.g., Mumbai" {...field} data-testid="input-lab-location" />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={labForm.control}
-                      name="description"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Description</FormLabel>
-                          <FormControl>
-                            <Textarea placeholder="Brief description of your lab" {...field} data-testid="input-lab-description" />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <Button type="submit" className="w-full" disabled={createLabMutation.isPending} data-testid="button-save-lab">
-                      {createLabMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                      Create Lab
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-sm text-muted-foreground">Select tests from the platform catalog or suggest new ones</p>
+            <div className="flex gap-2">
+              <Dialog open={isAddTestDialogOpen} onOpenChange={setIsAddTestDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button data-testid="button-add-catalog-test">
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add from Catalog
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Add Test from Catalog</DialogTitle>
+                    <DialogDescription>Select a predefined test and set your price</DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Select Test</label>
+                      <Select value={selectedPredefinedTest} onValueChange={setSelectedPredefinedTest}>
+                        <SelectTrigger data-testid="select-predefined-test">
+                          <SelectValue placeholder="Choose a test..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {availablePredefinedTests.map((test) => (
+                            <SelectItem key={test.id} value={test.id}>
+                              {test.testName} ({test.category})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="grid gap-4 grid-cols-2">
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Your Price (₹)</label>
+                        <Input 
+                          value={testPrice} 
+                          onChange={(e) => setTestPrice(e.target.value)} 
+                          placeholder="250"
+                          data-testid="input-catalog-price"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Turnaround Time</label>
+                        <Input 
+                          value={testTAT} 
+                          onChange={(e) => setTestTAT(e.target.value)} 
+                          placeholder="4 hours"
+                          data-testid="input-catalog-tat"
+                        />
+                      </div>
+                    </div>
+                    <Button 
+                      className="w-full" 
+                      onClick={() => addPredefinedTestMutation.mutate()}
+                      disabled={!selectedPredefinedTest || !testPrice || addPredefinedTestMutation.isPending}
+                      data-testid="button-add-predefined-test"
+                    >
+                      {addPredefinedTestMutation.isPending ? "Adding..." : "Add Test"}
                     </Button>
-                  </form>
-                </Form>
-              </DialogContent>
-            </Dialog>
+                  </div>
+                </DialogContent>
+              </Dialog>
+              <Dialog open={isSuggestTestDialogOpen} onOpenChange={setIsSuggestTestDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" data-testid="button-suggest-test">
+                    <AlertCircle className="mr-2 h-4 w-4" />
+                    Suggest New Test
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Suggest New Test</DialogTitle>
+                    <DialogDescription>Suggest a test not in the catalog. Admin will review and approve.</DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Test Name</label>
+                      <Input 
+                        value={suggestTestName} 
+                        onChange={(e) => setSuggestTestName(e.target.value)} 
+                        placeholder="e.g., Genetic Screening Panel"
+                        data-testid="input-suggest-name"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Description</label>
+                      <Textarea 
+                        value={suggestTestDesc} 
+                        onChange={(e) => setSuggestTestDesc(e.target.value)} 
+                        placeholder="Describe what this test is for..."
+                        data-testid="input-suggest-desc"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Suggested Price (₹)</label>
+                      <Input 
+                        value={suggestTestPrice} 
+                        onChange={(e) => setSuggestTestPrice(e.target.value)} 
+                        placeholder="1500"
+                        data-testid="input-suggest-price"
+                      />
+                    </div>
+                    <Button 
+                      className="w-full" 
+                      onClick={() => suggestTestMutation.mutate()}
+                      disabled={!suggestTestName || suggestTestMutation.isPending}
+                      data-testid="button-submit-suggestion"
+                    >
+                      {suggestTestMutation.isPending ? "Submitting..." : "Submit for Approval"}
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </div>
           </div>
 
-          {labsLoading ? (
+          {myLabTestsLoading ? (
             <Card><CardContent className="py-8"><Skeleton className="h-20 w-full" /></CardContent></Card>
-          ) : !labs || labs.length === 0 ? (
+          ) : !myLabTests || myLabTests.length === 0 ? (
             <Card>
               <CardContent className="flex flex-col items-center justify-center py-12 text-center">
                 <FlaskConical className="mb-4 h-12 w-12 text-muted-foreground/50" />
-                <h3 className="mb-2 text-lg font-medium">No labs yet</h3>
-                <p className="text-sm text-muted-foreground">Click "Add Lab" to create your first lab</p>
+                <h3 className="mb-2 text-lg font-medium">No lab tests added</h3>
+                <p className="text-sm text-muted-foreground">Add tests from the catalog to start receiving bookings</p>
               </CardContent>
             </Card>
           ) : (
-            labs.map((lab) => (
-              <Card key={lab.id}>
-                <CardHeader>
-                  <div className="flex items-start justify-between gap-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>My Lab Tests ({myLabTests.length})</CardTitle>
+                <CardDescription>Tests you offer to care seekers</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {myLabTests.map((pt) => (
+                  <div key={pt.id} className="flex items-center justify-between rounded-lg border p-3" data-testid={`my-test-row-${pt.id}`}>
                     <div>
-                      <CardTitle>{lab.name}</CardTitle>
-                      <CardDescription>{lab.location}</CardDescription>
+                      <p className="font-medium">{pt.labTest?.testName || "Unknown Test"}</p>
+                      <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+                        <Badge variant="outline">{pt.labTest?.category}</Badge>
+                        <span className="flex items-center gap-1">
+                          <IndianRupee className="h-3.5 w-3.5" />₹{pt.price}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Clock className="h-3.5 w-3.5" />{pt.turnaroundTime || "N/A"}
+                        </span>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <StarRating rating={parseFloat(lab.rating || "4.0")} />
-                      <Badge variant={lab.isActive ? "default" : "secondary"}>
-                        {lab.isActive ? "Active" : "Inactive"}
-                      </Badge>
-                    </div>
+                    <Button 
+                      variant="ghost" 
+                      size="icon"
+                      onClick={() => removeTestMutation.mutate(pt.id)}
+                      disabled={removeTestMutation.isPending}
+                      data-testid={`button-remove-test-${pt.id}`}
+                    >
+                      <AlertCircle className="h-4 w-4 text-destructive" />
+                    </Button>
                   </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {lab.description && <p className="text-sm text-muted-foreground">{lab.description}</p>}
-                  
-                  <div className="flex items-center justify-between">
-                    <h4 className="font-medium">Tests ({lab.tests.length})</h4>
-                    <Dialog open={isTestDialogOpen && selectedLabId === lab.id} onOpenChange={(open) => {
-                      setIsTestDialogOpen(open);
-                      if (open) setSelectedLabId(lab.id);
-                    }}>
-                      <DialogTrigger asChild>
-                        <Button size="sm" variant="outline" data-testid={`button-add-test-${lab.id}`}>
-                          <Plus className="mr-2 h-4 w-4" />
-                          Add Test
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent>
-                        <DialogHeader>
-                          <DialogTitle>Add Lab Test</DialogTitle>
-                          <DialogDescription>Add a new test to {lab.name}</DialogDescription>
-                        </DialogHeader>
-                        <Form {...testForm}>
-                          <form onSubmit={testForm.handleSubmit(handleAddTest)} className="space-y-4">
-                            <FormField
-                              control={testForm.control}
-                              name="testName"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>Test Name</FormLabel>
-                                  <FormControl>
-                                    <Input placeholder="e.g., Complete Blood Count" {...field} data-testid="input-test-name" />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                            <FormField
-                              control={testForm.control}
-                              name="cost"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>Cost (INR)</FormLabel>
-                                  <FormControl>
-                                    <Input placeholder="e.g., 50.00" {...field} data-testid="input-test-cost" />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                            <FormField
-                              control={testForm.control}
-                              name="turnaroundTime"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>Turnaround Time</FormLabel>
-                                  <FormControl>
-                                    <Input placeholder="e.g., 24 hours" {...field} data-testid="input-test-tat" />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                            <Button type="submit" className="w-full" disabled={addTestMutation.isPending} data-testid="button-save-test">
-                              {addTestMutation.isPending ? "Adding..." : "Add Test"}
-                            </Button>
-                          </form>
-                        </Form>
-                      </DialogContent>
-                    </Dialog>
-                  </div>
-
-                  {lab.tests.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">No tests added yet</p>
-                  ) : (
-                    <div className="space-y-2">
-                      {lab.tests.map((test) => (
-                        <div key={test.id} className="flex items-center justify-between rounded-lg border p-3" data-testid={`test-row-${test.id}`}>
-                          <div>
-                            <p className="font-medium">{test.testName}</p>
-                            <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-                              <span className="flex items-center gap-1">
-                                <IndianRupee className="h-3.5 w-3.5" />₹{test.cost}
-                              </span>
-                              <span className="flex items-center gap-1">
-                                <Clock className="h-3.5 w-3.5" />{test.turnaroundTime}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            ))
+                ))}
+              </CardContent>
+            </Card>
           )}
         </TabsContent>
 
