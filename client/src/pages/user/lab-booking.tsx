@@ -26,6 +26,8 @@ const bookingSchema = z.object({
   patientName: z.string().min(2, "Patient name is required"),
   patientAge: z.coerce.number().min(1, "Age must be at least 1").max(150, "Invalid age"),
   provisionalDiagnosis: z.string().optional(),
+  ipdNumber: z.string().optional(),
+  bedNumber: z.string().optional(),
   orderingPhysician: z.string().optional(),
 });
 
@@ -51,6 +53,8 @@ export default function LabBookingPage() {
       patientName: "",
       patientAge: "" as unknown as number,
       provisionalDiagnosis: "",
+      ipdNumber: "",
+      bedNumber: "",
       orderingPhysician: "",
     },
   });
@@ -68,6 +72,8 @@ export default function LabBookingPage() {
         patientName: data.patientName,
         patientAge: data.patientAge,
         provisionalDiagnosis: data.provisionalDiagnosis || null,
+        ipdNumber: data.ipdNumber || null,
+        bedNumber: data.bedNumber || null,
         orderingPhysician: data.orderingPhysician || null,
         amount: test.cost,
         status: "booked",
@@ -352,6 +358,44 @@ export default function LabBookingPage() {
                       </FormItem>
                     )}
                   />
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="ipdNumber"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>IPD Number</FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder="IPD No."
+                              {...field}
+                              data-testid="input-ipd-number"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="bedNumber"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Bed Number</FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder="Bed No."
+                              {...field}
+                              data-testid="input-bed-number"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
 
                   <FormField
                     control={form.control}

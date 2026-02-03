@@ -158,6 +158,8 @@ export const bookings = pgTable("bookings", {
   patientContact: varchar("patient_contact", { length: 20 }),
   clinicalSummary: text("clinical_summary"),
   provisionalDiagnosis: text("provisional_diagnosis"),
+  ipdNumber: varchar("ipd_number", { length: 50 }),
+  bedNumber: varchar("bed_number", { length: 50 }),
   documentUrls: text("document_urls").array(),
   // Appointment and payment
   appointmentSlot: varchar("appointment_slot", { length: 100 }),
