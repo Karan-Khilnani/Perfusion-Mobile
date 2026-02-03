@@ -16,7 +16,10 @@ export default function ProviderDashboard() {
     pending: bookings?.filter((b) => b.status === "booked").length || 0,
     processing: bookings?.filter((b) => ["sample_collected", "processing"].includes(b.status)).length || 0,
     completed: bookings?.filter((b) => b.status === "completed").length || 0,
-    revenue: bookings?.reduce((sum, b) => sum + parseFloat(b.amount), 0) || 0,
+    revenue: bookings?.reduce((sum, b) => {
+      const price = (b as any).providerPrice || b.amount;
+      return sum + parseFloat(price);
+    }, 0) || 0,
   };
 
   const recentBookings = bookings?.slice(0, 5) || [];
@@ -130,7 +133,9 @@ export default function ProviderDashboard() {
                     </p>
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className="text-sm font-medium">₹{booking.amount}</span>
+                    <span className="text-sm font-medium">
+                      ₹{(booking as any).providerPrice || booking.amount}
+                    </span>
                     <StatusBadge status={booking.status} />
                   </div>
                 </div>
