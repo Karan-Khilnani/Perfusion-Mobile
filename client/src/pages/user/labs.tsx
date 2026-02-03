@@ -1,16 +1,33 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Search, Clock, FlaskConical, ArrowUpDown, ShoppingCart, Check } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { LabTest } from "@shared/schema";
+
+const patientFormSchema = z.object({
+  patientName: z.string().min(2, "Patient name is required"),
+  patientAge: z.coerce.number().min(1, "Age must be at least 1").max(150, "Invalid age"),
+  provisionalDiagnosis: z.string().optional(),
+  ipdNumber: z.string().optional(),
+  bedNumber: z.string().optional(),
+  orderingPhysician: z.string().optional(),
+});
+
+type PatientFormData = z.infer<typeof patientFormSchema>;
 
 type SortOption = "name" | "cost" | "turnaroundTime";
 
@@ -19,14 +36,27 @@ export default function LabsPage() {
   const [selectedCategory, setSelectedCategory] = useState("All Categories");
   const [sortBy, setSortBy] = useState<SortOption>("name");
   const [cart, setCart] = useState<string[]>([]);
+  const [showPatientForm, setShowPatientForm] = useState(false);
   const { toast } = useToast();
+
+  const form = useForm<PatientFormData>({
+    resolver: zodResolver(patientFormSchema),
+    defaultValues: {
+      patientName: "",
+      patientAge: "" as unknown as number,
+      provisionalDiagnosis: "",
+      ipdNumber: "",
+      bedNumber: "",
+      orderingPhysician: "",
+    },
+  });
 
   const { data: tests, isLoading } = useQuery<LabTest[]>({
     queryKey: ["/api/lab-tests"],
   });
 
   const createBookingMutation = useMutation({
-    mutationFn: async (testIds: string[]) => {
+    mutationFn: async ({ testIds, patientData }: { testIds: string[]; patientData: PatientFormData }) => {
       const bookings = await Promise.all(
         testIds.map((testId) => {
           const test = tests?.find((t) => t.id === testId);
@@ -36,8 +66,12 @@ export default function LabsPage() {
             serviceId: test.id,
             serviceName: test.testName,
             providerName: "Perfusion Lab Services",
-            patientName: "Patient",
-            patientAge: 0,
+            patientName: patientData.patientName,
+            patientAge: patientData.patientAge,
+            provisionalDiagnosis: patientData.provisionalDiagnosis || null,
+            ipdNumber: patientData.ipdNumber || null,
+            bedNumber: patientData.bedNumber || null,
+            orderingPhysician: patientData.orderingPhysician || null,
             amount: test.cost,
             status: "booked",
             paymentStatus: "pending",
@@ -49,6 +83,8 @@ export default function LabsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
       setCart([]);
+      setShowPatientForm(false);
+      form.reset();
       toast({
         title: "Tests Booked",
         description: "Your lab test booking has been created successfully.",
@@ -65,7 +101,7 @@ export default function LabsPage() {
 
   const categories = useMemo(() => {
     if (!tests) return ["All Categories"];
-    const catSet = new Set(tests.map((t) => t.category).filter(Boolean));
+    const catSet = new Set(tests.map((t) => t.category).filter((c): c is string => Boolean(c)));
     const cats = Array.from(catSet);
     return ["All Categories", ...cats.sort()];
   }, [tests]);
@@ -119,7 +155,11 @@ export default function LabsPage() {
       });
       return;
     }
-    createBookingMutation.mutate(cart);
+    setShowPatientForm(true);
+  };
+
+  const onSubmitPatientForm = (data: PatientFormData) => {
+    createBookingMutation.mutate({ testIds: cart, patientData: data });
   };
 
   const cartTotal = useMemo(() => {
@@ -293,6 +333,117 @@ export default function LabsPage() {
           })}
         </div>
       )}
+
+      <Dialog open={showPatientForm} onOpenChange={setShowPatientForm}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Patient Details</DialogTitle>
+            <DialogDescription>
+              Enter patient information for {cart.length} test(s) - Total: ₹{cartTotal.toFixed(2)}
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmitPatientForm)} className="space-y-4">
+              <FormField
+                control={form.control}
+                name="patientName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Patient Name *</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Enter patient's full name" {...field} data-testid="input-patient-name" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="patientAge"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Age *</FormLabel>
+                      <FormControl>
+                        <Input type="number" placeholder="Age" {...field} data-testid="input-patient-age" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="orderingPhysician"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Doctor Name</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Ordering doctor" {...field} data-testid="input-doctor-name" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="ipdNumber"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>IPD Number</FormLabel>
+                      <FormControl>
+                        <Input placeholder="IPD No." {...field} data-testid="input-ipd-number" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="bedNumber"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Bed Number</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Bed No." {...field} data-testid="input-bed-number" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <FormField
+                control={form.control}
+                name="provisionalDiagnosis"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Provisional Diagnosis</FormLabel>
+                    <FormControl>
+                      <Textarea placeholder="Enter diagnosis (optional)" {...field} data-testid="input-diagnosis" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setShowPatientForm(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={createBookingMutation.isPending} data-testid="button-confirm-booking">
+                  {createBookingMutation.isPending ? "Booking..." : `Book Tests (₹${cartTotal.toFixed(2)})`}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
