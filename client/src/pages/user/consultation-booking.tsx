@@ -31,15 +31,6 @@ const bookingSchema = z.object({
 
 type BookingFormData = z.infer<typeof bookingSchema>;
 
-function generateVideoRoomId(): string {
-  const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
-  let result = "perfusion-";
-  for (let i = 0; i < 12; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return result;
-}
-
 export default function ConsultationBookingPage() {
   const { id } = useParams<{ id: string }>();
   const [, navigate] = useLocation();
@@ -72,9 +63,7 @@ export default function ConsultationBookingPage() {
     mutationFn: async (data: BookingFormData) => {
       if (!consultant) throw new Error("Consultant not found");
 
-      const roomId = generateVideoRoomId();
-      setVideoRoomId(roomId);
-
+      // Server creates the Daily.co room and returns the URL
       const response = await apiRequest("POST", "/api/bookings", {
         bookingType: "consultation",
         serviceId: consultant.id,
@@ -87,7 +76,6 @@ export default function ConsultationBookingPage() {
         clinicalSummary: data.clinicalSummary,
         provisionalDiagnosis: data.provisionalDiagnosis || null,
         appointmentSlot: data.appointmentSlot,
-        videoRoomId: roomId,
         amount: consultant.consultationFee,
         status: "confirmed",
         paymentStatus: "paid",
@@ -96,6 +84,10 @@ export default function ConsultationBookingPage() {
     },
     onSuccess: (data) => {
       setBookingId(data.id);
+      // Use the video room URL from the server response
+      if (data.videoRoomId) {
+        setVideoRoomId(data.videoRoomId);
+      }
       setStep("confirmation");
       queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
       toast({
@@ -234,7 +226,7 @@ export default function ConsultationBookingPage() {
                 <p className="mt-2 text-sm text-muted-foreground">
                   Join the video call at your scheduled appointment time
                 </p>
-                <Link href={`/video/${videoRoomId}?returnTo=/user/orders`}>
+                <Link href={`/video/${encodeURIComponent(videoRoomId)}?returnTo=/user/orders`}>
                   <Button
                     className="mt-3"
                     data-testid="button-join-video"

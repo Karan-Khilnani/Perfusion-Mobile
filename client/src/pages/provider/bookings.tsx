@@ -286,7 +286,7 @@ export default function ProviderBookingsPage() {
       <div className="flex flex-col items-start gap-2 sm:items-end">
         <span className="font-medium">₹{booking.amount}</span>
         {booking.bookingType === "consultation" && booking.videoRoomId && (
-          <Link href={`/video/${booking.videoRoomId}?returnTo=/provider/bookings`}>
+          <Link href={`/video/${encodeURIComponent(booking.videoRoomId)}?returnTo=/provider/bookings`}>
             <Button size="sm" variant="outline" data-testid={`button-join-video-${booking.id}`}>
               <Video className="mr-2 h-3.5 w-3.5" />
               Join Call

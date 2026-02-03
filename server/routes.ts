@@ -577,8 +577,8 @@ export async function registerRoutes(
       if (bookingData.bookingType === "consultation") {
         const roomName = `perfusion-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
         const dailyRoom = await createDailyRoom(roomName);
-        // Store room name - frontend will construct full URL
-        bookingData.videoRoomId = dailyRoom ? dailyRoom.name : roomName;
+        // Store full Daily.co URL so it works for any account
+        bookingData.videoRoomId = dailyRoom ? dailyRoom.url : null;
       }
       
       const booking = await storage.createBooking(bookingData);

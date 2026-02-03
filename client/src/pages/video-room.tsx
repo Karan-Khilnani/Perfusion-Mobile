@@ -23,20 +23,21 @@ export default function VideoRoomPage() {
     enabled: !!roomId,
   });
 
-  // Construct Daily.co prebuilt URL from room name
+  // Build Daily.co URL - handles both full URLs and legacy room names
   const getDailyUrl = () => {
     if (!roomId) return null;
+    const decoded = decodeURIComponent(roomId);
     
     // If it's already a full URL, use it directly
-    if (roomId.startsWith("https://")) {
-      return roomId;
+    if (decoded.startsWith("https://") || decoded.startsWith("http://")) {
+      return decoded;
     }
     
-    // Use the Daily.co domain from your account
-    // Room names from API are used directly
-    return `https://srikantgiri.daily.co/${roomId}`;
+    // Legacy fallback: old bookings may have just room names
+    // This won't work unless the room exists, but provides graceful handling
+    return null;
   };
-
+  
   const dailyUrl = getDailyUrl();
 
   useEffect(() => {
@@ -66,15 +67,17 @@ export default function VideoRoomPage() {
     return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
   }, []);
 
-  if (!roomId) {
+  if (!roomId || !dailyUrl) {
     return (
       <div className="flex h-screen items-center justify-center">
         <Card className="max-w-md">
           <CardContent className="py-8 text-center">
             <VideoOff className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
-            <h2 className="mb-2 text-xl font-semibold">Invalid Room</h2>
+            <h2 className="mb-2 text-xl font-semibold">Video Room Unavailable</h2>
             <p className="mb-4 text-muted-foreground">
-              No video room ID was provided.
+              {!roomId 
+                ? "No video room ID was provided."
+                : "This booking was created before video calls were set up. Please book a new consultation to get a working video room."}
             </p>
             <Link href={returnTo}>
               <Button data-testid="button-back-orders">Back to Orders</Button>
