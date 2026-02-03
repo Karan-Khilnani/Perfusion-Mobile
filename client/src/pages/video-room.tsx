@@ -1,31 +1,20 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams, Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, Video, VideoOff, Mic, MicOff, Phone, Users, Maximize2, Minimize2 } from "lucide-react";
+import { ArrowLeft, Video, VideoOff, Phone, Maximize2, Minimize2 } from "lucide-react";
 import type { Booking } from "@shared/schema";
-
-declare global {
-  interface Window {
-    JitsiMeetExternalAPI: any;
-  }
-}
 
 export default function VideoRoomPage() {
   const { roomId } = useParams<{ roomId: string }>();
   const [, navigate] = useLocation();
-  const jitsiContainerRef = useRef<HTMLDivElement>(null);
-  const jitsiApiRef = useRef<any>(null);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [isAudioMuted, setIsAudioMuted] = useState(false);
-  const [isVideoMuted, setIsVideoMuted] = useState(false);
-  const [participantCount, setParticipantCount] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Get return path from URL query param (for role-aware navigation)
   const urlParams = new URLSearchParams(window.location.search);
   const returnTo = urlParams.get("returnTo") || "/user/orders";
 
@@ -34,153 +23,36 @@ export default function VideoRoomPage() {
     enabled: !!roomId,
   });
 
+  // Construct Daily.co prebuilt URL from room name
+  const getDailyUrl = () => {
+    if (!roomId) return null;
+    
+    // If it's already a full URL, use it directly
+    if (roomId.startsWith("https://")) {
+      return roomId;
+    }
+    
+    // Use the Daily.co domain from your account
+    // Room names from API are used directly
+    return `https://srikantgiri.daily.co/${roomId}`;
+  };
+
+  const dailyUrl = getDailyUrl();
+
   useEffect(() => {
-    if (!roomId || !jitsiContainerRef.current) return;
-
-    const loadJitsiScript = () => {
-      return new Promise<void>((resolve, reject) => {
-        if (window.JitsiMeetExternalAPI) {
-          resolve();
-          return;
-        }
-
-        const script = document.createElement("script");
-        script.src = "https://meet.jit.si/external_api.js";
-        script.async = true;
-        script.onload = () => resolve();
-        script.onerror = () => reject(new Error("Failed to load Jitsi API"));
-        document.body.appendChild(script);
-      });
-    };
-
-    const initJitsi = async () => {
-      try {
-        await loadJitsiScript();
-        
-        if (jitsiApiRef.current) {
-          jitsiApiRef.current.dispose();
-        }
-
-        const domain = "meet.jit.si";
-        const options = {
-          roomName: roomId,
-          width: "100%",
-          height: "100%",
-          parentNode: jitsiContainerRef.current,
-          configOverwrite: {
-            startWithAudioMuted: false,
-            startWithVideoMuted: false,
-            prejoinPageEnabled: false,
-            disableDeepLinking: true,
-            toolbarButtons: [
-              "microphone",
-              "camera",
-              "closedcaptions",
-              "desktop",
-              "fullscreen",
-              "fodeviceselection",
-              "hangup",
-              "chat",
-              "recording",
-              "settings",
-              "raisehand",
-              "videoquality",
-              "filmstrip",
-              "tileview",
-            ],
-          },
-          interfaceConfigOverwrite: {
-            TOOLBAR_BUTTONS: [
-              "microphone",
-              "camera",
-              "closedcaptions",
-              "desktop",
-              "fullscreen",
-              "fodeviceselection",
-              "hangup",
-              "chat",
-              "recording",
-              "settings",
-              "raisehand",
-              "videoquality",
-              "filmstrip",
-              "tileview",
-            ],
-            SHOW_JITSI_WATERMARK: false,
-            SHOW_WATERMARK_FOR_GUESTS: false,
-            DEFAULT_BACKGROUND: "#1a1a2e",
-            DISABLE_JOIN_LEAVE_NOTIFICATIONS: false,
-            MOBILE_APP_PROMO: false,
-          },
-        };
-
-        const api = new window.JitsiMeetExternalAPI(domain, options);
-        jitsiApiRef.current = api;
-
-        api.addListener("videoConferenceJoined", () => {
-          setIsLoading(false);
-        });
-
-        api.addListener("participantJoined", () => {
-          setParticipantCount((prev) => prev + 1);
-        });
-
-        api.addListener("participantLeft", () => {
-          setParticipantCount((prev) => Math.max(1, prev - 1));
-        });
-
-        api.addListener("audioMuteStatusChanged", (event: { muted: boolean }) => {
-          setIsAudioMuted(event.muted);
-        });
-
-        api.addListener("videoMuteStatusChanged", (event: { muted: boolean }) => {
-          setIsVideoMuted(event.muted);
-        });
-
-        api.addListener("readyToClose", () => {
-          navigate(returnTo);
-        });
-
-      } catch (error) {
-        console.error("Failed to initialize Jitsi:", error);
-        setIsLoading(false);
-      }
-    };
-
-    initJitsi();
-
-    return () => {
-      if (jitsiApiRef.current) {
-        jitsiApiRef.current.dispose();
-        jitsiApiRef.current = null;
-      }
-    };
-  }, [roomId, navigate]);
-
-  const toggleAudio = () => {
-    if (jitsiApiRef.current) {
-      jitsiApiRef.current.executeCommand("toggleAudio");
-    }
-  };
-
-  const toggleVideo = () => {
-    if (jitsiApiRef.current) {
-      jitsiApiRef.current.executeCommand("toggleVideo");
-    }
-  };
+    const timer = setTimeout(() => setIsLoading(false), 2000);
+    return () => clearTimeout(timer);
+  }, []);
 
   const hangUp = () => {
-    if (jitsiApiRef.current) {
-      jitsiApiRef.current.executeCommand("hangup");
-    }
     navigate(returnTo);
   };
 
   const toggleFullscreen = () => {
-    if (!document.fullscreenElement) {
-      jitsiContainerRef.current?.requestFullscreen();
+    if (!document.fullscreenElement && containerRef.current) {
+      containerRef.current.requestFullscreen();
       setIsFullscreen(true);
-    } else {
+    } else if (document.fullscreenElement) {
       document.exitFullscreen();
       setIsFullscreen(false);
     }
@@ -224,14 +96,12 @@ export default function VideoRoomPage() {
           </Link>
           <div>
             <h1 className="text-lg font-semibold">Video Consultation</h1>
-            <p className="text-sm text-muted-foreground">Room: {roomId}</p>
+            <p className="text-sm text-muted-foreground">
+              {booking?.serviceName || "Super Speciality Consultation"}
+            </p>
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <Badge variant="secondary" className="gap-1.5">
-            <Users className="h-3.5 w-3.5" />
-            {participantCount} participant{participantCount !== 1 ? "s" : ""}
-          </Badge>
           <Badge variant="outline" className="gap-1.5 text-green-600 border-green-600/30 bg-green-600/10">
             <Video className="h-3.5 w-3.5" />
             Live
@@ -239,45 +109,39 @@ export default function VideoRoomPage() {
         </div>
       </header>
 
-      <div className="relative flex-1 min-h-[400px]" style={{ height: "calc(100vh - 140px)" }}>
+      <div 
+        ref={containerRef}
+        className="relative flex-1 bg-black"
+        style={{ minHeight: "500px" }}
+      >
         {isLoading && (
           <div className="absolute inset-0 z-10 flex items-center justify-center bg-background">
             <div className="text-center">
               <div className="mb-4 h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto" />
               <p className="text-muted-foreground">Connecting to video room...</p>
-              <p className="mt-2 text-xs text-muted-foreground max-w-sm">
-                Note: If prompted, click "I am the host" to start the meeting. The first person to join becomes the moderator.
-              </p>
             </div>
           </div>
         )}
-        <div
-          ref={jitsiContainerRef}
-          className="absolute inset-0"
-          style={{ minHeight: "400px" }}
-          data-testid="video-container"
-        />
+        
+        {dailyUrl && (
+          <iframe
+            ref={iframeRef}
+            src={dailyUrl}
+            allow="camera; microphone; fullscreen; display-capture; autoplay"
+            className="w-full h-full border-0"
+            style={{ 
+              position: "absolute",
+              top: 0,
+              left: 0,
+              width: "100%",
+              height: "100%",
+            }}
+            data-testid="video-container"
+          />
+        )}
       </div>
 
       <footer className="flex items-center justify-center gap-4 border-t bg-muted/30 px-4 py-4">
-        <Button
-          variant={isAudioMuted ? "destructive" : "secondary"}
-          size="icon"
-          onClick={toggleAudio}
-          className="h-12 w-12 rounded-full"
-          data-testid="button-toggle-audio"
-        >
-          {isAudioMuted ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
-        </Button>
-        <Button
-          variant={isVideoMuted ? "destructive" : "secondary"}
-          size="icon"
-          onClick={toggleVideo}
-          className="h-12 w-12 rounded-full"
-          data-testid="button-toggle-video"
-        >
-          {isVideoMuted ? <VideoOff className="h-5 w-5" /> : <Video className="h-5 w-5" />}
-        </Button>
         <Button
           variant="destructive"
           size="icon"

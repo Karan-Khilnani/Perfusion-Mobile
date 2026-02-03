@@ -8,6 +8,46 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 
+// Daily.co API helper
+async function createDailyRoom(roomName: string): Promise<{ url: string; name: string } | null> {
+  const apiKey = process.env.DAILY_API_KEY;
+  if (!apiKey) {
+    console.error("DAILY_API_KEY not configured");
+    return null;
+  }
+
+  try {
+    const response = await fetch("https://api.daily.co/v1/rooms", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        name: roomName,
+        properties: {
+          enable_chat: true,
+          enable_screenshare: true,
+          enable_recording: "cloud",
+          exp: Math.floor(Date.now() / 1000) + 86400, // Expires in 24 hours
+        },
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      console.error("Failed to create Daily room:", error);
+      return null;
+    }
+
+    const room = await response.json();
+    return { url: room.url, name: room.name };
+  } catch (error) {
+    console.error("Error creating Daily room:", error);
+    return null;
+  }
+}
+
 // Configure multer for file uploads
 const uploadDir = path.join(process.cwd(), "uploads", "reports");
 if (!fs.existsSync(uploadDir)) {
@@ -533,9 +573,12 @@ export async function registerRoutes(
         userId,
       };
       
-      // Generate videoRoomId for consultation bookings
+      // Generate Daily.co room for consultation bookings
       if (bookingData.bookingType === "consultation") {
-        bookingData.videoRoomId = `perfusion-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        const roomName = `perfusion-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        const dailyRoom = await createDailyRoom(roomName);
+        // Store room name - frontend will construct full URL
+        bookingData.videoRoomId = dailyRoom ? dailyRoom.name : roomName;
       }
       
       const booking = await storage.createBooking(bookingData);
