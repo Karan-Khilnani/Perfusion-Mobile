@@ -45,7 +45,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, MoreHorizontal, Pause, Play, Trash2, FileImage, Search } from "lucide-react";
+import { Plus, MoreHorizontal, Pause, Play, Trash2, FileImage, Search, Pencil, Users } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { RadiologyModality } from "@shared/schema";
@@ -53,6 +53,8 @@ import type { RadiologyModality } from "@shared/schema";
 const modalitySchema = z.object({
   name: z.string().min(2, "Modality name is required"),
   category: z.string().min(1, "Category is required"),
+  cost: z.string().optional(),
+  turnaroundTime: z.string().optional(),
 });
 
 type ModalityFormData = z.infer<typeof modalitySchema>;
@@ -73,6 +75,8 @@ export default function AdminRadiologyPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterCategory, setFilterCategory] = useState("All");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editingModality, setEditingModality] = useState<RadiologyModality | null>(null);
   const { toast } = useToast();
 
   const { data: modalities, isLoading } = useQuery<RadiologyModality[]>({
@@ -84,6 +88,18 @@ export default function AdminRadiologyPage() {
     defaultValues: {
       name: "",
       category: "",
+      cost: "",
+      turnaroundTime: "",
+    },
+  });
+
+  const editForm = useForm<ModalityFormData>({
+    resolver: zodResolver(modalitySchema),
+    defaultValues: {
+      name: "",
+      category: "",
+      cost: "",
+      turnaroundTime: "",
     },
   });
 
@@ -131,8 +147,41 @@ export default function AdminRadiologyPage() {
     },
   });
 
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: ModalityFormData }) => {
+      return apiRequest("PATCH", `/api/admin/radiology-modalities/${id}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/radiology-modalities/all"] });
+      setIsEditDialogOpen(false);
+      setEditingModality(null);
+      editForm.reset();
+      toast({ title: "Success", description: "Modality updated successfully" });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to update modality", variant: "destructive" });
+    },
+  });
+
   const onSubmit = (data: ModalityFormData) => {
     createMutation.mutate(data);
+  };
+
+  const onEditSubmit = (data: ModalityFormData) => {
+    if (editingModality) {
+      updateMutation.mutate({ id: editingModality.id, data });
+    }
+  };
+
+  const openEditDialog = (modality: RadiologyModality) => {
+    setEditingModality(modality);
+    editForm.reset({
+      name: modality.name,
+      category: modality.category || "",
+      cost: modality.cost?.toString() || "",
+      turnaroundTime: modality.turnaroundTime || "",
+    });
+    setIsEditDialogOpen(true);
   };
 
   const filteredModalities = modalities?.filter((m) => {
@@ -273,6 +322,8 @@ export default function AdminRadiologyPage() {
                 <TableRow>
                   <TableHead>Modality Name</TableHead>
                   <TableHead>Category</TableHead>
+                  <TableHead>Cost</TableHead>
+                  <TableHead>TAT</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="w-[70px]">Actions</TableHead>
                 </TableRow>
@@ -284,6 +335,8 @@ export default function AdminRadiologyPage() {
                     <TableCell>
                       <Badge variant="outline">{modality.category}</Badge>
                     </TableCell>
+                    <TableCell>{modality.cost ? `₹${modality.cost}` : "-"}</TableCell>
+                    <TableCell>{modality.turnaroundTime || "-"}</TableCell>
                     <TableCell>{getStatusBadge(modality.status || "active")}</TableCell>
                     <TableCell>
                       <DropdownMenu>
@@ -293,6 +346,10 @@ export default function AdminRadiologyPage() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => openEditDialog(modality)}>
+                            <Pencil className="mr-2 h-4 w-4" />
+                            Edit Cost/TAT
+                          </DropdownMenuItem>
                           {modality.status === "active" ? (
                             <DropdownMenuItem
                               onClick={() => updateStatusMutation.mutate({ id: modality.id, status: "paused" })}
@@ -325,6 +382,96 @@ export default function AdminRadiologyPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Edit Modality Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={(open) => {
+        setIsEditDialogOpen(open);
+        if (!open) {
+          setEditingModality(null);
+          editForm.reset();
+        }
+      }}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Edit Modality</DialogTitle>
+            <DialogDescription>
+              Update the cost and turnaround time for {editingModality?.name}
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...editForm}>
+            <form onSubmit={editForm.handleSubmit(onEditSubmit)} className="space-y-4">
+              <FormField
+                control={editForm.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Modality Name</FormLabel>
+                    <FormControl>
+                      <Input {...field} data-testid="input-edit-modality-name" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={editForm.control}
+                name="category"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Category</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-edit-modality-category">
+                          <SelectValue placeholder="Select category" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {modalityCategories.map((cat) => (
+                          <SelectItem key={cat} value={cat}>
+                            {cat}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <div className="grid gap-4 grid-cols-2">
+                <FormField
+                  control={editForm.control}
+                  name="cost"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Platform Cost (₹)</FormLabel>
+                      <FormControl>
+                        <Input placeholder="500.00" {...field} data-testid="input-edit-modality-cost" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={editForm.control}
+                  name="turnaroundTime"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Turnaround Time</FormLabel>
+                      <FormControl>
+                        <Input placeholder="24 hours" {...field} data-testid="input-edit-modality-tat" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              <Button type="submit" className="w-full" disabled={updateMutation.isPending} data-testid="button-update-modality">
+                {updateMutation.isPending ? "Updating..." : "Update Modality"}
+              </Button>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

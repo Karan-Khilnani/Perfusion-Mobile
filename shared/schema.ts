@@ -78,6 +78,8 @@ export const radiologyModalities = pgTable("radiology_modalities", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: varchar("name", { length: 255 }).notNull(),
   category: varchar("category", { length: 100 }),
+  cost: decimal("cost", { precision: 10, scale: 2 }),
+  turnaroundTime: varchar("turnaround_time", { length: 50 }),
   status: varchar("status", { length: 20 }).default("active").$type<ServiceStatus>(),
   createdAt: timestamp("created_at").defaultNow(),
 });

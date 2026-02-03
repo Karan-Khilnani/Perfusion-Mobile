@@ -752,7 +752,34 @@ export async function registerRoutes(
       
       // Get only bookings assigned to this provider
       const bookings = await storage.getBookingsByProviderId(provider.id);
-      res.json(bookings);
+      
+      // Get all provider assignments for lab tests and modalities
+      const providerLabTests = await storage.getProviderLabTestsByProvider(provider.id);
+      const providerModalities = await storage.getProviderModalitiesByProvider(provider.id);
+      
+      // Enrich bookings with provider's price
+      const enrichedBookings = bookings.map(booking => {
+        let providerPrice = null;
+        
+        if (booking.bookingType === "lab" && booking.serviceId) {
+          const assignment = providerLabTests.find(plt => plt.labTestId === booking.serviceId);
+          if (assignment) {
+            providerPrice = assignment.price;
+          }
+        } else if (booking.bookingType === "teleradiology" && booking.modalityId) {
+          const assignment = providerModalities.find(pm => pm.modalityId === booking.modalityId);
+          if (assignment) {
+            providerPrice = assignment.price;
+          }
+        }
+        
+        return {
+          ...booking,
+          providerPrice,
+        };
+      });
+      
+      res.json(enrichedBookings);
     } catch (error) {
       console.error("Error fetching provider bookings:", error);
       res.status(500).json({ message: "Failed to fetch bookings" });

@@ -284,7 +284,14 @@ export default function ProviderBookingsPage() {
         </p>
       </div>
       <div className="flex flex-col items-start gap-2 sm:items-end">
-        <span className="font-medium">₹{booking.amount}</span>
+        <span className="font-medium">
+          ₹{(booking.bookingType === "lab" || booking.bookingType === "teleradiology") && (booking as any).providerPrice 
+            ? (booking as any).providerPrice 
+            : booking.amount}
+        </span>
+        {(booking.bookingType === "lab" || booking.bookingType === "teleradiology") && (booking as any).providerPrice && (
+          <span className="text-xs text-muted-foreground">Your rate</span>
+        )}
         {booking.bookingType === "consultation" && booking.videoRoomId && (
           <Link href={`/video/${encodeURIComponent(booking.videoRoomId)}?returnTo=/provider/bookings`}>
             <Button size="sm" variant="outline" data-testid={`button-join-video-${booking.id}`}>

@@ -45,7 +45,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, MoreHorizontal, Pause, Play, Trash2, FlaskConical, Search, Users } from "lucide-react";
+import { Plus, MoreHorizontal, Pause, Play, Trash2, FlaskConical, Search, Users, Pencil } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { LabTest, Provider, ProviderLabTest } from "@shared/schema";
@@ -88,8 +88,10 @@ export default function AdminLabTestsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterCategory, setFilterCategory] = useState("All");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isProviderDialogOpen, setIsProviderDialogOpen] = useState(false);
   const [selectedTest, setSelectedTest] = useState<LabTest | null>(null);
+  const [editingTest, setEditingTest] = useState<LabTest | null>(null);
   const { toast } = useToast();
 
   const { data: tests, isLoading } = useQuery<LabTest[]>({
@@ -129,6 +131,16 @@ export default function AdminLabTestsPage() {
     },
   });
 
+  const editForm = useForm<LabTestFormData>({
+    resolver: zodResolver(labTestSchema),
+    defaultValues: {
+      testName: "",
+      category: "",
+      cost: "",
+      turnaroundTime: "",
+    },
+  });
+
   const createMutation = useMutation({
     mutationFn: async (data: LabTestFormData) => {
       return apiRequest("POST", "/api/admin/lab-tests", {
@@ -157,6 +169,22 @@ export default function AdminLabTestsPage() {
     },
     onError: () => {
       toast({ title: "Error", description: "Failed to update status", variant: "destructive" });
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: LabTestFormData }) => {
+      return apiRequest("PATCH", `/api/admin/lab-tests/${id}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/lab-tests/all"] });
+      setIsEditDialogOpen(false);
+      setEditingTest(null);
+      editForm.reset();
+      toast({ title: "Success", description: "Lab test updated successfully" });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to update lab test", variant: "destructive" });
     },
   });
 
@@ -208,6 +236,23 @@ export default function AdminLabTestsPage() {
 
   const onSubmit = (data: LabTestFormData) => {
     createMutation.mutate(data);
+  };
+
+  const onEditSubmit = (data: LabTestFormData) => {
+    if (editingTest) {
+      updateMutation.mutate({ id: editingTest.id, data });
+    }
+  };
+
+  const openEditDialog = (test: LabTest) => {
+    setEditingTest(test);
+    editForm.reset({
+      testName: test.testName,
+      category: test.category || "",
+      cost: test.cost?.toString() || "",
+      turnaroundTime: test.turnaroundTime || "",
+    });
+    setIsEditDialogOpen(true);
   };
 
   const onAssignProvider = (data: ProviderAssignFormData) => {
@@ -412,6 +457,10 @@ export default function AdminLabTestsPage() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => openEditDialog(test)}>
+                            <Pencil className="mr-2 h-4 w-4" />
+                            Edit Cost/TAT
+                          </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => openProviderDialog(test)}>
                             <Users className="mr-2 h-4 w-4" />
                             Manage Providers
@@ -567,6 +616,96 @@ export default function AdminLabTestsPage() {
               </p>
             )}
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Lab Test Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={(open) => {
+        setIsEditDialogOpen(open);
+        if (!open) {
+          setEditingTest(null);
+          editForm.reset();
+        }
+      }}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Edit Lab Test</DialogTitle>
+            <DialogDescription>
+              Update the cost and turnaround time for {editingTest?.testName}
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...editForm}>
+            <form onSubmit={editForm.handleSubmit(onEditSubmit)} className="space-y-4">
+              <FormField
+                control={editForm.control}
+                name="testName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Test Name</FormLabel>
+                    <FormControl>
+                      <Input {...field} data-testid="input-edit-test-name" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={editForm.control}
+                name="category"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Category</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-edit-category">
+                          <SelectValue placeholder="Select category" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {categories.map((cat) => (
+                          <SelectItem key={cat} value={cat}>
+                            {cat}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <div className="grid gap-4 grid-cols-2">
+                <FormField
+                  control={editForm.control}
+                  name="cost"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Platform Cost (₹)</FormLabel>
+                      <FormControl>
+                        <Input placeholder="250.00" {...field} data-testid="input-edit-cost" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={editForm.control}
+                  name="turnaroundTime"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Turnaround Time</FormLabel>
+                      <FormControl>
+                        <Input placeholder="4 hours" {...field} data-testid="input-edit-tat" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              <Button type="submit" className="w-full" disabled={updateMutation.isPending} data-testid="button-update-test">
+                {updateMutation.isPending ? "Updating..." : "Update Lab Test"}
+              </Button>
+            </form>
+          </Form>
         </DialogContent>
       </Dialog>
     </div>
