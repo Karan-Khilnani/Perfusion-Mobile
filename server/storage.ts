@@ -5,6 +5,10 @@ import {
   labTests,
   consultants,
   radiologyModalities,
+  providerLabTests,
+  suggestedLabTests,
+  providerModalities,
+  suggestedModalities,
   hospitals,
   criticalCareDoctors,
   referralHospitals,
@@ -16,6 +20,10 @@ import {
   type LabTest,
   type Consultant,
   type RadiologyModality,
+  type ProviderLabTest,
+  type SuggestedLabTest,
+  type ProviderModality,
+  type SuggestedModality,
   type Hospital,
   type CriticalCareDoctor,
   type ReferralHospital,
@@ -27,6 +35,10 @@ import {
   type InsertLabTest,
   type InsertConsultant,
   type InsertRadiologyModality,
+  type InsertProviderLabTest,
+  type InsertSuggestedLabTest,
+  type InsertProviderModality,
+  type InsertSuggestedModality,
   type InsertHospital,
   type InsertCriticalCareDoctor,
   type InsertReferralHospital,
@@ -37,6 +49,7 @@ import {
   type ProviderStatus,
   type UserRole,
   type ServiceStatus,
+  type SuggestionStatus,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -67,6 +80,38 @@ export interface IStorage {
   updateRadiologyModality(id: string, data: Partial<InsertRadiologyModality>): Promise<RadiologyModality | undefined>;
   updateRadiologyModalityStatus(id: string, status: ServiceStatus): Promise<RadiologyModality | undefined>;
   deleteRadiologyModality(id: string): Promise<boolean>;
+  
+  // Provider Lab Tests (junction table)
+  getProviderLabTests(): Promise<ProviderLabTest[]>;
+  getProviderLabTestsByProvider(providerId: string): Promise<ProviderLabTest[]>;
+  getProviderLabTestsByTest(labTestId: string): Promise<ProviderLabTest[]>;
+  getEnabledProviderForTest(labTestId: string): Promise<ProviderLabTest | undefined>;
+  createProviderLabTest(data: InsertProviderLabTest): Promise<ProviderLabTest>;
+  updateProviderLabTest(id: string, data: Partial<InsertProviderLabTest>): Promise<ProviderLabTest | undefined>;
+  deleteProviderLabTest(id: string): Promise<boolean>;
+  
+  // Suggested Lab Tests
+  getSuggestedLabTests(): Promise<SuggestedLabTest[]>;
+  getSuggestedLabTestsByProvider(providerId: string): Promise<SuggestedLabTest[]>;
+  getPendingSuggestedLabTests(): Promise<SuggestedLabTest[]>;
+  createSuggestedLabTest(data: InsertSuggestedLabTest): Promise<SuggestedLabTest>;
+  updateSuggestedLabTestStatus(id: string, status: SuggestionStatus, adminNotes?: string): Promise<SuggestedLabTest | undefined>;
+  
+  // Provider Modalities (junction table)
+  getProviderModalities(): Promise<ProviderModality[]>;
+  getProviderModalitiesByProvider(providerId: string): Promise<ProviderModality[]>;
+  getProviderModalitiesByModality(modalityId: string): Promise<ProviderModality[]>;
+  getEnabledProviderForModality(modalityId: string): Promise<ProviderModality | undefined>;
+  createProviderModality(data: InsertProviderModality): Promise<ProviderModality>;
+  updateProviderModality(id: string, data: Partial<InsertProviderModality>): Promise<ProviderModality | undefined>;
+  deleteProviderModality(id: string): Promise<boolean>;
+  
+  // Suggested Modalities
+  getSuggestedModalities(): Promise<SuggestedModality[]>;
+  getSuggestedModalitiesByProvider(providerId: string): Promise<SuggestedModality[]>;
+  getPendingSuggestedModalities(): Promise<SuggestedModality[]>;
+  createSuggestedModality(data: InsertSuggestedModality): Promise<SuggestedModality>;
+  updateSuggestedModalityStatus(id: string, status: SuggestionStatus, adminNotes?: string): Promise<SuggestedModality | undefined>;
   
   // Hospitals (legacy - kept for data integrity)
   getHospitals(): Promise<Hospital[]>;
@@ -229,6 +274,124 @@ export class DatabaseStorage implements IStorage {
   async deleteRadiologyModality(id: string): Promise<boolean> {
     await db.delete(radiologyModalities).where(eq(radiologyModalities.id, id));
     return true;
+  }
+
+  // Provider Lab Tests
+  async getProviderLabTests(): Promise<ProviderLabTest[]> {
+    return await db.select().from(providerLabTests).orderBy(desc(providerLabTests.createdAt));
+  }
+
+  async getProviderLabTestsByProvider(providerId: string): Promise<ProviderLabTest[]> {
+    return await db.select().from(providerLabTests).where(eq(providerLabTests.providerId, providerId));
+  }
+
+  async getProviderLabTestsByTest(labTestId: string): Promise<ProviderLabTest[]> {
+    return await db.select().from(providerLabTests).where(eq(providerLabTests.labTestId, labTestId));
+  }
+
+  async getEnabledProviderForTest(labTestId: string): Promise<ProviderLabTest | undefined> {
+    const [result] = await db.select().from(providerLabTests)
+      .where(and(eq(providerLabTests.labTestId, labTestId), eq(providerLabTests.isActive, true)));
+    return result;
+  }
+
+  async createProviderLabTest(data: InsertProviderLabTest): Promise<ProviderLabTest> {
+    const [created] = await db.insert(providerLabTests).values([data as any]).returning();
+    return created;
+  }
+
+  async updateProviderLabTest(id: string, data: Partial<InsertProviderLabTest>): Promise<ProviderLabTest | undefined> {
+    const [updated] = await db.update(providerLabTests).set(data as any).where(eq(providerLabTests.id, id)).returning();
+    return updated;
+  }
+
+  async deleteProviderLabTest(id: string): Promise<boolean> {
+    await db.delete(providerLabTests).where(eq(providerLabTests.id, id));
+    return true;
+  }
+
+  // Suggested Lab Tests
+  async getSuggestedLabTests(): Promise<SuggestedLabTest[]> {
+    return await db.select().from(suggestedLabTests).orderBy(desc(suggestedLabTests.createdAt));
+  }
+
+  async getSuggestedLabTestsByProvider(providerId: string): Promise<SuggestedLabTest[]> {
+    return await db.select().from(suggestedLabTests).where(eq(suggestedLabTests.providerId, providerId));
+  }
+
+  async getPendingSuggestedLabTests(): Promise<SuggestedLabTest[]> {
+    return await db.select().from(suggestedLabTests).where(eq(suggestedLabTests.status, "pending"));
+  }
+
+  async createSuggestedLabTest(data: InsertSuggestedLabTest): Promise<SuggestedLabTest> {
+    const [created] = await db.insert(suggestedLabTests).values([data as any]).returning();
+    return created;
+  }
+
+  async updateSuggestedLabTestStatus(id: string, status: SuggestionStatus, adminNotes?: string): Promise<SuggestedLabTest | undefined> {
+    const [updated] = await db.update(suggestedLabTests)
+      .set({ status, adminNotes, reviewedAt: new Date() } as any)
+      .where(eq(suggestedLabTests.id, id)).returning();
+    return updated;
+  }
+
+  // Provider Modalities
+  async getProviderModalities(): Promise<ProviderModality[]> {
+    return await db.select().from(providerModalities).orderBy(desc(providerModalities.createdAt));
+  }
+
+  async getProviderModalitiesByProvider(providerId: string): Promise<ProviderModality[]> {
+    return await db.select().from(providerModalities).where(eq(providerModalities.providerId, providerId));
+  }
+
+  async getProviderModalitiesByModality(modalityId: string): Promise<ProviderModality[]> {
+    return await db.select().from(providerModalities).where(eq(providerModalities.modalityId, modalityId));
+  }
+
+  async getEnabledProviderForModality(modalityId: string): Promise<ProviderModality | undefined> {
+    const [result] = await db.select().from(providerModalities)
+      .where(and(eq(providerModalities.modalityId, modalityId), eq(providerModalities.isActive, true)));
+    return result;
+  }
+
+  async createProviderModality(data: InsertProviderModality): Promise<ProviderModality> {
+    const [created] = await db.insert(providerModalities).values([data as any]).returning();
+    return created;
+  }
+
+  async updateProviderModality(id: string, data: Partial<InsertProviderModality>): Promise<ProviderModality | undefined> {
+    const [updated] = await db.update(providerModalities).set(data as any).where(eq(providerModalities.id, id)).returning();
+    return updated;
+  }
+
+  async deleteProviderModality(id: string): Promise<boolean> {
+    await db.delete(providerModalities).where(eq(providerModalities.id, id));
+    return true;
+  }
+
+  // Suggested Modalities
+  async getSuggestedModalities(): Promise<SuggestedModality[]> {
+    return await db.select().from(suggestedModalities).orderBy(desc(suggestedModalities.createdAt));
+  }
+
+  async getSuggestedModalitiesByProvider(providerId: string): Promise<SuggestedModality[]> {
+    return await db.select().from(suggestedModalities).where(eq(suggestedModalities.providerId, providerId));
+  }
+
+  async getPendingSuggestedModalities(): Promise<SuggestedModality[]> {
+    return await db.select().from(suggestedModalities).where(eq(suggestedModalities.status, "pending"));
+  }
+
+  async createSuggestedModality(data: InsertSuggestedModality): Promise<SuggestedModality> {
+    const [created] = await db.insert(suggestedModalities).values([data as any]).returning();
+    return created;
+  }
+
+  async updateSuggestedModalityStatus(id: string, status: SuggestionStatus, adminNotes?: string): Promise<SuggestedModality | undefined> {
+    const [updated] = await db.update(suggestedModalities)
+      .set({ status, adminNotes, reviewedAt: new Date() } as any)
+      .where(eq(suggestedModalities.id, id)).returning();
+    return updated;
   }
 
   // Hospitals

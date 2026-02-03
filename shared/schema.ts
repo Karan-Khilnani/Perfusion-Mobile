@@ -82,6 +82,56 @@ export const radiologyModalities = pgTable("radiology_modalities", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Provider-LabTest junction table - which provider is enabled for which test
+export const providerLabTests = pgTable("provider_lab_tests", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  providerId: varchar("provider_id").notNull(),
+  labTestId: varchar("lab_test_id").notNull(),
+  price: decimal("price", { precision: 10, scale: 2 }).notNull(),
+  turnaroundTime: varchar("turnaround_time", { length: 50 }),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Suggested Lab Tests - providers suggest new tests for admin approval
+export type SuggestionStatus = "pending" | "approved" | "rejected";
+
+export const suggestedLabTests = pgTable("suggested_lab_tests", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  providerId: varchar("provider_id").notNull(),
+  testName: varchar("test_name", { length: 255 }).notNull(),
+  description: text("description"),
+  suggestedPrice: decimal("suggested_price", { precision: 10, scale: 2 }),
+  status: varchar("status", { length: 20 }).default("pending").$type<SuggestionStatus>(),
+  adminNotes: text("admin_notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  reviewedAt: timestamp("reviewed_at"),
+});
+
+// Provider-Modality junction table - which provider is enabled for which modality
+export const providerModalities = pgTable("provider_modalities", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  providerId: varchar("provider_id").notNull(),
+  modalityId: varchar("modality_id").notNull(),
+  price: decimal("price", { precision: 10, scale: 2 }).notNull(),
+  turnaroundTime: varchar("turnaround_time", { length: 50 }),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Suggested Modalities - providers suggest new modalities for admin approval
+export const suggestedModalities = pgTable("suggested_modalities", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  providerId: varchar("provider_id").notNull(),
+  modalityName: varchar("modality_name", { length: 255 }).notNull(),
+  description: text("description"),
+  suggestedPrice: decimal("suggested_price", { precision: 10, scale: 2 }),
+  status: varchar("status", { length: 20 }).default("pending").$type<SuggestionStatus>(),
+  adminNotes: text("admin_notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  reviewedAt: timestamp("reviewed_at"),
+});
+
 // Hospitals (Emergency & Critical Care)
 export const hospitals = pgTable("hospitals", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -193,6 +243,10 @@ export const insertLabSchema = createInsertSchema(labs).omit({ id: true });
 export const insertLabTestSchema = createInsertSchema(labTests).omit({ id: true, createdAt: true });
 export const insertConsultantSchema = createInsertSchema(consultants).omit({ id: true, createdAt: true });
 export const insertRadiologyModalitySchema = createInsertSchema(radiologyModalities).omit({ id: true, createdAt: true });
+export const insertProviderLabTestSchema = createInsertSchema(providerLabTests).omit({ id: true, createdAt: true });
+export const insertSuggestedLabTestSchema = createInsertSchema(suggestedLabTests).omit({ id: true, createdAt: true, reviewedAt: true });
+export const insertProviderModalitySchema = createInsertSchema(providerModalities).omit({ id: true, createdAt: true });
+export const insertSuggestedModalitySchema = createInsertSchema(suggestedModalities).omit({ id: true, createdAt: true, reviewedAt: true });
 export const insertHospitalSchema = createInsertSchema(hospitals).omit({ id: true });
 export const insertCriticalCareDoctorSchema = createInsertSchema(criticalCareDoctors).omit({ id: true });
 export const insertReferralHospitalSchema = createInsertSchema(referralHospitals).omit({ id: true });
@@ -214,6 +268,18 @@ export type Consultant = typeof consultants.$inferSelect;
 
 export type InsertRadiologyModality = z.infer<typeof insertRadiologyModalitySchema>;
 export type RadiologyModality = typeof radiologyModalities.$inferSelect;
+
+export type InsertProviderLabTest = z.infer<typeof insertProviderLabTestSchema>;
+export type ProviderLabTest = typeof providerLabTests.$inferSelect;
+
+export type InsertSuggestedLabTest = z.infer<typeof insertSuggestedLabTestSchema>;
+export type SuggestedLabTest = typeof suggestedLabTests.$inferSelect;
+
+export type InsertProviderModality = z.infer<typeof insertProviderModalitySchema>;
+export type ProviderModality = typeof providerModalities.$inferSelect;
+
+export type InsertSuggestedModality = z.infer<typeof insertSuggestedModalitySchema>;
+export type SuggestedModality = typeof suggestedModalities.$inferSelect;
 
 export type InsertHospital = z.infer<typeof insertHospitalSchema>;
 export type Hospital = typeof hospitals.$inferSelect;

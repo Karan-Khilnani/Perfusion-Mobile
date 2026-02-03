@@ -586,6 +586,31 @@ export async function registerRoutes(
         bookingData.videoRoomId = dailyRoom ? dailyRoom.url : null;
       }
       
+      // For lab bookings, auto-assign to enabled provider for that test
+      if (bookingData.bookingType === "lab" && bookingData.serviceId) {
+        const enabledProvider = await storage.getEnabledProviderForTest(bookingData.serviceId);
+        if (enabledProvider) {
+          bookingData.providerId = enabledProvider.providerId;
+          // Get provider name for display
+          const provider = await storage.getProviderById(enabledProvider.providerId);
+          if (provider) {
+            bookingData.providerName = provider.name;
+          }
+        }
+      }
+      
+      // For teleradiology bookings, auto-assign to enabled provider for that modality
+      if (bookingData.bookingType === "teleradiology" && bookingData.modalityId) {
+        const enabledProvider = await storage.getEnabledProviderForModality(bookingData.modalityId);
+        if (enabledProvider) {
+          bookingData.providerId = enabledProvider.providerId;
+          const provider = await storage.getProviderById(enabledProvider.providerId);
+          if (provider) {
+            bookingData.providerName = provider.name;
+          }
+        }
+      }
+      
       const booking = await storage.createBooking(bookingData);
       res.status(201).json(booking);
     } catch (error) {
@@ -741,6 +766,230 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error fetching provider labs:", error);
       res.status(500).json({ message: "Failed to fetch labs" });
+    }
+  });
+
+  // ===== Provider Lab Tests (what tests the provider offers) =====
+  
+  // Get tests the provider is enabled for
+  app.get("/api/provider/my-lab-tests", isAuthenticated, async (req: any, res) => {
+    try {
+      const user = req.user;
+      if (user.role !== "provider") {
+        return res.status(403).json({ message: "Access denied. Providers only." });
+      }
+      
+      const provider = await storage.getProviderByUserId(user.id);
+      if (!provider) {
+        return res.json([]);
+      }
+      
+      const assignments = await storage.getProviderLabTestsByProvider(provider.id);
+      const labTests = await storage.getLabTests();
+      
+      const enriched = assignments.map(a => ({
+        ...a,
+        labTest: labTests.find(t => t.id === a.labTestId),
+      }));
+      res.json(enriched);
+    } catch (error) {
+      console.error("Error fetching provider lab tests:", error);
+      res.status(500).json({ message: "Failed to fetch lab tests" });
+    }
+  });
+
+  // Add a test from the predefined catalog to provider's offerings
+  app.post("/api/provider/lab-tests", isAuthenticated, async (req: any, res) => {
+    try {
+      const user = req.user;
+      if (user.role !== "provider") {
+        return res.status(403).json({ message: "Access denied. Providers only." });
+      }
+      
+      const provider = await storage.getProviderByUserId(user.id);
+      if (!provider) {
+        return res.status(404).json({ message: "Provider profile not found" });
+      }
+      
+      const assignment = await storage.createProviderLabTest({
+        providerId: provider.id,
+        labTestId: req.body.labTestId,
+        price: req.body.price,
+        turnaroundTime: req.body.turnaroundTime,
+      });
+      res.status(201).json(assignment);
+    } catch (error) {
+      console.error("Error adding provider lab test:", error);
+      res.status(500).json({ message: "Failed to add lab test" });
+    }
+  });
+
+  // Update provider's test offering (price, turnaround)
+  app.patch("/api/provider/lab-tests/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const updated = await storage.updateProviderLabTest(req.params.id, req.body);
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating provider lab test:", error);
+      res.status(500).json({ message: "Failed to update lab test" });
+    }
+  });
+
+  // Remove a test from provider's offerings
+  app.delete("/api/provider/lab-tests/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      await storage.deleteProviderLabTest(req.params.id);
+      res.json({ message: "Lab test removed" });
+    } catch (error) {
+      console.error("Error deleting provider lab test:", error);
+      res.status(500).json({ message: "Failed to remove lab test" });
+    }
+  });
+
+  // Suggest a new test (Other option) - pending admin approval
+  app.post("/api/provider/suggest-lab-test", isAuthenticated, async (req: any, res) => {
+    try {
+      const user = req.user;
+      if (user.role !== "provider") {
+        return res.status(403).json({ message: "Access denied. Providers only." });
+      }
+      
+      const provider = await storage.getProviderByUserId(user.id);
+      if (!provider) {
+        return res.status(404).json({ message: "Provider profile not found" });
+      }
+      
+      const suggestion = await storage.createSuggestedLabTest({
+        providerId: provider.id,
+        testName: req.body.testName,
+        description: req.body.description,
+        suggestedPrice: req.body.suggestedPrice,
+      });
+      res.status(201).json(suggestion);
+    } catch (error) {
+      console.error("Error suggesting lab test:", error);
+      res.status(500).json({ message: "Failed to suggest lab test" });
+    }
+  });
+
+  // Get provider's suggestions
+  app.get("/api/provider/my-suggestions", isAuthenticated, async (req: any, res) => {
+    try {
+      const user = req.user;
+      if (user.role !== "provider") {
+        return res.status(403).json({ message: "Access denied. Providers only." });
+      }
+      
+      const provider = await storage.getProviderByUserId(user.id);
+      if (!provider) {
+        return res.json({ labTests: [], modalities: [] });
+      }
+      
+      const labTests = await storage.getSuggestedLabTestsByProvider(provider.id);
+      const modalities = await storage.getSuggestedModalitiesByProvider(provider.id);
+      
+      res.json({ labTests, modalities });
+    } catch (error) {
+      console.error("Error fetching provider suggestions:", error);
+      res.status(500).json({ message: "Failed to fetch suggestions" });
+    }
+  });
+
+  // ===== Provider Modalities (what modalities the provider offers) =====
+  
+  app.get("/api/provider/my-modalities", isAuthenticated, async (req: any, res) => {
+    try {
+      const user = req.user;
+      if (user.role !== "provider") {
+        return res.status(403).json({ message: "Access denied. Providers only." });
+      }
+      
+      const provider = await storage.getProviderByUserId(user.id);
+      if (!provider) {
+        return res.json([]);
+      }
+      
+      const assignments = await storage.getProviderModalitiesByProvider(provider.id);
+      const modalities = await storage.getRadiologyModalities();
+      
+      const enriched = assignments.map(a => ({
+        ...a,
+        modality: modalities.find(m => m.id === a.modalityId),
+      }));
+      res.json(enriched);
+    } catch (error) {
+      console.error("Error fetching provider modalities:", error);
+      res.status(500).json({ message: "Failed to fetch modalities" });
+    }
+  });
+
+  app.post("/api/provider/modalities", isAuthenticated, async (req: any, res) => {
+    try {
+      const user = req.user;
+      if (user.role !== "provider") {
+        return res.status(403).json({ message: "Access denied. Providers only." });
+      }
+      
+      const provider = await storage.getProviderByUserId(user.id);
+      if (!provider) {
+        return res.status(404).json({ message: "Provider profile not found" });
+      }
+      
+      const assignment = await storage.createProviderModality({
+        providerId: provider.id,
+        modalityId: req.body.modalityId,
+        price: req.body.price,
+        turnaroundTime: req.body.turnaroundTime,
+      });
+      res.status(201).json(assignment);
+    } catch (error) {
+      console.error("Error adding provider modality:", error);
+      res.status(500).json({ message: "Failed to add modality" });
+    }
+  });
+
+  app.patch("/api/provider/modalities/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const updated = await storage.updateProviderModality(req.params.id, req.body);
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating provider modality:", error);
+      res.status(500).json({ message: "Failed to update modality" });
+    }
+  });
+
+  app.delete("/api/provider/modalities/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      await storage.deleteProviderModality(req.params.id);
+      res.json({ message: "Modality removed" });
+    } catch (error) {
+      console.error("Error deleting provider modality:", error);
+      res.status(500).json({ message: "Failed to remove modality" });
+    }
+  });
+
+  app.post("/api/provider/suggest-modality", isAuthenticated, async (req: any, res) => {
+    try {
+      const user = req.user;
+      if (user.role !== "provider") {
+        return res.status(403).json({ message: "Access denied. Providers only." });
+      }
+      
+      const provider = await storage.getProviderByUserId(user.id);
+      if (!provider) {
+        return res.status(404).json({ message: "Provider profile not found" });
+      }
+      
+      const suggestion = await storage.createSuggestedModality({
+        providerId: provider.id,
+        modalityName: req.body.modalityName,
+        description: req.body.description,
+        suggestedPrice: req.body.suggestedPrice,
+      });
+      res.status(201).json(suggestion);
+    } catch (error) {
+      console.error("Error suggesting modality:", error);
+      res.status(500).json({ message: "Failed to suggest modality" });
     }
   });
 
@@ -1011,6 +1260,201 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error deleting radiology modality:", error);
       res.status(500).json({ message: "Failed to delete modality" });
+    }
+  });
+
+  // ===== Provider-Test Assignments (Admin manages which provider handles which test) =====
+  
+  // Get all provider-test assignments with provider details
+  app.get("/api/admin/provider-lab-tests", isAdmin, async (req, res) => {
+    try {
+      const assignments = await storage.getProviderLabTests();
+      const providers = await storage.getProviders();
+      const labTests = await storage.getLabTests();
+      
+      const enriched = assignments.map(a => ({
+        ...a,
+        provider: providers.find(p => p.id === a.providerId),
+        labTest: labTests.find(t => t.id === a.labTestId),
+      }));
+      res.json(enriched);
+    } catch (error) {
+      console.error("Error fetching provider lab tests:", error);
+      res.status(500).json({ message: "Failed to fetch provider lab tests" });
+    }
+  });
+
+  // Get providers assigned to a specific test
+  app.get("/api/admin/lab-tests/:testId/providers", isAdmin, async (req, res) => {
+    try {
+      const assignments = await storage.getProviderLabTestsByTest(req.params.testId);
+      const providers = await storage.getProviders();
+      
+      const enriched = assignments.map(a => ({
+        ...a,
+        provider: providers.find(p => p.id === a.providerId),
+      }));
+      res.json(enriched);
+    } catch (error) {
+      console.error("Error fetching test providers:", error);
+      res.status(500).json({ message: "Failed to fetch test providers" });
+    }
+  });
+
+  // Enable provider for a test
+  app.post("/api/admin/provider-lab-tests", isAdmin, async (req, res) => {
+    try {
+      const assignment = await storage.createProviderLabTest(req.body);
+      res.status(201).json(assignment);
+    } catch (error) {
+      console.error("Error creating provider lab test:", error);
+      res.status(500).json({ message: "Failed to assign provider to test" });
+    }
+  });
+
+  // Update provider-test assignment
+  app.patch("/api/admin/provider-lab-tests/:id", isAdmin, async (req, res) => {
+    try {
+      const updated = await storage.updateProviderLabTest(req.params.id, req.body);
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating provider lab test:", error);
+      res.status(500).json({ message: "Failed to update assignment" });
+    }
+  });
+
+  // Remove provider from test
+  app.delete("/api/admin/provider-lab-tests/:id", isAdmin, async (req, res) => {
+    try {
+      await storage.deleteProviderLabTest(req.params.id);
+      res.json({ message: "Provider removed from test" });
+    } catch (error) {
+      console.error("Error deleting provider lab test:", error);
+      res.status(500).json({ message: "Failed to remove provider from test" });
+    }
+  });
+
+  // ===== Suggested Lab Tests (Providers suggest, Admin approves) =====
+  
+  app.get("/api/admin/suggested-lab-tests", isAdmin, async (req, res) => {
+    try {
+      const suggestions = await storage.getPendingSuggestedLabTests();
+      const providers = await storage.getProviders();
+      
+      const enriched = suggestions.map(s => ({
+        ...s,
+        provider: providers.find(p => p.id === s.providerId),
+      }));
+      res.json(enriched);
+    } catch (error) {
+      console.error("Error fetching suggested lab tests:", error);
+      res.status(500).json({ message: "Failed to fetch suggestions" });
+    }
+  });
+
+  app.patch("/api/admin/suggested-lab-tests/:id", isAdmin, async (req, res) => {
+    try {
+      const { status, adminNotes } = req.body;
+      const updated = await storage.updateSuggestedLabTestStatus(req.params.id, status, adminNotes);
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating suggested lab test:", error);
+      res.status(500).json({ message: "Failed to update suggestion" });
+    }
+  });
+
+  // ===== Provider-Modality Assignments (Admin manages which provider handles which modality) =====
+  
+  app.get("/api/admin/provider-modalities", isAdmin, async (req, res) => {
+    try {
+      const assignments = await storage.getProviderModalities();
+      const providers = await storage.getProviders();
+      const modalities = await storage.getRadiologyModalities();
+      
+      const enriched = assignments.map(a => ({
+        ...a,
+        provider: providers.find(p => p.id === a.providerId),
+        modality: modalities.find(m => m.id === a.modalityId),
+      }));
+      res.json(enriched);
+    } catch (error) {
+      console.error("Error fetching provider modalities:", error);
+      res.status(500).json({ message: "Failed to fetch provider modalities" });
+    }
+  });
+
+  app.get("/api/admin/modalities/:modalityId/providers", isAdmin, async (req, res) => {
+    try {
+      const assignments = await storage.getProviderModalitiesByModality(req.params.modalityId);
+      const providers = await storage.getProviders();
+      
+      const enriched = assignments.map(a => ({
+        ...a,
+        provider: providers.find(p => p.id === a.providerId),
+      }));
+      res.json(enriched);
+    } catch (error) {
+      console.error("Error fetching modality providers:", error);
+      res.status(500).json({ message: "Failed to fetch modality providers" });
+    }
+  });
+
+  app.post("/api/admin/provider-modalities", isAdmin, async (req, res) => {
+    try {
+      const assignment = await storage.createProviderModality(req.body);
+      res.status(201).json(assignment);
+    } catch (error) {
+      console.error("Error creating provider modality:", error);
+      res.status(500).json({ message: "Failed to assign provider to modality" });
+    }
+  });
+
+  app.patch("/api/admin/provider-modalities/:id", isAdmin, async (req, res) => {
+    try {
+      const updated = await storage.updateProviderModality(req.params.id, req.body);
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating provider modality:", error);
+      res.status(500).json({ message: "Failed to update assignment" });
+    }
+  });
+
+  app.delete("/api/admin/provider-modalities/:id", isAdmin, async (req, res) => {
+    try {
+      await storage.deleteProviderModality(req.params.id);
+      res.json({ message: "Provider removed from modality" });
+    } catch (error) {
+      console.error("Error deleting provider modality:", error);
+      res.status(500).json({ message: "Failed to remove provider from modality" });
+    }
+  });
+
+  // ===== Suggested Modalities (Providers suggest, Admin approves) =====
+  
+  app.get("/api/admin/suggested-modalities", isAdmin, async (req, res) => {
+    try {
+      const suggestions = await storage.getPendingSuggestedModalities();
+      const providers = await storage.getProviders();
+      
+      const enriched = suggestions.map(s => ({
+        ...s,
+        provider: providers.find(p => p.id === s.providerId),
+      }));
+      res.json(enriched);
+    } catch (error) {
+      console.error("Error fetching suggested modalities:", error);
+      res.status(500).json({ message: "Failed to fetch suggestions" });
+    }
+  });
+
+  app.patch("/api/admin/suggested-modalities/:id", isAdmin, async (req, res) => {
+    try {
+      const { status, adminNotes } = req.body;
+      const updated = await storage.updateSuggestedModalityStatus(req.params.id, status, adminNotes);
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating suggested modality:", error);
+      res.status(500).json({ message: "Failed to update suggestion" });
     }
   });
 
