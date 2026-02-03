@@ -573,11 +573,16 @@ export async function registerRoutes(
         userId,
       };
       
-      // Generate Daily.co room for consultation bookings
-      if (bookingData.bookingType === "consultation") {
+      // For consultation bookings, link to the provider who owns the consultant
+      if (bookingData.bookingType === "consultation" && bookingData.serviceId) {
+        const consultant = await storage.getConsultantById(bookingData.serviceId);
+        if (consultant && consultant.providerId) {
+          bookingData.providerId = consultant.providerId;
+        }
+        
+        // Generate Daily.co room for video calls
         const roomName = `perfusion-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
         const dailyRoom = await createDailyRoom(roomName);
-        // Store full Daily.co URL so it works for any account
         bookingData.videoRoomId = dailyRoom ? dailyRoom.url : null;
       }
       
@@ -707,7 +712,21 @@ export async function registerRoutes(
   // Provider endpoints
   app.get("/api/provider/bookings", isAuthenticated, async (req: any, res) => {
     try {
-      const bookings = await storage.getAllBookings();
+      const user = req.user;
+      
+      // Verify user is a provider
+      if (user.role !== "provider") {
+        return res.status(403).json({ message: "Access denied. Only providers can access this endpoint." });
+      }
+      
+      // Get the provider profile for this user
+      const provider = await storage.getProviderByUserId(user.id);
+      if (!provider) {
+        return res.status(404).json({ message: "Provider profile not found" });
+      }
+      
+      // Get only bookings assigned to this provider
+      const bookings = await storage.getBookingsByProviderId(provider.id);
       res.json(bookings);
     } catch (error) {
       console.error("Error fetching provider bookings:", error);
