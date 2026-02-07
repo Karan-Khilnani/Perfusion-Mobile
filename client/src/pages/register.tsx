@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -10,8 +9,10 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { Heart, Loader2, User, Building } from "lucide-react";
+import { SiGoogle } from "react-icons/si";
 
 const registerSchema = z.object({
   email: z.string().email("Invalid email address"),
@@ -95,7 +96,38 @@ export default function RegisterPage() {
           <CardTitle>Create an Account</CardTitle>
           <CardDescription>Join Perfusion Healthcare Platform</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => { window.location.href = "/api/auth/google?role=care_seeker"; }}
+              data-testid="button-google-seeker"
+            >
+              <SiGoogle className="mr-2 h-4 w-4" />
+              Care Seeker
+            </Button>
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => { window.location.href = "/api/auth/google?role=provider"; }}
+              data-testid="button-google-provider"
+            >
+              <SiGoogle className="mr-2 h-4 w-4" />
+              Provider
+            </Button>
+          </div>
+          <p className="text-xs text-center text-muted-foreground">Sign up with Google as your role</p>
+
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <Separator className="w-full" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-card px-2 text-muted-foreground">Or register with email</span>
+            </div>
+          </div>
+
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               <div className="grid grid-cols-2 gap-4">

@@ -10,6 +10,7 @@ import Home from "@/pages/home";
 import LandingPage from "@/pages/landing";
 import LoginPage from "@/pages/login";
 import RegisterPage from "@/pages/register";
+import SelectRolePage from "@/pages/select-role";
 import UserLayout from "@/pages/user/layout";
 import UserDashboard from "@/pages/user/dashboard";
 import LabsPage from "@/pages/user/labs";
@@ -73,6 +74,7 @@ function Router() {
       <Route path="/home" component={Home} />
       <Route path="/login" component={LoginPage} />
       <Route path="/register" component={RegisterPage} />
+      <Route path="/select-role" component={SelectRolePage} />
       <Route path="/provider/onboarding" component={ProviderOnboardingPage} />
       
       <Route path="/user" component={withUserLayout(UserDashboard)} />

@@ -79,6 +79,45 @@ export async function createUser(data: {
   return excludePassword(user);
 }
 
+export async function getUserByGoogleId(googleId: string): Promise<User | null> {
+  const [user] = await db.select().from(users).where(eq(users.googleId, googleId));
+  return user || null;
+}
+
+export async function createGoogleUser(data: {
+  email: string;
+  googleId: string;
+  firstName: string;
+  lastName: string;
+  profileImageUrl?: string;
+  role?: UserRole;
+}): Promise<SafeUser> {
+  const [user] = await db
+    .insert(users)
+    .values({
+      email: data.email.toLowerCase(),
+      googleId: data.googleId,
+      firstName: data.firstName,
+      lastName: data.lastName,
+      profileImageUrl: data.profileImageUrl,
+      role: data.role,
+    })
+    .returning();
+  
+  return excludePassword(user);
+}
+
+export async function linkGoogleId(userId: string, googleId: string, profileImageUrl?: string): Promise<SafeUser | null> {
+  const updates: any = { googleId, updatedAt: new Date() };
+  if (profileImageUrl) updates.profileImageUrl = profileImageUrl;
+  const [user] = await db
+    .update(users)
+    .set(updates)
+    .where(eq(users.id, userId))
+    .returning();
+  return user ? excludePassword(user) : null;
+}
+
 export async function verifyPassword(plainPassword: string, hashedPassword: string): Promise<boolean> {
   return bcrypt.compare(plainPassword, hashedPassword);
 }
