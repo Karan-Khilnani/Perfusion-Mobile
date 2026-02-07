@@ -50,8 +50,14 @@ export default function LoginPage() {
     },
     onSuccess: (user) => {
       queryClient.setQueryData(["/api/auth/user"], user);
-      toast({ title: "Welcome back!", description: "You have been logged in successfully." });
       
+      if (user.needsVerification) {
+        toast({ title: "Email not verified", description: "Please verify your email to continue." });
+        setLocation("/verify-email");
+        return;
+      }
+      
+      toast({ title: "Welcome back!", description: "You have been logged in successfully." });
       if (user.role === "admin") {
         setLocation("/admin");
       } else if (user.role === "provider") {

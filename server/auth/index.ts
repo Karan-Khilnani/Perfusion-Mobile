@@ -42,8 +42,8 @@ export async function setupAuth(app: Express): Promise<void> {
 }
 
 function excludePassword(user: User): SafeUser {
-  const { password, ...safeUser } = user;
-  return safeUser;
+  const { password, verificationCode, verificationCodeExpiresAt, ...safeUser } = user;
+  return safeUser as SafeUser;
 }
 
 export async function getUserById(id: string): Promise<SafeUser | null> {
@@ -62,6 +62,8 @@ export async function createUser(data: {
   firstName: string;
   lastName: string;
   role?: UserRole;
+  verificationCode?: string;
+  verificationCodeExpiresAt?: Date;
 }): Promise<SafeUser> {
   const hashedPassword = await bcrypt.hash(data.password, 10);
   
@@ -73,10 +75,44 @@ export async function createUser(data: {
       firstName: data.firstName,
       lastName: data.lastName,
       role: data.role || "care_seeker",
+      emailVerified: false,
+      verificationCode: data.verificationCode,
+      verificationCodeExpiresAt: data.verificationCodeExpiresAt,
     })
     .returning();
   
   return excludePassword(user);
+}
+
+export async function setVerificationCode(userId: string, code: string): Promise<void> {
+  const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+  await db
+    .update(users)
+    .set({ verificationCode: code, verificationCodeExpiresAt: expiresAt, updatedAt: new Date() })
+    .where(eq(users.id, userId));
+}
+
+export async function verifyEmailCode(userId: string, code: string): Promise<{ success: boolean; message: string }> {
+  const [user] = await db.select().from(users).where(eq(users.id, userId));
+  if (!user) return { success: false, message: "User not found" };
+  if (user.emailVerified) return { success: true, message: "Already verified" };
+  if (!user.verificationCode) return { success: false, message: "No verification code found. Please request a new one." };
+  if (user.verificationCodeExpiresAt && user.verificationCodeExpiresAt < new Date()) {
+    return { success: false, message: "Verification code has expired. Please request a new one." };
+  }
+  if (user.verificationCode !== code) {
+    return { success: false, message: "Invalid verification code" };
+  }
+  await db
+    .update(users)
+    .set({ emailVerified: true, verificationCode: null, verificationCodeExpiresAt: null, updatedAt: new Date() })
+    .where(eq(users.id, userId));
+  return { success: true, message: "Email verified successfully" };
+}
+
+export async function getRawUserById(id: string): Promise<User | null> {
+  const [user] = await db.select().from(users).where(eq(users.id, id));
+  return user || null;
 }
 
 export async function getUserByGoogleId(googleId: string): Promise<User | null> {
@@ -101,6 +137,7 @@ export async function createGoogleUser(data: {
       lastName: data.lastName,
       profileImageUrl: data.profileImageUrl,
       role: data.role,
+      emailVerified: true,
     })
     .returning();
   
@@ -108,7 +145,7 @@ export async function createGoogleUser(data: {
 }
 
 export async function linkGoogleId(userId: string, googleId: string, profileImageUrl?: string): Promise<SafeUser | null> {
-  const updates: any = { googleId, updatedAt: new Date() };
+  const updates: any = { googleId, emailVerified: true, updatedAt: new Date() };
   if (profileImageUrl) updates.profileImageUrl = profileImageUrl;
   const [user] = await db
     .update(users)
@@ -141,6 +178,10 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
   if (!user || !user.isActive) {
     req.session.destroy(() => {});
     return res.status(401).json({ message: "Unauthorized" });
+  }
+
+  if (!user.emailVerified && !user.googleId) {
+    return res.status(403).json({ message: "Email not verified", needsVerification: true });
   }
   
   (req as any).user = user;

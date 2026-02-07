@@ -64,8 +64,14 @@ export default function RegisterPage() {
     },
     onSuccess: (user) => {
       queryClient.setQueryData(["/api/auth/user"], user);
-      toast({ title: "Account created!", description: "Welcome to Perfusion." });
       
+      if (user.needsVerification) {
+        toast({ title: "Account created!", description: "Please verify your email to continue." });
+        setLocation("/verify-email");
+        return;
+      }
+      
+      toast({ title: "Account created!", description: "Welcome to Perfusion." });
       if (user.role === "provider") {
         setLocation("/provider/onboarding");
       } else {

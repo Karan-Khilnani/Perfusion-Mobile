@@ -233,12 +233,13 @@ export async function seedDatabase() {
         lastName: "Admin",
         role: "admin",
         isActive: true,
+        emailVerified: true,
       });
       console.log("Admin account created: admin@perfusion.test / Admin@123");
     } else {
       await db
         .update(users)
-        .set({ password: hashedPassword })
+        .set({ password: hashedPassword, emailVerified: true })
         .where(eq(users.email, ADMIN_EMAIL));
       console.log("Admin password reset: admin@perfusion.test / Admin@123");
     }

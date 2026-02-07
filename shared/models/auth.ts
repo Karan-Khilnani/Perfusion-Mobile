@@ -31,6 +31,9 @@ export const users = pgTable("users", {
   profileImageUrl: varchar("profile_image_url"),
   role: varchar("role", { length: 20 }).default("care_seeker").$type<UserRole>(),
   isActive: boolean("is_active").default(true),
+  emailVerified: boolean("email_verified").default(false),
+  verificationCode: varchar("verification_code", { length: 6 }),
+  verificationCodeExpiresAt: timestamp("verification_code_expires_at"),
   phone: varchar("phone", { length: 20 }),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -66,5 +69,5 @@ export type RegisterInput = z.infer<typeof registerSchema>;
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
 
-// Safe user type without password for client
-export type SafeUser = Omit<User, "password">;
+// Safe user type without sensitive fields for client
+export type SafeUser = Omit<User, "password" | "verificationCode" | "verificationCodeExpiresAt">;

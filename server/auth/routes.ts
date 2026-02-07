@@ -11,9 +11,13 @@ import {
   getUserByGoogleId,
   createGoogleUser,
   linkGoogleId,
+  setVerificationCode,
+  verifyEmailCode,
+  getRawUserById,
 } from "./index";
 import { loginSchema, registerSchema, type UserRole } from "@shared/models/auth";
 import { z } from "zod";
+import { generateVerificationCode, sendVerificationEmail } from "../email";
 
 function getCallbackURL(req: any): string {
   const protocol = req.headers["x-forwarded-proto"] || req.protocol || "https";
@@ -172,8 +176,17 @@ export function registerAuthRoutes(app: Express): void {
       if (existingUser) {
         return res.status(400).json({ message: "Email already registered" });
       }
+
+      const code = generateVerificationCode();
+      const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
       
-      const user = await createUser(validatedData);
+      const user = await createUser({
+        ...validatedData,
+        verificationCode: code,
+        verificationCodeExpiresAt: expiresAt,
+      });
+
+      const emailSent = await sendVerificationEmail(validatedData.email, code, validatedData.firstName);
       
       req.session.userId = user.id;
       req.session.save((err) => {
@@ -181,7 +194,7 @@ export function registerAuthRoutes(app: Express): void {
           console.error("Session save error:", err);
           return res.status(500).json({ message: "Failed to create session" });
         }
-        res.status(201).json(user);
+        res.status(201).json({ ...user, needsVerification: true, emailSent });
       });
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -225,6 +238,9 @@ export function registerAuthRoutes(app: Express): void {
         }
         
         const { password, ...safeUser } = user;
+        if (!user.emailVerified && !user.googleId) {
+          return res.json({ ...safeUser, needsVerification: true });
+        }
         res.json(safeUser);
       });
     } catch (error) {
@@ -250,9 +266,17 @@ export function registerAuthRoutes(app: Express): void {
     });
   });
 
-  app.get("/api/auth/user", isAuthenticated, async (req: any, res) => {
+  app.get("/api/auth/user", async (req: any, res) => {
     try {
-      res.json(req.user);
+      if (!req.session.userId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      const user = await getUserById(req.session.userId);
+      if (!user || !user.isActive) {
+        req.session.destroy(() => {});
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      res.json(user);
     } catch (error) {
       console.error("Error fetching user:", error);
       res.status(500).json({ message: "Failed to fetch user" });
@@ -275,6 +299,52 @@ export function registerAuthRoutes(app: Express): void {
     } catch (error) {
       console.error("Error updating role:", error);
       res.status(500).json({ message: "Failed to update role" });
+    }
+  });
+
+  app.post("/api/auth/verify-email", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ message: "Not logged in" });
+      }
+      const { code } = req.body as { code: string };
+      if (!code || code.length !== 6) {
+        return res.status(400).json({ message: "Please enter a 6-digit code" });
+      }
+      const result = await verifyEmailCode(req.session.userId, code);
+      if (!result.success) {
+        return res.status(400).json({ message: result.message });
+      }
+      const user = await getUserById(req.session.userId);
+      res.json(user);
+    } catch (error) {
+      console.error("Verification error:", error);
+      res.status(500).json({ message: "Verification failed" });
+    }
+  });
+
+  app.post("/api/auth/resend-verification", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ message: "Not logged in" });
+      }
+      const rawUser = await getRawUserById(req.session.userId);
+      if (!rawUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      if (rawUser.emailVerified) {
+        return res.status(400).json({ message: "Email is already verified" });
+      }
+      const code = generateVerificationCode();
+      await setVerificationCode(rawUser.id, code);
+      const sent = await sendVerificationEmail(rawUser.email, code, rawUser.firstName || undefined);
+      if (!sent) {
+        return res.status(500).json({ message: "Failed to send verification email. Please try again." });
+      }
+      res.json({ message: "Verification code sent to your email" });
+    } catch (error) {
+      console.error("Resend verification error:", error);
+      res.status(500).json({ message: "Failed to resend verification code" });
     }
   });
 }
