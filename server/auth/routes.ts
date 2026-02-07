@@ -15,22 +15,29 @@ import {
 import { loginSchema, registerSchema, type UserRole } from "@shared/models/auth";
 import { z } from "zod";
 
+function getCallbackURL(req: any): string {
+  const protocol = req.headers["x-forwarded-proto"] || req.protocol || "https";
+  const host = req.headers["x-forwarded-host"] || req.headers.host;
+  if (!host) {
+    const fallback = process.env.REPLIT_DEV_DOMAIN
+      ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+      : process.env.APP_URL || "http://localhost:5000";
+    return `${fallback}/api/auth/google/callback`;
+  }
+  return `${protocol}://${host}/api/auth/google/callback`;
+}
+
 export function registerAuthRoutes(app: Express): void {
   if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
-    const callbackURL = process.env.REPLIT_DEV_DOMAIN
-      ? `https://${process.env.REPLIT_DEV_DOMAIN}/api/auth/google/callback`
-      : process.env.APP_URL
-        ? `${process.env.APP_URL}/api/auth/google/callback`
-        : "/api/auth/google/callback";
-
     passport.use(
       new GoogleStrategy(
         {
           clientID: process.env.GOOGLE_CLIENT_ID!,
           clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-          callbackURL,
+          callbackURL: "/api/auth/google/callback",
+          passReqToCallback: true,
         },
-        async (_accessToken, _refreshToken, profile, done) => {
+        async (req: any, _accessToken: string, _refreshToken: string, profile: any, done: any) => {
           try {
             const email = profile.emails?.[0]?.value;
             if (!email) {
@@ -44,13 +51,13 @@ export function registerAuthRoutes(app: Express): void {
 
             let existingUser = await getUserByGoogleId(googleId);
             if (existingUser) {
-              return done(null, { id: existingUser.id, needsRole: false });
+              return done(null, { id: existingUser.id, isNew: false });
             }
 
             const existingEmailUser = await getUserByEmail(email);
             if (existingEmailUser) {
               await linkGoogleId(existingEmailUser.id, googleId, profileImageUrl);
-              return done(null, { id: existingEmailUser.id, needsRole: false });
+              return done(null, { id: existingEmailUser.id, isNew: false });
             }
 
             const newUser = await createGoogleUser({
@@ -61,7 +68,7 @@ export function registerAuthRoutes(app: Express): void {
               profileImageUrl,
             });
 
-            return done(null, { id: newUser.id, needsRole: !newUser.role || newUser.role === "care_seeker" });
+            return done(null, { id: newUser.id, isNew: true });
           } catch (error) {
             return done(error as Error);
           }
@@ -84,16 +91,27 @@ export function registerAuthRoutes(app: Express): void {
       (req, res, next) => {
         const role = req.query.role as string;
         const state = role ? Buffer.from(JSON.stringify({ role })).toString("base64") : undefined;
+        const callbackURL = getCallbackURL(req);
+        console.log("Google OAuth redirect with callbackURL:", callbackURL);
         passport.authenticate("google", {
           scope: ["profile", "email"],
           state,
-        })(req, res, next);
+          callbackURL,
+        } as any)(req, res, next);
       }
     );
 
     app.get(
       "/api/auth/google/callback",
-      passport.authenticate("google", { failureRedirect: "/login?error=google_failed", session: false }),
+      (req, res, next) => {
+        const callbackURL = getCallbackURL(req);
+        console.log("Google OAuth callback with callbackURL:", callbackURL);
+        passport.authenticate("google", {
+          failureRedirect: "/login?error=google_failed",
+          session: false,
+          callbackURL,
+        } as any)(req, res, next);
+      },
       async (req: any, res) => {
         try {
           const googleUser = req.user;
@@ -120,8 +138,12 @@ export function registerAuthRoutes(app: Express): void {
               return res.redirect("/login?error=session_failed");
             }
 
-            if (googleUser.needsRole && !role) {
-              return res.redirect("/select-role");
+            if (googleUser.isNew && !role) {
+              return res.redirect("/complete-profile");
+            }
+
+            if (googleUser.isNew && role === "provider") {
+              return res.redirect("/complete-profile?role=provider");
             }
 
             if (role === "provider") {
