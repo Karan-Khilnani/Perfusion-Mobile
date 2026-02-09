@@ -9,7 +9,7 @@ function generateVerificationCode(): string {
 async function sendVerificationEmail(email: string, code: string, firstName?: string): Promise<boolean> {
   try {
     const { error } = await resend.emails.send({
-      from: "Perfusion <onboarding@resend.dev>",
+      from: "Perfusion <noreply@perfusionhealth.in>",
       to: email,
       subject: "Verify your Perfusion account",
       html: `
