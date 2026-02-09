@@ -15,7 +15,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { StarRating } from "@/components/star-rating";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Plus, Edit2, FlaskConical, IndianRupee, Clock, Building2, Stethoscope, Loader2, AlertCircle, ScanLine, CheckCircle2, ArrowRight, Calendar } from "lucide-react";
+import { Plus, Edit2, FlaskConical, IndianRupee, Clock, Building2, Stethoscope, Loader2, AlertCircle, ScanLine, CheckCircle2, ArrowRight, Calendar, Upload, FileText, X } from "lucide-react";
+import { Label } from "@/components/ui/label";
 import type { Lab, LabTest, Consultant, Provider, RadiologyModality, ProviderLabTest } from "@shared/schema";
 import { Link } from "wouter";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -59,6 +60,10 @@ export default function ProviderServicesPage() {
   const [suggestTestName, setSuggestTestName] = useState("");
   const [suggestTestDesc, setSuggestTestDesc] = useState("");
   const [suggestTestPrice, setSuggestTestPrice] = useState("");
+  const [testRegNo, setTestRegNo] = useState("");
+  const [testDocFile, setTestDocFile] = useState<File | null>(null);
+  const [consultantRegNo, setConsultantRegNo] = useState("");
+  const [consultantDocFile, setConsultantDocFile] = useState<File | null>(null);
 
   const { data: provider, isLoading: providerLoading } = useQuery<Provider>({
     queryKey: ["/api/providers/me"],
@@ -125,14 +130,24 @@ export default function ProviderServicesPage() {
 
   const createConsultantMutation = useMutation({
     mutationFn: async (data: ConsultantFormData) => {
-      const response = await apiRequest("POST", "/api/provider/consultants", data);
+      let registrationDocumentUrl: string | undefined;
+      if (consultantDocFile) {
+        registrationDocumentUrl = await uploadDocument(consultantDocFile);
+      }
+      const response = await apiRequest("POST", "/api/provider/consultants", {
+        ...data,
+        registrationNo: consultantRegNo || undefined,
+        registrationDocumentUrl,
+      });
       return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/provider/my-consultants"] });
       setIsConsultantDialogOpen(false);
       consultantForm.reset();
-      toast({ title: "Consultant Added", description: "Consultant profile has been created." });
+      setConsultantRegNo("");
+      setConsultantDocFile(null);
+      toast({ title: "Consultant Added", description: "Consultant profile submitted (pending approval)." });
     },
     onError: () => {
       toast({ title: "Failed", description: "Failed to create consultant.", variant: "destructive" });
@@ -155,13 +170,29 @@ export default function ProviderServicesPage() {
     },
   });
 
-  // Add predefined test to provider's catalog
+  const uploadDocument = async (file: File): Promise<string | undefined> => {
+    const formData = new FormData();
+    formData.append("file", file);
+    const res = await fetch("/api/upload/document", { method: "POST", body: formData });
+    if (res.ok) {
+      const result = await res.json();
+      return result.url;
+    }
+    return undefined;
+  };
+
   const addPredefinedTestMutation = useMutation({
     mutationFn: async () => {
+      let registrationDocumentUrl: string | undefined;
+      if (testDocFile) {
+        registrationDocumentUrl = await uploadDocument(testDocFile);
+      }
       return apiRequest("POST", "/api/provider/lab-tests", {
         labTestId: selectedPredefinedTest,
         price: testPrice,
         turnaroundTime: testTAT,
+        registrationNo: testRegNo || undefined,
+        registrationDocumentUrl,
       });
     },
     onSuccess: () => {
@@ -170,7 +201,9 @@ export default function ProviderServicesPage() {
       setSelectedPredefinedTest("");
       setTestPrice("");
       setTestTAT("");
-      toast({ title: "Test Added", description: "Lab test added to your catalog." });
+      setTestRegNo("");
+      setTestDocFile(null);
+      toast({ title: "Test Added", description: "Lab test added to your catalog (pending approval)." });
     },
     onError: () => {
       toast({ title: "Failed", description: "Failed to add test.", variant: "destructive" });
@@ -350,13 +383,40 @@ export default function ProviderServicesPage() {
                         />
                       </div>
                     </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Lab Registration No.</label>
+                      <Input
+                        value={testRegNo}
+                        onChange={(e) => setTestRegNo(e.target.value)}
+                        placeholder="Lab registration number"
+                        data-testid="input-test-reg-no"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Registration Document</Label>
+                      {testDocFile ? (
+                        <div className="flex items-center gap-2 rounded-md border p-2">
+                          <FileText className="h-4 w-4 text-muted-foreground" />
+                          <span className="flex-1 text-sm truncate">{testDocFile.name}</span>
+                          <Button type="button" variant="ghost" size="icon" onClick={() => setTestDocFile(null)} data-testid="button-remove-test-doc">
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <label className="flex items-center gap-2 rounded-md border border-dashed p-3 cursor-pointer hover-elevate" data-testid="label-upload-test-doc">
+                          <Upload className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-sm">Upload registration certificate</span>
+                          <input type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => { const f = e.target.files?.[0]; if (f) setTestDocFile(f); }} />
+                        </label>
+                      )}
+                    </div>
                     <Button 
                       className="w-full" 
                       onClick={() => addPredefinedTestMutation.mutate()}
                       disabled={!selectedPredefinedTest || !testPrice || addPredefinedTestMutation.isPending}
                       data-testid="button-add-predefined-test"
                     >
-                      {addPredefinedTestMutation.isPending ? "Adding..." : "Add Test"}
+                      {addPredefinedTestMutation.isPending ? "Adding..." : "Add Test (Pending Approval)"}
                     </Button>
                   </div>
                 </DialogContent>
@@ -435,7 +495,12 @@ export default function ProviderServicesPage() {
                 {myLabTests.map((pt) => (
                   <div key={pt.id} className="flex items-center justify-between rounded-lg border p-3" data-testid={`my-test-row-${pt.id}`}>
                     <div>
-                      <p className="font-medium">{pt.labTest?.testName || "Unknown Test"}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium">{pt.labTest?.testName || "Unknown Test"}</p>
+                        {(pt as any).approvalStatus === "pending" && <Badge variant="outline" className="text-yellow-600 border-yellow-500">Pending</Badge>}
+                        {(pt as any).approvalStatus === "rejected" && <Badge variant="outline" className="text-destructive border-destructive">Rejected</Badge>}
+                        {(pt as any).approvalStatus === "approved" && <Badge variant="outline" className="text-green-600 border-green-500">Approved</Badge>}
+                      </div>
                       <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
                         <Badge variant="outline">{pt.labTest?.category}</Badge>
                         <span className="flex items-center gap-1">
@@ -545,9 +610,36 @@ export default function ProviderServicesPage() {
                         )}
                       />
                     </div>
+                    <div className="space-y-2">
+                      <Label>Registration No.</Label>
+                      <Input
+                        value={consultantRegNo}
+                        onChange={(e) => setConsultantRegNo(e.target.value)}
+                        placeholder="Medical registration number"
+                        data-testid="input-consultant-reg-no"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Registration Document</Label>
+                      {consultantDocFile ? (
+                        <div className="flex items-center gap-2 rounded-md border p-2">
+                          <FileText className="h-4 w-4 text-muted-foreground" />
+                          <span className="flex-1 text-sm truncate">{consultantDocFile.name}</span>
+                          <Button type="button" variant="ghost" size="icon" onClick={() => setConsultantDocFile(null)} data-testid="button-remove-consultant-doc">
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <label className="flex items-center gap-2 rounded-md border border-dashed p-3 cursor-pointer hover-elevate" data-testid="label-upload-consultant-doc">
+                          <Upload className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-sm">Upload registration certificate</span>
+                          <input type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => { const f = e.target.files?.[0]; if (f) setConsultantDocFile(f); }} />
+                        </label>
+                      )}
+                    </div>
                     <Button type="submit" className="w-full" disabled={createConsultantMutation.isPending} data-testid="button-save-consultant">
                       {createConsultantMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                      Add Consultant
+                      Add Consultant (Pending Approval)
                     </Button>
                   </form>
                 </Form>
@@ -571,7 +663,12 @@ export default function ProviderServicesPage() {
                 <Card key={consultant.id}>
                   <CardContent className="flex items-center justify-between gap-4 py-4">
                     <div className="flex-1">
-                      <p className="font-medium">{consultant.name}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium">{consultant.name}</p>
+                        {consultant.approvalStatus === "pending" && <Badge variant="outline" className="text-yellow-600 border-yellow-500">Pending</Badge>}
+                        {consultant.approvalStatus === "rejected" && <Badge variant="outline" className="text-destructive border-destructive">Rejected</Badge>}
+                        {consultant.approvalStatus === "approved" && <Badge variant="outline" className="text-green-600 border-green-500">Approved</Badge>}
+                      </div>
                       <p className="text-sm text-muted-foreground">{consultant.qualification}</p>
                       <div className="mt-1 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
                         <span>{consultant.specialization}</span>

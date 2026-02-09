@@ -3,6 +3,19 @@ import { QueryClient, QueryFunction } from "@tanstack/react-query";
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     const text = (await res.text()) || res.statusText;
+    if (res.status === 403) {
+      try {
+        const data = JSON.parse(text);
+        if (data.needsApproval) {
+          window.location.href = "/pending-approval";
+          return;
+        }
+        if (data.needsVerification) {
+          window.location.href = "/verify-email";
+          return;
+        }
+      } catch {}
+    }
     throw new Error(`${res.status}: ${text}`);
   }
 }
@@ -35,6 +48,22 @@ export const getQueryFn: <T>(options: {
 
     if (unauthorizedBehavior === "returnNull" && res.status === 401) {
       return null;
+    }
+
+    if (res.status === 403) {
+      const text = await res.text();
+      try {
+        const data = JSON.parse(text);
+        if (data.needsApproval) {
+          window.location.href = "/pending-approval";
+          return null;
+        }
+        if (data.needsVerification) {
+          window.location.href = "/verify-email";
+          return null;
+        }
+      } catch {}
+      throw new Error(`403: ${text}`);
     }
 
     await throwIfResNotOk(res);

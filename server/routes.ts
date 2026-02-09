@@ -85,6 +85,41 @@ const uploadReport = multer({
   },
 });
 
+// Configure multer for registration document uploads
+const docUploadDir = path.join(process.cwd(), "uploads", "documents");
+if (!fs.existsSync(docUploadDir)) {
+  fs.mkdirSync(docUploadDir, { recursive: true });
+}
+
+const documentStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, docUploadDir);
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    const ext = path.extname(file.originalname);
+    cb(null, `doc-${uniqueSuffix}${ext}`);
+  },
+});
+
+const uploadDocument = multer({
+  storage: documentStorage,
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = [
+      "application/pdf",
+      "image/jpeg",
+      "image/png",
+      "image/gif",
+    ];
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error("Invalid file type. Allowed: PDF, JPEG, PNG, GIF"));
+    }
+  },
+});
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -213,7 +248,7 @@ export async function registerRoutes(
         return res.status(403).json({ message: "Provider profile required" });
       }
       
-      const labData = { ...req.body, providerId: provider.id };
+      const labData = { ...req.body, providerId: provider.id, approvalStatus: "pending" };
       const lab = await storage.createLab(labData);
       res.status(201).json(lab);
     } catch (error) {
@@ -288,7 +323,7 @@ export async function registerRoutes(
         return res.status(403).json({ message: "Provider profile required" });
       }
       
-      const consultantData = { ...req.body, providerId: provider.id };
+      const consultantData = { ...req.body, providerId: provider.id, approvalStatus: "pending" };
       const consultant = await storage.createConsultant(consultantData);
       res.status(201).json(consultant);
     } catch (error) {
@@ -843,6 +878,9 @@ export async function registerRoutes(
         labTestId: req.body.labTestId,
         price: req.body.price,
         turnaroundTime: req.body.turnaroundTime,
+        registrationNo: req.body.registrationNo,
+        registrationDocumentUrl: req.body.registrationDocumentUrl,
+        approvalStatus: "pending",
       });
       res.status(201).json(assignment);
     } catch (error) {
@@ -1197,7 +1235,7 @@ export async function registerRoutes(
 
   app.post("/api/admin/consultants", isAdmin, async (req, res) => {
     try {
-      const consultant = await storage.createConsultant(req.body);
+      const consultant = await storage.createConsultant({ ...req.body, approvalStatus: "approved" });
       res.status(201).json(consultant);
     } catch (error) {
       console.error("Error creating consultant:", error);
@@ -1331,7 +1369,7 @@ export async function registerRoutes(
   // Enable provider for a test
   app.post("/api/admin/provider-lab-tests", isAdmin, async (req, res) => {
     try {
-      const assignment = await storage.createProviderLabTest(req.body);
+      const assignment = await storage.createProviderLabTest({ ...req.body, approvalStatus: "approved" });
       res.status(201).json(assignment);
     } catch (error) {
       console.error("Error creating provider lab test:", error);
@@ -1696,6 +1734,12 @@ export async function registerRoutes(
     express.static(uploadDir)(req, res, next);
   });
 
+  // Serve uploaded registration documents
+  app.use("/uploads/documents", (req, res, next) => {
+    const express = require("express");
+    express.static(docUploadDir)(req, res, next);
+  });
+
   // File upload endpoint for reports
   app.post("/api/upload/report", isAuthenticated, uploadReport.single("file"), async (req: any, res) => {
     try {
@@ -1722,6 +1766,137 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error uploading report file:", error);
       res.status(500).json({ message: "Failed to upload file" });
+    }
+  });
+
+  // File upload endpoint for registration documents (used during registration and service addition)
+  app.post("/api/upload/document", uploadDocument.single("file"), async (req: any, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: "No file uploaded" });
+      }
+
+      const fileUrl = `/uploads/documents/${req.file.filename}`;
+      
+      res.json({ 
+        success: true, 
+        url: fileUrl,
+        filename: req.file.originalname,
+        size: req.file.size
+      });
+    } catch (error) {
+      console.error("Error uploading document:", error);
+      res.status(500).json({ message: "Failed to upload document" });
+    }
+  });
+
+  // ===== Admin User Registration Approvals =====
+  
+  // Get all users pending approval
+  app.get("/api/admin/pending-registrations", isAdmin, async (req, res) => {
+    try {
+      const pendingUsers = await storage.getPendingRegistrations();
+      res.json(pendingUsers);
+    } catch (error) {
+      console.error("Error fetching pending registrations:", error);
+      res.status(500).json({ message: "Failed to fetch pending registrations" });
+    }
+  });
+
+  // Approve or reject a user registration
+  app.patch("/api/admin/users/:id/approval", isAdmin, async (req, res) => {
+    try {
+      const { status, notes } = req.body as { status: "approved" | "rejected"; notes?: string };
+      const user = await storage.updateUserApproval(req.params.id, status, notes);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      res.json(user);
+    } catch (error) {
+      console.error("Error updating user approval:", error);
+      res.status(500).json({ message: "Failed to update user approval" });
+    }
+  });
+
+  // ===== Admin Service Registration Approvals =====
+  
+  // Get all pending service registrations (labs, consultants, provider-tests, provider-modalities)
+  app.get("/api/admin/pending-services", isAdmin, async (req, res) => {
+    try {
+      const pendingLabs = await storage.getPendingLabs();
+      const pendingConsultants = await storage.getPendingConsultants();
+      const pendingLabTests = await storage.getPendingProviderLabTests();
+      const pendingModalities = await storage.getPendingProviderModalities();
+      
+      const providers = await storage.getProviders();
+      const labTests = await storage.getLabTests();
+      const modalities = await storage.getRadiologyModalities();
+      
+      res.json({
+        labs: pendingLabs.map(l => ({ ...l, provider: providers.find(p => p.id === l.providerId) })),
+        consultants: pendingConsultants.map(c => ({ ...c, provider: providers.find(p => p.id === c.providerId) })),
+        labTests: pendingLabTests.map(pt => ({
+          ...pt,
+          provider: providers.find(p => p.id === pt.providerId),
+          labTest: labTests.find(t => t.id === pt.labTestId),
+        })),
+        modalities: pendingModalities.map(pm => ({
+          ...pm,
+          provider: providers.find(p => p.id === pm.providerId),
+          modality: modalities.find(m => m.id === pm.modalityId),
+        })),
+      });
+    } catch (error) {
+      console.error("Error fetching pending services:", error);
+      res.status(500).json({ message: "Failed to fetch pending services" });
+    }
+  });
+
+  // Approve or reject a lab registration
+  app.patch("/api/admin/labs/:id/approval", isAdmin, async (req, res) => {
+    try {
+      const { status } = req.body as { status: "approved" | "rejected" };
+      const lab = await storage.updateLabApproval(req.params.id, status);
+      if (!lab) return res.status(404).json({ message: "Lab not found" });
+      res.json(lab);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update lab approval" });
+    }
+  });
+
+  // Approve or reject a consultant registration
+  app.patch("/api/admin/consultants/:id/approval", isAdmin, async (req, res) => {
+    try {
+      const { status } = req.body as { status: "approved" | "rejected" };
+      const consultant = await storage.updateConsultantApproval(req.params.id, status);
+      if (!consultant) return res.status(404).json({ message: "Consultant not found" });
+      res.json(consultant);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update consultant approval" });
+    }
+  });
+
+  // Approve or reject a provider lab test registration
+  app.patch("/api/admin/provider-lab-tests/:id/approval", isAdmin, async (req, res) => {
+    try {
+      const { status } = req.body as { status: "approved" | "rejected" };
+      const plt = await storage.updateProviderLabTestApproval(req.params.id, status);
+      if (!plt) return res.status(404).json({ message: "Provider lab test not found" });
+      res.json(plt);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update provider lab test approval" });
+    }
+  });
+
+  // Approve or reject a provider modality registration
+  app.patch("/api/admin/provider-modalities/:id/approval", isAdmin, async (req, res) => {
+    try {
+      const { status } = req.body as { status: "approved" | "rejected" };
+      const pm = await storage.updateProviderModalityApproval(req.params.id, status);
+      if (!pm) return res.status(404).json({ message: "Provider modality not found" });
+      res.json(pm);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update provider modality approval" });
     }
   });
 

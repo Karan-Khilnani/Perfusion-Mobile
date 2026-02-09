@@ -234,12 +234,13 @@ export async function seedDatabase() {
         role: "admin",
         isActive: true,
         emailVerified: true,
+        approvalStatus: "approved",
       });
       console.log("Admin account created: admin@perfusion.test / Admin@123");
     } else {
       await db
         .update(users)
-        .set({ password: hashedPassword, emailVerified: true })
+        .set({ password: hashedPassword, emailVerified: true, approvalStatus: "approved" as any })
         .where(eq(users.email, ADMIN_EMAIL));
       console.log("Admin password reset: admin@perfusion.test / Admin@123");
     }

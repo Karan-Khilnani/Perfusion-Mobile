@@ -160,6 +160,18 @@ export interface IStorage {
   updateUserRole(id: string, role: UserRole): Promise<User | undefined>;
   updateUserActive(id: string, isActive: boolean): Promise<User | undefined>;
   
+  // Registration & Service Approvals
+  getPendingRegistrations(): Promise<User[]>;
+  updateUserApproval(id: string, status: "approved" | "rejected", notes?: string): Promise<User | undefined>;
+  getPendingLabs(): Promise<Lab[]>;
+  getPendingConsultants(): Promise<Consultant[]>;
+  getPendingProviderLabTests(): Promise<ProviderLabTest[]>;
+  getPendingProviderModalities(): Promise<ProviderModality[]>;
+  updateLabApproval(id: string, status: "approved" | "rejected"): Promise<Lab | undefined>;
+  updateConsultantApproval(id: string, status: "approved" | "rejected"): Promise<Consultant | undefined>;
+  updateProviderLabTestApproval(id: string, status: "approved" | "rejected"): Promise<ProviderLabTest | undefined>;
+  updateProviderModalityApproval(id: string, status: "approved" | "rejected"): Promise<ProviderModality | undefined>;
+  
   // Labs (legacy - kept for backward compatibility)
   getLabs(): Promise<(Lab & { tests: LabTest[] })[]>;
   getLabById(id: string): Promise<(Lab & { tests: LabTest[] }) | undefined>;
@@ -210,7 +222,9 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getActiveConsultants(): Promise<Consultant[]> {
-    return await db.select().from(consultants).where(eq(consultants.status, "active")).orderBy(consultants.name);
+    return await db.select().from(consultants)
+      .where(and(eq(consultants.status, "active"), eq(consultants.approvalStatus, "approved")))
+      .orderBy(consultants.name);
   }
 
   async getConsultantById(id: string): Promise<Consultant | undefined> {
@@ -600,6 +614,69 @@ export class DatabaseStorage implements IStorage {
   async deleteLab(id: string): Promise<boolean> {
     await db.delete(labs).where(eq(labs.id, id));
     return true;
+  }
+
+  // Registration & Service Approvals
+  async getPendingRegistrations(): Promise<User[]> {
+    return await db.select().from(users)
+      .where(and(eq(users.approvalStatus, "pending"), eq(users.isActive, true)))
+      .orderBy(desc(users.createdAt));
+  }
+
+  async updateUserApproval(id: string, status: "approved" | "rejected", notes?: string): Promise<User | undefined> {
+    const [updated] = await db.update(users)
+      .set({ approvalStatus: status as any, approvalNotes: notes || null })
+      .where(eq(users.id, id))
+      .returning();
+    return updated;
+  }
+
+  async getPendingLabs(): Promise<Lab[]> {
+    return await db.select().from(labs).where(eq(labs.approvalStatus, "pending"));
+  }
+
+  async getPendingConsultants(): Promise<Consultant[]> {
+    return await db.select().from(consultants).where(eq(consultants.approvalStatus, "pending"));
+  }
+
+  async getPendingProviderLabTests(): Promise<ProviderLabTest[]> {
+    return await db.select().from(providerLabTests).where(eq(providerLabTests.approvalStatus, "pending"));
+  }
+
+  async getPendingProviderModalities(): Promise<ProviderModality[]> {
+    return await db.select().from(providerModalities).where(eq(providerModalities.approvalStatus, "pending"));
+  }
+
+  async updateLabApproval(id: string, status: "approved" | "rejected"): Promise<Lab | undefined> {
+    const [updated] = await db.update(labs)
+      .set({ approvalStatus: status as any })
+      .where(eq(labs.id, id))
+      .returning();
+    return updated;
+  }
+
+  async updateConsultantApproval(id: string, status: "approved" | "rejected"): Promise<Consultant | undefined> {
+    const [updated] = await db.update(consultants)
+      .set({ approvalStatus: status as any })
+      .where(eq(consultants.id, id))
+      .returning();
+    return updated;
+  }
+
+  async updateProviderLabTestApproval(id: string, status: "approved" | "rejected"): Promise<ProviderLabTest | undefined> {
+    const [updated] = await db.update(providerLabTests)
+      .set({ approvalStatus: status as any })
+      .where(eq(providerLabTests.id, id))
+      .returning();
+    return updated;
+  }
+
+  async updateProviderModalityApproval(id: string, status: "approved" | "rejected"): Promise<ProviderModality | undefined> {
+    const [updated] = await db.update(providerModalities)
+      .set({ approvalStatus: status as any })
+      .where(eq(providerModalities.id, id))
+      .returning();
+    return updated;
   }
 }
 

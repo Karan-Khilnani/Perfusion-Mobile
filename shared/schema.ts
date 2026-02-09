@@ -39,6 +39,9 @@ export const labs = pgTable("labs", {
   location: varchar("location", { length: 255 }).notNull(),
   description: text("description"),
   rating: decimal("rating", { precision: 2, scale: 1 }).default("4.0"),
+  registrationNumber: varchar("registration_number", { length: 100 }),
+  registrationDocumentUrl: varchar("registration_document_url", { length: 500 }),
+  approvalStatus: varchar("approval_status", { length: 20 }).default("pending").$type<SuggestionStatus>(),
   isActive: boolean("is_active").default(true),
 });
 
@@ -69,6 +72,9 @@ export const consultants = pgTable("consultants", {
   rating: decimal("rating", { precision: 2, scale: 1 }).default("4.0"),
   consultationFee: decimal("consultation_fee", { precision: 10, scale: 2 }).notNull(),
   availableSlots: text("available_slots").array(),
+  registrationNumber: varchar("registration_number", { length: 100 }),
+  registrationDocumentUrl: varchar("registration_document_url", { length: 500 }),
+  approvalStatus: varchar("approval_status", { length: 20 }).default("pending").$type<SuggestionStatus>(),
   status: varchar("status", { length: 20 }).default("active").$type<ServiceStatus>(),
   createdAt: timestamp("created_at").defaultNow(),
 });
@@ -91,6 +97,9 @@ export const providerLabTests = pgTable("provider_lab_tests", {
   labTestId: varchar("lab_test_id").notNull(),
   price: decimal("price", { precision: 10, scale: 2 }).notNull(),
   turnaroundTime: varchar("turnaround_time", { length: 50 }),
+  registrationNumber: varchar("registration_number", { length: 100 }),
+  registrationDocumentUrl: varchar("registration_document_url", { length: 500 }),
+  approvalStatus: varchar("approval_status", { length: 20 }).default("pending").$type<SuggestionStatus>(),
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
 });
@@ -117,6 +126,9 @@ export const providerModalities = pgTable("provider_modalities", {
   modalityId: varchar("modality_id").notNull(),
   price: decimal("price", { precision: 10, scale: 2 }).notNull(),
   turnaroundTime: varchar("turnaround_time", { length: 50 }),
+  registrationNumber: varchar("registration_number", { length: 100 }),
+  registrationDocumentUrl: varchar("registration_document_url", { length: 500 }),
+  approvalStatus: varchar("approval_status", { length: 20 }).default("pending").$type<SuggestionStatus>(),
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
 });

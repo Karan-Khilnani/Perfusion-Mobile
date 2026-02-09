@@ -9,6 +9,9 @@ export type UserRole = "care_seeker" | "provider" | "admin";
 // Provider verification status
 export type ProviderStatus = "pending" | "verified" | "rejected" | "suspended";
 
+// User approval status (for registration approval by admin)
+export type UserApprovalStatus = "pending" | "approved" | "rejected";
+
 // Session storage table for express-session with connect-pg-simple
 export const sessions = pgTable(
   "sessions",
@@ -35,6 +38,12 @@ export const users = pgTable("users", {
   verificationCode: varchar("verification_code", { length: 6 }),
   verificationCodeExpiresAt: timestamp("verification_code_expires_at"),
   phone: varchar("phone", { length: 20 }),
+  hospitalName: varchar("hospital_name", { length: 255 }),
+  hospitalAddress: varchar("hospital_address", { length: 500 }),
+  hospitalRegistrationNo: varchar("hospital_registration_no", { length: 100 }),
+  registrationDocumentUrl: varchar("registration_document_url", { length: 500 }),
+  approvalStatus: varchar("approval_status", { length: 20 }).default("pending").$type<UserApprovalStatus>(),
+  approvalNotes: varchar("approval_notes", { length: 500 }),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -61,6 +70,10 @@ export const registerSchema = z.object({
   firstName: z.string().min(1, "First name is required"),
   lastName: z.string().min(1, "Last name is required"),
   role: z.enum(["care_seeker", "provider"]).default("care_seeker"),
+  hospitalName: z.string().min(2, "Hospital name is required"),
+  hospitalAddress: z.string().min(5, "Hospital address is required"),
+  hospitalRegistrationNo: z.string().min(1, "Registration number is required"),
+  registrationDocumentUrl: z.string().optional(),
 });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;

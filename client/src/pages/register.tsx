@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -5,13 +6,14 @@ import { z } from "zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
-import { Heart, Loader2, User, Building } from "lucide-react";
+import { Heart, Loader2, User, Building, Upload, FileText, X } from "lucide-react";
 import { SiGoogle } from "react-icons/si";
 
 const registerSchema = z.object({
@@ -21,6 +23,9 @@ const registerSchema = z.object({
   firstName: z.string().min(1, "First name is required"),
   lastName: z.string().min(1, "Last name is required"),
   role: z.enum(["care_seeker", "provider"]),
+  hospitalName: z.string().min(2, "Hospital name is required"),
+  hospitalAddress: z.string().min(5, "Hospital address is required"),
+  hospitalRegistrationNo: z.string().min(1, "Registration number is required"),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match",
   path: ["confirmPassword"],
@@ -32,6 +37,8 @@ export default function RegisterPage() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [documentFile, setDocumentFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
 
   const form = useForm<RegisterFormData>({
     resolver: zodResolver(registerSchema),
@@ -42,17 +49,37 @@ export default function RegisterPage() {
       firstName: "",
       lastName: "",
       role: "care_seeker",
+      hospitalName: "",
+      hospitalAddress: "",
+      hospitalRegistrationNo: "",
     },
   });
 
   const registerMutation = useMutation({
     mutationFn: async (data: RegisterFormData) => {
       const { confirmPassword, ...registerData } = data;
+      
+      let registrationDocumentUrl: string | undefined;
+      if (documentFile) {
+        setIsUploading(true);
+        const formData = new FormData();
+        formData.append("file", documentFile);
+        const uploadRes = await fetch("/api/upload/document", {
+          method: "POST",
+          body: formData,
+        });
+        if (uploadRes.ok) {
+          const uploadResult = await uploadRes.json();
+          registrationDocumentUrl = uploadResult.url;
+        }
+        setIsUploading(false);
+      }
+
       const response = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify(registerData),
+        body: JSON.stringify({ ...registerData, registrationDocumentUrl }),
       });
       
       if (!response.ok) {
@@ -71,12 +98,8 @@ export default function RegisterPage() {
         return;
       }
       
-      toast({ title: "Account created!", description: "Welcome to Perfusion." });
-      if (user.role === "provider") {
-        setLocation("/provider/onboarding");
-      } else {
-        setLocation("/user");
-      }
+      toast({ title: "Account created!", description: "Your registration is pending approval." });
+      setLocation("/pending-approval");
     },
     onError: (error: Error) => {
       toast({ title: "Registration failed", description: error.message, variant: "destructive" });
@@ -89,9 +112,20 @@ export default function RegisterPage() {
 
   const selectedRole = form.watch("role");
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 10 * 1024 * 1024) {
+        toast({ title: "File too large", description: "Maximum file size is 10MB", variant: "destructive" });
+        return;
+      }
+      setDocumentFile(file);
+    }
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-md">
+      <Card className="w-full max-w-lg">
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4">
             <div className="flex items-center gap-2">
@@ -100,7 +134,7 @@ export default function RegisterPage() {
             </div>
           </div>
           <CardTitle>Create an Account</CardTitle>
-          <CardDescription>Join Perfusion Healthcare Platform</CardDescription>
+          <CardDescription>Register your hospital on Perfusion Healthcare Platform</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
@@ -136,6 +170,65 @@ export default function RegisterPage() {
 
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <FormField
+                control={form.control}
+                name="role"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>I am a</FormLabel>
+                    <FormControl>
+                      <RadioGroup
+                        onValueChange={field.onChange}
+                        defaultValue={field.value}
+                        className="grid grid-cols-2 gap-4"
+                      >
+                        <div>
+                          <RadioGroupItem
+                            value="care_seeker"
+                            id="care_seeker"
+                            className="peer sr-only"
+                          />
+                          <Label
+                            htmlFor="care_seeker"
+                            className={`flex flex-col items-center justify-between rounded-md border-2 p-4 cursor-pointer ${
+                              selectedRole === "care_seeker" 
+                                ? "border-primary bg-primary/5" 
+                                : "border-muted"
+                            }`}
+                            data-testid="radio-care_seeker"
+                          >
+                            <User className="mb-2 h-6 w-6" />
+                            <span className="text-sm font-medium">Care Seeker</span>
+                            <span className="text-xs text-muted-foreground">Hospital seeking services</span>
+                          </Label>
+                        </div>
+                        <div>
+                          <RadioGroupItem
+                            value="provider"
+                            id="provider"
+                            className="peer sr-only"
+                          />
+                          <Label
+                            htmlFor="provider"
+                            className={`flex flex-col items-center justify-between rounded-md border-2 p-4 cursor-pointer ${
+                              selectedRole === "provider" 
+                                ? "border-primary bg-primary/5" 
+                                : "border-muted"
+                            }`}
+                            data-testid="radio-provider"
+                          >
+                            <Building className="mb-2 h-6 w-6" />
+                            <span className="text-sm font-medium">Care Provider</span>
+                            <span className="text-xs text-muted-foreground">Lab, Consultant, Radiology</span>
+                          </Label>
+                        </div>
+                      </RadioGroup>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
               <div className="grid grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
@@ -192,17 +285,59 @@ export default function RegisterPage() {
                 )}
               />
               
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="password"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Password</FormLabel>
+                      <FormControl>
+                        <Input 
+                          type="password" 
+                          placeholder="Create a password" 
+                          data-testid="input-password"
+                          {...field} 
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={form.control}
+                  name="confirmPassword"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Confirm Password</FormLabel>
+                      <FormControl>
+                        <Input 
+                          type="password" 
+                          placeholder="Confirm password" 
+                          data-testid="input-confirmPassword"
+                          {...field} 
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <Separator />
+              <p className="text-sm font-medium">Hospital Details</p>
+
               <FormField
                 control={form.control}
-                name="password"
+                name="hospitalName"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Password</FormLabel>
+                    <FormLabel>Hospital / Organization Name</FormLabel>
                     <FormControl>
                       <Input 
-                        type="password" 
-                        placeholder="Create a password" 
-                        data-testid="input-password"
+                        placeholder="e.g., City General Hospital" 
+                        data-testid="input-hospitalName"
                         {...field} 
                       />
                     </FormControl>
@@ -210,18 +345,17 @@ export default function RegisterPage() {
                   </FormItem>
                 )}
               />
-              
+
               <FormField
                 control={form.control}
-                name="confirmPassword"
+                name="hospitalAddress"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Confirm Password</FormLabel>
+                    <FormLabel>Hospital Address</FormLabel>
                     <FormControl>
-                      <Input 
-                        type="password" 
-                        placeholder="Confirm your password" 
-                        data-testid="input-confirmPassword"
+                      <Textarea 
+                        placeholder="Full address including city, state, pin code" 
+                        data-testid="input-hospitalAddress"
                         {...field} 
                       />
                     </FormControl>
@@ -229,76 +363,73 @@ export default function RegisterPage() {
                   </FormItem>
                 )}
               />
-              
+
               <FormField
                 control={form.control}
-                name="role"
+                name="hospitalRegistrationNo"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>I am a</FormLabel>
+                    <FormLabel>Hospital Registration Number</FormLabel>
                     <FormControl>
-                      <RadioGroup
-                        onValueChange={field.onChange}
-                        defaultValue={field.value}
-                        className="grid grid-cols-2 gap-4"
-                      >
-                        <div>
-                          <RadioGroupItem
-                            value="care_seeker"
-                            id="care_seeker"
-                            className="peer sr-only"
-                          />
-                          <Label
-                            htmlFor="care_seeker"
-                            className={`flex flex-col items-center justify-between rounded-md border-2 p-4 hover:bg-accent hover:text-accent-foreground cursor-pointer ${
-                              selectedRole === "care_seeker" 
-                                ? "border-primary bg-primary/5" 
-                                : "border-muted"
-                            }`}
-                            data-testid="radio-care_seeker"
-                          >
-                            <User className="mb-2 h-6 w-6" />
-                            <span className="text-sm font-medium">Care Seeker</span>
-                            <span className="text-xs text-muted-foreground">Patient or Hospital</span>
-                          </Label>
-                        </div>
-                        <div>
-                          <RadioGroupItem
-                            value="provider"
-                            id="provider"
-                            className="peer sr-only"
-                          />
-                          <Label
-                            htmlFor="provider"
-                            className={`flex flex-col items-center justify-between rounded-md border-2 p-4 hover:bg-accent hover:text-accent-foreground cursor-pointer ${
-                              selectedRole === "provider" 
-                                ? "border-primary bg-primary/5" 
-                                : "border-muted"
-                            }`}
-                            data-testid="radio-provider"
-                          >
-                            <Building className="mb-2 h-6 w-6" />
-                            <span className="text-sm font-medium">Care Provider</span>
-                            <span className="text-xs text-muted-foreground">Lab, Consultant, Hospital</span>
-                          </Label>
-                        </div>
-                      </RadioGroup>
+                      <Input 
+                        placeholder="e.g., REG-2024-XXXXX" 
+                        data-testid="input-hospitalRegistrationNo"
+                        {...field} 
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
+
+              <div className="space-y-2">
+                <Label>Registration Document</Label>
+                {documentFile ? (
+                  <div className="flex items-center gap-2 rounded-md border p-3">
+                    <FileText className="h-5 w-5 text-muted-foreground" />
+                    <span className="flex-1 text-sm truncate">{documentFile.name}</span>
+                    <span className="text-xs text-muted-foreground">{(documentFile.size / 1024).toFixed(0)} KB</span>
+                    <Button 
+                      type="button" 
+                      variant="ghost" 
+                      size="icon" 
+                      onClick={() => setDocumentFile(null)}
+                      data-testid="button-remove-document"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ) : (
+                  <label 
+                    className="flex items-center gap-3 rounded-md border border-dashed p-4 cursor-pointer hover-elevate"
+                    data-testid="label-upload-document"
+                  >
+                    <Upload className="h-5 w-5 text-muted-foreground" />
+                    <div>
+                      <p className="text-sm font-medium">Upload registration certificate</p>
+                      <p className="text-xs text-muted-foreground">PDF, JPEG, or PNG (max 10MB)</p>
+                    </div>
+                    <input 
+                      type="file" 
+                      className="hidden" 
+                      accept=".pdf,.jpg,.jpeg,.png"
+                      onChange={handleFileChange}
+                      data-testid="input-document-file"
+                    />
+                  </label>
+                )}
+              </div>
               
               <Button 
                 type="submit" 
                 className="w-full" 
-                disabled={registerMutation.isPending}
+                disabled={registerMutation.isPending || isUploading}
                 data-testid="button-register"
               >
-                {registerMutation.isPending ? (
+                {registerMutation.isPending || isUploading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Creating account...
+                    {isUploading ? "Uploading document..." : "Creating account..."}
                   </>
                 ) : (
                   "Create Account"

@@ -30,6 +30,9 @@ The platform uses INR (₹) currency throughout, features role-based access (Adm
 - **Currency**: Changed from USD ($) to INR (₹) across all monetary displays and form labels
 - **Teleradiology**: Added mandatory accession number field for radiologist reference
 - **Specialization Filter**: Now dynamically builds filter options from actual consultant data instead of hardcoded list
+- **B2B Registration Approval Workflow**: Both care seekers and providers are hospitals that must register with hospital name, address, registration number, and upload registration documents. New registrations go to "pending" approval status. Admin reviews documents and approves/rejects from the Approvals page (/admin/approvals). Unapproved users are blocked from accessing protected routes (403 with needsApproval flag). Pending users see a dedicated /pending-approval page. Schema: hospitalName, hospitalAddress, hospitalRegistrationNo, registrationDocumentUrl, approvalStatus, approvalNotes columns on users table. approvalStatus and registrationNo/registrationDocumentUrl columns also on consultants, labs, provider_lab_tests, provider_modalities tables.
+- **Provider Service Approval**: When providers add labs, consultants, or lab test assignments, these go to "pending" approval status. Providers must submit registration number and document for each service. Admin reviews and approves/rejects from the Service Additions tab on the Approvals page.
+- **File Upload System**: Multer-based file upload for registration documents at POST /api/upload/document (max 10MB, accepts PDF/JPEG/PNG). Files stored in uploads/documents/ directory, served statically. Upload endpoint returns file URL for storage in database records.
 
 ## User Preferences
 

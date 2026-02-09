@@ -64,6 +64,10 @@ export async function createUser(data: {
   role?: UserRole;
   verificationCode?: string;
   verificationCodeExpiresAt?: Date;
+  hospitalName?: string;
+  hospitalAddress?: string;
+  hospitalRegistrationNo?: string;
+  registrationDocumentUrl?: string;
 }): Promise<SafeUser> {
   const hashedPassword = await bcrypt.hash(data.password, 10);
   
@@ -78,6 +82,11 @@ export async function createUser(data: {
       emailVerified: false,
       verificationCode: data.verificationCode,
       verificationCodeExpiresAt: data.verificationCodeExpiresAt,
+      hospitalName: data.hospitalName,
+      hospitalAddress: data.hospitalAddress,
+      hospitalRegistrationNo: data.hospitalRegistrationNo,
+      registrationDocumentUrl: data.registrationDocumentUrl,
+      approvalStatus: "pending",
     })
     .returning();
   
@@ -182,6 +191,14 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
 
   if (!user.emailVerified && !user.googleId) {
     return res.status(403).json({ message: "Email not verified", needsVerification: true });
+  }
+
+  if (user.approvalStatus === "pending" && user.role !== "admin") {
+    return res.status(403).json({ message: "Your registration is pending admin approval", needsApproval: true });
+  }
+
+  if (user.approvalStatus === "rejected" && user.role !== "admin") {
+    return res.status(403).json({ message: "Your registration has been rejected. Please contact support.", registrationRejected: true });
   }
   
   (req as any).user = user;

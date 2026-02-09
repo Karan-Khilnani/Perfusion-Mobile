@@ -13,6 +13,7 @@ import RegisterPage from "@/pages/register";
 import SelectRolePage from "@/pages/select-role";
 import CompleteProfilePage from "@/pages/complete-profile";
 import VerifyEmailPage from "@/pages/verify-email";
+import PendingApprovalPage from "@/pages/pending-approval";
 import UserLayout from "@/pages/user/layout";
 import UserDashboard from "@/pages/user/dashboard";
 import LabsPage from "@/pages/user/labs";
@@ -38,6 +39,7 @@ import AdminConsultantsPage from "@/pages/admin/consultants";
 import AdminLabTestsPage from "@/pages/admin/lab-tests";
 import AdminRadiologyPage from "@/pages/admin/radiology";
 import AdminSuggestionsPage from "@/pages/admin/suggestions";
+import AdminApprovalsPage from "@/pages/admin/approvals";
 
 function withUserLayout(Component: React.ComponentType) {
   return function WrappedComponent() {
@@ -79,6 +81,7 @@ function Router() {
       <Route path="/select-role" component={SelectRolePage} />
       <Route path="/complete-profile" component={CompleteProfilePage} />
       <Route path="/verify-email" component={VerifyEmailPage} />
+      <Route path="/pending-approval" component={PendingApprovalPage} />
       <Route path="/provider/onboarding" component={ProviderOnboardingPage} />
       
       <Route path="/user" component={withUserLayout(UserDashboard)} />
@@ -100,6 +103,7 @@ function Router() {
       <Route path="/admin/lab-tests" component={withAdminLayout(AdminLabTestsPage)} />
       <Route path="/admin/radiology" component={withAdminLayout(AdminRadiologyPage)} />
       <Route path="/admin/suggestions" component={withAdminLayout(AdminSuggestionsPage)} />
+      <Route path="/admin/approvals" component={withAdminLayout(AdminApprovalsPage)} />
       <Route path="/admin/providers" component={withAdminLayout(AdminProvidersPage)} />
       <Route path="/admin/users" component={withAdminLayout(AdminUsersPage)} />
       

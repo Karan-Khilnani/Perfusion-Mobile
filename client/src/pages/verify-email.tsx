@@ -21,11 +21,13 @@ export default function VerifyEmailPage() {
     },
     onSuccess: (user) => {
       queryClient.setQueryData(["/api/auth/user"], user);
-      toast({ title: "Email verified!", description: "Welcome to Perfusion." });
-      if (user.role === "provider") {
-        setLocation("/provider/onboarding");
-      } else if (user.role === "admin") {
+      toast({ title: "Email verified!", description: "Your registration is now pending admin approval." });
+      if (user.role === "admin") {
         setLocation("/admin");
+      } else if (user.approvalStatus === "pending") {
+        setLocation("/pending-approval");
+      } else if (user.role === "provider") {
+        setLocation("/provider");
       } else {
         setLocation("/user");
       }

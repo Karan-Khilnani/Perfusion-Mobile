@@ -56,6 +56,16 @@ export default function LoginPage() {
         setLocation("/verify-email");
         return;
       }
+
+      if (user.approvalStatus === "pending") {
+        setLocation("/pending-approval");
+        return;
+      }
+
+      if (user.approvalStatus === "rejected") {
+        toast({ title: "Registration Rejected", description: "Your registration has been rejected. Please contact support.", variant: "destructive" });
+        return;
+      }
       
       toast({ title: "Welcome back!", description: "You have been logged in successfully." });
       if (user.role === "admin") {
