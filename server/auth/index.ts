@@ -27,9 +27,10 @@ export function getSession(): RequestHandler {
     store: sessionStore,
     resave: false,
     saveUninitialized: false,
+    proxy: true,
     cookie: {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
+      secure: false,
       maxAge: sessionTtl,
       sameSite: "lax",
     },
