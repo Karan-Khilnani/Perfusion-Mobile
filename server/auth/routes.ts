@@ -14,6 +14,7 @@ import {
   setVerificationCode,
   verifyEmailCode,
   getRawUserById,
+  completeUserProfile,
 } from "./index";
 import { loginSchema, registerSchema, type UserRole } from "@shared/models/auth";
 import { z } from "zod";
@@ -131,10 +132,6 @@ export function registerAuthRoutes(app: Express): void {
             } catch {}
           }
 
-          if (role && ["care_seeker", "provider"].includes(role)) {
-            await updateUserRole(googleUser.id, role as UserRole);
-          }
-
           req.session.userId = googleUser.id;
           req.session.save((err: any) => {
             if (err) {
@@ -142,19 +139,22 @@ export function registerAuthRoutes(app: Express): void {
               return res.redirect("/login?error=session_failed");
             }
 
-            if (googleUser.isNew && !role) {
-              return res.redirect("/complete-profile");
+            if (googleUser.isNew) {
+              const roleParam = role ? `?role=${role}` : "";
+              return res.redirect(`/complete-profile${roleParam}`);
             }
 
-            if (googleUser.isNew && role === "provider") {
-              return res.redirect("/complete-profile?role=provider");
-            }
-
-            if (role === "provider") {
-              return res.redirect("/provider/onboarding");
-            }
-
-            res.redirect("/home");
+            const user = getUserById(googleUser.id).then(u => {
+              if (u && u.approvalStatus === "pending") {
+                return res.redirect("/pending-approval");
+              }
+              if (u?.role === "provider") {
+                return res.redirect("/provider");
+              }
+              res.redirect("/home");
+            }).catch(() => {
+              res.redirect("/home");
+            });
           });
         } catch (error) {
           console.error("Google callback error:", error);
@@ -280,6 +280,43 @@ export function registerAuthRoutes(app: Express): void {
     } catch (error) {
       console.error("Error fetching user:", error);
       res.status(500).json({ message: "Failed to fetch user" });
+    }
+  });
+
+  app.post("/api/auth/complete-profile", async (req: any, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ message: "Not logged in" });
+      }
+      const user = await getUserById(req.session.userId);
+      if (!user) {
+        return res.status(401).json({ message: "User not found" });
+      }
+
+      const { role, hospitalName, hospitalAddress, hospitalRegistrationNo, registrationDocumentUrl } = req.body;
+      if (!role || !["care_seeker", "provider"].includes(role)) {
+        return res.status(400).json({ message: "Valid role is required" });
+      }
+      if (!hospitalName || !hospitalAddress || !hospitalRegistrationNo) {
+        return res.status(400).json({ message: "Hospital name, address, and registration number are required" });
+      }
+
+      const updated = await completeUserProfile(req.session.userId, {
+        role,
+        hospitalName,
+        hospitalAddress,
+        hospitalRegistrationNo,
+        registrationDocumentUrl,
+      });
+
+      if (!updated) {
+        return res.status(500).json({ message: "Failed to update profile" });
+      }
+
+      res.json({ ...updated, needsApproval: true });
+    } catch (error) {
+      console.error("Complete profile error:", error);
+      res.status(500).json({ message: "Failed to complete profile" });
     }
   });
 

@@ -147,10 +147,34 @@ export async function createGoogleUser(data: {
       profileImageUrl: data.profileImageUrl,
       role: data.role,
       emailVerified: true,
+      approvalStatus: "pending",
     })
     .returning();
   
   return excludePassword(user);
+}
+
+export async function completeUserProfile(userId: string, data: {
+  role: UserRole;
+  hospitalName: string;
+  hospitalAddress: string;
+  hospitalRegistrationNo: string;
+  registrationDocumentUrl?: string;
+}): Promise<SafeUser | null> {
+  const [user] = await db
+    .update(users)
+    .set({
+      role: data.role,
+      hospitalName: data.hospitalName,
+      hospitalAddress: data.hospitalAddress,
+      hospitalRegistrationNo: data.hospitalRegistrationNo,
+      registrationDocumentUrl: data.registrationDocumentUrl,
+      approvalStatus: "pending",
+      updatedAt: new Date(),
+    })
+    .where(eq(users.id, userId))
+    .returning();
+  return user ? excludePassword(user) : null;
 }
 
 export async function linkGoogleId(userId: string, googleId: string, profileImageUrl?: string): Promise<SafeUser | null> {

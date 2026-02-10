@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useLocation, useSearch } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -6,14 +7,19 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Heart, Loader2, User, Building } from "lucide-react";
+import { Heart, Loader2, User, Building, Upload } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 
 const profileSchema = z.object({
   role: z.enum(["care_seeker", "provider"]),
+  hospitalName: z.string().min(2, "Hospital name is required"),
+  hospitalAddress: z.string().min(5, "Hospital address is required"),
+  hospitalRegistrationNo: z.string().min(1, "Registration number is required"),
 });
 
 type ProfileFormData = z.infer<typeof profileSchema>;
@@ -23,6 +29,8 @@ export default function CompleteProfilePage() {
   const searchString = useSearch();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [documentUrl, setDocumentUrl] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
 
   const params = new URLSearchParams(searchString);
   const presetRole = params.get("role");
@@ -35,37 +43,61 @@ export default function CompleteProfilePage() {
     resolver: zodResolver(profileSchema),
     defaultValues: {
       role: (presetRole === "provider" ? "provider" : "care_seeker") as "care_seeker" | "provider",
+      hospitalName: "",
+      hospitalAddress: "",
+      hospitalRegistrationNo: "",
     },
   });
 
-  const roleMutation = useMutation({
+  const profileMutation = useMutation({
     mutationFn: async (data: ProfileFormData) => {
-      const res = await apiRequest("PATCH", "/api/auth/user/role", { role: data.role });
+      const res = await apiRequest("POST", "/api/auth/complete-profile", {
+        ...data,
+        registrationDocumentUrl: documentUrl,
+      });
       return res.json();
     },
-    onSuccess: (user) => {
-      queryClient.setQueryData(["/api/auth/user"], user);
-      toast({ title: "Welcome to Perfusion!", description: "Your profile is set up." });
-      if (user.role === "provider") {
-        setLocation("/provider/onboarding");
-      } else {
-        setLocation("/user");
-      }
+    onSuccess: (result) => {
+      queryClient.setQueryData(["/api/auth/user"], result);
+      toast({
+        title: "Profile submitted",
+        description: "Your registration is pending admin approval. You'll be notified once approved.",
+      });
+      setLocation("/pending-approval");
     },
     onError: (error: Error) => {
       toast({ title: "Failed to complete profile", description: error.message, variant: "destructive" });
     },
   });
 
+  const handleDocumentUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("document", file);
+      const res = await fetch("/api/upload/document", { method: "POST", body: formData, credentials: "include" });
+      if (!res.ok) throw new Error("Upload failed");
+      const data = await res.json();
+      setDocumentUrl(data.url);
+      toast({ title: "Document uploaded" });
+    } catch {
+      toast({ title: "Upload failed", description: "Please try again", variant: "destructive" });
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const selectedRole = form.watch("role");
 
   const onSubmit = (data: ProfileFormData) => {
-    roleMutation.mutate(data);
+    profileMutation.mutate(data);
   };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-md">
+      <Card className="w-full max-w-lg">
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4">
             <div className="flex items-center gap-2">
@@ -76,15 +108,15 @@ export default function CompleteProfilePage() {
           <CardTitle>Complete Your Profile</CardTitle>
           <CardDescription>
             {currentUser?.email ? (
-              <>Signed in as <span className="font-medium">{currentUser.email}</span>. Choose how you'll use Perfusion.</>
+              <>Signed in as <span className="font-medium">{currentUser.email}</span>. Please provide your hospital details to continue.</>
             ) : (
-              "One more step to get started."
+              "Please provide your hospital details to continue."
             )}
           </CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
               <FormField
                 control={form.control}
                 name="role"
@@ -105,16 +137,16 @@ export default function CompleteProfilePage() {
                           />
                           <Label
                             htmlFor="cp_care_seeker"
-                            className={`flex flex-col items-center justify-between rounded-md border-2 p-6 cursor-pointer ${
+                            className={`flex flex-col items-center justify-between rounded-md border-2 p-4 cursor-pointer ${
                               selectedRole === "care_seeker"
                                 ? "border-primary bg-primary/5"
                                 : "border-muted"
                             }`}
                             data-testid="radio-cp-care-seeker"
                           >
-                            <User className="mb-3 h-8 w-8" />
+                            <User className="mb-2 h-6 w-6" />
                             <span className="text-sm font-medium">Care Seeker</span>
-                            <span className="text-xs text-muted-foreground mt-1">Patient or Hospital</span>
+                            <span className="text-xs text-muted-foreground mt-1">Hospital seeking services</span>
                           </Label>
                         </div>
                         <div>
@@ -125,14 +157,14 @@ export default function CompleteProfilePage() {
                           />
                           <Label
                             htmlFor="cp_provider"
-                            className={`flex flex-col items-center justify-between rounded-md border-2 p-6 cursor-pointer ${
+                            className={`flex flex-col items-center justify-between rounded-md border-2 p-4 cursor-pointer ${
                               selectedRole === "provider"
                                 ? "border-primary bg-primary/5"
                                 : "border-muted"
                             }`}
                             data-testid="radio-cp-provider"
                           >
-                            <Building className="mb-3 h-8 w-8" />
+                            <Building className="mb-2 h-6 w-6" />
                             <span className="text-sm font-medium">Care Provider</span>
                             <span className="text-xs text-muted-foreground mt-1">Lab, Consultant, Hospital</span>
                           </Label>
@@ -144,19 +176,96 @@ export default function CompleteProfilePage() {
                 )}
               />
 
+              <FormField
+                control={form.control}
+                name="hospitalName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Hospital / Organization Name</FormLabel>
+                    <FormControl>
+                      <Input placeholder="e.g. City General Hospital" {...field} data-testid="input-hospital-name" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="hospitalAddress"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Hospital Address</FormLabel>
+                    <FormControl>
+                      <Textarea placeholder="Full address including city, state, and PIN code" {...field} data-testid="input-hospital-address" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="hospitalRegistrationNo"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Registration Number</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Hospital registration number" {...field} data-testid="input-registration-no" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <div className="space-y-2">
+                <Label>Registration Certificate (optional)</Label>
+                <div className="border-2 border-dashed rounded-md p-4 text-center">
+                  {documentUrl ? (
+                    <div className="text-sm text-muted-foreground">
+                      Document uploaded successfully
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        className="ml-2"
+                        onClick={() => setDocumentUrl(null)}
+                        data-testid="button-remove-doc"
+                      >
+                        Remove
+                      </Button>
+                    </div>
+                  ) : (
+                    <label className="cursor-pointer flex flex-col items-center gap-2">
+                      <Upload className="h-6 w-6 text-muted-foreground" />
+                      <span className="text-sm text-muted-foreground">
+                        {uploading ? "Uploading..." : "Upload registration certificate (PDF, JPEG, PNG)"}
+                      </span>
+                      <input
+                        type="file"
+                        accept=".pdf,.jpg,.jpeg,.png"
+                        className="hidden"
+                        onChange={handleDocumentUpload}
+                        disabled={uploading}
+                        data-testid="input-document-upload"
+                      />
+                    </label>
+                  )}
+                </div>
+              </div>
+
               <Button
                 type="submit"
                 className="w-full"
-                disabled={roleMutation.isPending}
+                disabled={profileMutation.isPending}
                 data-testid="button-complete-profile"
               >
-                {roleMutation.isPending ? (
+                {profileMutation.isPending ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Setting up...
+                    Submitting...
                   </>
                 ) : (
-                  "Continue"
+                  "Submit for Approval"
                 )}
               </Button>
             </form>
