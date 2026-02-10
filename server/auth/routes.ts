@@ -21,7 +21,10 @@ import { z } from "zod";
 import { generateVerificationCode, sendVerificationEmail } from "../email";
 
 function getCallbackURL(req: any): string {
-  const protocol = req.headers["x-forwarded-proto"] || req.protocol || "https";
+  let protocol = req.headers["x-forwarded-proto"] || req.protocol || "https";
+  if (protocol.includes(",")) {
+    protocol = protocol.split(",")[0].trim();
+  }
   const host = req.headers["x-forwarded-host"] || req.headers.host;
   if (!host) {
     const fallback = process.env.REPLIT_DEV_DOMAIN
@@ -29,7 +32,8 @@ function getCallbackURL(req: any): string {
       : process.env.APP_URL || "http://localhost:5000";
     return `${fallback}/api/auth/google/callback`;
   }
-  return `${protocol}://${host}/api/auth/google/callback`;
+  const hostClean = host.split(",")[0].trim();
+  return `${protocol}://${hostClean}/api/auth/google/callback`;
 }
 
 export function registerAuthRoutes(app: Express): void {
@@ -98,10 +102,12 @@ export function registerAuthRoutes(app: Express): void {
         const state = role ? Buffer.from(JSON.stringify({ role })).toString("base64") : undefined;
         const callbackURL = getCallbackURL(req);
         console.log("Google OAuth redirect with callbackURL:", callbackURL);
+        console.log("IMPORTANT: Make sure this callback URL is registered in Google Cloud Console under Authorized redirect URIs:", callbackURL);
         passport.authenticate("google", {
           scope: ["profile", "email"],
           state,
           callbackURL,
+          prompt: "select_account",
         } as any)(req, res, next);
       }
     );
@@ -111,16 +117,29 @@ export function registerAuthRoutes(app: Express): void {
       (req, res, next) => {
         const callbackURL = getCallbackURL(req);
         console.log("Google OAuth callback with callbackURL:", callbackURL);
+        console.log("Google OAuth callback query params:", req.query);
         passport.authenticate("google", {
-          failureRedirect: "/login?error=google_failed",
           session: false,
           callbackURL,
-        } as any)(req, res, next);
+        } as any, (err: any, user: any, info: any) => {
+          if (err) {
+            console.error("Google OAuth authenticate error:", err);
+            return res.redirect("/login?error=google_failed");
+          }
+          if (!user) {
+            console.error("Google OAuth no user returned. Info:", info);
+            return res.redirect("/login?error=google_failed");
+          }
+          req.user = user;
+          next();
+        })(req, res, next);
       },
       async (req: any, res) => {
         try {
           const googleUser = req.user;
+          console.log("Google callback processing user:", { id: googleUser?.id, isNew: googleUser?.isNew });
           if (!googleUser || !googleUser.id) {
+            console.error("Google callback: no user id");
             return res.redirect("/login?error=google_failed");
           }
 
@@ -133,28 +152,48 @@ export function registerAuthRoutes(app: Express): void {
           }
 
           req.session.userId = googleUser.id;
-          req.session.save((err: any) => {
+          req.session.save(async (err: any) => {
             if (err) {
               console.error("Session save error after Google auth:", err);
               return res.redirect("/login?error=session_failed");
             }
 
-            if (googleUser.isNew) {
-              const roleParam = role ? `?role=${role}` : "";
-              return res.redirect(`/complete-profile${roleParam}`);
-            }
+            try {
+              if (googleUser.isNew) {
+                const roleParam = role ? `?role=${role}` : "";
+                console.log("Google callback: new user, redirecting to complete-profile");
+                return res.redirect(`/complete-profile${roleParam}`);
+              }
 
-            const user = getUserById(googleUser.id).then(u => {
+              const u = await getUserById(googleUser.id);
+              console.log("Google callback: existing user lookup:", { role: u?.role, approvalStatus: u?.approvalStatus, hospitalName: u?.hospitalName });
+
+              if (u && !u.hospitalName && u.approvalStatus === "pending") {
+                console.log("Google callback: user has no hospital details, redirecting to complete-profile");
+                return res.redirect("/complete-profile");
+              }
+
               if (u && u.approvalStatus === "pending") {
+                console.log("Google callback: user pending approval");
                 return res.redirect("/pending-approval");
               }
+
+              if (u && u.approvalStatus === "rejected") {
+                console.log("Google callback: user rejected");
+                return res.redirect("/pending-approval");
+              }
+
               if (u?.role === "provider") {
                 return res.redirect("/provider");
               }
+              if (u?.role === "care_seeker") {
+                return res.redirect("/user");
+              }
               res.redirect("/home");
-            }).catch(() => {
+            } catch (innerErr) {
+              console.error("Google callback inner error:", innerErr);
               res.redirect("/home");
-            });
+            }
           });
         } catch (error) {
           console.error("Google callback error:", error);

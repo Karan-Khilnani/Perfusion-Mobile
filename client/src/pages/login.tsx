@@ -1,4 +1,5 @@
-import { Link, useLocation } from "wouter";
+import { useEffect } from "react";
+import { Link, useLocation, useSearch } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -21,8 +22,19 @@ type LoginFormData = z.infer<typeof loginSchema>;
 
 export default function LoginPage() {
   const [, setLocation] = useLocation();
+  const searchString = useSearch();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  useEffect(() => {
+    const params = new URLSearchParams(searchString);
+    const error = params.get("error");
+    if (error === "google_failed") {
+      toast({ title: "Google sign-in failed", description: "Please try again or use email login.", variant: "destructive" });
+    } else if (error === "session_failed") {
+      toast({ title: "Session error", description: "Could not create session. Please try again.", variant: "destructive" });
+    }
+  }, [searchString]);
 
   const form = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
