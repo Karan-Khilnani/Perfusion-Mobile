@@ -284,7 +284,7 @@ export async function seedDatabase() {
     if (existingConsultants.length === 0) {
       console.log("Seeding consultants...");
       for (const consultant of consultantsData) {
-        await db.insert(consultants).values([consultant as any]);
+        await db.insert(consultants).values([{ ...consultant, approvalStatus: "approved" } as any]);
       }
       console.log(`Seeded ${consultantsData.length} consultants`);
     } else {
