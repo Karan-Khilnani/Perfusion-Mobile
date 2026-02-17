@@ -19,7 +19,7 @@ import { ArrowLeft, Check, CreditCard, Briefcase, Video, Upload, FileText } from
 import type { Consultant } from "@shared/schema";
 
 const bookingSchema = z.object({
-  appointmentSlot: z.string().min(1, "Please select a slot"),
+  appointmentSlot: z.string().optional(),
   patientName: z.string().min(2, "Patient name is required"),
   patientAge: z.coerce.number().min(1, "Age must be at least 1").max(150, "Invalid age"),
   patientGender: z.enum(["male", "female", "other"], { required_error: "Gender is required" }),
@@ -46,6 +46,21 @@ export default function ConsultationBookingPage() {
     enabled: !!id,
   });
 
+  const { data: emergencyTeam } = useQuery<any>({
+    queryKey: ["/api/emergency-teams", id],
+    enabled: !!id && !consultant && !isLoading,
+  });
+
+  const service = consultant || (emergencyTeam ? {
+    ...emergencyTeam,
+    name: `${emergencyTeam.department} Team`,
+    specialization: emergencyTeam.department,
+    yearsExperience: 0,
+    availableSlots: [],
+  } : null);
+
+  const isEmergencyTeam = !consultant && !!emergencyTeam;
+
   const form = useForm<BookingFormData>({
     resolver: zodResolver(bookingSchema),
     defaultValues: {
@@ -62,23 +77,23 @@ export default function ConsultationBookingPage() {
 
   const bookingMutation = useMutation({
     mutationFn: async (data: BookingFormData) => {
-      if (!consultant) throw new Error("Consultant not found");
+      if (!service) throw new Error("Service not found");
 
-      // Server creates the Daily.co room and returns the URL
       const response = await apiRequest("POST", "/api/bookings", {
         bookingType: "consultation",
-        serviceId: consultant.id,
-        serviceName: consultant.name,
-        providerName: consultant.qualification,
+        serviceId: service.id,
+        serviceName: isEmergencyTeam ? `${emergencyTeam.department} Team` : service.name,
+        providerName: isEmergencyTeam ? emergencyTeam.qualification : service.qualification,
         patientName: data.patientName,
         patientAge: data.patientAge,
         patientGender: data.patientGender,
         patientContact: data.contactNumber,
         clinicalSummary: data.clinicalSummary,
         provisionalDiagnosis: data.provisionalDiagnosis || null,
-        appointmentSlot: data.appointmentSlot,
-        amount: consultant.consultationFee,
-        status: "confirmed",
+        appointmentSlot: isEmergencyTeam ? "Emergency - Immediate" : data.appointmentSlot,
+        amount: service.consultationFee,
+        urgency: isEmergencyTeam ? "emergency" : "routine",
+        status: "booked",
         paymentStatus: paymentMethod === "pay_now" ? "paid" : "pending",
         paymentMethod: paymentMethod,
       });
@@ -125,7 +140,9 @@ export default function ConsultationBookingPage() {
 
   const validateCurrentStep = () => {
     if (step === "details") {
-      return form.trigger(["appointmentSlot", "patientName", "patientAge", "patientGender", "contactNumber"]);
+      const fields: (keyof BookingFormData)[] = ["patientName", "patientAge", "patientGender", "contactNumber"];
+      if (!isEmergencyTeam) fields.unshift("appointmentSlot");
+      return form.trigger(fields);
     } else if (step === "clinical") {
       return form.trigger(["clinicalSummary"]);
     }
@@ -161,14 +178,14 @@ export default function ConsultationBookingPage() {
     );
   }
 
-  if (!consultant) {
+  if (!service) {
     return (
       <Card>
         <CardContent className="py-12 text-center">
-          <p className="text-muted-foreground">Consultant not found</p>
+          <p className="text-muted-foreground">Service not found</p>
           <Link href="/user/consultation">
             <Button variant="outline" className="mt-4">
-              Back to Consultants
+              Back to Consultations
             </Button>
           </Link>
         </CardContent>
@@ -197,17 +214,25 @@ export default function ConsultationBookingPage() {
                   <dd className="font-mono">{bookingId}</dd>
                 </div>
                 <div className="flex justify-between">
-                  <dt className="text-muted-foreground">Consultant</dt>
-                  <dd>{consultant.name}</dd>
+                  <dt className="text-muted-foreground">{isEmergencyTeam ? "Emergency Team" : "Consultant"}</dt>
+                  <dd>{service.name}</dd>
                 </div>
                 <div className="flex justify-between">
-                  <dt className="text-muted-foreground">Specialization</dt>
-                  <dd>{consultant.specialization}</dd>
+                  <dt className="text-muted-foreground">{isEmergencyTeam ? "Department" : "Specialization"}</dt>
+                  <dd>{service.specialization}</dd>
                 </div>
+                {!isEmergencyTeam && form.getValues("appointmentSlot") && (
                 <div className="flex justify-between">
                   <dt className="text-muted-foreground">Time Slot</dt>
                   <dd>{form.getValues("appointmentSlot")}</dd>
                 </div>
+                )}
+                {isEmergencyTeam && (
+                <div className="flex justify-between">
+                  <dt className="text-muted-foreground">Type</dt>
+                  <dd className="text-red-600 font-medium">Emergency</dd>
+                </div>
+                )}
                 <div className="flex justify-between">
                   <dt className="text-muted-foreground">Patient</dt>
                   <dd>{form.getValues("patientName")}</dd>
@@ -267,7 +292,7 @@ export default function ConsultationBookingPage() {
         </Link>
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Book Consultation</h1>
-          <p className="text-muted-foreground">{consultant.name}</p>
+          <p className="text-muted-foreground">{service.name}</p>
         </div>
       </div>
 
@@ -295,20 +320,20 @@ export default function ConsultationBookingPage() {
           <CardContent className="pt-6">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <h3 className="font-semibold">{consultant.name}</h3>
-                <p className="text-sm text-muted-foreground">{consultant.qualification}</p>
-                {consultant.specialization && (
+                <h3 className="font-semibold">{service.name}</h3>
+                <p className="text-sm text-muted-foreground">{service.qualification}</p>
+                {service.specialization && (
                   <Badge variant="secondary" className="mt-2">
-                    {consultant.specialization}
+                    {service.specialization}
                   </Badge>
                 )}
               </div>
-              <StarRating rating={parseFloat(consultant.rating || "4.0")} />
+              <StarRating rating={parseFloat(service.rating || "4.0")} />
             </div>
             <div className="mt-4 flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
               <span className="flex items-center gap-1">
                 <Briefcase className="h-3.5 w-3.5" />
-                {consultant.yearsExperience} years experience
+                {service.yearsExperience} years experience
               </span>
               <span className="flex items-center gap-1">
                 <Video className="h-3.5 w-3.5" />
@@ -329,30 +354,39 @@ export default function ConsultationBookingPage() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <FormField
-                    control={form.control}
-                    name="appointmentSlot"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Select Time Slot *</FormLabel>
-                        <Select value={field.value} onValueChange={field.onChange}>
-                          <FormControl>
-                            <SelectTrigger data-testid="select-slot">
-                              <SelectValue placeholder="Choose a slot" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {consultant.availableSlots?.map((slot, i) => (
-                              <SelectItem key={i} value={slot}>
-                                {slot}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                  {!isEmergencyTeam && (
+                    <FormField
+                      control={form.control}
+                      name="appointmentSlot"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Select Time Slot *</FormLabel>
+                          <Select value={field.value} onValueChange={field.onChange}>
+                            <FormControl>
+                              <SelectTrigger data-testid="select-slot">
+                                <SelectValue placeholder="Choose a slot" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {service.availableSlots?.map((slot, i) => (
+                                <SelectItem key={i} value={slot}>
+                                  {slot}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
+
+                  {isEmergencyTeam && (
+                    <div className="rounded-lg border border-red-500/30 bg-red-50 dark:bg-red-950/20 p-3">
+                      <p className="text-sm font-medium text-red-800 dark:text-red-200">Emergency Consultation - Immediate Response</p>
+                      <p className="text-xs text-red-600 dark:text-red-400 mt-1">No slot selection needed. The team will be contacted immediately upon booking.</p>
+                    </div>
+                  )}
 
                   <div className="grid gap-4 md:grid-cols-3">
                     <FormField
@@ -570,12 +604,12 @@ export default function ConsultationBookingPage() {
                     <h3 className="mb-3 font-medium">Booking Summary</h3>
                     <dl className="space-y-2 text-sm">
                       <div className="flex justify-between">
-                        <dt className="text-muted-foreground">Consultant</dt>
-                        <dd>{consultant.name}</dd>
+                        <dt className="text-muted-foreground">{isEmergencyTeam ? "Emergency Team" : "Consultant"}</dt>
+                        <dd>{service.name}</dd>
                       </div>
                       <div className="flex justify-between">
-                        <dt className="text-muted-foreground">Specialization</dt>
-                        <dd>{consultant.specialization}</dd>
+                        <dt className="text-muted-foreground">{isEmergencyTeam ? "Department" : "Specialization"}</dt>
+                        <dd>{service.specialization}</dd>
                       </div>
                       <div className="flex justify-between">
                         <dt className="text-muted-foreground">Time Slot</dt>
@@ -614,7 +648,7 @@ export default function ConsultationBookingPage() {
                       <span className="font-medium">Payment Option</span>
                     </div>
                     <p className="text-sm text-muted-foreground mb-3">
-                      Consultation fee: ₹{consultant.consultationFee}
+                      Consultation fee: ₹{service.consultationFee}
                     </p>
                     <div className="space-y-3">
                       <label className="flex items-center gap-3 rounded-lg border p-3 cursor-pointer hover:bg-muted/50" data-testid="radio-pay-later">

@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { StarRating } from "@/components/star-rating";
-import { Search, Stethoscope, ArrowUpDown, Briefcase, Calendar } from "lucide-react";
+import { Search, Stethoscope, ArrowUpDown, Briefcase, Calendar, AlertTriangle, IndianRupee, Users } from "lucide-react";
 import type { Consultant } from "@shared/schema";
 
 type SortOption = "rating" | "cost" | "availability";
@@ -18,9 +18,16 @@ export default function ConsultationPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedSpecialization, setSelectedSpecialization] = useState("All Specializations");
   const [sortBy, setSortBy] = useState<SortOption>("rating");
+  const [showEmergency, setShowEmergency] = useState(false);
+  const [selectedDepartment, setSelectedDepartment] = useState("All Departments");
 
   const { data: consultants, isLoading } = useQuery<Consultant[]>({
     queryKey: ["/api/consultants"],
+  });
+
+  const { data: emergencyTeams, isLoading: emergencyLoading } = useQuery<any[]>({
+    queryKey: ["/api/emergency-teams"],
+    enabled: showEmergency,
   });
 
   // Build dynamic specializations list from actual consultant data
@@ -67,6 +74,19 @@ export default function ConsultationPage() {
     return filtered;
   }, [consultants, searchTerm, selectedSpecialization, sortBy]);
 
+  const departments = useMemo(() => {
+    if (!emergencyTeams) return ["All Departments"];
+    const uniqueDepts = new Set(emergencyTeams.map(t => t.department).filter(Boolean));
+    return ["All Departments", ...Array.from(uniqueDepts).sort()];
+  }, [emergencyTeams]);
+
+  const filteredEmergencyTeams = useMemo(() => {
+    if (!emergencyTeams) return [];
+    return emergencyTeams.filter(t =>
+      selectedDepartment === "All Departments" || t.department === selectedDepartment
+    );
+  }, [emergencyTeams, selectedDepartment]);
+
   return (
     <div className="space-y-6">
       <div>
@@ -76,6 +96,111 @@ export default function ConsultationPage() {
         </p>
       </div>
 
+      <div className="flex items-center gap-4">
+        <Button
+          onClick={() => { setShowEmergency(!showEmergency); setSelectedDepartment("All Departments"); }}
+          variant={showEmergency ? "default" : "outline"}
+          className={showEmergency
+            ? "bg-red-600 text-white shadow-lg shadow-red-600/30 border-red-600 no-default-hover-elevate no-default-active-elevate"
+            : "border-red-500 text-red-600 shadow-md no-default-hover-elevate no-default-active-elevate"}
+          size="lg"
+          data-testid="button-emergency-consultation"
+        >
+          <AlertTriangle className="mr-2 h-5 w-5" />
+          {showEmergency ? "Back to Regular Consultation" : "Emergency Consultation"}
+        </Button>
+      </div>
+
+      {showEmergency ? (
+        <div className="space-y-4">
+          <Card className="border-red-500/30 bg-red-50 dark:bg-red-950/20">
+            <CardContent className="flex items-center gap-3 py-4">
+              <AlertTriangle className="h-5 w-5 text-red-600" />
+              <div>
+                <p className="font-medium text-red-800 dark:text-red-200">Emergency Consultation Services</p>
+                <p className="text-sm text-red-600 dark:text-red-400">Select a department to find available emergency teams</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="pt-6">
+              <div className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <Label htmlFor="department" className="sr-only">Department</Label>
+                  <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
+                    <SelectTrigger data-testid="select-department">
+                      <Users className="mr-2 h-4 w-4 text-muted-foreground" />
+                      <SelectValue placeholder="Select department" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {departments.map((dept) => (
+                        <SelectItem key={dept} value={dept}>{dept}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {emergencyLoading ? (
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {[1, 2, 3].map((i) => (
+                <Card key={i}>
+                  <CardHeader><Skeleton className="h-6 w-3/4" /></CardHeader>
+                  <CardContent className="space-y-3">
+                    <Skeleton className="h-4 w-full" />
+                    <Skeleton className="h-4 w-2/3" />
+                    <Skeleton className="h-10 w-full" />
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : filteredEmergencyTeams.length === 0 ? (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+                <AlertTriangle className="mb-4 h-12 w-12 text-muted-foreground/50" />
+                <h3 className="mb-2 text-lg font-medium">No emergency teams available</h3>
+                <p className="text-sm text-muted-foreground">No emergency teams found for the selected department</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {filteredEmergencyTeams.map((team: any) => (
+                <Card key={team.id} className="overflow-visible" data-testid={`card-emergency-team-${team.id}`}>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-lg">{team.department} Team</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="space-y-2 text-sm text-muted-foreground">
+                      <div className="flex items-center gap-2">
+                        <Users className="h-3.5 w-3.5" />
+                        <span>Team Lead: {team.teamLeadName}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Stethoscope className="h-3.5 w-3.5" />
+                        <span>{team.qualification}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <IndianRupee className="h-3.5 w-3.5" />
+                        <span>Fee: ₹{team.consultationFee}</span>
+                      </div>
+                    </div>
+                    <Link href={`/user/consultation/${team.id}/book`}>
+                      <Button className="w-full bg-red-600 text-white border-red-600 no-default-hover-elevate no-default-active-elevate" data-testid={`button-book-emergency-${team.id}`}>
+                        <AlertTriangle className="mr-2 h-4 w-4" />
+                        Book Emergency Consultation
+                      </Button>
+                    </Link>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </div>
+      ) : (
+        <>
       <Card>
         <CardContent className="pt-6">
           <div className="grid gap-4 md:grid-cols-4">
@@ -217,6 +342,8 @@ export default function ConsultationPage() {
             </Card>
           ))}
         </div>
+      )}
+      </>
       )}
     </div>
   );

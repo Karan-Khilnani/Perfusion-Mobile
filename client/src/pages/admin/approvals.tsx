@@ -8,7 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { 
   CheckCircle, XCircle, Building, FileText, ExternalLink, 
-  Clock, UserCheck, FlaskConical, Stethoscope, ScanLine, Loader2
+  Clock, UserCheck, FlaskConical, Stethoscope, ScanLine, Loader2, AlertTriangle
 } from "lucide-react";
 import type { User, Lab, Consultant, ProviderLabTest, LabTest, Provider } from "@shared/schema";
 
@@ -17,6 +17,7 @@ type PendingServices = {
   consultants: (Consultant & { provider?: Provider })[];
   labTests: (ProviderLabTest & { provider?: Provider; labTest?: LabTest })[];
   modalities: any[];
+  emergencyTeams: (any & { provider?: Provider })[];
 };
 
 export default function AdminApprovalsPage() {
@@ -88,11 +89,23 @@ export default function AdminApprovalsPage() {
     },
   });
 
+  const approveEmergencyTeamMutation = useMutation({
+    mutationFn: async ({ id, status }: { id: string; status: "approved" | "rejected" }) => {
+      const res = await apiRequest("PATCH", `/api/admin/emergency-teams/${id}/approval`, { status });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/pending-services"] });
+      toast({ title: "Updated", description: "Emergency team registration updated." });
+    },
+  });
+
   const totalPendingUsers = pendingUsers?.length || 0;
   const totalPendingServices = (pendingServices?.labs?.length || 0) + 
     (pendingServices?.consultants?.length || 0) + 
     (pendingServices?.labTests?.length || 0) + 
-    (pendingServices?.modalities?.length || 0);
+    (pendingServices?.modalities?.length || 0) +
+    (pendingServices?.emergencyTeams?.length || 0);
 
   return (
     <div className="space-y-6">
@@ -358,6 +371,44 @@ export default function AdminApprovalsPage() {
                             <CheckCircle className="mr-1 h-3.5 w-3.5" /> Approve
                           </Button>
                           <Button size="sm" variant="destructive" onClick={() => approveModalityMutation.mutate({ id: pm.id, status: "rejected" })} disabled={approveModalityMutation.isPending} data-testid={`button-reject-modality-${pm.id}`}>
+                            <XCircle className="mr-1 h-3.5 w-3.5" /> Reject
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+              )}
+
+              {pendingServices?.emergencyTeams && pendingServices.emergencyTeams.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <AlertTriangle className="h-5 w-5" />
+                      Pending Emergency Teams ({pendingServices.emergencyTeams.length})
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {pendingServices.emergencyTeams.map((et: any) => (
+                      <div key={et.id} className="flex items-center justify-between rounded-lg border p-3" data-testid={`pending-emergency-team-${et.id}`}>
+                        <div>
+                          <p className="font-medium">{et.department} Team</p>
+                          <p className="text-sm text-muted-foreground">Team Lead: {et.teamLeadName} - {et.qualification}</p>
+                          <p className="text-sm text-muted-foreground">Fee: ₹{et.consultationFee}</p>
+                          {et.provider && <p className="text-xs text-muted-foreground">Provider: {et.provider.name}</p>}
+                          {et.registrationNumber && <p className="text-xs text-muted-foreground">Reg: {et.registrationNumber}</p>}
+                          {et.registeredOrganization && <p className="text-xs text-muted-foreground">Registered Org: {et.registeredOrganization}</p>}
+                          {et.registrationDocumentUrl && (
+                            <a href={et.registrationDocumentUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline flex items-center gap-1">
+                              <FileText className="h-3 w-3" /> View Document <ExternalLink className="h-3 w-3" />
+                            </a>
+                          )}
+                        </div>
+                        <div className="flex gap-2">
+                          <Button size="sm" onClick={() => approveEmergencyTeamMutation.mutate({ id: et.id, status: "approved" })} disabled={approveEmergencyTeamMutation.isPending} data-testid={`button-approve-emergency-team-${et.id}`}>
+                            <CheckCircle className="mr-1 h-3.5 w-3.5" /> Approve
+                          </Button>
+                          <Button size="sm" variant="destructive" onClick={() => approveEmergencyTeamMutation.mutate({ id: et.id, status: "rejected" })} disabled={approveEmergencyTeamMutation.isPending} data-testid={`button-reject-emergency-team-${et.id}`}>
                             <XCircle className="mr-1 h-3.5 w-3.5" /> Reject
                           </Button>
                         </div>

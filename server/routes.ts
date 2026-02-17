@@ -374,6 +374,53 @@ export async function registerRoutes(
     }
   });
 
+  // Emergency Teams - Public
+  app.get("/api/emergency-teams", async (req, res) => {
+    try {
+      const teams = await storage.getActiveEmergencyTeams();
+      res.json(teams);
+    } catch (error) {
+      console.error("Error fetching emergency teams:", error);
+      res.status(500).json({ message: "Failed to fetch emergency teams" });
+    }
+  });
+
+  app.get("/api/emergency-teams/:id", async (req, res) => {
+    try {
+      const team = await storage.getEmergencyTeamById(req.params.id);
+      if (!team) return res.status(404).json({ message: "Emergency team not found" });
+      res.json(team);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch emergency team" });
+    }
+  });
+
+  // Emergency Teams - Provider
+  app.get("/api/provider/my-emergency-teams", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.id;
+      const provider = await storage.getProviderByUserId(userId);
+      if (!provider) return res.json([]);
+      const teams = await storage.getEmergencyTeamsByProvider(provider.id);
+      res.json(teams);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch emergency teams" });
+    }
+  });
+
+  app.post("/api/provider/emergency-teams", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.id;
+      const provider = await storage.getProviderByUserId(userId);
+      if (!provider) return res.status(403).json({ message: "Provider profile required" });
+      const teamData = { ...req.body, providerId: provider.id, approvalStatus: "pending" };
+      const team = await storage.createEmergencyTeam(teamData);
+      res.status(201).json(team);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to create emergency team" });
+    }
+  });
+
   // Lab Tests - Direct Catalog (no providers)
   app.get("/api/lab-tests", async (req, res) => {
     try {
@@ -1853,6 +1900,7 @@ export async function registerRoutes(
       const pendingConsultants = await storage.getPendingConsultants();
       const pendingLabTests = await storage.getPendingProviderLabTests();
       const pendingModalities = await storage.getPendingProviderModalities();
+      const pendingEmergencyTeams = await storage.getPendingEmergencyTeams();
       
       const providers = await storage.getProviders();
       const labTests = await storage.getLabTests();
@@ -1871,6 +1919,7 @@ export async function registerRoutes(
           provider: providers.find(p => p.id === pm.providerId),
           modality: modalities.find(m => m.id === pm.modalityId),
         })),
+        emergencyTeams: pendingEmergencyTeams.map(et => ({ ...et, provider: providers.find(p => p.id === et.providerId) })),
       });
     } catch (error) {
       console.error("Error fetching pending services:", error);
@@ -1911,6 +1960,21 @@ export async function registerRoutes(
       res.json(plt);
     } catch (error) {
       res.status(500).json({ message: "Failed to update provider lab test approval" });
+    }
+  });
+
+  // Approve or reject an emergency team registration
+  app.patch("/api/admin/emergency-teams/:id/approval", isAdmin, async (req: any, res) => {
+    try {
+      const { status } = req.body;
+      if (!["approved", "rejected"].includes(status)) {
+        return res.status(400).json({ message: "Invalid status" });
+      }
+      const updated = await storage.updateEmergencyTeamApproval(req.params.id, status);
+      if (!updated) return res.status(404).json({ message: "Emergency team not found" });
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update emergency team approval" });
     }
   });
 

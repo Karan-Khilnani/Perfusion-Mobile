@@ -82,6 +82,23 @@ export const consultants = pgTable("consultants", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Emergency Teams table
+export const emergencyTeams = pgTable("emergency_teams", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  providerId: varchar("provider_id"),
+  teamLeadName: varchar("team_lead_name", { length: 255 }).notNull(),
+  qualification: varchar("qualification", { length: 255 }).notNull(),
+  department: varchar("department", { length: 255 }).notNull(),
+  consultationFee: decimal("consultation_fee", { precision: 10, scale: 2 }).notNull(),
+  rating: decimal("rating", { precision: 2, scale: 1 }).default("4.0"),
+  registrationNumber: varchar("registration_number", { length: 100 }),
+  registeredOrganization: varchar("registered_organization", { length: 255 }),
+  registrationDocumentUrl: varchar("registration_document_url", { length: 500 }),
+  approvalStatus: varchar("approval_status", { length: 20 }).default("pending").$type<SuggestionStatus>(),
+  status: varchar("status", { length: 20 }).default("active").$type<ServiceStatus>(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Radiology Modalities table
 export const radiologyModalities = pgTable("radiology_modalities", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -288,6 +305,7 @@ export const insertProviderSchema = createInsertSchema(providers).omit({ id: tru
 export const insertLabSchema = createInsertSchema(labs).omit({ id: true });
 export const insertLabTestSchema = createInsertSchema(labTests).omit({ id: true, createdAt: true });
 export const insertConsultantSchema = createInsertSchema(consultants).omit({ id: true, createdAt: true });
+export const insertEmergencyTeamSchema = createInsertSchema(emergencyTeams).omit({ id: true, createdAt: true });
 export const insertRadiologyModalitySchema = createInsertSchema(radiologyModalities).omit({ id: true, createdAt: true });
 export const insertProviderLabTestSchema = createInsertSchema(providerLabTests).omit({ id: true, createdAt: true });
 export const insertSuggestedLabTestSchema = createInsertSchema(suggestedLabTests).omit({ id: true, createdAt: true, reviewedAt: true });
@@ -313,6 +331,9 @@ export type LabTest = typeof labTests.$inferSelect;
 
 export type InsertConsultant = z.infer<typeof insertConsultantSchema>;
 export type Consultant = typeof consultants.$inferSelect;
+
+export type InsertEmergencyTeam = z.infer<typeof insertEmergencyTeamSchema>;
+export type EmergencyTeam = typeof emergencyTeams.$inferSelect;
 
 export type InsertRadiologyModality = z.infer<typeof insertRadiologyModalitySchema>;
 export type RadiologyModality = typeof radiologyModalities.$inferSelect;

@@ -4,6 +4,7 @@ import {
   labs,
   labTests,
   consultants,
+  emergencyTeams,
   radiologyModalities,
   providerLabTests,
   suggestedLabTests,
@@ -21,6 +22,7 @@ import {
   type Lab,
   type LabTest,
   type Consultant,
+  type EmergencyTeam,
   type RadiologyModality,
   type ProviderLabTest,
   type SuggestedLabTest,
@@ -36,6 +38,7 @@ import {
   type InsertLab,
   type InsertLabTest,
   type InsertConsultant,
+  type InsertEmergencyTeam,
   type InsertRadiologyModality,
   type InsertProviderLabTest,
   type InsertSuggestedLabTest,
@@ -78,6 +81,14 @@ export interface IStorage {
   updateConsultantStatus(id: string, status: ServiceStatus): Promise<Consultant | undefined>;
   deleteConsultant(id: string): Promise<boolean>;
   getConsultantsByProvider(providerId: string): Promise<Consultant[]>;
+
+  // Emergency Teams
+  getActiveEmergencyTeams(): Promise<EmergencyTeam[]>;
+  getEmergencyTeamById(id: string): Promise<EmergencyTeam | undefined>;
+  createEmergencyTeam(team: InsertEmergencyTeam): Promise<EmergencyTeam>;
+  getEmergencyTeamsByProvider(providerId: string): Promise<EmergencyTeam[]>;
+  getPendingEmergencyTeams(): Promise<EmergencyTeam[]>;
+  updateEmergencyTeamApproval(id: string, status: "approved" | "rejected"): Promise<EmergencyTeam | undefined>;
   
   // Radiology Modalities
   getRadiologyModalities(): Promise<RadiologyModality[]>;
@@ -277,6 +288,36 @@ export class DatabaseStorage implements IStorage {
 
   async getConsultantsByProvider(providerId: string): Promise<Consultant[]> {
     return await db.select().from(consultants).where(eq(consultants.providerId, providerId));
+  }
+
+  // Emergency Teams
+  async getActiveEmergencyTeams(): Promise<EmergencyTeam[]> {
+    return await db.select().from(emergencyTeams)
+      .where(and(eq(emergencyTeams.status, "active"), eq(emergencyTeams.approvalStatus, "approved")))
+      .orderBy(emergencyTeams.department);
+  }
+
+  async getEmergencyTeamById(id: string): Promise<EmergencyTeam | undefined> {
+    const [team] = await db.select().from(emergencyTeams).where(eq(emergencyTeams.id, id));
+    return team;
+  }
+
+  async createEmergencyTeam(team: InsertEmergencyTeam): Promise<EmergencyTeam> {
+    const [created] = await db.insert(emergencyTeams).values([team as any]).returning();
+    return created;
+  }
+
+  async getEmergencyTeamsByProvider(providerId: string): Promise<EmergencyTeam[]> {
+    return await db.select().from(emergencyTeams).where(eq(emergencyTeams.providerId, providerId));
+  }
+
+  async getPendingEmergencyTeams(): Promise<EmergencyTeam[]> {
+    return await db.select().from(emergencyTeams).where(eq(emergencyTeams.approvalStatus, "pending"));
+  }
+
+  async updateEmergencyTeamApproval(id: string, status: "approved" | "rejected"): Promise<EmergencyTeam | undefined> {
+    const [updated] = await db.update(emergencyTeams).set({ approvalStatus: status }).where(eq(emergencyTeams.id, id)).returning();
+    return updated;
   }
 
   // Radiology Modalities

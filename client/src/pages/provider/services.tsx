@@ -43,8 +43,16 @@ const consultantSchema = z.object({
   consultationFee: z.string().min(1, "Fee is required"),
 });
 
+const emergencyTeamSchema = z.object({
+  teamLeadName: z.string().min(2, "Team lead name is required"),
+  qualification: z.string().min(2, "Qualification is required"),
+  department: z.string().min(2, "Department is required"),
+  consultationFee: z.string().min(1, "Fee is required"),
+});
+
 type LabFormData = z.infer<typeof labSchema>;
 type ConsultantFormData = z.infer<typeof consultantSchema>;
+type EmergencyTeamFormData = z.infer<typeof emergencyTeamSchema>;
 
 export default function ProviderServicesPage() {
   const { toast } = useToast();
@@ -68,6 +76,10 @@ export default function ProviderServicesPage() {
   const [consultantRegNo, setConsultantRegNo] = useState("");
   const [consultantRegOrg, setConsultantRegOrg] = useState("");
   const [consultantDocFile, setConsultantDocFile] = useState<File | null>(null);
+  const [isEmergencyDialogOpen, setIsEmergencyDialogOpen] = useState(false);
+  const [emergencyRegNo, setEmergencyRegNo] = useState("");
+  const [emergencyRegOrg, setEmergencyRegOrg] = useState("");
+  const [emergencyDocFile, setEmergencyDocFile] = useState<File | null>(null);
 
   const { data: provider, isLoading: providerLoading } = useQuery<Provider>({
     queryKey: ["/api/providers/me"],
@@ -101,6 +113,11 @@ export default function ProviderServicesPage() {
     enabled: !!provider,
   });
 
+  const { data: emergencyTeams, isLoading: emergencyLoading } = useQuery<any[]>({
+    queryKey: ["/api/provider/my-emergency-teams"],
+    enabled: !!provider,
+  });
+
   // Filter out already assigned tests
   const availablePredefinedTests = predefinedLabTests?.filter(
     t => !myLabTests?.some(mt => mt.labTestId === t.id)
@@ -114,6 +131,11 @@ export default function ProviderServicesPage() {
   const consultantForm = useForm<ConsultantFormData>({
     resolver: zodResolver(consultantSchema),
     defaultValues: { name: "", qualification: "", specialization: "", yearsExperience: 0, consultationFee: "" },
+  });
+
+  const emergencyForm = useForm<EmergencyTeamFormData>({
+    resolver: zodResolver(emergencyTeamSchema),
+    defaultValues: { teamLeadName: "", qualification: "", department: "", consultationFee: "" },
   });
 
   const createLabMutation = useMutation({
@@ -157,6 +179,34 @@ export default function ProviderServicesPage() {
     },
     onError: () => {
       toast({ title: "Failed", description: "Failed to create consultant.", variant: "destructive" });
+    },
+  });
+
+  const createEmergencyMutation = useMutation({
+    mutationFn: async (data: EmergencyTeamFormData) => {
+      let registrationDocumentUrl: string | undefined;
+      if (emergencyDocFile) {
+        registrationDocumentUrl = await uploadDocument(emergencyDocFile);
+      }
+      const response = await apiRequest("POST", "/api/provider/emergency-teams", {
+        ...data,
+        registrationNumber: emergencyRegNo || undefined,
+        registeredOrganization: emergencyRegOrg || undefined,
+        registrationDocumentUrl,
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/provider/my-emergency-teams"] });
+      setIsEmergencyDialogOpen(false);
+      emergencyForm.reset();
+      setEmergencyRegNo("");
+      setEmergencyRegOrg("");
+      setEmergencyDocFile(null);
+      toast({ title: "Emergency Team Added", description: "Emergency team submitted (pending approval)." });
+    },
+    onError: () => {
+      toast({ title: "Failed", description: "Failed to add emergency team.", variant: "destructive" });
     },
   });
 
@@ -349,7 +399,7 @@ export default function ProviderServicesPage() {
       {verificationBanner}
 
       <Tabs defaultValue="labs" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="labs" data-testid="tab-labs">
             <FlaskConical className="mr-2 h-4 w-4" />
             Labs
@@ -357,6 +407,10 @@ export default function ProviderServicesPage() {
           <TabsTrigger value="consultants" data-testid="tab-consultants">
             <Stethoscope className="mr-2 h-4 w-4" />
             Consultants
+          </TabsTrigger>
+          <TabsTrigger value="emergency" data-testid="tab-emergency">
+            <AlertCircle className="mr-2 h-4 w-4" />
+            Emergency
           </TabsTrigger>
           <TabsTrigger value="teleradiology" data-testid="tab-teleradiology">
             <ScanLine className="mr-2 h-4 w-4" />
@@ -752,6 +806,155 @@ export default function ProviderServicesPage() {
                         Slots
                       </Button>
                       <StarRating rating={parseFloat(consultant.rating || "4.0")} />
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="emergency" className="space-y-4">
+          <div className="flex justify-end">
+            <Dialog open={isEmergencyDialogOpen} onOpenChange={setIsEmergencyDialogOpen}>
+              <DialogTrigger asChild>
+                <Button data-testid="button-add-emergency-team">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Emergency Team
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Add Emergency Team</DialogTitle>
+                  <DialogDescription>Register an emergency team for your facility</DialogDescription>
+                </DialogHeader>
+                <Form {...emergencyForm}>
+                  <form onSubmit={emergencyForm.handleSubmit((data) => createEmergencyMutation.mutate(data))} className="space-y-4">
+                    <FormField
+                      control={emergencyForm.control}
+                      name="teamLeadName"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Team Lead Name</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Team Lead Name" {...field} data-testid="input-emergency-lead" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={emergencyForm.control}
+                      name="qualification"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Qualification</FormLabel>
+                          <FormControl>
+                            <Input placeholder="e.g., MD, DM (Cardiology)" {...field} data-testid="input-emergency-qualification" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={emergencyForm.control}
+                      name="department"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Department</FormLabel>
+                          <FormControl>
+                            <Input placeholder="e.g., Cardiology, Nephrology" {...field} data-testid="input-emergency-department" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={emergencyForm.control}
+                      name="consultationFee"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Consultation Fee (INR)</FormLabel>
+                          <FormControl>
+                            <Input placeholder="e.g., 5000.00" {...field} data-testid="input-emergency-fee" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <div className="space-y-2">
+                      <Label>Registration No.</Label>
+                      <Input
+                        value={emergencyRegNo}
+                        onChange={(e) => setEmergencyRegNo(e.target.value)}
+                        placeholder="Registration number"
+                        data-testid="input-emergency-reg-no"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Registered Organization</Label>
+                      <Input
+                        value={emergencyRegOrg}
+                        onChange={(e) => setEmergencyRegOrg(e.target.value)}
+                        placeholder="e.g., State Medical Council, MCI, NABL, etc."
+                        data-testid="input-emergency-registered-org"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Registration Document</Label>
+                      {emergencyDocFile ? (
+                        <div className="flex items-center gap-2 rounded-md border p-2">
+                          <FileText className="h-4 w-4 text-muted-foreground" />
+                          <span className="flex-1 text-sm truncate">{emergencyDocFile.name}</span>
+                          <Button type="button" variant="ghost" size="icon" onClick={() => setEmergencyDocFile(null)} data-testid="button-remove-emergency-doc">
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <label className="flex items-center gap-2 rounded-md border border-dashed p-3 cursor-pointer hover-elevate" data-testid="label-upload-emergency-doc">
+                          <Upload className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-sm">Upload registration certificate</span>
+                          <input type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => { const f = e.target.files?.[0]; if (f) setEmergencyDocFile(f); }} />
+                        </label>
+                      )}
+                    </div>
+                    <Button type="submit" className="w-full" disabled={createEmergencyMutation.isPending} data-testid="button-save-emergency-team">
+                      {createEmergencyMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                      Add Emergency Team (Pending Approval)
+                    </Button>
+                  </form>
+                </Form>
+              </DialogContent>
+            </Dialog>
+          </div>
+
+          {emergencyLoading ? (
+            <Card><CardContent className="py-8"><Skeleton className="h-20 w-full" /></CardContent></Card>
+          ) : !emergencyTeams || emergencyTeams.length === 0 ? (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+                <AlertCircle className="mb-4 h-12 w-12 text-muted-foreground/50" />
+                <h3 className="mb-2 text-lg font-medium">No emergency teams yet</h3>
+                <p className="text-sm text-muted-foreground">Click "Add Emergency Team" to register your first emergency team</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-3">
+              {emergencyTeams.map((team: any) => (
+                <Card key={team.id}>
+                  <CardContent className="flex items-center justify-between gap-4 py-4">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium">{team.department} Team</p>
+                        {team.approvalStatus === "pending" && <Badge variant="outline" className="text-yellow-600 border-yellow-500">Pending</Badge>}
+                        {team.approvalStatus === "rejected" && <Badge variant="outline" className="text-destructive border-destructive">Rejected</Badge>}
+                        {team.approvalStatus === "approved" && <Badge variant="outline" className="text-green-600 border-green-500">Approved</Badge>}
+                      </div>
+                      <p className="text-sm text-muted-foreground">Team Lead: {team.teamLeadName}</p>
+                      <div className="mt-1 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+                        <span>{team.qualification}</span>
+                        <span>Fee: ₹{team.consultationFee}</span>
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
