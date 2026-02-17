@@ -61,8 +61,10 @@ export default function ProviderServicesPage() {
   const [suggestTestDesc, setSuggestTestDesc] = useState("");
   const [suggestTestPrice, setSuggestTestPrice] = useState("");
   const [testRegNo, setTestRegNo] = useState("");
+  const [testRegOrg, setTestRegOrg] = useState("");
   const [testDocFile, setTestDocFile] = useState<File | null>(null);
   const [consultantRegNo, setConsultantRegNo] = useState("");
+  const [consultantRegOrg, setConsultantRegOrg] = useState("");
   const [consultantDocFile, setConsultantDocFile] = useState<File | null>(null);
 
   const { data: provider, isLoading: providerLoading } = useQuery<Provider>({
@@ -137,6 +139,7 @@ export default function ProviderServicesPage() {
       const response = await apiRequest("POST", "/api/provider/consultants", {
         ...data,
         registrationNo: consultantRegNo || undefined,
+        registeredOrganization: consultantRegOrg || undefined,
         registrationDocumentUrl,
       });
       return response.json();
@@ -146,6 +149,7 @@ export default function ProviderServicesPage() {
       setIsConsultantDialogOpen(false);
       consultantForm.reset();
       setConsultantRegNo("");
+      setConsultantRegOrg("");
       setConsultantDocFile(null);
       toast({ title: "Consultant Added", description: "Consultant profile submitted (pending approval)." });
     },
@@ -192,6 +196,7 @@ export default function ProviderServicesPage() {
         price: testPrice,
         turnaroundTime: testTAT,
         registrationNo: testRegNo || undefined,
+        registeredOrganization: testRegOrg || undefined,
         registrationDocumentUrl,
       });
     },
@@ -202,6 +207,7 @@ export default function ProviderServicesPage() {
       setTestPrice("");
       setTestTAT("");
       setTestRegNo("");
+      setTestRegOrg("");
       setTestDocFile(null);
       toast({ title: "Test Added", description: "Lab test added to your catalog (pending approval)." });
     },
@@ -390,6 +396,15 @@ export default function ProviderServicesPage() {
                         onChange={(e) => setTestRegNo(e.target.value)}
                         placeholder="Lab registration number"
                         data-testid="input-test-reg-no"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Registered Organization</label>
+                      <Input
+                        value={testRegOrg}
+                        onChange={(e) => setTestRegOrg(e.target.value)}
+                        placeholder="e.g., State Medical Council, MCI, NABL, etc."
+                        data-testid="input-test-registered-org"
                       />
                     </div>
                     <div className="space-y-2">
@@ -617,6 +632,15 @@ export default function ProviderServicesPage() {
                         onChange={(e) => setConsultantRegNo(e.target.value)}
                         placeholder="Medical registration number"
                         data-testid="input-consultant-reg-no"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Registered Organization</Label>
+                      <Input
+                        value={consultantRegOrg}
+                        onChange={(e) => setConsultantRegOrg(e.target.value)}
+                        placeholder="e.g., State Medical Council, MCI, NABL, etc."
+                        data-testid="input-consultant-registered-org"
                       />
                     </div>
                     <div className="space-y-2">

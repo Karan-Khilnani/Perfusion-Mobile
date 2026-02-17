@@ -68,6 +68,7 @@ export async function createUser(data: {
   hospitalName?: string;
   hospitalAddress?: string;
   hospitalRegistrationNo?: string;
+  hospitalRegisteredOrg?: string;
   registrationDocumentUrl?: string;
 }): Promise<SafeUser> {
   const hashedPassword = await bcrypt.hash(data.password, 10);
@@ -86,6 +87,7 @@ export async function createUser(data: {
       hospitalName: data.hospitalName,
       hospitalAddress: data.hospitalAddress,
       hospitalRegistrationNo: data.hospitalRegistrationNo,
+      hospitalRegisteredOrg: data.hospitalRegisteredOrg,
       registrationDocumentUrl: data.registrationDocumentUrl,
       approvalStatus: "pending",
     })
@@ -160,6 +162,7 @@ export async function completeUserProfile(userId: string, data: {
   hospitalName: string;
   hospitalAddress: string;
   hospitalRegistrationNo: string;
+  hospitalRegisteredOrg?: string;
   registrationDocumentUrl?: string;
 }): Promise<SafeUser | null> {
   const [user] = await db
@@ -169,6 +172,7 @@ export async function completeUserProfile(userId: string, data: {
       hospitalName: data.hospitalName,
       hospitalAddress: data.hospitalAddress,
       hospitalRegistrationNo: data.hospitalRegistrationNo,
+      hospitalRegisteredOrg: data.hospitalRegisteredOrg,
       registrationDocumentUrl: data.registrationDocumentUrl,
       approvalStatus: "pending",
       updatedAt: new Date(),

@@ -41,6 +41,7 @@ export const users = pgTable("users", {
   hospitalName: varchar("hospital_name", { length: 255 }),
   hospitalAddress: varchar("hospital_address", { length: 500 }),
   hospitalRegistrationNo: varchar("hospital_registration_no", { length: 100 }),
+  hospitalRegisteredOrg: varchar("hospital_registered_org", { length: 255 }),
   registrationDocumentUrl: varchar("registration_document_url", { length: 500 }),
   approvalStatus: varchar("approval_status", { length: 20 }).default("pending").$type<UserApprovalStatus>(),
   approvalNotes: varchar("approval_notes", { length: 500 }),
@@ -73,6 +74,7 @@ export const registerSchema = z.object({
   hospitalName: z.string().min(2, "Hospital name is required"),
   hospitalAddress: z.string().min(5, "Hospital address is required"),
   hospitalRegistrationNo: z.string().min(1, "Registration number is required"),
+  hospitalRegisteredOrg: z.string().min(2, "Registered organization is required"),
   registrationDocumentUrl: z.string().optional(),
 });
 

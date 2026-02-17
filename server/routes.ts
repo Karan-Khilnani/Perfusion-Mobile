@@ -902,6 +902,7 @@ export async function registerRoutes(
         price: req.body.price,
         turnaroundTime: req.body.turnaroundTime,
         registrationNo: req.body.registrationNo,
+        registeredOrganization: req.body.registeredOrganization,
         registrationDocumentUrl: req.body.registrationDocumentUrl,
         approvalStatus: "pending",
       });
@@ -1028,6 +1029,8 @@ export async function registerRoutes(
         modalityId: req.body.modalityId,
         price: req.body.price,
         turnaroundTime: req.body.turnaroundTime,
+        registrationNo: req.body.registrationNo,
+        registeredOrganization: req.body.registeredOrganization,
       });
       res.status(201).json(assignment);
     } catch (error) {

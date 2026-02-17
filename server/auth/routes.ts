@@ -332,7 +332,7 @@ export function registerAuthRoutes(app: Express): void {
         return res.status(401).json({ message: "User not found" });
       }
 
-      const { role, hospitalName, hospitalAddress, hospitalRegistrationNo, registrationDocumentUrl } = req.body;
+      const { role, hospitalName, hospitalAddress, hospitalRegistrationNo, hospitalRegisteredOrg, registrationDocumentUrl } = req.body;
       if (!role || !["care_seeker", "provider"].includes(role)) {
         return res.status(400).json({ message: "Valid role is required" });
       }
@@ -345,6 +345,7 @@ export function registerAuthRoutes(app: Express): void {
         hospitalName,
         hospitalAddress,
         hospitalRegistrationNo,
+        hospitalRegisteredOrg,
         registrationDocumentUrl,
       });
 

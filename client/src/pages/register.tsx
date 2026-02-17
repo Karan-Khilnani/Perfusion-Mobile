@@ -26,6 +26,7 @@ const registerSchema = z.object({
   hospitalName: z.string().min(2, "Hospital name is required"),
   hospitalAddress: z.string().min(5, "Hospital address is required"),
   hospitalRegistrationNo: z.string().min(1, "Registration number is required"),
+  hospitalRegisteredOrg: z.string().min(2, "Registered organization is required"),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match",
   path: ["confirmPassword"],
@@ -52,6 +53,7 @@ export default function RegisterPage() {
       hospitalName: "",
       hospitalAddress: "",
       hospitalRegistrationNo: "",
+      hospitalRegisteredOrg: "",
     },
   });
 
@@ -374,6 +376,24 @@ export default function RegisterPage() {
                       <Input 
                         placeholder="e.g., REG-2024-XXXXX" 
                         data-testid="input-hospitalRegistrationNo"
+                        {...field} 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="hospitalRegisteredOrg"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Registered Organization</FormLabel>
+                    <FormControl>
+                      <Input 
+                        placeholder="e.g., State Medical Council, MCI, NABL, etc." 
+                        data-testid="input-registered-org"
                         {...field} 
                       />
                     </FormControl>

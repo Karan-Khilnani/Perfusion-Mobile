@@ -153,6 +153,9 @@ export default function AdminApprovalsPage() {
                             {user.hospitalRegistrationNo && (
                               <p className="text-muted-foreground pl-6">Reg. No: {user.hospitalRegistrationNo}</p>
                             )}
+                            {(user as any).hospitalRegisteredOrg && (
+                              <p className="text-muted-foreground pl-6">Registered Org: {(user as any).hospitalRegisteredOrg}</p>
+                            )}
                             {user.registrationDocumentUrl && (
                               <a 
                                 href={user.registrationDocumentUrl} 
@@ -232,6 +235,7 @@ export default function AdminApprovalsPage() {
                           <p className="text-sm text-muted-foreground">{lab.location}</p>
                           {lab.provider && <p className="text-xs text-muted-foreground">Provider: {lab.provider.name}</p>}
                           {(lab as any).registrationNo && <p className="text-xs text-muted-foreground">Reg: {(lab as any).registrationNo}</p>}
+                          {(lab as any).registeredOrganization && <p className="text-xs text-muted-foreground">Registered Org: {(lab as any).registeredOrganization}</p>}
                           {(lab as any).registrationDocumentUrl && (
                             <a href={(lab as any).registrationDocumentUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline flex items-center gap-1">
                               <FileText className="h-3 w-3" /> View Document <ExternalLink className="h-3 w-3" />
@@ -269,6 +273,7 @@ export default function AdminApprovalsPage() {
                           <p className="text-sm text-muted-foreground">Fee: ₹{c.consultationFee}</p>
                           {c.provider && <p className="text-xs text-muted-foreground">Provider: {c.provider.name}</p>}
                           {(c as any).registrationNo && <p className="text-xs text-muted-foreground">Reg: {(c as any).registrationNo}</p>}
+                          {(c as any).registeredOrganization && <p className="text-xs text-muted-foreground">Registered Org: {(c as any).registeredOrganization}</p>}
                           {(c as any).registrationDocumentUrl && (
                             <a href={(c as any).registrationDocumentUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline flex items-center gap-1">
                               <FileText className="h-3 w-3" /> View Document <ExternalLink className="h-3 w-3" />
@@ -305,6 +310,7 @@ export default function AdminApprovalsPage() {
                           <p className="text-sm text-muted-foreground">Price: ₹{pt.price} | TAT: {pt.turnaroundTime || "N/A"}</p>
                           {pt.provider && <p className="text-xs text-muted-foreground">Provider: {pt.provider.name}</p>}
                           {pt.registrationNo && <p className="text-xs text-muted-foreground">Reg: {pt.registrationNo}</p>}
+                          {pt.registeredOrganization && <p className="text-xs text-muted-foreground">Registered Org: {pt.registeredOrganization}</p>}
                           {pt.registrationDocumentUrl && (
                             <a href={pt.registrationDocumentUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline flex items-center gap-1">
                               <FileText className="h-3 w-3" /> View Document <ExternalLink className="h-3 w-3" />
@@ -340,6 +346,7 @@ export default function AdminApprovalsPage() {
                           <p className="font-medium">{pm.modality?.name || "Unknown Modality"}</p>
                           {pm.provider && <p className="text-xs text-muted-foreground">Provider: {pm.provider.name}</p>}
                           {pm.registrationNo && <p className="text-xs text-muted-foreground">Reg: {pm.registrationNo}</p>}
+                          {pm.registeredOrganization && <p className="text-xs text-muted-foreground">Registered Org: {pm.registeredOrganization}</p>}
                           {pm.registrationDocumentUrl && (
                             <a href={pm.registrationDocumentUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline flex items-center gap-1">
                               <FileText className="h-3 w-3" /> View Document <ExternalLink className="h-3 w-3" />

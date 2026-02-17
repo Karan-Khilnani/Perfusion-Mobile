@@ -22,6 +22,7 @@ const providerSchema = z.object({
   phone: z.string().min(10, "Valid phone number is required"),
   email: z.string().email("Valid email is required"),
   licenseNumber: z.string().min(1, "License number is required"),
+  registeredOrganization: z.string().min(2, "Registered organization is required"),
 });
 
 type ProviderFormData = z.infer<typeof providerSchema>;
@@ -42,6 +43,7 @@ export default function ProviderOnboardingPage() {
       phone: "",
       email: "",
       licenseNumber: "",
+      registeredOrganization: "",
     },
   });
 
@@ -171,6 +173,20 @@ export default function ProviderOnboardingPage() {
                   )}
                 />
               </div>
+
+              <FormField
+                control={form.control}
+                name="registeredOrganization"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Registered Organization</FormLabel>
+                    <FormControl>
+                      <Input placeholder="e.g., State Medical Council, MCI, NABL, etc." {...field} data-testid="input-registered-org" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
               <FormField
                 control={form.control}
