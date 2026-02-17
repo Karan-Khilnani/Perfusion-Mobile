@@ -51,7 +51,9 @@ export default function ProviderServicesPage() {
   const [isLabDialogOpen, setIsLabDialogOpen] = useState(false);
   const [isConsultantDialogOpen, setIsConsultantDialogOpen] = useState(false);
   const [editingSlotsFor, setEditingSlotsFor] = useState<Consultant | null>(null);
-  const [newSlots, setNewSlots] = useState("");
+  const [slotsList, setSlotsList] = useState<string[]>([]);
+  const [selectedDay, setSelectedDay] = useState("Mon");
+  const [selectedTime, setSelectedTime] = useState("09:00 AM");
   const [isAddTestDialogOpen, setIsAddTestDialogOpen] = useState(false);
   const [isSuggestTestDialogOpen, setIsSuggestTestDialogOpen] = useState(false);
   const [selectedPredefinedTest, setSelectedPredefinedTest] = useState<string>("");
@@ -166,7 +168,7 @@ export default function ProviderServicesPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/provider/my-consultants"] });
       setEditingSlotsFor(null);
-      setNewSlots("");
+      setSlotsList([]);
       toast({ title: "Slots Updated", description: "Booking slots have been saved." });
     },
     onError: () => {
@@ -252,15 +254,40 @@ export default function ProviderServicesPage() {
     },
   });
 
+  const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  const TIMES = [
+    "06:00 AM", "06:30 AM", "07:00 AM", "07:30 AM",
+    "08:00 AM", "08:30 AM", "09:00 AM", "09:30 AM",
+    "10:00 AM", "10:30 AM", "11:00 AM", "11:30 AM",
+    "12:00 PM", "12:30 PM", "01:00 PM", "01:30 PM",
+    "02:00 PM", "02:30 PM", "03:00 PM", "03:30 PM",
+    "04:00 PM", "04:30 PM", "05:00 PM", "05:30 PM",
+    "06:00 PM", "06:30 PM", "07:00 PM", "07:30 PM",
+    "08:00 PM", "08:30 PM", "09:00 PM", "09:30 PM",
+    "10:00 PM",
+  ];
+
   const handleOpenSlotsEditor = (consultant: Consultant) => {
     setEditingSlotsFor(consultant);
-    setNewSlots(consultant.availableSlots?.join(", ") || "");
+    setSlotsList(consultant.availableSlots ? [...consultant.availableSlots] : []);
+    setSelectedDay("Mon");
+    setSelectedTime("09:00 AM");
+  };
+
+  const handleAddSlot = () => {
+    const slot = `${selectedDay} ${selectedTime}`;
+    if (!slotsList.includes(slot)) {
+      setSlotsList([...slotsList, slot]);
+    }
+  };
+
+  const handleRemoveSlot = (index: number) => {
+    setSlotsList(slotsList.filter((_, i) => i !== index));
   };
 
   const handleSaveSlots = () => {
     if (!editingSlotsFor) return;
-    const slots = newSlots.split(",").map((s) => s.trim()).filter(Boolean);
-    updateSlotsMutation.mutate({ id: editingSlotsFor.id, slots });
+    updateSlotsMutation.mutate({ id: editingSlotsFor.id, slots: slotsList });
   };
 
   const isLoading = providerLoading || labsLoading;
@@ -809,24 +836,54 @@ export default function ProviderServicesPage() {
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium">Available Slots (comma separated)</label>
-              <Input
-                value={newSlots}
-                onChange={(e) => setNewSlots(e.target.value)}
-                placeholder="Mon 10:00 AM, Wed 2:00 PM, Fri 4:00 PM"
-                data-testid="input-edit-slots"
-              />
-              <p className="text-xs text-muted-foreground">
-                Enter time slots separated by commas, e.g., "Mon 10:00 AM, Tue 3:00 PM"
-              </p>
+              <label className="text-sm font-medium">Add a Slot</label>
+              <div className="flex gap-2 items-end">
+                <div className="flex-1">
+                  <label className="text-xs text-muted-foreground mb-1 block">Day</label>
+                  <Select value={selectedDay} onValueChange={setSelectedDay}>
+                    <SelectTrigger data-testid="select-slot-day">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {DAYS.map((d) => (
+                        <SelectItem key={d} value={d}>{d}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex-1">
+                  <label className="text-xs text-muted-foreground mb-1 block">Time</label>
+                  <Select value={selectedTime} onValueChange={setSelectedTime}>
+                    <SelectTrigger data-testid="select-slot-time">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {TIMES.map((t) => (
+                        <SelectItem key={t} value={t}>{t}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button type="button" size="sm" onClick={handleAddSlot} data-testid="button-add-slot">
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
-            {editingSlotsFor?.availableSlots && editingSlotsFor.availableSlots.length > 0 && (
+            {slotsList.length > 0 && (
               <div className="space-y-2">
-                <p className="text-sm font-medium">Current slots:</p>
+                <p className="text-sm font-medium">Slots ({slotsList.length}):</p>
                 <div className="flex flex-wrap gap-2">
-                  {editingSlotsFor.availableSlots.map((slot, i) => (
-                    <Badge key={i} variant="secondary">
+                  {slotsList.map((slot, i) => (
+                    <Badge key={i} variant="secondary" className="flex items-center gap-1 pr-1">
                       {slot}
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveSlot(i)}
+                        className="ml-1 rounded-full hover:bg-muted p-0.5"
+                        data-testid={`button-remove-slot-${i}`}
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
                     </Badge>
                   ))}
                 </div>
