@@ -30,6 +30,7 @@ import {
   LayoutDashboard,
   ClipboardList,
   Settings,
+  IndianRupee,
   LogOut,
   ChevronUp,
   User,
@@ -40,6 +41,7 @@ const menuItems = [
   { title: "Dashboard", url: "/provider", icon: LayoutDashboard },
   { title: "Bookings", url: "/provider/bookings", icon: ClipboardList },
   { title: "Services", url: "/provider/services", icon: Settings },
+  { title: "Billing", url: "/provider/billing", icon: IndianRupee },
 ];
 
 export default function ProviderLayout({ children }: { children: React.ReactNode }) {

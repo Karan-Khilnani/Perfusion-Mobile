@@ -645,6 +645,29 @@ export async function registerRoutes(
           }
         }
       }
+
+      // Calculate billing fields
+      const defaultMarginSetting = await storage.getPlatformSetting("default_margin_percent");
+      const marginPercent = parseFloat(defaultMarginSetting?.settingValue || "15");
+      const basePrice = parseFloat(bookingData.amount);
+      const marginAmount = (basePrice * marginPercent) / 100;
+      const finalPrice = basePrice + marginAmount;
+
+      bookingData.basePrice = basePrice.toFixed(2);
+      bookingData.marginPercent = marginPercent.toFixed(2);
+      bookingData.marginAmount = marginAmount.toFixed(2);
+      bookingData.amount = finalPrice.toFixed(2);
+      bookingData.paymentStatus = bookingData.paymentStatus || "pending";
+      bookingData.amountPaid = "0";
+
+      if (bookingData.paymentMethod === "pay_now") {
+        bookingData.dueDate = new Date();
+      } else {
+        const dueDate = new Date();
+        dueDate.setMonth(dueDate.getMonth() + 1);
+        bookingData.dueDate = dueDate;
+        bookingData.paymentMethod = "pay_later";
+      }
       
       const booking = await storage.createBooking(bookingData);
       res.status(201).json(booking);
@@ -1899,6 +1922,281 @@ export async function registerRoutes(
       res.status(500).json({ message: "Failed to update provider modality approval" });
     }
   });
+
+  // Platform settings - get default margin
+  app.get("/api/settings/margin", isAuthenticated, async (req, res) => {
+    try {
+      const setting = await storage.getPlatformSetting("default_margin_percent");
+      res.json({ marginPercent: setting?.settingValue || "15" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch margin setting" });
+    }
+  });
+
+  // Admin - Update default margin
+  app.put("/api/admin/settings/margin", isAdmin, async (req: any, res) => {
+    try {
+      const { marginPercent } = req.body;
+      if (isNaN(parseFloat(marginPercent)) || parseFloat(marginPercent) < 0) {
+        return res.status(400).json({ message: "Invalid margin percentage" });
+      }
+      const setting = await storage.upsertPlatformSetting("default_margin_percent", marginPercent.toString());
+      await storage.createAuditLog({
+        userId: req.user.id,
+        action: "update_margin",
+        entityType: "setting",
+        entityId: "default_margin_percent",
+        details: JSON.stringify({ newValue: marginPercent }),
+      });
+      res.json(setting);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update margin" });
+    }
+  });
+
+  // Admin - Record payment for a booking
+  app.post("/api/admin/bookings/:id/payment", isAdmin, async (req: any, res) => {
+    try {
+      const { amount, method } = req.body;
+      if (!amount || isNaN(parseFloat(amount)) || parseFloat(amount) <= 0) {
+        return res.status(400).json({ message: "Invalid payment amount" });
+      }
+      const booking = await storage.recordPayment(req.params.id, parseFloat(amount), method || "manual");
+      if (!booking) {
+        return res.status(404).json({ message: "Booking not found" });
+      }
+      await storage.createAuditLog({
+        userId: req.user.id,
+        action: "record_payment",
+        entityType: "booking",
+        entityId: req.params.id,
+        details: JSON.stringify({ amount, method: method || "manual" }),
+      });
+      res.json(booking);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to record payment" });
+    }
+  });
+
+  // Admin - Extend due date
+  app.patch("/api/admin/bookings/:id/due-date", isAdmin, async (req: any, res) => {
+    try {
+      const { dueDate } = req.body;
+      const booking = await storage.updateBooking(req.params.id, { dueDate: new Date(dueDate) });
+      if (!booking) {
+        return res.status(404).json({ message: "Booking not found" });
+      }
+      await storage.createAuditLog({
+        userId: req.user.id,
+        action: "extend_due_date",
+        entityType: "booking",
+        entityId: req.params.id,
+        details: JSON.stringify({ newDueDate: dueDate }),
+      });
+      res.json(booking);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to extend due date" });
+    }
+  });
+
+  // Admin - Disable/Enable user account
+  app.patch("/api/admin/users/:id/account-status", isAdmin, async (req: any, res) => {
+    try {
+      const { disabled, reason } = req.body;
+      const user = await storage.getUserById(req.params.id);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      const updated = await storage.updateUser(req.params.id, { approvalStatus: disabled ? "rejected" : "approved" });
+      await storage.createAuditLog({
+        userId: req.user.id,
+        action: disabled ? "disable_account" : "enable_account",
+        entityType: "user",
+        entityId: req.params.id,
+        details: JSON.stringify({ reason }),
+      });
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update account status" });
+    }
+  });
+
+  // Billing - Get bookings with billing info for current user
+  app.get("/api/billing/my-invoices", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const { startDate, endDate, status } = req.query;
+      const start = startDate ? new Date(startDate as string) : new Date(0);
+      const end = endDate ? new Date(endDate as string) : new Date();
+      const filters: any = { userId };
+      if (status) filters.paymentStatus = status as string;
+      const invoices = await storage.getBookingsByDateRange(start, end, filters);
+      res.json(invoices);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch invoices" });
+    }
+  });
+
+  // Billing - Get provider earnings
+  app.get("/api/billing/provider-earnings", isAuthenticated, isProvider, async (req: any, res) => {
+    try {
+      const provider = await storage.getProviderByUserId(req.user.id);
+      if (!provider) {
+        return res.status(404).json({ message: "Provider not found" });
+      }
+      const { startDate, endDate } = req.query;
+      const start = startDate ? new Date(startDate as string) : new Date(0);
+      const end = endDate ? new Date(endDate as string) : new Date();
+      const bookings = await storage.getBookingsByDateRange(start, end, { providerId: provider.id });
+      res.json(bookings);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch provider earnings" });
+    }
+  });
+
+  // Admin - Get all invoices with filters
+  app.get("/api/admin/billing/invoices", isAdmin, async (req: any, res) => {
+    try {
+      const { startDate, endDate, status, userId, providerId } = req.query;
+      const start = startDate ? new Date(startDate as string) : new Date(0);
+      const end = endDate ? new Date(endDate as string) : new Date();
+      const filters: any = {};
+      if (status) filters.paymentStatus = status as string;
+      if (userId) filters.userId = userId as string;
+      if (providerId) filters.providerId = providerId as string;
+      const invoices = await storage.getBookingsByDateRange(start, end, filters);
+      res.json(invoices);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch invoices" });
+    }
+  });
+
+  // Admin - Get overdue bookings
+  app.get("/api/admin/billing/overdue", isAdmin, async (req, res) => {
+    try {
+      const overdue = await storage.getOverdueBookings();
+      res.json(overdue);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch overdue bookings" });
+    }
+  });
+
+  // Audit log
+  app.get("/api/admin/audit-log", isAdmin, async (req: any, res) => {
+    try {
+      const { entityType, entityId } = req.query;
+      const logs = await storage.getAuditLogs({
+        entityType: entityType as string,
+        entityId: entityId as string,
+      });
+      res.json(logs);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch audit logs" });
+    }
+  });
+
+  // Admin analytics - revenue summary
+  app.get("/api/admin/analytics/revenue", isAdmin, async (req: any, res) => {
+    try {
+      const { startDate, endDate } = req.query;
+      const start = startDate ? new Date(startDate as string) : new Date(0);
+      const end = endDate ? new Date(endDate as string) : new Date();
+      const allBookings = await storage.getBookingsByDateRange(start, end, {});
+      
+      const grossRevenue = allBookings.reduce((sum, b) => sum + parseFloat(b.amount || "0"), 0);
+      const providerPayout = allBookings.reduce((sum, b) => sum + parseFloat(b.basePrice || b.amount || "0"), 0);
+      const netRevenue = allBookings.reduce((sum, b) => sum + parseFloat(b.marginAmount || "0"), 0);
+      const totalPaid = allBookings.reduce((sum, b) => sum + parseFloat(b.amountPaid || "0"), 0);
+      const totalOutstanding = grossRevenue - totalPaid;
+      
+      const byServiceType: any = {};
+      for (const b of allBookings) {
+        if (!byServiceType[b.bookingType]) {
+          byServiceType[b.bookingType] = { count: 0, revenue: 0, margin: 0 };
+        }
+        byServiceType[b.bookingType].count++;
+        byServiceType[b.bookingType].revenue += parseFloat(b.amount || "0");
+        byServiceType[b.bookingType].margin += parseFloat(b.marginAmount || "0");
+      }
+      
+      const byProvider: any = {};
+      for (const b of allBookings) {
+        const key = b.providerId || "unassigned";
+        if (!byProvider[key]) {
+          byProvider[key] = { name: b.providerName || "Unassigned", count: 0, revenue: 0, payout: 0 };
+        }
+        byProvider[key].count++;
+        byProvider[key].revenue += parseFloat(b.amount || "0");
+        byProvider[key].payout += parseFloat(b.basePrice || b.amount || "0");
+      }
+      
+      const bySeeker: any = {};
+      for (const b of allBookings) {
+        if (!bySeeker[b.userId]) {
+          bySeeker[b.userId] = { count: 0, revenue: 0, paid: 0, outstanding: 0 };
+        }
+        bySeeker[b.userId].count++;
+        bySeeker[b.userId].revenue += parseFloat(b.amount || "0");
+        bySeeker[b.userId].paid += parseFloat(b.amountPaid || "0");
+        bySeeker[b.userId].outstanding += parseFloat(b.amount || "0") - parseFloat(b.amountPaid || "0");
+      }
+      
+      const overdue = allBookings.filter(b => b.dueDate && new Date(b.dueDate) < new Date() && (b.paymentStatus === "pending" || b.paymentStatus === "partial"));
+      
+      res.json({
+        summary: { grossRevenue, providerPayout, netRevenue, totalPaid, totalOutstanding },
+        byServiceType,
+        byProvider: Object.values(byProvider),
+        bySeeker: Object.values(bySeeker),
+        overdueCount: overdue.length,
+        totalBookings: allBookings.length,
+      });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch analytics" });
+    }
+  });
+
+  setInterval(async () => {
+    try {
+      const overdue = await storage.getOverdueBookings();
+      let markedOverdue = 0;
+      const usersToDisable = new Set<string>();
+
+      for (const booking of overdue) {
+        if (booking.paymentStatus !== "overdue") {
+          await storage.updateBooking(booking.id, { paymentStatus: "overdue" as any });
+          markedOverdue++;
+        }
+        if (booking.dueDate) {
+          const daysPastDue = Math.floor((Date.now() - new Date(booking.dueDate).getTime()) / (1000 * 60 * 60 * 24));
+          if (daysPastDue >= 30) {
+            usersToDisable.add(booking.userId);
+          }
+        }
+      }
+
+      for (const userId of usersToDisable) {
+        const user = await storage.getUserById(userId);
+        if (user && user.approvalStatus !== "rejected") {
+          await storage.updateUser(userId, { approvalStatus: "rejected" });
+          await storage.createAuditLog({
+            userId: "system",
+            action: "auto_disable_account",
+            entityType: "user",
+            entityId: userId,
+            details: JSON.stringify({ reason: "Overdue payment exceeding 30 days" }),
+          });
+          console.log(`[Billing] Auto-disabled account for user ${userId} due to overdue payment > 30 days`);
+        }
+      }
+
+      if (markedOverdue > 0 || usersToDisable.size > 0) {
+        console.log(`[Billing] Marked ${markedOverdue} bookings overdue, disabled ${usersToDisable.size} accounts`);
+      }
+    } catch (error) {
+      console.error("[Billing] Error checking overdue bookings:", error);
+    }
+  }, 60 * 60 * 1000);
 
   return httpServer;
 }

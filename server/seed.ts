@@ -3,6 +3,7 @@ import {
   labTests,
   radiologyModalities,
   consultants,
+  platformSettings,
 } from "@shared/schema";
 import { users } from "@shared/models/auth";
 import { eq } from "drizzle-orm";
@@ -289,6 +290,18 @@ export async function seedDatabase() {
       console.log(`Seeded ${consultantsData.length} consultants`);
     } else {
       console.log(`Skipping consultants (${existingConsultants.length} already exist)`);
+    }
+
+    // Seed default platform settings
+    const existingSettings = await db.select().from(platformSettings);
+    if (existingSettings.length === 0) {
+      await db.insert(platformSettings).values({
+        settingKey: "default_margin_percent",
+        settingValue: "15",
+      });
+      console.log("Seeded default platform settings (15% margin)");
+    } else {
+      console.log(`Skipping platform settings (${existingSettings.length} already exist)`);
     }
 
     console.log("Database seed completed successfully!");

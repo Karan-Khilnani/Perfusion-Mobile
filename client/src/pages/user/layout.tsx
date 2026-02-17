@@ -32,6 +32,7 @@ import {
   Stethoscope,
   ScanLine,
   ClipboardList,
+  IndianRupee,
   LogOut,
   ChevronUp,
   User,
@@ -44,6 +45,7 @@ const menuItems = [
   { title: "Labs", url: "/user/labs", icon: FlaskConical },
   { title: "Teleradiology", url: "/user/teleradiology", icon: ScanLine },
   { title: "My Orders", url: "/user/orders", icon: ClipboardList },
+  { title: "Billing", url: "/user/billing", icon: IndianRupee },
 ];
 
 export default function UserLayout({ children }: { children: React.ReactNode }) {

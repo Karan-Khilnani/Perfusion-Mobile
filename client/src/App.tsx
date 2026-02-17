@@ -22,6 +22,7 @@ import ConsultationPage from "@/pages/user/consultation";
 import ConsultationBookingPage from "@/pages/user/consultation-booking";
 import TeleradiologyPage from "@/pages/user/teleradiology";
 import OrdersPage from "@/pages/user/orders";
+import UserBillingPage from "@/pages/user/billing";
 import VideoRoomPage from "@/pages/video-room";
 
 import ProviderLayout from "@/pages/provider/layout";
@@ -29,6 +30,7 @@ import ProviderDashboard from "@/pages/provider/dashboard";
 import ProviderBookingsPage from "@/pages/provider/bookings";
 import ProviderServicesPage from "@/pages/provider/services";
 import ProviderOnboardingPage from "@/pages/provider/onboarding";
+import ProviderBillingPage from "@/pages/provider/billing";
 
 import AdminLayout from "@/pages/admin/layout";
 import AdminDashboard from "@/pages/admin/dashboard";
@@ -40,6 +42,8 @@ import AdminLabTestsPage from "@/pages/admin/lab-tests";
 import AdminRadiologyPage from "@/pages/admin/radiology";
 import AdminSuggestionsPage from "@/pages/admin/suggestions";
 import AdminApprovalsPage from "@/pages/admin/approvals";
+import AdminBillingPage from "@/pages/admin/billing";
+import AdminAnalyticsPage from "@/pages/admin/analytics";
 
 function withUserLayout(Component: React.ComponentType) {
   return function WrappedComponent() {
@@ -91,11 +95,13 @@ function Router() {
       <Route path="/user/consultation/:id/book" component={withUserLayout(ConsultationBookingPage)} />
       <Route path="/user/teleradiology" component={withUserLayout(TeleradiologyPage)} />
       <Route path="/user/orders" component={withUserLayout(OrdersPage)} />
+      <Route path="/user/billing" component={withUserLayout(UserBillingPage)} />
       <Route path="/video/:roomId" component={VideoRoomPage} />
       
       <Route path="/provider" component={withProviderLayout(ProviderDashboard)} />
       <Route path="/provider/bookings" component={withProviderLayout(ProviderBookingsPage)} />
       <Route path="/provider/services" component={withProviderLayout(ProviderServicesPage)} />
+      <Route path="/provider/billing" component={withProviderLayout(ProviderBillingPage)} />
       
       <Route path="/admin" component={withAdminLayout(AdminDashboard)} />
       <Route path="/admin/bookings" component={withAdminLayout(AdminBookingsPage)} />
@@ -105,6 +111,8 @@ function Router() {
       <Route path="/admin/suggestions" component={withAdminLayout(AdminSuggestionsPage)} />
       <Route path="/admin/approvals" component={withAdminLayout(AdminApprovalsPage)} />
       <Route path="/admin/providers" component={withAdminLayout(AdminProvidersPage)} />
+      <Route path="/admin/billing" component={withAdminLayout(AdminBillingPage)} />
+      <Route path="/admin/analytics" component={withAdminLayout(AdminAnalyticsPage)} />
       <Route path="/admin/users" component={withAdminLayout(AdminUsersPage)} />
       
       <Route component={NotFound} />

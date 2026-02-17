@@ -40,6 +40,7 @@ export default function LabBookingPage() {
   const [step, setStep] = useState<"details" | "payment" | "confirmation">("details");
   const [bookingId, setBookingId] = useState<string | null>(null);
   const [selectedTest, setSelectedTest] = useState<LabTest | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState<"pay_now" | "pay_later">("pay_later");
 
   const { data: lab, isLoading } = useQuery<LabWithTests>({
     queryKey: ["/api/labs", id],
@@ -77,7 +78,8 @@ export default function LabBookingPage() {
         orderingPhysician: data.orderingPhysician || null,
         amount: test.cost,
         status: "booked",
-        paymentStatus: "paid",
+        paymentStatus: paymentMethod === "pay_now" ? "paid" : "pending",
+        paymentMethod: paymentMethod,
       });
       return response.json();
     },
@@ -180,7 +182,7 @@ export default function LabBookingPage() {
                 </div>
                 <div className="flex justify-between">
                   <dt className="text-muted-foreground">Amount Paid</dt>
-                  <dd className="font-semibold">${selectedTest?.cost}</dd>
+                  <dd className="font-semibold">₹{selectedTest?.cost}</dd>
                 </div>
                 <div className="flex justify-between">
                   <dt className="text-muted-foreground">Status</dt>
@@ -273,7 +275,7 @@ export default function LabBookingPage() {
                                 <div className="flex items-center gap-2">
                                   <span>{test.testName}</span>
                                   <span className="text-muted-foreground">
-                                    - ${test.cost}
+                                    - ₹{test.cost}
                                   </span>
                                 </div>
                               </SelectItem>
@@ -290,7 +292,7 @@ export default function LabBookingPage() {
                       <div className="flex flex-wrap items-center gap-4 text-sm">
                         <span className="flex items-center gap-1">
                           <DollarSign className="h-4 w-4 text-muted-foreground" />
-                          ${selectedTest.cost}
+                          ₹{selectedTest.cost}
                         </span>
                         <span className="flex items-center gap-1">
                           <Clock className="h-4 w-4 text-muted-foreground" />
@@ -453,7 +455,7 @@ export default function LabBookingPage() {
                       </div>
                       <div className="flex justify-between border-t pt-2">
                         <dt className="font-medium">Total Amount</dt>
-                        <dd className="font-semibold">${selectedTest?.cost}</dd>
+                        <dd className="font-semibold">₹{selectedTest?.cost}</dd>
                       </div>
                     </dl>
                   </div>
@@ -461,11 +463,24 @@ export default function LabBookingPage() {
                   <div className="rounded-lg border p-4">
                     <div className="mb-4 flex items-center gap-2">
                       <CreditCard className="h-5 w-5 text-muted-foreground" />
-                      <span className="font-medium">Payment Method</span>
+                      <span className="font-medium">Payment Option</span>
                     </div>
-                    <p className="text-sm text-muted-foreground">
-                      Payment simulation - Click confirm to complete booking
-                    </p>
+                    <div className="space-y-3">
+                      <label className="flex items-center gap-3 rounded-lg border p-3 cursor-pointer hover:bg-muted/50" data-testid="radio-pay-later">
+                        <input type="radio" name="paymentMethod" value="pay_later" checked={paymentMethod === "pay_later"} onChange={() => setPaymentMethod("pay_later")} className="h-4 w-4" />
+                        <div>
+                          <div className="font-medium">Pay Later</div>
+                          <div className="text-sm text-muted-foreground">Pay within 30 days. Invoice will be generated.</div>
+                        </div>
+                      </label>
+                      <label className="flex items-center gap-3 rounded-lg border p-3 cursor-pointer hover:bg-muted/50" data-testid="radio-pay-now">
+                        <input type="radio" name="paymentMethod" value="pay_now" checked={paymentMethod === "pay_now"} onChange={() => setPaymentMethod("pay_now")} className="h-4 w-4" />
+                        <div>
+                          <div className="font-medium">Pay Now</div>
+                          <div className="text-sm text-muted-foreground">Mark as paid immediately (offline payment).</div>
+                        </div>
+                      </label>
+                    </div>
                   </div>
 
                   <div className="flex gap-3">
@@ -483,7 +498,7 @@ export default function LabBookingPage() {
                       disabled={bookingMutation.isPending}
                       data-testid="button-confirm-payment"
                     >
-                      {bookingMutation.isPending ? "Processing..." : "Confirm Payment"}
+                      {bookingMutation.isPending ? "Processing..." : paymentMethod === "pay_now" ? "Confirm & Pay" : "Confirm Booking"}
                     </Button>
                   </div>
                 </CardContent>

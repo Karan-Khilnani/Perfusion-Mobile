@@ -205,6 +205,7 @@ export type BookingStatus = "booked" | "sample_collected" | "processing" | "repo
 export type BookingType = "lab" | "consultation" | "teleradiology";
 export type PatientGender = "male" | "female" | "other";
 export type UrgencyType = "routine" | "emergency";
+export type PaymentStatus = "pending" | "partial" | "paid" | "overdue";
 
 // Bookings table
 export const bookings = pgTable("bookings", {
@@ -229,7 +230,14 @@ export const bookings = pgTable("bookings", {
   appointmentSlot: varchar("appointment_slot", { length: 100 }),
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
   status: varchar("status", { length: 30 }).notNull().default("booked").$type<BookingStatus>(),
-  paymentStatus: varchar("payment_status", { length: 20 }).default("paid"),
+  paymentStatus: varchar("payment_status", { length: 20 }).default("paid").$type<PaymentStatus>(),
+  basePrice: decimal("base_price", { precision: 10, scale: 2 }),
+  marginPercent: decimal("margin_percent", { precision: 5, scale: 2 }).default("15.00"),
+  marginAmount: decimal("margin_amount", { precision: 10, scale: 2 }),
+  paymentMethod: varchar("payment_method", { length: 30 }),
+  amountPaid: decimal("amount_paid", { precision: 10, scale: 2 }).default("0"),
+  dueDate: timestamp("due_date"),
+  paidAt: timestamp("paid_at"),
   // Consultation-specific: video room
   videoRoomId: varchar("video_room_id", { length: 255 }),
   // Teleradiology-specific fields
@@ -251,6 +259,25 @@ export const bookings = pgTable("bookings", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Platform Settings table
+export const platformSettings = pgTable("platform_settings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  settingKey: varchar("setting_key", { length: 100 }).notNull().unique(),
+  settingValue: varchar("setting_value", { length: 255 }).notNull(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Audit Log table
+export const auditLog = pgTable("audit_log", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  action: varchar("action", { length: 100 }).notNull(),
+  entityType: varchar("entity_type", { length: 50 }).notNull(),
+  entityId: varchar("entity_id", { length: 255 }),
+  details: text("details"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Insert schemas
 export const insertProviderSchema = createInsertSchema(providers).omit({ id: true, createdAt: true });
 export const insertLabSchema = createInsertSchema(labs).omit({ id: true });
@@ -266,6 +293,8 @@ export const insertCriticalCareDoctorSchema = createInsertSchema(criticalCareDoc
 export const insertReferralHospitalSchema = createInsertSchema(referralHospitals).omit({ id: true });
 export const insertTransportServiceSchema = createInsertSchema(transportServices).omit({ id: true });
 export const insertBookingSchema = createInsertSchema(bookings).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertPlatformSettingSchema = createInsertSchema(platformSettings).omit({ id: true, updatedAt: true });
+export const insertAuditLogSchema = createInsertSchema(auditLog).omit({ id: true, createdAt: true });
 
 // Types
 export type InsertProvider = z.infer<typeof insertProviderSchema>;
@@ -309,6 +338,11 @@ export type TransportService = typeof transportServices.$inferSelect;
 
 export type InsertBooking = z.infer<typeof insertBookingSchema>;
 export type Booking = typeof bookings.$inferSelect;
+
+export type PlatformSetting = typeof platformSettings.$inferSelect;
+export type InsertPlatformSetting = z.infer<typeof insertPlatformSettingSchema>;
+export type AuditLog = typeof auditLog.$inferSelect;
+export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
 
 // Search/filter types
 export interface LabSearchParams {

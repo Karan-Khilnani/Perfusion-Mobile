@@ -41,6 +41,7 @@ type TeleradiologyFormData = z.infer<typeof teleradiologySchema>;
 
 export default function TeleradiologyPage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState<"pay_now" | "pay_later">("pay_later");
   const { toast } = useToast();
 
   const { data: modalities, isLoading: modalitiesLoading } = useQuery<RadiologyModality[]>({
@@ -83,7 +84,8 @@ export default function TeleradiologyPage() {
         urgency: data.priority,
         amount: "0.00",
         status: "pending",
-        paymentStatus: "pending",
+        paymentStatus: paymentMethod === "pay_now" ? "paid" : "pending",
+        paymentMethod: paymentMethod,
       });
       return response;
     },
@@ -403,13 +405,35 @@ export default function TeleradiologyPage() {
                     </div>
                   </div>
 
+                  <div className="space-y-4">
+                    <h3 className="font-medium">Payment Option</h3>
+                    <div className="rounded-lg border p-4">
+                      <div className="space-y-3">
+                        <label className="flex items-center gap-3 rounded-lg border p-3 cursor-pointer hover:bg-muted/50" data-testid="radio-pay-later">
+                          <input type="radio" name="paymentMethod" value="pay_later" checked={paymentMethod === "pay_later"} onChange={() => setPaymentMethod("pay_later")} className="h-4 w-4" />
+                          <div>
+                            <div className="font-medium">Pay Later</div>
+                            <div className="text-sm text-muted-foreground">Pay within 30 days. Invoice will be generated.</div>
+                          </div>
+                        </label>
+                        <label className="flex items-center gap-3 rounded-lg border p-3 cursor-pointer hover:bg-muted/50" data-testid="radio-pay-now">
+                          <input type="radio" name="paymentMethod" value="pay_now" checked={paymentMethod === "pay_now"} onChange={() => setPaymentMethod("pay_now")} className="h-4 w-4" />
+                          <div>
+                            <div className="font-medium">Pay Now</div>
+                            <div className="text-sm text-muted-foreground">Mark as paid immediately (offline payment).</div>
+                          </div>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+
                   <Button
                     type="submit"
                     className="w-full"
                     disabled={createBookingMutation.isPending}
                     data-testid="button-submit-request"
                   >
-                    {createBookingMutation.isPending ? "Submitting..." : "Submit Request"}
+                    {createBookingMutation.isPending ? "Submitting..." : paymentMethod === "pay_now" ? "Submit & Pay" : "Submit Request"}
                   </Button>
                 </form>
               </Form>

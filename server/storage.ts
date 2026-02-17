@@ -1,4 +1,4 @@
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, gte, lte, or, inArray } from "drizzle-orm";
 import { db } from "./db";
 import {
   labs,
@@ -16,6 +16,8 @@ import {
   bookings,
   providers,
   users,
+  platformSettings,
+  auditLog,
   type Lab,
   type LabTest,
   type Consultant,
@@ -50,6 +52,11 @@ import {
   type UserRole,
   type ServiceStatus,
   type SuggestionStatus,
+  type PlatformSetting,
+  type InsertPlatformSetting,
+  type AuditLog,
+  type InsertAuditLog,
+  type PaymentStatus,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -179,6 +186,22 @@ export interface IStorage {
   getLabsByProvider(providerId: string): Promise<(Lab & { tests: LabTest[] })[]>;
   updateLab(id: string, data: Partial<InsertLab>): Promise<Lab | undefined>;
   deleteLab(id: string): Promise<boolean>;
+
+  // User update (generic)
+  updateUser(id: string, data: Partial<any>): Promise<User | undefined>;
+
+  // Platform Settings
+  getPlatformSetting(key: string): Promise<PlatformSetting | undefined>;
+  upsertPlatformSetting(key: string, value: string): Promise<PlatformSetting>;
+
+  // Audit Log
+  createAuditLog(log: InsertAuditLog): Promise<AuditLog>;
+  getAuditLogs(filters?: { entityType?: string; entityId?: string; userId?: string }): Promise<AuditLog[]>;
+
+  // Billing
+  getBookingsByDateRange(startDate: Date, endDate: Date, filters?: { userId?: string; providerId?: string; paymentStatus?: string }): Promise<Booking[]>;
+  recordPayment(bookingId: string, amount: number, method: string): Promise<Booking | undefined>;
+  getOverdueBookings(): Promise<Booking[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -677,6 +700,106 @@ export class DatabaseStorage implements IStorage {
       .where(eq(providerModalities.id, id))
       .returning();
     return updated;
+  }
+
+  // User update (generic)
+  async updateUser(id: string, data: Partial<any>): Promise<User | undefined> {
+    const [updated] = await db.update(users).set(data).where(eq(users.id, id)).returning();
+    return updated;
+  }
+
+  // Platform Settings
+  async getPlatformSetting(key: string): Promise<PlatformSetting | undefined> {
+    const [setting] = await db.select().from(platformSettings).where(eq(platformSettings.settingKey, key));
+    return setting;
+  }
+
+  async upsertPlatformSetting(key: string, value: string): Promise<PlatformSetting> {
+    const existing = await this.getPlatformSetting(key);
+    if (existing) {
+      const [updated] = await db.update(platformSettings)
+        .set({ settingValue: value, updatedAt: new Date() })
+        .where(eq(platformSettings.settingKey, key))
+        .returning();
+      return updated;
+    } else {
+      const [created] = await db.insert(platformSettings)
+        .values({ settingKey: key, settingValue: value })
+        .returning();
+      return created;
+    }
+  }
+
+  // Audit Log
+  async createAuditLog(log: InsertAuditLog): Promise<AuditLog> {
+    const [created] = await db.insert(auditLog).values(log as any).returning();
+    return created;
+  }
+
+  async getAuditLogs(filters?: { entityType?: string; entityId?: string; userId?: string }): Promise<AuditLog[]> {
+    const conditions: any[] = [];
+    if (filters?.entityType) conditions.push(eq(auditLog.entityType, filters.entityType));
+    if (filters?.entityId) conditions.push(eq(auditLog.entityId, filters.entityId));
+    if (filters?.userId) conditions.push(eq(auditLog.userId, filters.userId));
+    
+    if (conditions.length > 0) {
+      return await db.select().from(auditLog).where(and(...conditions)).orderBy(desc(auditLog.createdAt));
+    }
+    return await db.select().from(auditLog).orderBy(desc(auditLog.createdAt));
+  }
+
+  // Billing
+  async getBookingsByDateRange(startDate: Date, endDate: Date, filters?: { userId?: string; providerId?: string; paymentStatus?: string }): Promise<Booking[]> {
+    const conditions: any[] = [
+      gte(bookings.createdAt, startDate),
+      lte(bookings.createdAt, endDate),
+    ];
+    if (filters?.userId) conditions.push(eq(bookings.userId, filters.userId));
+    if (filters?.providerId) conditions.push(eq(bookings.providerId, filters.providerId));
+    if (filters?.paymentStatus) conditions.push(eq(bookings.paymentStatus, filters.paymentStatus as any));
+    
+    return await db.select().from(bookings).where(and(...conditions)).orderBy(desc(bookings.createdAt));
+  }
+
+  async recordPayment(bookingId: string, amount: number, method: string): Promise<Booking | undefined> {
+    const booking = await this.getBookingById(bookingId);
+    if (!booking) return undefined;
+
+    const existingPaid = parseFloat(booking.amountPaid || "0");
+    const newAmountPaid = existingPaid + amount;
+    const totalAmount = parseFloat(booking.amount || "0");
+
+    let paymentStatus: PaymentStatus = "partial";
+    let paidAt: Date | null = null;
+    if (newAmountPaid >= totalAmount) {
+      paymentStatus = "paid";
+      paidAt = new Date();
+    } else if (newAmountPaid > 0) {
+      paymentStatus = "partial";
+    }
+
+    const [updated] = await db.update(bookings)
+      .set({
+        amountPaid: newAmountPaid.toFixed(2),
+        paymentStatus,
+        paymentMethod: method,
+        paidAt,
+        updatedAt: new Date(),
+      } as any)
+      .where(eq(bookings.id, bookingId))
+      .returning();
+    return updated;
+  }
+
+  async getOverdueBookings(): Promise<Booking[]> {
+    return await db.select().from(bookings)
+      .where(
+        and(
+          lte(bookings.dueDate, new Date()),
+          inArray(bookings.paymentStatus, ["pending", "partial"])
+        )
+      )
+      .orderBy(desc(bookings.createdAt));
   }
 }
 

@@ -39,6 +39,7 @@ export default function ConsultationBookingPage() {
   const [bookingId, setBookingId] = useState<string | null>(null);
   const [videoRoomId, setVideoRoomId] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState<"pay_now" | "pay_later">("pay_later");
 
   const { data: consultant, isLoading } = useQuery<Consultant>({
     queryKey: ["/api/consultants", id],
@@ -78,7 +79,8 @@ export default function ConsultationBookingPage() {
         appointmentSlot: data.appointmentSlot,
         amount: consultant.consultationFee,
         status: "confirmed",
-        paymentStatus: "paid",
+        paymentStatus: paymentMethod === "pay_now" ? "paid" : "pending",
+        paymentMethod: paymentMethod,
       });
       return response.json();
     },
@@ -609,14 +611,27 @@ export default function ConsultationBookingPage() {
                   <div className="rounded-lg border p-4">
                     <div className="mb-4 flex items-center gap-2">
                       <CreditCard className="h-5 w-5 text-muted-foreground" />
-                      <span className="font-medium">Payment</span>
+                      <span className="font-medium">Payment Option</span>
                     </div>
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-sm text-muted-foreground mb-3">
                       Consultation fee: ₹{consultant.consultationFee}
                     </p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Payment will be processed after confirmation
-                    </p>
+                    <div className="space-y-3">
+                      <label className="flex items-center gap-3 rounded-lg border p-3 cursor-pointer hover:bg-muted/50" data-testid="radio-pay-later">
+                        <input type="radio" name="paymentMethod" value="pay_later" checked={paymentMethod === "pay_later"} onChange={() => setPaymentMethod("pay_later")} className="h-4 w-4" />
+                        <div>
+                          <div className="font-medium">Pay Later</div>
+                          <div className="text-sm text-muted-foreground">Pay within 30 days. Invoice will be generated.</div>
+                        </div>
+                      </label>
+                      <label className="flex items-center gap-3 rounded-lg border p-3 cursor-pointer hover:bg-muted/50" data-testid="radio-pay-now">
+                        <input type="radio" name="paymentMethod" value="pay_now" checked={paymentMethod === "pay_now"} onChange={() => setPaymentMethod("pay_now")} className="h-4 w-4" />
+                        <div>
+                          <div className="font-medium">Pay Now</div>
+                          <div className="text-sm text-muted-foreground">Mark as paid immediately (offline payment).</div>
+                        </div>
+                      </label>
+                    </div>
                   </div>
 
                   <div className="flex gap-3">
@@ -634,7 +649,7 @@ export default function ConsultationBookingPage() {
                       disabled={bookingMutation.isPending}
                       data-testid="button-confirm-booking"
                     >
-                      {bookingMutation.isPending ? "Processing..." : "Confirm Booking"}
+                      {bookingMutation.isPending ? "Processing..." : paymentMethod === "pay_now" ? "Confirm & Pay" : "Confirm Booking"}
                     </Button>
                   </div>
                 </CardContent>
