@@ -1789,8 +1789,8 @@ export async function registerRoutes(
       
       const { documentUrl } = req.body as { documentUrl: string };
       
-      // Append to existing document URLs array
-      const existingDocs = booking.documentUrls || [];
+      // Append to existing document URLs array, filtering out any null/undefined values
+      const existingDocs = (booking.documentUrls || []).filter((u: any) => u && u !== "undefined" && u !== "null");
       const newDocUrls = [...existingDocs, documentUrl];
       
       const updated = await storage.updateBooking(req.params.id, { documentUrls: newDocUrls } as any);
@@ -1801,6 +1801,32 @@ export async function registerRoutes(
     }
   });
 
+  // Append treatment chart URL to a booking
+  app.patch("/api/bookings/:id/treatment-charts", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.id;
+      const booking = await storage.getBookingById(req.params.id);
+      
+      if (!booking) {
+        return res.status(404).json({ message: "Booking not found" });
+      }
+      
+      if (booking.userId !== userId) {
+        return res.status(403).json({ message: "Access denied." });
+      }
+      
+      const { chartUrl } = req.body as { chartUrl: string };
+      
+      const existingCharts = ((booking as any).treatmentChartUrls || []).filter((u: any) => u && u !== "undefined" && u !== "null");
+      const newChartUrls = [...existingCharts, chartUrl];
+      
+      const updated = await storage.updateBooking(req.params.id, { treatmentChartUrls: newChartUrls } as any);
+      res.json(updated);
+    } catch (error) {
+      console.error("Error uploading treatment chart:", error);
+      res.status(500).json({ message: "Failed to upload treatment chart" });
+    }
+  });
 
   // File upload endpoint for reports
   app.post("/api/upload/report", isAuthenticated, uploadReport.single("file"), async (req: any, res) => {

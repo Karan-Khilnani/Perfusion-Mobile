@@ -33,13 +33,18 @@ async function uploadFile(file: File): Promise<string> {
   const res = await fetch("/api/upload/document", { method: "POST", body: formData, credentials: "include" });
   if (!res.ok) throw new Error("Upload failed");
   const data = await res.json();
-  return data.fileUrl;
+  return data.url;
+}
+
+function validUrls(urls: string[] | null | undefined): string[] {
+  return (urls || []).filter((u) => u && u !== "undefined" && u !== "null");
 }
 
 export default function OrdersPage() {
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const [showUploadDialog, setShowUploadDialog] = useState(false);
   const [uploadBooking, setUploadBooking] = useState<Booking | null>(null);
+  const [uploadCategory, setUploadCategory] = useState<"reports" | "charts">("reports");
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [uploadingFiles, setUploadingFiles] = useState(false);
   const { toast } = useToast();
@@ -48,28 +53,23 @@ export default function OrdersPage() {
     queryKey: ["/api/bookings"],
   });
 
-  const uploadDocumentMutation = useMutation({
-    mutationFn: async ({ id, documentUrl }: { id: string; documentUrl: string }) => {
-      const response = await apiRequest("PATCH", `/api/bookings/${id}/documents`, { documentUrl });
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
-    },
-  });
-
   const handleUploadFiles = async () => {
     if (!uploadBooking || pendingFiles.length === 0) return;
     setUploadingFiles(true);
     try {
       for (const file of pendingFiles) {
         const fileUrl = await uploadFile(file);
-        await uploadDocumentMutation.mutateAsync({ id: uploadBooking.id, documentUrl: fileUrl });
+        if (uploadCategory === "reports") {
+          await apiRequest("PATCH", `/api/bookings/${uploadBooking.id}/documents`, { documentUrl: fileUrl });
+        } else {
+          await apiRequest("PATCH", `/api/bookings/${uploadBooking.id}/treatment-charts`, { chartUrl: fileUrl });
+        }
       }
+      queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
       setShowUploadDialog(false);
       setUploadBooking(null);
       setPendingFiles([]);
-      toast({ title: "Documents Uploaded", description: `${pendingFiles.length} file(s) uploaded successfully.` });
+      toast({ title: "Uploaded", description: `${pendingFiles.length} file(s) uploaded as ${uploadCategory === "reports" ? "reports" : "treatment charts"}.` });
     } catch {
       toast({ title: "Upload Failed", description: "Failed to upload one or more files.", variant: "destructive" });
     } finally {
@@ -204,14 +204,14 @@ export default function OrdersPage() {
           </div>
         )}
 
-        {booking.documentUrls && booking.documentUrls.length > 0 && (
+        {validUrls(booking.documentUrls).length > 0 && (
           <div className="rounded-lg border p-4">
             <div className="flex items-center gap-2">
               <FileText className="h-5 w-5 text-muted-foreground" />
               <span className="font-medium">Uploaded Reports</span>
             </div>
             <div className="mt-3 space-y-2">
-              {booking.documentUrls.map((url, i) => (
+              {validUrls(booking.documentUrls).map((url, i) => (
                 <a 
                   key={i} 
                   href={url} 
@@ -228,14 +228,14 @@ export default function OrdersPage() {
           </div>
         )}
 
-        {(booking as any).treatmentChartUrls && (booking as any).treatmentChartUrls.length > 0 && (
+        {validUrls((booking as any).treatmentChartUrls).length > 0 && (
           <div className="rounded-lg border p-4">
             <div className="flex items-center gap-2">
               <Paperclip className="h-5 w-5 text-muted-foreground" />
               <span className="font-medium">Treatment Charts</span>
             </div>
             <div className="mt-3 space-y-2">
-              {((booking as any).treatmentChartUrls as string[]).map((url, i) => (
+              {validUrls((booking as any).treatmentChartUrls).map((url, i) => (
                 <a 
                   key={i} 
                   href={url} 
@@ -259,21 +259,36 @@ export default function OrdersPage() {
               <span className="font-medium">Upload More Documents</span>
             </div>
             <p className="mt-1 text-sm text-muted-foreground">
-              Upload additional medical records, reports, or treatment charts
+              Upload additional reports or treatment charts
             </p>
-            <Button
-              className="mt-3"
-              variant="outline"
-              onClick={() => {
-                setUploadBooking(booking);
-                setPendingFiles([]);
-                setShowUploadDialog(true);
-              }}
-              data-testid="button-upload-documents"
-            >
-              <Upload className="mr-2 h-4 w-4" />
-              Upload Documents
-            </Button>
+            <div className="mt-3 flex gap-2 flex-wrap">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setUploadBooking(booking);
+                  setUploadCategory("reports");
+                  setPendingFiles([]);
+                  setShowUploadDialog(true);
+                }}
+                data-testid="button-upload-reports"
+              >
+                <Upload className="mr-2 h-4 w-4" />
+                Upload Reports
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setUploadBooking(booking);
+                  setUploadCategory("charts");
+                  setPendingFiles([]);
+                  setShowUploadDialog(true);
+                }}
+                data-testid="button-upload-charts"
+              >
+                <Paperclip className="mr-2 h-4 w-4" />
+                Upload Treatment Charts
+              </Button>
+            </div>
           </div>
         )}
 
@@ -496,9 +511,11 @@ ${(booking as any).prescriptionFollowUp ? `FOLLOW-UP\n---------\n${(booking as a
       <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Upload Documents</DialogTitle>
+            <DialogTitle>Upload {uploadCategory === "reports" ? "Reports" : "Treatment Charts"}</DialogTitle>
             <DialogDescription>
-              Upload medical records, reports, or other relevant documents for this booking. You can select multiple files.
+              {uploadCategory === "reports" 
+                ? "Upload patient reports, lab results, or medical records. You can select multiple files."
+                : "Upload treatment records, nursing charts, or medication charts. You can select multiple files."}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">

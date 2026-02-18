@@ -91,7 +91,7 @@ export default function ConsultationBookingPage() {
     const res = await fetch("/api/upload/document", { method: "POST", body: formData, credentials: "include" });
     if (!res.ok) throw new Error("Upload failed");
     const data = await res.json();
-    return data.fileUrl;
+    return data.url;
   };
 
   const handleReportFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
