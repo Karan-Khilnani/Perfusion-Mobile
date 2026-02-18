@@ -16,7 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useRazorpay } from "@/hooks/use-razorpay";
 import { StarRating } from "@/components/star-rating";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { ArrowLeft, Check, CreditCard, Briefcase, Video, Upload, FileText } from "lucide-react";
+import { ArrowLeft, Check, CreditCard, Briefcase, Video, Upload, FileText, X } from "lucide-react";
 import type { Consultant } from "@shared/schema";
 
 const bookingSchema = z.object({
@@ -28,6 +28,8 @@ const bookingSchema = z.object({
   clinicalSummary: z.string().min(10, "Please provide clinical summary"),
   provisionalDiagnosis: z.string().optional(),
   orderingPhysician: z.string().optional(),
+  examination: z.string().optional(),
+  investigations: z.string().optional(),
 });
 
 type BookingFormData = z.infer<typeof bookingSchema>;
@@ -39,7 +41,11 @@ export default function ConsultationBookingPage() {
   const [step, setStep] = useState<"details" | "clinical" | "payment" | "confirmation">("details");
   const [bookingId, setBookingId] = useState<string | null>(null);
   const [videoRoomId, setVideoRoomId] = useState<string | null>(null);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [reportFiles, setReportFiles] = useState<File[]>([]);
+  const [reportUrls, setReportUrls] = useState<string[]>([]);
+  const [chartFiles, setChartFiles] = useState<File[]>([]);
+  const [chartUrls, setChartUrls] = useState<string[]>([]);
+  const [uploading, setUploading] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<"pay_now" | "pay_later">("pay_later");
   const { openCheckout } = useRazorpay();
 
@@ -74,12 +80,50 @@ export default function ConsultationBookingPage() {
       clinicalSummary: "",
       provisionalDiagnosis: "",
       orderingPhysician: "",
+      examination: "",
+      investigations: "",
     },
   });
+
+  const uploadFile = async (file: File): Promise<string> => {
+    const formData = new FormData();
+    formData.append("file", file);
+    const res = await fetch("/api/upload/document", { method: "POST", body: formData, credentials: "include" });
+    if (!res.ok) throw new Error("Upload failed");
+    const data = await res.json();
+    return data.fileUrl;
+  };
+
+  const handleReportFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    setReportFiles(prev => [...prev, ...files]);
+  };
+  const removeReportFile = (index: number) => {
+    setReportFiles(prev => prev.filter((_, i) => i !== index));
+  };
+  const handleChartFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    setChartFiles(prev => [...prev, ...files]);
+  };
+  const removeChartFile = (index: number) => {
+    setChartFiles(prev => prev.filter((_, i) => i !== index));
+  };
 
   const bookingMutation = useMutation({
     mutationFn: async (data: BookingFormData) => {
       if (!service) throw new Error("Service not found");
+
+      const uploadedReportUrls: string[] = [];
+      const uploadedChartUrls: string[] = [];
+
+      for (const file of reportFiles) {
+        const url = await uploadFile(file);
+        uploadedReportUrls.push(url);
+      }
+      for (const file of chartFiles) {
+        const url = await uploadFile(file);
+        uploadedChartUrls.push(url);
+      }
 
       const response = await apiRequest("POST", "/api/bookings", {
         bookingType: "consultation",
@@ -92,6 +136,10 @@ export default function ConsultationBookingPage() {
         patientContact: data.contactNumber,
         clinicalSummary: data.clinicalSummary,
         provisionalDiagnosis: data.provisionalDiagnosis || null,
+        examination: data.examination || null,
+        investigations: data.investigations || null,
+        documentUrls: uploadedReportUrls.length > 0 ? uploadedReportUrls : null,
+        treatmentChartUrls: uploadedChartUrls.length > 0 ? uploadedChartUrls : null,
         appointmentSlot: isEmergencyTeam ? "Emergency - Immediate" : data.appointmentSlot,
         amount: service.consultationFee,
         urgency: isEmergencyTeam ? "emergency" : "routine",
@@ -139,13 +187,6 @@ export default function ConsultationBookingPage() {
       });
     },
   });
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setSelectedFile(file);
-    }
-  };
 
   const onSubmit = (data: BookingFormData) => {
     if (step === "details") {
@@ -563,28 +604,95 @@ export default function ConsultationBookingPage() {
                     )}
                   />
 
+                  <FormField
+                    control={form.control}
+                    name="examination"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Examination (Optional)</FormLabel>
+                        <FormControl>
+                          <Textarea
+                            placeholder="Physical examination findings, vitals, systemic examination..."
+                            className="min-h-[80px]"
+                            {...field}
+                            data-testid="input-examination"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="investigations"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Investigations (Optional)</FormLabel>
+                        <FormControl>
+                          <Textarea
+                            placeholder="Lab results, imaging findings, ECG findings..."
+                            className="min-h-[80px]"
+                            {...field}
+                            data-testid="input-investigations"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
                   <div className="space-y-2">
-                    <FormLabel>Upload Documents (Optional)</FormLabel>
+                    <FormLabel>Upload Reports (Optional)</FormLabel>
+                    <p className="text-xs text-muted-foreground">Upload patient reports, lab results, images</p>
                     <div className="rounded-lg border-2 border-dashed border-muted-foreground/25 p-4">
                       <div className="flex flex-col items-center gap-2">
-                        <Upload className="h-8 w-8 text-muted-foreground" />
-                        <p className="text-sm text-muted-foreground">
-                          {selectedFile ? selectedFile.name : "Upload reports, images, or documents"}
-                        </p>
-                        <Input
-                          type="file"
-                          accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
-                          onChange={handleFileChange}
-                          className="max-w-xs"
-                          data-testid="input-file-upload"
-                        />
-                        {selectedFile && (
-                          <Badge variant="secondary" className="gap-2">
-                            <FileText className="h-3 w-3" />
-                            {selectedFile.name}
-                          </Badge>
-                        )}
+                        <Upload className="h-6 w-6 text-muted-foreground" />
+                        <p className="text-sm text-muted-foreground">Select one or more files</p>
+                        <Input type="file" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" onChange={handleReportFiles} multiple className="max-w-xs" data-testid="input-report-upload" />
                       </div>
+                      {reportFiles.length > 0 && (
+                        <div className="mt-3 space-y-1">
+                          {reportFiles.map((file, i) => (
+                            <div key={i} className="flex items-center justify-between rounded border p-2 text-sm">
+                              <div className="flex items-center gap-2">
+                                <FileText className="h-3 w-3" />
+                                <span className="truncate max-w-[200px]">{file.name}</span>
+                              </div>
+                              <Button type="button" variant="ghost" size="icon" onClick={() => removeReportFile(i)} data-testid={`button-remove-report-${i}`}>
+                                <X className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <FormLabel>Upload Treatment Charts (Optional)</FormLabel>
+                    <p className="text-xs text-muted-foreground">Upload treatment records, nursing charts, medication charts</p>
+                    <div className="rounded-lg border-2 border-dashed border-muted-foreground/25 p-4">
+                      <div className="flex flex-col items-center gap-2">
+                        <Upload className="h-6 w-6 text-muted-foreground" />
+                        <p className="text-sm text-muted-foreground">Select one or more files</p>
+                        <Input type="file" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" onChange={handleChartFiles} multiple className="max-w-xs" data-testid="input-chart-upload" />
+                      </div>
+                      {chartFiles.length > 0 && (
+                        <div className="mt-3 space-y-1">
+                          {chartFiles.map((file, i) => (
+                            <div key={i} className="flex items-center justify-between rounded border p-2 text-sm">
+                              <div className="flex items-center gap-2">
+                                <FileText className="h-3 w-3" />
+                                <span className="truncate max-w-[200px]">{file.name}</span>
+                              </div>
+                              <Button type="button" variant="ghost" size="icon" onClick={() => removeChartFile(i)} data-testid={`button-remove-chart-${i}`}>
+                                <X className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
 

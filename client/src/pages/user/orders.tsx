@@ -7,10 +7,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { StatusBadge } from "@/components/status-badge";
 import { BookingTimeline } from "@/components/booking-timeline";
-import { ClipboardList, FlaskConical, Stethoscope, Calendar, IndianRupee, ChevronRight, Video, Scan, Download, FileText, Upload, Paperclip } from "lucide-react";
+import { ClipboardList, FlaskConical, Stethoscope, Calendar, IndianRupee, ChevronRight, Video, Scan, Download, FileText, Upload, Paperclip, X } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { Booking, BookingType } from "@shared/schema";
@@ -28,11 +27,21 @@ const typeLabels: Record<BookingType, string> = {
   teleradiology: "Teleradiology",
 };
 
+async function uploadFile(file: File): Promise<string> {
+  const formData = new FormData();
+  formData.append("file", file);
+  const res = await fetch("/api/upload/document", { method: "POST", body: formData, credentials: "include" });
+  if (!res.ok) throw new Error("Upload failed");
+  const data = await res.json();
+  return data.fileUrl;
+}
+
 export default function OrdersPage() {
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const [showUploadDialog, setShowUploadDialog] = useState(false);
   const [uploadBooking, setUploadBooking] = useState<Booking | null>(null);
-  const [documentUrl, setDocumentUrl] = useState("");
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [uploadingFiles, setUploadingFiles] = useState(false);
   const { toast } = useToast();
 
   const { data: bookings, isLoading } = useQuery<Booking[]>({
@@ -46,26 +55,35 @@ export default function OrdersPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
-      setShowUploadDialog(false);
-      setUploadBooking(null);
-      setDocumentUrl("");
-      toast({
-        title: "Document Uploaded",
-        description: "Your document has been uploaded successfully.",
-      });
-    },
-    onError: () => {
-      toast({
-        title: "Upload Failed",
-        description: "Failed to upload document.",
-        variant: "destructive",
-      });
     },
   });
 
-  const handleUploadDocument = () => {
-    if (!uploadBooking || !documentUrl) return;
-    uploadDocumentMutation.mutate({ id: uploadBooking.id, documentUrl });
+  const handleUploadFiles = async () => {
+    if (!uploadBooking || pendingFiles.length === 0) return;
+    setUploadingFiles(true);
+    try {
+      for (const file of pendingFiles) {
+        const fileUrl = await uploadFile(file);
+        await uploadDocumentMutation.mutateAsync({ id: uploadBooking.id, documentUrl: fileUrl });
+      }
+      setShowUploadDialog(false);
+      setUploadBooking(null);
+      setPendingFiles([]);
+      toast({ title: "Documents Uploaded", description: `${pendingFiles.length} file(s) uploaded successfully.` });
+    } catch {
+      toast({ title: "Upload Failed", description: "Failed to upload one or more files.", variant: "destructive" });
+    } finally {
+      setUploadingFiles(false);
+    }
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    setPendingFiles(prev => [...prev, ...files]);
+  };
+
+  const removeFile = (index: number) => {
+    setPendingFiles(prev => prev.filter((_, i) => i !== index));
   };
 
   const labBookings = bookings?.filter((b) => b.bookingType === "lab") || [];
@@ -119,7 +137,7 @@ export default function OrdersPage() {
   const BookingDetails = ({ booking }: { booking: Booking }) => (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
+        <CardTitle className="flex items-center gap-2 flex-wrap">
           {typeLabels[booking.bookingType as BookingType]} Details
           <StatusBadge status={booking.status} />
         </CardTitle>
@@ -152,7 +170,7 @@ export default function OrdersPage() {
               <dd>{booking.appointmentSlot}</dd>
             </div>
           )}
-                    {parseFloat(booking.amount) > 0 && (
+          {parseFloat(booking.amount) > 0 && (
             <div className="flex justify-between border-b pb-2">
               <dt className="text-muted-foreground">Amount</dt>
               <dd className="font-semibold">₹{booking.amount}</dd>
@@ -186,43 +204,75 @@ export default function OrdersPage() {
           </div>
         )}
 
-        {!["completed", "cancelled"].includes(booking.status) && (
+        {booking.documentUrls && booking.documentUrls.length > 0 && (
+          <div className="rounded-lg border p-4">
+            <div className="flex items-center gap-2">
+              <FileText className="h-5 w-5 text-muted-foreground" />
+              <span className="font-medium">Uploaded Reports</span>
+            </div>
+            <div className="mt-3 space-y-2">
+              {booking.documentUrls.map((url, i) => (
+                <a 
+                  key={i} 
+                  href={url} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 text-sm text-primary hover:underline"
+                  data-testid={`link-document-${i}`}
+                >
+                  <FileText className="h-4 w-4" />
+                  Report {i + 1}
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {(booking as any).treatmentChartUrls && (booking as any).treatmentChartUrls.length > 0 && (
           <div className="rounded-lg border p-4">
             <div className="flex items-center gap-2">
               <Paperclip className="h-5 w-5 text-muted-foreground" />
-              <span className="font-medium">Upload Documents</span>
+              <span className="font-medium">Treatment Charts</span>
+            </div>
+            <div className="mt-3 space-y-2">
+              {((booking as any).treatmentChartUrls as string[]).map((url, i) => (
+                <a 
+                  key={i} 
+                  href={url} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 text-sm text-primary hover:underline"
+                  data-testid={`link-treatment-chart-${i}`}
+                >
+                  <FileText className="h-4 w-4" />
+                  Treatment Chart {i + 1}
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {!["completed", "cancelled"].includes(booking.status) && (
+          <div className="rounded-lg border p-4">
+            <div className="flex items-center gap-2">
+              <Upload className="h-5 w-5 text-muted-foreground" />
+              <span className="font-medium">Upload More Documents</span>
             </div>
             <p className="mt-1 text-sm text-muted-foreground">
-              Upload medical records, prescriptions, or other relevant documents
+              Upload additional medical records, reports, or treatment charts
             </p>
-            {booking.documentUrls && booking.documentUrls.length > 0 && (
-              <div className="mt-3 space-y-2">
-                <p className="text-sm font-medium">Uploaded Documents:</p>
-                {booking.documentUrls.map((url, i) => (
-                  <a 
-                    key={i} 
-                    href={url} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-2 text-sm text-primary hover:underline"
-                  >
-                    <FileText className="h-4 w-4" />
-                    Document {i + 1}
-                  </a>
-                ))}
-              </div>
-            )}
             <Button
               className="mt-3"
               variant="outline"
               onClick={() => {
                 setUploadBooking(booking);
+                setPendingFiles([]);
                 setShowUploadDialog(true);
               }}
               data-testid="button-upload-documents"
             >
               <Upload className="mr-2 h-4 w-4" />
-              Upload Document
+              Upload Documents
             </Button>
           </div>
         )}
@@ -446,35 +496,54 @@ ${(booking as any).prescriptionFollowUp ? `FOLLOW-UP\n---------\n${(booking as a
       <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Upload Document</DialogTitle>
+            <DialogTitle>Upload Documents</DialogTitle>
             <DialogDescription>
-              Upload medical records, prescriptions, or other relevant documents for your booking
+              Upload medical records, reports, or other relevant documents for this booking. You can select multiple files.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>Document URL</Label>
-              <Input
-                placeholder="https://example.com/document.pdf"
-                value={documentUrl}
-                onChange={(e) => setDocumentUrl(e.target.value)}
-                data-testid="input-document-url"
-              />
-              <p className="text-xs text-muted-foreground">
-                Enter the URL where your document is hosted (e.g., Google Drive, Dropbox)
-              </p>
+            <div className="rounded-lg border-2 border-dashed border-muted-foreground/25 p-4">
+              <div className="flex flex-col items-center gap-2">
+                <Upload className="h-8 w-8 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">Select files to upload</p>
+                <Input
+                  type="file"
+                  accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+                  onChange={handleFileSelect}
+                  multiple
+                  className="max-w-xs"
+                  data-testid="input-upload-files"
+                />
+              </div>
             </div>
+            {pendingFiles.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-sm font-medium">{pendingFiles.length} file(s) selected</p>
+                {pendingFiles.map((file, i) => (
+                  <div key={i} className="flex items-center justify-between rounded border p-2 text-sm">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <FileText className="h-4 w-4 shrink-0" />
+                      <span className="truncate">{file.name}</span>
+                      <span className="text-xs text-muted-foreground shrink-0">({(file.size / 1024).toFixed(0)} KB)</span>
+                    </div>
+                    <Button type="button" variant="ghost" size="icon" onClick={() => removeFile(i)} data-testid={`button-remove-file-${i}`}>
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowUploadDialog(false)}>
               Cancel
             </Button>
             <Button
-              onClick={handleUploadDocument}
-              disabled={!documentUrl || uploadDocumentMutation.isPending}
-              data-testid="button-submit-document"
+              onClick={handleUploadFiles}
+              disabled={pendingFiles.length === 0 || uploadingFiles}
+              data-testid="button-submit-upload"
             >
-              {uploadDocumentMutation.isPending ? "Uploading..." : "Upload Document"}
+              {uploadingFiles ? "Uploading..." : `Upload ${pendingFiles.length} File(s)`}
             </Button>
           </DialogFooter>
         </DialogContent>

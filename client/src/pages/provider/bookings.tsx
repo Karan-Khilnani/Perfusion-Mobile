@@ -343,9 +343,12 @@ export default function ProviderBookingsPage() {
           data-testid={`button-view-docs-${booking.id}`}
         >
           <Paperclip className="mr-1 h-3.5 w-3.5" />
-          {booking.documentUrls && booking.documentUrls.length > 0 
-            ? `${booking.documentUrls.length} doc(s)` 
-            : "Documents"}
+          {(() => {
+            const docCount = booking.documentUrls?.length || 0;
+            const chartCount = ((booking as any).treatmentChartUrls as string[] | null)?.length || 0;
+            const total = docCount + chartCount;
+            return total > 0 ? `${total} doc(s)` : "Documents";
+          })()}
         </Button>
         <Select
           value={booking.status}
@@ -586,24 +589,53 @@ export default function ProviderBookingsPage() {
               Documents uploaded by {docsBooking?.patientName} for this booking
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-3">
-            {docsBooking?.documentUrls?.map((url, i) => (
-              <a 
-                key={i}
-                href={url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-2 rounded-lg border p-3 hover:bg-muted"
-              >
-                <FileText className="h-5 w-5 text-primary" />
-                <div className="flex-1">
-                  <p className="font-medium">Document {i + 1}</p>
-                  <p className="text-xs text-muted-foreground truncate">{url}</p>
-                </div>
-                <Download className="h-4 w-4 text-muted-foreground" />
-              </a>
-            ))}
-            {(!docsBooking?.documentUrls || docsBooking.documentUrls.length === 0) && (
+          <div className="space-y-4 max-h-[60vh] overflow-y-auto">
+            {docsBooking?.documentUrls && docsBooking.documentUrls.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Reports</p>
+                {docsBooking.documentUrls.map((url, i) => (
+                  <a 
+                    key={i}
+                    href={url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 rounded-lg border p-3 hover:bg-muted"
+                    data-testid={`link-provider-doc-${i}`}
+                  >
+                    <FileText className="h-5 w-5 text-primary" />
+                    <div className="flex-1">
+                      <p className="font-medium">Report {i + 1}</p>
+                      <p className="text-xs text-muted-foreground truncate">{url}</p>
+                    </div>
+                    <Download className="h-4 w-4 text-muted-foreground" />
+                  </a>
+                ))}
+              </div>
+            )}
+            {(docsBooking as any)?.treatmentChartUrls && ((docsBooking as any).treatmentChartUrls as string[]).length > 0 && (
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Treatment Charts</p>
+                {((docsBooking as any).treatmentChartUrls as string[]).map((url, i) => (
+                  <a 
+                    key={i}
+                    href={url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 rounded-lg border p-3 hover:bg-muted"
+                    data-testid={`link-provider-chart-${i}`}
+                  >
+                    <Paperclip className="h-5 w-5 text-primary" />
+                    <div className="flex-1">
+                      <p className="font-medium">Treatment Chart {i + 1}</p>
+                      <p className="text-xs text-muted-foreground truncate">{url}</p>
+                    </div>
+                    <Download className="h-4 w-4 text-muted-foreground" />
+                  </a>
+                ))}
+              </div>
+            )}
+            {(!docsBooking?.documentUrls || docsBooking.documentUrls.length === 0) && 
+             (!(docsBooking as any)?.treatmentChartUrls || ((docsBooking as any)?.treatmentChartUrls as string[])?.length === 0) && (
               <p className="text-center text-muted-foreground py-4">No documents uploaded</p>
             )}
           </div>
