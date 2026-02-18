@@ -41,7 +41,7 @@ function validUrls(urls: string[] | null | undefined): string[] {
 }
 
 export default function OrdersPage() {
-  const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
+  const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null);
   const [showUploadDialog, setShowUploadDialog] = useState(false);
   const [uploadBooking, setUploadBooking] = useState<Booking | null>(null);
   const [uploadCategory, setUploadCategory] = useState<"reports" | "charts">("reports");
@@ -52,6 +52,8 @@ export default function OrdersPage() {
   const { data: bookings, isLoading } = useQuery<Booking[]>({
     queryKey: ["/api/bookings"],
   });
+
+  const selectedBooking = bookings?.find(b => b.id === selectedBookingId) || null;
 
   const handleUploadFiles = async () => {
     if (!uploadBooking || pendingFiles.length === 0) return;
@@ -98,7 +100,7 @@ export default function OrdersPage() {
         className={`cursor-pointer overflow-visible transition-all ${
           selectedBooking?.id === booking.id ? "ring-2 ring-primary" : ""
         }`}
-        onClick={() => setSelectedBooking(booking)}
+        onClick={() => setSelectedBookingId(booking.id)}
         data-testid={`card-booking-${booking.id}`}
       >
         <CardContent className="p-4">
