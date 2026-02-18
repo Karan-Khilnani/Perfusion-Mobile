@@ -3,6 +3,8 @@ import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 import { seedDatabase } from "./seed";
+import path from "path";
+import fs from "fs";
 
 const app = express();
 const httpServer = createServer(app);
@@ -22,6 +24,13 @@ app.use(
 );
 
 app.use(express.urlencoded({ extended: false }));
+
+const uploadsReportsDir = path.join(process.cwd(), "uploads", "reports");
+const uploadsDocsDir = path.join(process.cwd(), "uploads", "documents");
+fs.mkdirSync(uploadsReportsDir, { recursive: true });
+fs.mkdirSync(uploadsDocsDir, { recursive: true });
+app.use("/uploads/reports", express.static(uploadsReportsDir));
+app.use("/uploads/documents", express.static(uploadsDocsDir));
 
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {

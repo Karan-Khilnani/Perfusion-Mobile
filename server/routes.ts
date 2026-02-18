@@ -1801,17 +1801,6 @@ export async function registerRoutes(
     }
   });
 
-  // Serve uploaded report files
-  app.use("/uploads/reports", (req, res, next) => {
-    const express = require("express");
-    express.static(uploadDir)(req, res, next);
-  });
-
-  // Serve uploaded registration documents
-  app.use("/uploads/documents", (req, res, next) => {
-    const express = require("express");
-    express.static(docUploadDir)(req, res, next);
-  });
 
   // File upload endpoint for reports
   app.post("/api/upload/report", isAuthenticated, uploadReport.single("file"), async (req: any, res) => {
