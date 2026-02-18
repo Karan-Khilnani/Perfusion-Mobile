@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
+import { useRazorpay } from "@/hooks/use-razorpay";
 import { StarRating } from "@/components/star-rating";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { ArrowLeft, Check, CreditCard, MapPin, Clock, DollarSign } from "lucide-react";
@@ -41,6 +42,7 @@ export default function LabBookingPage() {
   const [bookingId, setBookingId] = useState<string | null>(null);
   const [selectedTest, setSelectedTest] = useState<LabTest | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<"pay_now" | "pay_later">("pay_later");
+  const { openCheckout } = useRazorpay();
 
   const { data: lab, isLoading } = useQuery<LabWithTests>({
     queryKey: ["/api/labs", id],
@@ -78,19 +80,37 @@ export default function LabBookingPage() {
         orderingPhysician: data.orderingPhysician || null,
         amount: test.cost,
         status: "booked",
-        paymentStatus: paymentMethod === "pay_now" ? "paid" : "pending",
+        paymentStatus: "pending",
         paymentMethod: paymentMethod,
       });
       return response.json();
     },
     onSuccess: (data) => {
       setBookingId(data.id);
-      setStep("confirmation");
-      queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
-      toast({
-        title: "Booking Confirmed",
-        description: "Your lab test has been booked successfully.",
-      });
+
+      if (paymentMethod === "pay_now") {
+        const fee = parseFloat(data.amount || "0");
+        openCheckout({
+          amount: fee,
+          bookingId: data.id,
+          description: `Lab Test: ${data.serviceName}`,
+          prefill: { name: form.getValues("patientName") },
+          onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
+            queryClient.invalidateQueries({ queryKey: ["/api/billing/my-invoices"] });
+            setStep("confirmation");
+            toast({ title: "Payment Successful", description: "Your lab test has been booked and paid." });
+          },
+          onError: (msg) => {
+            setStep("confirmation");
+            toast({ title: "Payment Pending", description: msg || "You can pay later from the billing page.", variant: "destructive" });
+          },
+        });
+      } else {
+        setStep("confirmation");
+        queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
+        toast({ title: "Booking Confirmed", description: "Your lab test has been booked successfully." });
+      }
     },
     onError: () => {
       toast({

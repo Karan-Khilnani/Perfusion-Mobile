@@ -2045,6 +2045,133 @@ export async function registerRoutes(
     }
   });
 
+  // Razorpay - Create order for a single booking
+  app.post("/api/payments/create-order", isAuthenticated, async (req: any, res) => {
+    try {
+      const Razorpay = (await import("razorpay")).default;
+      const razorpay = new Razorpay({
+        key_id: process.env.RAZORPAY_KEY_ID!,
+        key_secret: process.env.RAZORPAY_KEY_SECRET!,
+      });
+
+      const { bookingId } = req.body;
+      if (!bookingId) {
+        return res.status(400).json({ message: "Booking ID is required" });
+      }
+
+      const booking = await storage.getBookingById(bookingId);
+      if (!booking || booking.userId !== req.user.id) {
+        return res.status(404).json({ message: "Booking not found" });
+      }
+
+      const dueAmount = parseFloat(booking.amount || "0") - parseFloat(booking.amountPaid || "0");
+      if (dueAmount <= 0) {
+        return res.status(400).json({ message: "No outstanding amount" });
+      }
+
+      const amountInPaise = Math.round(dueAmount * 100);
+
+      const order = await razorpay.orders.create({
+        amount: amountInPaise,
+        currency: "INR",
+        receipt: bookingId,
+        notes: { bookingId, userId: req.user.id },
+      });
+
+      await storage.updateBooking(bookingId, { razorpayOrderId: order.id } as any);
+
+      res.json({ orderId: order.id, amount: amountInPaise, currency: "INR", keyId: process.env.RAZORPAY_KEY_ID });
+    } catch (error) {
+      console.error("Error creating Razorpay order:", error);
+      res.status(500).json({ message: "Failed to create payment order" });
+    }
+  });
+
+  // Razorpay - Create order for multiple bookings (billing page pay selected)
+  app.post("/api/payments/create-bulk-order", isAuthenticated, async (req: any, res) => {
+    try {
+      const Razorpay = (await import("razorpay")).default;
+      const razorpay = new Razorpay({
+        key_id: process.env.RAZORPAY_KEY_ID!,
+        key_secret: process.env.RAZORPAY_KEY_SECRET!,
+      });
+
+      const { bookingIds } = req.body;
+      if (!bookingIds || !Array.isArray(bookingIds) || bookingIds.length === 0) {
+        return res.status(400).json({ message: "No bookings selected" });
+      }
+
+      let totalAmount = 0;
+      for (const id of bookingIds) {
+        const booking = await storage.getBookingById(id);
+        if (!booking || booking.userId !== req.user.id) continue;
+        const due = parseFloat(booking.amount || "0") - parseFloat(booking.amountPaid || "0");
+        if (due > 0) totalAmount += due;
+      }
+
+      if (totalAmount <= 0) {
+        return res.status(400).json({ message: "No outstanding amount" });
+      }
+
+      const amountInPaise = Math.round(totalAmount * 100);
+      const order = await razorpay.orders.create({
+        amount: amountInPaise,
+        currency: "INR",
+        receipt: `bulk_${Date.now()}`,
+        notes: { bookingIds: JSON.stringify(bookingIds), userId: req.user.id },
+      });
+
+      res.json({ orderId: order.id, amount: amountInPaise, currency: "INR", keyId: process.env.RAZORPAY_KEY_ID, bookingIds });
+    } catch (error) {
+      console.error("Error creating bulk Razorpay order:", error);
+      res.status(500).json({ message: "Failed to create bulk payment order" });
+    }
+  });
+
+  // Razorpay - Verify payment and mark booking(s) as paid
+  app.post("/api/payments/verify", isAuthenticated, async (req: any, res) => {
+    try {
+      const crypto = await import("crypto");
+      const { razorpay_order_id, razorpay_payment_id, razorpay_signature, bookingId, bookingIds } = req.body;
+
+      const expectedSignature = crypto
+        .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET!)
+        .update(`${razorpay_order_id}|${razorpay_payment_id}`)
+        .digest("hex");
+
+      if (expectedSignature !== razorpay_signature) {
+        return res.status(400).json({ message: "Invalid payment signature" });
+      }
+
+      if (bookingId) {
+        const booking = await storage.getBookingById(bookingId);
+        if (booking) {
+          const due = parseFloat(booking.amount || "0") - parseFloat(booking.amountPaid || "0");
+          await storage.recordPayment(bookingId, due, "razorpay");
+          await storage.updateBooking(bookingId, { razorpayPaymentId: razorpay_payment_id } as any);
+        }
+      }
+
+      if (bookingIds && Array.isArray(bookingIds)) {
+        for (const id of bookingIds) {
+          const booking = await storage.getBookingById(id);
+          if (booking && booking.userId === req.user.id) {
+            const due = parseFloat(booking.amount || "0") - parseFloat(booking.amountPaid || "0");
+            if (due > 0) {
+              await storage.recordPayment(id, due, "razorpay");
+              await storage.updateBooking(id, { razorpayPaymentId: razorpay_payment_id } as any);
+            }
+          }
+        }
+      }
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error verifying payment:", error);
+      res.status(500).json({ message: "Payment verification failed" });
+    }
+  });
+
   // Admin - Extend due date
   app.patch("/api/admin/bookings/:id/due-date", isAdmin, async (req: any, res) => {
     try {

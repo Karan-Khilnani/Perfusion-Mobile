@@ -13,6 +13,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
+import { useRazorpay } from "@/hooks/use-razorpay";
 import { StarRating } from "@/components/star-rating";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { ArrowLeft, Check, CreditCard, Briefcase, Video, Upload, FileText } from "lucide-react";
@@ -40,6 +41,7 @@ export default function ConsultationBookingPage() {
   const [videoRoomId, setVideoRoomId] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<"pay_now" | "pay_later">("pay_later");
+  const { openCheckout } = useRazorpay();
 
   const { data: consultant, isLoading } = useQuery<Consultant>({
     queryKey: ["/api/consultants", id],
@@ -94,23 +96,40 @@ export default function ConsultationBookingPage() {
         amount: service.consultationFee,
         urgency: isEmergencyTeam ? "emergency" : "routine",
         status: "booked",
-        paymentStatus: paymentMethod === "pay_now" ? "paid" : "pending",
+        paymentStatus: "pending",
         paymentMethod: paymentMethod,
       });
       return response.json();
     },
     onSuccess: (data) => {
       setBookingId(data.id);
-      // Use the video room URL from the server response
       if (data.videoRoomId) {
         setVideoRoomId(data.videoRoomId);
       }
-      setStep("confirmation");
-      queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
-      toast({
-        title: "Appointment Confirmed",
-        description: "Your consultation has been booked successfully.",
-      });
+
+      if (paymentMethod === "pay_now") {
+        const fee = parseFloat(data.amount || service?.consultationFee || "0");
+        openCheckout({
+          amount: fee,
+          bookingId: data.id,
+          description: `Consultation: ${data.serviceName}`,
+          prefill: { name: form.getValues("patientName"), contact: form.getValues("contactNumber") },
+          onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
+            queryClient.invalidateQueries({ queryKey: ["/api/billing/my-invoices"] });
+            setStep("confirmation");
+            toast({ title: "Payment Successful", description: "Your consultation has been booked and paid." });
+          },
+          onError: (msg) => {
+            setStep("confirmation");
+            toast({ title: "Payment Pending", description: msg || "You can pay later from the billing page.", variant: "destructive" });
+          },
+        });
+      } else {
+        setStep("confirmation");
+        queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
+        toast({ title: "Appointment Confirmed", description: "Your consultation has been booked successfully." });
+      }
     },
     onError: () => {
       toast({

@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/form";
 import { FileImage, Upload, AlertTriangle, Clock, CheckCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useRazorpay } from "@/hooks/use-razorpay";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { RadiologyModality } from "@shared/schema";
 
@@ -43,6 +44,7 @@ export default function TeleradiologyPage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<"pay_now" | "pay_later">("pay_later");
   const { toast } = useToast();
+  const { openCheckout } = useRazorpay();
 
   const { data: modalities, isLoading: modalitiesLoading } = useQuery<RadiologyModality[]>({
     queryKey: ["/api/radiology-modalities"],
@@ -84,19 +86,45 @@ export default function TeleradiologyPage() {
         urgency: data.priority,
         amount: "0.00",
         status: "pending",
-        paymentStatus: paymentMethod === "pay_now" ? "paid" : "pending",
+        paymentStatus: "pending",
         paymentMethod: paymentMethod,
       });
-      return response;
+      return response.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
-      form.reset();
-      setSelectedFile(null);
-      toast({
-        title: "Request Submitted",
-        description: "Your teleradiology reporting request has been submitted successfully.",
-      });
+    onSuccess: (data: any) => {
+      if (paymentMethod === "pay_now") {
+        const fee = parseFloat(data.amount || "0");
+        if (fee > 0) {
+          openCheckout({
+            amount: fee,
+            bookingId: data.id,
+            description: `Teleradiology: ${data.serviceName}`,
+            prefill: { name: form.getValues("patientName"), contact: form.getValues("contactNumber") },
+            onSuccess: () => {
+              queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
+              queryClient.invalidateQueries({ queryKey: ["/api/billing/my-invoices"] });
+              form.reset();
+              setSelectedFile(null);
+              toast({ title: "Payment Successful", description: "Your teleradiology request has been submitted and paid." });
+            },
+            onError: (msg) => {
+              form.reset();
+              setSelectedFile(null);
+              toast({ title: "Payment Pending", description: msg || "You can pay later from the billing page.", variant: "destructive" });
+            },
+          });
+        } else {
+          queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
+          form.reset();
+          setSelectedFile(null);
+          toast({ title: "Request Submitted", description: "Your teleradiology request has been submitted." });
+        }
+      } else {
+        queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
+        form.reset();
+        setSelectedFile(null);
+        toast({ title: "Request Submitted", description: "Your teleradiology reporting request has been submitted successfully." });
+      }
     },
     onError: () => {
       toast({

@@ -277,6 +277,8 @@ export const bookings = pgTable("bookings", {
   prescriptionAdvice: text("prescription_advice"),
   prescriptionFollowUp: varchar("prescription_follow_up", { length: 255 }),
   prescriptionGeneratedAt: timestamp("prescription_generated_at"),
+  razorpayOrderId: varchar("razorpay_order_id", { length: 255 }),
+  razorpayPaymentId: varchar("razorpay_payment_id", { length: 255 }),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

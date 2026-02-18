@@ -2,10 +2,15 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { IndianRupee, Calendar, FileText, AlertTriangle, CheckCircle, Clock } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { IndianRupee, Calendar, FileText, AlertTriangle, CheckCircle, Clock, CreditCard } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { useRazorpay } from "@/hooks/use-razorpay";
+import { queryClient } from "@/lib/queryClient";
 import type { Booking } from "@shared/schema";
 
 function getPaymentBadge(status: string | null) {
@@ -17,10 +22,18 @@ function getPaymentBadge(status: string | null) {
   }
 }
 
+function getDueAmount(invoice: Booking): number {
+  return Math.max(0, parseFloat(invoice.amount || "0") - parseFloat(invoice.amountPaid || "0"));
+}
+
 export default function UserBillingPage() {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [paying, setPaying] = useState(false);
+  const { toast } = useToast();
+  const { openCheckout } = useRazorpay();
 
   const queryParams = new URLSearchParams();
   if (startDate) queryParams.set("startDate", new Date(startDate).toISOString());
@@ -40,6 +53,52 @@ export default function UserBillingPage() {
   const totalPaid = invoices?.reduce((sum, b) => sum + parseFloat(b.amountPaid || "0"), 0) || 0;
   const totalOutstanding = totalAmount - totalPaid;
   const overdueCount = invoices?.filter(b => b.paymentStatus === "overdue" || (b.dueDate && new Date(b.dueDate) < new Date() && b.paymentStatus !== "paid")).length || 0;
+
+  const unpaidInvoices = invoices?.filter(b => b.paymentStatus !== "paid") || [];
+  const selectedTotal = unpaidInvoices
+    .filter(b => selectedIds.has(b.id))
+    .reduce((sum, b) => sum + getDueAmount(b), 0);
+
+  const allUnpaidSelected = unpaidInvoices.length > 0 && unpaidInvoices.every(b => selectedIds.has(b.id));
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (allUnpaidSelected) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(unpaidInvoices.map(b => b.id)));
+    }
+  };
+
+  const handlePaySelected = () => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0 || selectedTotal <= 0) return;
+
+    setPaying(true);
+    openCheckout({
+      amount: selectedTotal,
+      bookingIds: ids,
+      description: `Payment for ${ids.length} invoice(s)`,
+      onSuccess: () => {
+        setPaying(false);
+        setSelectedIds(new Set());
+        queryClient.invalidateQueries({ queryKey: ["/api/billing/my-invoices"] });
+        toast({ title: "Payment Successful", description: `Paid ₹${selectedTotal.toFixed(2)} for ${ids.length} invoice(s).` });
+      },
+      onError: (msg) => {
+        setPaying(false);
+        toast({ title: "Payment Failed", description: msg || "Please try again.", variant: "destructive" });
+      },
+    });
+  };
 
   return (
     <div className="space-y-6">
@@ -122,6 +181,42 @@ export default function UserBillingPage() {
         </CardContent>
       </Card>
 
+      {unpaidInvoices.length > 0 && (
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <Checkbox
+                  checked={allUnpaidSelected}
+                  onCheckedChange={toggleSelectAll}
+                  data-testid="checkbox-select-all"
+                />
+                <span className="text-sm font-medium">
+                  {selectedIds.size > 0
+                    ? `${selectedIds.size} invoice(s) selected`
+                    : "Select All Unpaid"}
+                </span>
+              </div>
+              <div className="flex items-center gap-4">
+                {selectedIds.size > 0 && (
+                  <span className="text-sm font-semibold" data-testid="text-selected-total">
+                    Selected Total: ₹{selectedTotal.toFixed(2)}
+                  </span>
+                )}
+                <Button
+                  onClick={handlePaySelected}
+                  disabled={selectedIds.size === 0 || selectedTotal <= 0 || paying}
+                  data-testid="button-pay-selected"
+                >
+                  <CreditCard className="mr-2 h-4 w-4" />
+                  {paying ? "Processing..." : `Pay Selected (₹${selectedTotal.toFixed(2)})`}
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {isLoading ? (
         <div className="space-y-4">
           {[1,2,3].map(i => <Skeleton key={i} className="h-24 w-full" />)}
@@ -135,38 +230,53 @@ export default function UserBillingPage() {
         </Card>
       ) : (
         <div className="space-y-3">
-          {invoices.map((invoice) => (
-            <Card key={invoice.id} data-testid={`card-invoice-${invoice.id}`}>
-              <CardContent className="p-4">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium" data-testid={`text-service-${invoice.id}`}>{invoice.serviceName}</span>
-                      <Badge variant="outline" className="text-xs">{invoice.bookingType}</Badge>
-                      {getPaymentBadge(invoice.paymentStatus)}
-                    </div>
-                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                      <span>Patient: {invoice.patientName}</span>
-                      {invoice.providerName && <span>Provider: {invoice.providerName}</span>}
-                    </div>
-                    <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                      <span><Calendar className="mr-1 inline h-3 w-3" />{invoice.createdAt ? new Date(invoice.createdAt).toLocaleDateString() : "N/A"}</span>
-                      {invoice.dueDate && <span>Due: {new Date(invoice.dueDate).toLocaleDateString()}</span>}
+          {invoices.map((invoice) => {
+            const dueAmount = getDueAmount(invoice);
+            const isUnpaid = invoice.paymentStatus !== "paid";
+            return (
+              <Card key={invoice.id} data-testid={`card-invoice-${invoice.id}`}>
+                <CardContent className="p-4">
+                  <div className="flex items-start gap-3">
+                    {isUnpaid && (
+                      <div className="pt-1">
+                        <Checkbox
+                          checked={selectedIds.has(invoice.id)}
+                          onCheckedChange={() => toggleSelect(invoice.id)}
+                          data-testid={`checkbox-invoice-${invoice.id}`}
+                        />
+                      </div>
+                    )}
+                    <div className="flex flex-1 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-medium" data-testid={`text-service-${invoice.id}`}>{invoice.serviceName}</span>
+                          <Badge variant="outline" className="text-xs">{invoice.bookingType}</Badge>
+                          {getPaymentBadge(invoice.paymentStatus)}
+                        </div>
+                        <div className="flex items-center gap-4 text-sm text-muted-foreground flex-wrap">
+                          <span>Patient: {invoice.patientName}</span>
+                          {invoice.providerName && <span>Provider: {invoice.providerName}</span>}
+                        </div>
+                        <div className="flex items-center gap-4 text-xs text-muted-foreground flex-wrap">
+                          <span><Calendar className="mr-1 inline h-3 w-3" />{invoice.createdAt ? new Date(invoice.createdAt).toLocaleDateString() : "N/A"}</span>
+                          {invoice.dueDate && <span>Due: {new Date(invoice.dueDate).toLocaleDateString()}</span>}
+                        </div>
+                      </div>
+                      <div className="text-right space-y-1">
+                        <div className="text-lg font-bold" data-testid={`text-amount-${invoice.id}`}>₹{parseFloat(invoice.amount || "0").toFixed(2)}</div>
+                        {invoice.amountPaid && parseFloat(invoice.amountPaid) > 0 && (
+                          <div className="text-sm text-green-600">Paid: ₹{parseFloat(invoice.amountPaid).toFixed(2)}</div>
+                        )}
+                        {dueAmount > 0 && invoice.paymentStatus !== "paid" && (
+                          <div className="text-sm text-orange-600">Due: ₹{dueAmount.toFixed(2)}</div>
+                        )}
+                      </div>
                     </div>
                   </div>
-                  <div className="text-right space-y-1">
-                    <div className="text-lg font-bold" data-testid={`text-amount-${invoice.id}`}>₹{parseFloat(invoice.amount || "0").toFixed(2)}</div>
-                    {invoice.amountPaid && parseFloat(invoice.amountPaid) > 0 && (
-                      <div className="text-sm text-green-600">Paid: ₹{parseFloat(invoice.amountPaid).toFixed(2)}</div>
-                    )}
-                    {parseFloat(invoice.amount || "0") - parseFloat(invoice.amountPaid || "0") > 0 && invoice.paymentStatus !== "paid" && (
-                      <div className="text-sm text-orange-600">Due: ₹{(parseFloat(invoice.amount || "0") - parseFloat(invoice.amountPaid || "0")).toFixed(2)}</div>
-                    )}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       )}
     </div>
