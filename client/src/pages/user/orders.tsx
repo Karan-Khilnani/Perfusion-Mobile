@@ -9,7 +9,9 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { StatusBadge } from "@/components/status-badge";
 import { BookingTimeline } from "@/components/booking-timeline";
-import { ClipboardList, FlaskConical, Stethoscope, Calendar, IndianRupee, ChevronRight, Video, Scan, Download, FileText, Upload, Paperclip, X } from "lucide-react";
+import { ClipboardList, FlaskConical, Stethoscope, Calendar, IndianRupee, ChevronRight, Video, Scan, Download, FileText, Upload, Paperclip, X, Search, CheckCircle2, Clock } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { Booking, BookingType } from "@shared/schema";
@@ -88,9 +90,44 @@ export default function OrdersPage() {
     setPendingFiles(prev => prev.filter((_, i) => i !== index));
   };
 
+  const [listSearch, setListSearch] = useState("");
+  const [listStatusFilter, setListStatusFilter] = useState<"all" | "ready" | "pending">("all");
+  const [listDateFrom, setListDateFrom] = useState("");
+  const [listDateTo, setListDateTo] = useState("");
+
   const labBookings = bookings?.filter((b) => b.bookingType === "lab") || [];
   const consultationBookings = bookings?.filter((b) => b.bookingType === "consultation") || [];
   const teleradiologyBookings = bookings?.filter((b) => b.bookingType === "teleradiology") || [];
+
+  const filterListBookings = (list: Booking[]) => {
+    let filtered = list;
+    if (listSearch.trim()) {
+      const q = listSearch.toLowerCase();
+      filtered = filtered.filter((b) =>
+        b.patientName.toLowerCase().includes(q) ||
+        (b as any).uhidIpNumber?.toLowerCase().includes(q) ||
+        b.id.toLowerCase().includes(q) ||
+        b.serviceName.toLowerCase().includes(q) ||
+        (b as any).accessionNumber?.toLowerCase().includes(q)
+      );
+    }
+    if (listStatusFilter === "ready") {
+      filtered = filtered.filter((b) => !!b.reportUrl);
+    } else if (listStatusFilter === "pending") {
+      filtered = filtered.filter((b) => !b.reportUrl);
+    }
+    if (listDateFrom) {
+      const from = new Date(listDateFrom);
+      from.setHours(0, 0, 0, 0);
+      filtered = filtered.filter((b) => new Date(b.createdAt!) >= from);
+    }
+    if (listDateTo) {
+      const to = new Date(listDateTo);
+      to.setHours(23, 59, 59, 999);
+      filtered = filtered.filter((b) => new Date(b.createdAt!) <= to);
+    }
+    return filtered;
+  };
 
   const BookingCard = ({ booking }: { booking: Booking }) => {
     const Icon = typeIcons[booking.bookingType as BookingType];
@@ -380,6 +417,138 @@ export default function OrdersPage() {
     </Card>
   );
 
+  const ListFilters = () => (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-end gap-3">
+        <div className="flex-1 min-w-[200px]">
+          <div className="relative">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search patient, IP number, booking ID, test..."
+              className="pl-9"
+              value={listSearch}
+              onChange={(e) => setListSearch(e.target.value)}
+              data-testid="input-list-search"
+            />
+          </div>
+        </div>
+        <Select value={listStatusFilter} onValueChange={(v) => setListStatusFilter(v as any)}>
+          <SelectTrigger className="w-[130px]" data-testid="select-report-status">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Status</SelectItem>
+            <SelectItem value="ready">Report Ready</SelectItem>
+            <SelectItem value="pending">Pending</SelectItem>
+          </SelectContent>
+        </Select>
+        <div className="flex items-center gap-2">
+          <Input type="date" className="w-[140px]" value={listDateFrom} onChange={(e) => setListDateFrom(e.target.value)} data-testid="input-date-from" />
+          <span className="text-xs text-muted-foreground">to</span>
+          <Input type="date" className="w-[140px]" value={listDateTo} onChange={(e) => setListDateTo(e.target.value)} data-testid="input-date-to" />
+        </div>
+        {(listSearch || listStatusFilter !== "all" || listDateFrom || listDateTo) && (
+          <Button variant="ghost" size="sm" onClick={() => { setListSearch(""); setListStatusFilter("all"); setListDateFrom(""); setListDateTo(""); }} data-testid="button-clear-filters">
+            <X className="mr-1 h-3 w-3" /> Clear
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+
+  const LabRadiologyListView = ({ list, type }: { list: Booking[]; type: "lab" | "teleradiology" }) => {
+    const filtered = filterListBookings(list);
+    return (
+      <div className="space-y-3">
+        <ListFilters />
+        {filtered.length === 0 ? (
+          <Card>
+            <CardContent className="py-8 text-center text-sm text-muted-foreground">
+              {list.length === 0 ? `No ${type === "lab" ? "lab" : "radiology"} bookings yet` : "No results match your filters"}
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="rounded-md border overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b bg-muted/50">
+                  <th className="px-3 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">Date</th>
+                  <th className="px-3 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">Booking #</th>
+                  <th className="px-3 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">IP / UHID</th>
+                  <th className="px-3 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">Patient</th>
+                  <th className="px-3 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">{type === "lab" ? "Test" : "Modality"}</th>
+                  <th className="px-3 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">Report</th>
+                  <th className="px-3 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">Slot / Expected</th>
+                  <th className="px-3 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((b) => {
+                  const reportReady = !!b.reportUrl;
+                  return (
+                    <tr
+                      key={b.id}
+                      className={`border-b hover:bg-muted/30 cursor-pointer transition-colors ${selectedBookingId === b.id ? "bg-primary/5" : ""}`}
+                      onClick={() => setSelectedBookingId(b.id)}
+                      data-testid={`row-booking-${b.id}`}
+                    >
+                      <td className="px-3 py-2 whitespace-nowrap">{format(new Date(b.createdAt!), "dd/MM/yy")}</td>
+                      <td className="px-3 py-2 whitespace-nowrap font-mono text-xs" title={b.id}>{b.id.substring(0, 12).toUpperCase()}</td>
+                      <td className="px-3 py-2 whitespace-nowrap">{(b as any).uhidIpNumber || "—"}</td>
+                      <td className="px-3 py-2 whitespace-nowrap">
+                        <span>{b.patientName}</span>
+                        <span className="text-muted-foreground ml-1 text-xs">
+                          {b.patientAge}y/{(b.patientGender || "").charAt(0).toUpperCase() || "—"}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2 max-w-[180px] truncate" title={b.serviceName}>{b.serviceName}</td>
+                      <td className="px-3 py-2 whitespace-nowrap">
+                        {reportReady ? (
+                          <Badge variant="default" className="text-xs gap-1">
+                            <CheckCircle2 className="h-3 w-3" /> Ready
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-xs gap-1">
+                            <Clock className="h-3 w-3" /> Pending
+                          </Badge>
+                        )}
+                      </td>
+                      <td className="px-3 py-2 whitespace-nowrap text-xs">
+                        {b.appointmentSlot
+                          ? b.appointmentSlot
+                          : format(new Date(b.createdAt!), "dd/MM/yy hh:mm a")}
+                      </td>
+                      <td className="px-3 py-2 whitespace-nowrap">
+                        {reportReady ? (
+                          <a
+                            href={b.reportUrl!}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            data-testid={`button-download-report-${b.id}`}
+                          >
+                            <Button size="sm" variant="default" className="h-7 text-xs gap-1">
+                              <Download className="h-3 w-3" /> Download
+                            </Button>
+                          </a>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+        <p className="text-xs text-muted-foreground">
+          Showing {filtered.length} of {list.length} · Click a row to view full details
+        </p>
+      </div>
+    );
+  };
+
   const EmptyState = ({ type }: { type: string }) => (
     <Card>
       <CardContent className="flex flex-col items-center justify-center py-12 text-center">
@@ -451,9 +620,7 @@ export default function OrdersPage() {
               {labBookings.length === 0 ? (
                 <EmptyState type="Lab" />
               ) : (
-                labBookings.map((booking) => (
-                  <BookingCard key={booking.id} booking={booking} />
-                ))
+                <LabRadiologyListView list={labBookings} type="lab" />
               )}
             </TabsContent>
 
@@ -471,9 +638,7 @@ export default function OrdersPage() {
               {teleradiologyBookings.length === 0 ? (
                 <EmptyState type="Teleradiology" />
               ) : (
-                teleradiologyBookings.map((booking) => (
-                  <BookingCard key={booking.id} booking={booking} />
-                ))
+                <LabRadiologyListView list={teleradiologyBookings} type="teleradiology" />
               )}
             </TabsContent>
           </Tabs>
