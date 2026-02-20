@@ -831,9 +831,9 @@ export default function ProviderServicesPage() {
                 <Card key={consultant.id}>
                   <CardContent className="flex items-center justify-between gap-4 py-4">
                     {(consultant as any).photoUrl ? (
-                      <img src={(consultant as any).photoUrl} alt={consultant.name} className="h-12 w-12 rounded-full object-cover border" data-testid={`img-consultant-photo-${consultant.id}`} />
+                      <img src={(consultant as any).photoUrl} alt={consultant.name} className="h-36 w-36 rounded-full object-cover border shrink-0" data-testid={`img-consultant-photo-${consultant.id}`} />
                     ) : (
-                      <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center text-muted-foreground text-lg font-medium">
+                      <div className="h-36 w-36 rounded-full bg-muted flex items-center justify-center text-muted-foreground text-4xl font-medium shrink-0">
                         {consultant.name.charAt(0)}
                       </div>
                     )}

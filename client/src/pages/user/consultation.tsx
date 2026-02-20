@@ -292,9 +292,9 @@ export default function ConsultationPage() {
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex items-center gap-3">
                     {(consultant as any).photoUrl ? (
-                      <img src={(consultant as any).photoUrl} alt={consultant.name} className="h-11 w-11 rounded-full object-cover border" />
+                      <img src={(consultant as any).photoUrl} alt={consultant.name} className="h-[132px] w-[132px] rounded-full object-cover border shrink-0" />
                     ) : (
-                      <div className="h-11 w-11 rounded-full bg-muted flex items-center justify-center text-muted-foreground text-base font-medium shrink-0">
+                      <div className="h-[132px] w-[132px] rounded-full bg-muted flex items-center justify-center text-muted-foreground text-4xl font-medium shrink-0">
                         {consultant.name.charAt(0)}
                       </div>
                     )}
