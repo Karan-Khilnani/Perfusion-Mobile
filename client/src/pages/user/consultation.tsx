@@ -303,7 +303,7 @@ export default function ConsultationPage() {
                       <p className="text-sm text-muted-foreground">{consultant.qualification}</p>
                     </div>
                   </div>
-                  <StarRating rating={parseFloat(consultant.rating || "4.0")} size="sm" />
+                  {consultant.rating && <StarRating rating={parseFloat(consultant.rating)} size="sm" />}
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">

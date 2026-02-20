@@ -890,7 +890,7 @@ export default function ProviderServicesPage() {
                         <Calendar className="mr-1 h-3.5 w-3.5" />
                         Slots
                       </Button>
-                      <StarRating rating={parseFloat(consultant.rating || "4.0")} />
+                      {consultant.rating && <StarRating rating={parseFloat(consultant.rating)} />}
                     </div>
                   </CardContent>
                 </Card>
