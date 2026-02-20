@@ -636,7 +636,14 @@ export async function registerRoutes(
         return res.status(401).json({ message: "Unauthorized" });
       }
       const bookings = await storage.getBookingsByUserId(userId);
-      res.json(bookings);
+      const enriched = await Promise.all(bookings.map(async (b) => {
+        if (b.bookingType === "consultation" && b.serviceId) {
+          const consultant = await storage.getConsultantById(b.serviceId);
+          return { ...b, specialization: consultant?.specialization || null };
+        }
+        return b;
+      }));
+      res.json(enriched);
     } catch (error) {
       console.error("Error fetching bookings:", error);
       res.status(500).json({ message: "Failed to fetch bookings" });

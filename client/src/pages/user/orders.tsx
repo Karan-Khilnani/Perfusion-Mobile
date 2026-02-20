@@ -678,6 +678,7 @@ export default function OrdersPage() {
                                 <th className="px-3 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">Date</th>
                                 <th className="px-3 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">Patient</th>
                                 <th className="px-3 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">Consultant</th>
+                                <th className="px-3 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">Department</th>
                                 <th className="px-3 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">Booked Slot</th>
                                 <th className="px-3 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">Status</th>
                               </tr>
@@ -696,6 +697,7 @@ export default function OrdersPage() {
                                     <span className="text-muted-foreground ml-1 text-xs">{b.patientAge}y/{(b.patientGender || "").charAt(0).toUpperCase() || "—"}</span>
                                   </td>
                                   <td className="px-3 py-2 whitespace-nowrap">{b.serviceName}</td>
+                                  <td className="px-3 py-2 whitespace-nowrap text-xs text-muted-foreground">{(b as any).specialization || "—"}</td>
                                   <td className="px-3 py-2 whitespace-nowrap text-xs">{b.appointmentSlot || "—"}</td>
                                   <td className="px-3 py-2 whitespace-nowrap">
                                     <Badge variant={b.status === "completed" ? "default" : "outline"} className="text-xs">
