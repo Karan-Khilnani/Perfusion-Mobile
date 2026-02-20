@@ -41,6 +41,7 @@ export default function ProviderBookingsPage() {
   const [prescriptionMedications, setPrescriptionMedications] = useState("");
   const [prescriptionAdvice, setPrescriptionAdvice] = useState("");
   const [prescriptionFollowUp, setPrescriptionFollowUp] = useState("");
+  const [prescriptionPhysicianNotes, setPrescriptionPhysicianNotes] = useState("");
   const [uploadMethod, setUploadMethod] = useState<"file" | "url">("file");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -171,18 +172,20 @@ export default function ProviderBookingsPage() {
   };
 
   const prescriptionMutation = useMutation({
-    mutationFn: async ({ id, diagnosis, medications, advice, followUp }: { 
+    mutationFn: async ({ id, diagnosis, medications, advice, followUp, physicianNotes }: { 
       id: string; 
       diagnosis: string; 
       medications: string; 
       advice: string; 
       followUp: string;
+      physicianNotes: string;
     }) => {
       const response = await apiRequest("PATCH", `/api/bookings/${id}/prescription`, { 
         diagnosis, 
         medications, 
         advice, 
-        followUp 
+        followUp,
+        physicianNotes,
       });
       return response.json();
     },
@@ -194,6 +197,7 @@ export default function ProviderBookingsPage() {
       setPrescriptionMedications("");
       setPrescriptionAdvice("");
       setPrescriptionFollowUp("");
+      setPrescriptionPhysicianNotes("");
       toast({
         title: "Prescription Generated",
         description: "Prescription has been saved and is available for download.",
@@ -210,21 +214,23 @@ export default function ProviderBookingsPage() {
 
   const openPrescriptionDialog = (booking: Booking) => {
     setPrescriptionBooking(booking);
-    setPrescriptionDiagnosis((booking as any).prescriptionDiagnosis || "");
-    setPrescriptionMedications((booking as any).prescriptionMedications || "");
-    setPrescriptionAdvice((booking as any).prescriptionAdvice || "");
-    setPrescriptionFollowUp((booking as any).prescriptionFollowUp || "");
+    setPrescriptionDiagnosis(booking.prescriptionDiagnosis || "");
+    setPrescriptionMedications(booking.prescriptionMedications || "");
+    setPrescriptionAdvice(booking.prescriptionAdvice || "");
+    setPrescriptionFollowUp(booking.prescriptionFollowUp || "");
+    setPrescriptionPhysicianNotes((booking as any).prescriptionPhysicianNotes || "");
     setShowPrescriptionDialog(true);
   };
 
   const handleSavePrescription = () => {
-    if (!prescriptionBooking || !prescriptionDiagnosis || !prescriptionMedications) return;
+    if (!prescriptionBooking || !prescriptionDiagnosis) return;
     prescriptionMutation.mutate({
       id: prescriptionBooking.id,
       diagnosis: prescriptionDiagnosis,
       medications: prescriptionMedications,
       advice: prescriptionAdvice,
       followUp: prescriptionFollowUp,
+      physicianNotes: prescriptionPhysicianNotes,
     });
   };
 
@@ -301,15 +307,38 @@ export default function ProviderBookingsPage() {
           </Link>
         )}
         {booking.bookingType === "consultation" && (
-          <Button
-            size="sm"
-            variant={(booking as any).prescriptionGeneratedAt ? "secondary" : "default"}
-            onClick={() => openPrescriptionDialog(booking)}
-            data-testid={`button-prescription-${booking.id}`}
-          >
-            <FileSignature className="mr-2 h-3.5 w-3.5" />
-            {(booking as any).prescriptionGeneratedAt ? "Edit Prescription" : "Generate Prescription"}
-          </Button>
+          <>
+            <Button
+              size="sm"
+              variant={(booking as any).prescriptionGeneratedAt ? "secondary" : "default"}
+              onClick={() => openPrescriptionDialog(booking)}
+              data-testid={`button-prescription-${booking.id}`}
+            >
+              <FileSignature className="mr-2 h-3.5 w-3.5" />
+              {(booking as any).prescriptionGeneratedAt ? "Edit Prescription" : "Generate Prescription"}
+            </Button>
+            {(booking as any).prescriptionGeneratedAt && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={async () => {
+                  try {
+                    const response = await fetch(`/api/bookings/${booking.id}/prescription-pdf`, { credentials: "include" });
+                    if (!response.ok) throw new Error("Failed to fetch prescription data");
+                    const prescriptionData = await response.json();
+                    const { generatePrescriptionPDF } = await import("@/lib/prescription-pdf");
+                    await generatePrescriptionPDF(prescriptionData);
+                  } catch (error) {
+                    console.error("PDF generation error:", error);
+                  }
+                }}
+                data-testid={`button-download-prescription-${booking.id}`}
+              >
+                <Download className="mr-2 h-3.5 w-3.5" />
+                Download PDF
+              </Button>
+            )}
+          </>
         )}
         {(booking.bookingType === "lab" || booking.bookingType === "teleradiology") && !booking.reportUrl && (
           <Button
@@ -649,13 +678,16 @@ export default function ProviderBookingsPage() {
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>
-              {(prescriptionBooking as any)?.prescriptionGeneratedAt ? "Edit Prescription" : "Generate Prescription"}
+              {prescriptionBooking?.prescriptionGeneratedAt ? "Edit Prescription" : "Generate Prescription"}
             </DialogTitle>
             <DialogDescription>
               Prescription for {prescriptionBooking?.patientName} - {prescriptionBooking?.serviceName}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 max-h-[60vh] overflow-y-auto">
+            <div className="rounded-lg bg-muted/50 p-3 text-sm text-muted-foreground">
+              Patient details, clinical history, examinations, and investigations will be auto-populated from the booking. Only fill in the fields below.
+            </div>
             <div className="space-y-2">
               <Label>Diagnosis <span className="text-destructive">*</span></Label>
               <Textarea
@@ -667,23 +699,23 @@ export default function ProviderBookingsPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label>Medications <span className="text-destructive">*</span></Label>
+              <Label>Physician Notes</Label>
               <Textarea
-                placeholder="List medications with dosage and frequency...&#10;e.g., Tab. Paracetamol 500mg - 1 tablet twice daily after meals for 5 days"
+                placeholder="Clinical observations, recommendations, special instructions..."
+                value={prescriptionPhysicianNotes}
+                onChange={(e) => setPrescriptionPhysicianNotes(e.target.value)}
+                rows={3}
+                data-testid="input-prescription-physician-notes"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Suggested Treatment Plan</Label>
+              <Textarea
+                placeholder="List medications with dosage and frequency, procedures, therapy...&#10;e.g., Tab. Paracetamol 500mg - 1 tablet twice daily after meals for 5 days"
                 value={prescriptionMedications}
                 onChange={(e) => setPrescriptionMedications(e.target.value)}
                 rows={5}
                 data-testid="input-prescription-medications"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Advice / Instructions</Label>
-              <Textarea
-                placeholder="Diet, lifestyle, precautions, etc..."
-                value={prescriptionAdvice}
-                onChange={(e) => setPrescriptionAdvice(e.target.value)}
-                rows={3}
-                data-testid="input-prescription-advice"
               />
             </div>
             <div className="space-y-2">
@@ -702,7 +734,7 @@ export default function ProviderBookingsPage() {
             </Button>
             <Button
               onClick={handleSavePrescription}
-              disabled={!prescriptionDiagnosis || !prescriptionMedications || prescriptionMutation.isPending}
+              disabled={!prescriptionDiagnosis || prescriptionMutation.isPending}
               data-testid="button-save-prescription"
             >
               {prescriptionMutation.isPending ? (

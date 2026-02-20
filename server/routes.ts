@@ -809,25 +809,23 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Prescriptions can only be generated for consultations" });
       }
       
-      const { diagnosis, medications, advice, followUp } = req.body as {
+      const { diagnosis, medications, advice, followUp, physicianNotes } = req.body as {
         diagnosis: string;
         medications: string;
         advice: string;
         followUp?: string;
+        physicianNotes?: string;
       };
       
-      // Validate required fields
       if (!diagnosis || diagnosis.trim().length === 0) {
         return res.status(400).json({ message: "Diagnosis is required" });
-      }
-      if (!medications || medications.trim().length === 0) {
-        return res.status(400).json({ message: "Medications are required" });
       }
       
       const updated = await storage.updateBooking(req.params.id, {
         prescriptionDiagnosis: diagnosis.trim(),
-        prescriptionMedications: medications.trim(),
+        prescriptionMedications: medications?.trim() || null,
         prescriptionAdvice: advice?.trim() || null,
+        prescriptionPhysicianNotes: physicianNotes?.trim() || null,
         prescriptionFollowUp: followUp?.trim() || null,
         prescriptionGeneratedAt: new Date(),
       } as any);
@@ -836,6 +834,106 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error generating prescription:", error);
       res.status(500).json({ message: "Failed to generate prescription" });
+    }
+  });
+
+  // Generate prescription PDF
+  app.get("/api/bookings/:id/prescription-pdf", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.id;
+      const booking = await storage.getBookingById(req.params.id);
+      if (!booking) {
+        return res.status(404).json({ message: "Booking not found" });
+      }
+      
+      // Allow the booking user, provider, or admin to access
+      const isOwner = booking.userId === userId;
+      const isAdminUser = req.user.role === "admin";
+      let isProviderUser = false;
+      if (req.user.role === "provider") {
+        const provider = await storage.getProviderByUserId(userId);
+        if (provider && booking.providerId === provider.id) {
+          isProviderUser = true;
+        }
+      }
+      
+      if (!isOwner && !isAdminUser && !isProviderUser) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      if (!booking.prescriptionGeneratedAt) {
+        return res.status(404).json({ message: "No prescription generated yet" });
+      }
+      
+      // Fetch consultant details for the prescription
+      let consultant: any = null;
+      if (booking.serviceId) {
+        consultant = await storage.getConsultantById(booking.serviceId);
+      }
+
+      // Fetch care seeker (user) details for referring facility info
+      const bookingUser = await storage.getUserById(booking.userId);
+      
+      // Build prescription data object for PDF generation
+      const prescriptionData = {
+        prescriptionId: `PFN-${booking.id.substring(0, 8).toUpperCase()}`,
+        dateTime: booking.prescriptionGeneratedAt ? new Date(booking.prescriptionGeneratedAt).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" }) : new Date().toLocaleString("en-IN"),
+        mode: "Teleconsultation",
+        referringFacility: bookingUser?.hospitalName || null,
+        referringDoctor: null as string | null,
+        onCallDoctorName: (booking as any).onCallDoctorName || null,
+        onCallDoctorDesignation: (booking as any).onCallDoctorDesignation || null,
+        patientName: booking.patientName,
+        patientAge: booking.patientAge,
+        patientGender: booking.patientGender,
+        uhidIpNumber: (booking as any).uhidIpNumber || null,
+        patientContact: booking.patientContact,
+        patientWeight: (booking as any).patientWeight || null,
+        patientAllergies: (booking as any).patientAllergyNotSpecified ? null : (booking as any).patientAllergies,
+        patientAllergyNotSpecified: (booking as any).patientAllergyNotSpecified,
+        consultantName: consultant?.name || booking.serviceName,
+        consultantSpecialization: consultant?.specialization || null,
+        consultantQualification: consultant?.qualification || booking.providerName,
+        consultantRegistrationNo: consultant?.registrationNumber || null,
+        consultantYearsExperience: consultant?.yearsExperience || null,
+        consultantAffiliation: consultant?.affiliatedInstitution || null,
+        consultantSignatureUrl: consultant?.digitalSignatureUrl || null,
+        clinicalHistory: booking.clinicalSummary || null,
+        examination: booking.examination || null,
+        investigations: booking.investigations || null,
+        diagnosis: booking.prescriptionDiagnosis || null,
+        physicianNotes: (booking as any).prescriptionPhysicianNotes || null,
+        treatmentPlan: booking.prescriptionMedications || null,
+        followUp: booking.prescriptionFollowUp || null,
+      };
+
+      res.json(prescriptionData);
+    } catch (error) {
+      console.error("Error generating prescription PDF data:", error);
+      res.status(500).json({ message: "Failed to generate prescription" });
+    }
+  });
+
+  // Save on-call doctor info (care seeker before joining video call)
+  app.patch("/api/bookings/:id/on-call-doctor", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.id;
+      const booking = await storage.getBookingById(req.params.id);
+      if (!booking) {
+        return res.status(404).json({ message: "Booking not found" });
+      }
+      if (booking.userId !== userId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      const { onCallDoctorName, onCallDoctorDesignation } = req.body;
+      const updated = await storage.updateBooking(req.params.id, {
+        onCallDoctorName: onCallDoctorName || null,
+        onCallDoctorDesignation: onCallDoctorDesignation || null,
+      } as any);
+      res.json(updated);
+    } catch (error) {
+      console.error("Error saving on-call doctor info:", error);
+      res.status(500).json({ message: "Failed to save on-call doctor info" });
     }
   });
 

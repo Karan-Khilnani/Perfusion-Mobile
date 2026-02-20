@@ -16,6 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useRazorpay } from "@/hooks/use-razorpay";
 import { StarRating } from "@/components/star-rating";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { Checkbox } from "@/components/ui/checkbox";
 import { ArrowLeft, Check, CreditCard, Briefcase, Video, Upload, FileText, X } from "lucide-react";
 import type { Consultant } from "@shared/schema";
 
@@ -25,6 +26,10 @@ const bookingSchema = z.object({
   patientAge: z.coerce.number().min(1, "Age must be at least 1").max(150, "Invalid age"),
   patientGender: z.enum(["male", "female", "other"], { required_error: "Gender is required" }),
   contactNumber: z.string().min(10, "Valid contact number required"),
+  patientWeight: z.string().optional(),
+  allergyNotSpecified: z.boolean().default(true),
+  patientAllergies: z.string().optional(),
+  uhidIpNumber: z.string().optional(),
   clinicalSummary: z.string().min(10, "Please provide clinical summary"),
   provisionalDiagnosis: z.string().optional(),
   orderingPhysician: z.string().optional(),
@@ -77,6 +82,10 @@ export default function ConsultationBookingPage() {
       patientAge: "" as unknown as number,
       patientGender: undefined,
       contactNumber: "",
+      patientWeight: "",
+      allergyNotSpecified: true,
+      patientAllergies: "",
+      uhidIpNumber: "",
       clinicalSummary: "",
       provisionalDiagnosis: "",
       orderingPhysician: "",
@@ -134,6 +143,10 @@ export default function ConsultationBookingPage() {
         patientAge: data.patientAge,
         patientGender: data.patientGender,
         patientContact: data.contactNumber,
+        patientWeight: data.patientWeight || null,
+        patientAllergies: data.allergyNotSpecified ? null : (data.patientAllergies || null),
+        patientAllergyNotSpecified: data.allergyNotSpecified,
+        uhidIpNumber: data.uhidIpNumber || null,
         clinicalSummary: data.clinicalSummary,
         provisionalDiagnosis: data.provisionalDiagnosis || null,
         examination: data.examination || null,
@@ -526,6 +539,81 @@ export default function ConsultationBookingPage() {
                         </FormItem>
                       )}
                     />
+                  </div>
+
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <FormField
+                      control={form.control}
+                      name="patientWeight"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Weight (kg)</FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder="e.g., 72"
+                              {...field}
+                              data-testid="input-patient-weight"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="uhidIpNumber"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>UHID / IP Number</FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder="Hospital IP/UHID number"
+                              {...field}
+                              data-testid="input-uhid"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <div className="space-y-3">
+                    <FormField
+                      control={form.control}
+                      name="allergyNotSpecified"
+                      render={({ field }) => (
+                        <FormItem className="flex items-center gap-2">
+                          <FormControl>
+                            <Checkbox
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                              data-testid="checkbox-no-allergy"
+                            />
+                          </FormControl>
+                          <FormLabel className="!mt-0 text-sm">No known allergies / Not specified</FormLabel>
+                        </FormItem>
+                      )}
+                    />
+                    {!form.watch("allergyNotSpecified") && (
+                      <FormField
+                        control={form.control}
+                        name="patientAllergies"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Allergies</FormLabel>
+                            <FormControl>
+                              <Input
+                                placeholder="e.g., Penicillin, Sulfa drugs"
+                                {...field}
+                                data-testid="input-allergies"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    )}
                   </div>
 
                   <Button

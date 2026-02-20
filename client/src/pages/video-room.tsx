@@ -4,7 +4,11 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Video, VideoOff, Phone, Maximize2, Minimize2 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ArrowLeft, Video, VideoOff, Phone, Maximize2, Minimize2, Stethoscope, ClipboardList } from "lucide-react";
+import { apiRequest } from "@/lib/queryClient";
 import type { Booking } from "@shared/schema";
 
 export default function VideoRoomPage() {
@@ -14,36 +18,52 @@ export default function VideoRoomPage() {
   const containerRef = useRef<HTMLDivElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [showPreCallDialog, setShowPreCallDialog] = useState(true);
+  const [onCallDoctorName, setOnCallDoctorName] = useState("");
+  const [onCallDoctorDesignation, setOnCallDoctorDesignation] = useState("");
+  const [callStarted, setCallStarted] = useState(false);
 
   const urlParams = new URLSearchParams(window.location.search);
   const returnTo = urlParams.get("returnTo") || "/user/orders";
+  const isProvider = returnTo.includes("/provider");
 
   const { data: booking } = useQuery<Booking>({
     queryKey: ["/api/bookings/room", roomId],
     enabled: !!roomId,
   });
 
-  // Build Daily.co URL - handles both full URLs and legacy room names
   const getDailyUrl = () => {
     if (!roomId) return null;
     const decoded = decodeURIComponent(roomId);
-    
-    // If it's already a full URL, use it directly
     if (decoded.startsWith("https://") || decoded.startsWith("http://")) {
       return decoded;
     }
-    
-    // Legacy fallback: old bookings may have just room names
-    // This won't work unless the room exists, but provides graceful handling
     return null;
   };
   
   const dailyUrl = getDailyUrl();
 
   useEffect(() => {
-    const timer = setTimeout(() => setIsLoading(false), 2000);
-    return () => clearTimeout(timer);
-  }, []);
+    if (callStarted) {
+      const timer = setTimeout(() => setIsLoading(false), 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [callStarted]);
+
+  const handleJoinCall = async () => {
+    if (booking && !isProvider && onCallDoctorName.trim()) {
+      try {
+        await apiRequest("PATCH", `/api/bookings/${booking.id}/on-call-doctor`, {
+          onCallDoctorName: onCallDoctorName.trim(),
+          onCallDoctorDesignation: onCallDoctorDesignation.trim() || null,
+        });
+      } catch (e) {
+        console.error("Failed to save on-call doctor info:", e);
+      }
+    }
+    setShowPreCallDialog(false);
+    setCallStarted(true);
+  };
 
   const hangUp = () => {
     navigate(returnTo);
@@ -90,6 +110,66 @@ export default function VideoRoomPage() {
 
   return (
     <div className="flex h-screen flex-col bg-background">
+      <Dialog open={showPreCallDialog && !isProvider} onOpenChange={setShowPreCallDialog}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Stethoscope className="h-5 w-5 text-primary" />
+              Pre-Consultation Setup
+            </DialogTitle>
+            <DialogDescription>
+              Please provide the on-call doctor details before joining the consultation.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>On-Call Doctor / Case Presenter Name *</Label>
+              <Input
+                placeholder="Dr. Name"
+                value={onCallDoctorName}
+                onChange={(e) => setOnCallDoctorName(e.target.value)}
+                data-testid="input-oncall-doctor-name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Designation</Label>
+              <Input
+                placeholder="e.g., Senior Resident, Attending Physician"
+                value={onCallDoctorDesignation}
+                onChange={(e) => setOnCallDoctorDesignation(e.target.value)}
+                data-testid="input-oncall-doctor-designation"
+              />
+            </div>
+            <div className="rounded-lg border border-amber-500/30 bg-amber-50 dark:bg-amber-950/20 p-4 space-y-2">
+              <div className="flex items-start gap-2">
+                <ClipboardList className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+                <p className="text-sm font-medium text-amber-800 dark:text-amber-200">Before You Join</p>
+              </div>
+              <ul className="text-sm text-amber-700 dark:text-amber-300 space-y-1 ml-6 list-disc">
+                <li>Please ensure all clinical reports, investigation results, and relevant medical records are readily accessible.</li>
+                <li>Have the patient's treatment charts and medication history available for reference.</li>
+                <li>Kindly be at the patient's bedside during the consultation for optimal clinical assessment and real-time examination support.</li>
+              </ul>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => navigate(returnTo)} data-testid="button-cancel-precall">
+              Cancel
+            </Button>
+            <Button
+              onClick={handleJoinCall}
+              disabled={!onCallDoctorName.trim()}
+              data-testid="button-join-call-confirm"
+            >
+              <Video className="mr-2 h-4 w-4" />
+              Join Consultation
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {isProvider && showPreCallDialog && (() => { setShowPreCallDialog(false); setCallStarted(true); return null; })()}
+
       <header className="flex items-center justify-between border-b px-4 py-3">
         <div className="flex items-center gap-4">
           <Link href={returnTo}>
@@ -117,7 +197,7 @@ export default function VideoRoomPage() {
         className="relative flex-1 bg-black"
         style={{ minHeight: "500px" }}
       >
-        {isLoading && (
+        {callStarted && isLoading && (
           <div className="absolute inset-0 z-10 flex items-center justify-center bg-background">
             <div className="text-center">
               <div className="mb-4 h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto" />
@@ -126,7 +206,7 @@ export default function VideoRoomPage() {
           </div>
         )}
         
-        {dailyUrl && (
+        {callStarted && dailyUrl && (
           <iframe
             ref={iframeRef}
             src={dailyUrl}
@@ -141,6 +221,15 @@ export default function VideoRoomPage() {
             }}
             data-testid="video-container"
           />
+        )}
+
+        {!callStarted && (
+          <div className="absolute inset-0 flex items-center justify-center bg-background">
+            <div className="text-center">
+              <Video className="mx-auto mb-4 h-16 w-16 text-muted-foreground/50" />
+              <p className="text-muted-foreground">Complete pre-consultation setup to join the call</p>
+            </div>
+          </div>
         )}
       </div>
 

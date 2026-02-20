@@ -308,14 +308,16 @@ export default function OrdersPage() {
                 <p className="text-xs font-medium text-muted-foreground">Diagnosis</p>
                 <p className="text-sm">{(booking as any).prescriptionDiagnosis}</p>
               </div>
-              <div>
-                <p className="text-xs font-medium text-muted-foreground">Medications</p>
-                <p className="text-sm whitespace-pre-line">{(booking as any).prescriptionMedications}</p>
-              </div>
-              {(booking as any).prescriptionAdvice && (
+              {(booking as any).prescriptionPhysicianNotes && (
                 <div>
-                  <p className="text-xs font-medium text-muted-foreground">Advice</p>
-                  <p className="text-sm">{(booking as any).prescriptionAdvice}</p>
+                  <p className="text-xs font-medium text-muted-foreground">Physician Notes</p>
+                  <p className="text-sm">{(booking as any).prescriptionPhysicianNotes}</p>
+                </div>
+              )}
+              {(booking as any).prescriptionMedications && (
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground">Suggested Treatment Plan</p>
+                  <p className="text-sm whitespace-pre-line">{(booking as any).prescriptionMedications}</p>
                 </div>
               )}
               {(booking as any).prescriptionFollowUp && (
@@ -328,38 +330,21 @@ export default function OrdersPage() {
             <Button 
               className="mt-3" 
               variant="default" 
-              onClick={() => {
-                const prescriptionContent = `
-PRESCRIPTION
-============================================
-Patient: ${booking.patientName}
-Date: ${new Date((booking as any).prescriptionGeneratedAt).toLocaleDateString()}
-Consultant: ${booking.serviceName}
-
-DIAGNOSIS
----------
-${(booking as any).prescriptionDiagnosis}
-
-MEDICATIONS
------------
-${(booking as any).prescriptionMedications}
-
-${(booking as any).prescriptionAdvice ? `ADVICE\n------\n${(booking as any).prescriptionAdvice}\n` : ''}
-${(booking as any).prescriptionFollowUp ? `FOLLOW-UP\n---------\n${(booking as any).prescriptionFollowUp}\n` : ''}
-============================================
-`;
-                const blob = new Blob([prescriptionContent], { type: 'text/plain' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `prescription_${booking.patientName}_${new Date().toISOString().split('T')[0]}.txt`;
-                a.click();
-                URL.revokeObjectURL(url);
+              onClick={async () => {
+                try {
+                  const response = await fetch(`/api/bookings/${booking.id}/prescription-pdf`, { credentials: "include" });
+                  if (!response.ok) throw new Error("Failed to fetch prescription data");
+                  const prescriptionData = await response.json();
+                  const { generatePrescriptionPDF } = await import("@/lib/prescription-pdf");
+                  await generatePrescriptionPDF(prescriptionData);
+                } catch (error) {
+                  console.error("PDF generation error:", error);
+                }
               }}
               data-testid="button-download-prescription"
             >
               <Download className="mr-2 h-4 w-4" />
-              Download Prescription
+              Download Prescription PDF
             </Button>
           </div>
         )}

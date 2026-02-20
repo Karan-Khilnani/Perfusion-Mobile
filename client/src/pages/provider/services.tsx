@@ -76,6 +76,8 @@ export default function ProviderServicesPage() {
   const [consultantRegNo, setConsultantRegNo] = useState("");
   const [consultantRegOrg, setConsultantRegOrg] = useState("");
   const [consultantDocFile, setConsultantDocFile] = useState<File | null>(null);
+  const [consultantSignatureFile, setConsultantSignatureFile] = useState<File | null>(null);
+  const [consultantAffiliation, setConsultantAffiliation] = useState("");
   const [isEmergencyDialogOpen, setIsEmergencyDialogOpen] = useState(false);
   const [emergencyRegNo, setEmergencyRegNo] = useState("");
   const [emergencyRegOrg, setEmergencyRegOrg] = useState("");
@@ -157,14 +159,20 @@ export default function ProviderServicesPage() {
   const createConsultantMutation = useMutation({
     mutationFn: async (data: ConsultantFormData) => {
       let registrationDocumentUrl: string | undefined;
+      let digitalSignatureUrl: string | undefined;
       if (consultantDocFile) {
         registrationDocumentUrl = await uploadDocument(consultantDocFile);
+      }
+      if (consultantSignatureFile) {
+        digitalSignatureUrl = await uploadDocument(consultantSignatureFile);
       }
       const response = await apiRequest("POST", "/api/provider/consultants", {
         ...data,
         registrationNo: consultantRegNo || undefined,
         registeredOrganization: consultantRegOrg || undefined,
         registrationDocumentUrl,
+        digitalSignatureUrl,
+        affiliatedInstitution: consultantAffiliation || undefined,
       });
       return response.json();
     },
@@ -175,6 +183,8 @@ export default function ProviderServicesPage() {
       setConsultantRegNo("");
       setConsultantRegOrg("");
       setConsultantDocFile(null);
+      setConsultantSignatureFile(null);
+      setConsultantAffiliation("");
       toast({ title: "Consultant Added", description: "Consultant profile submitted (pending approval)." });
     },
     onError: () => {
@@ -725,6 +735,15 @@ export default function ProviderServicesPage() {
                       />
                     </div>
                     <div className="space-y-2">
+                      <Label>Affiliated Institution (Optional)</Label>
+                      <Input
+                        value={consultantAffiliation}
+                        onChange={(e) => setConsultantAffiliation(e.target.value)}
+                        placeholder="e.g., AIIMS Delhi, CMC Vellore"
+                        data-testid="input-consultant-affiliation"
+                      />
+                    </div>
+                    <div className="space-y-2">
                       <Label>Registration Document</Label>
                       {consultantDocFile ? (
                         <div className="flex items-center gap-2 rounded-md border p-2">
@@ -739,6 +758,25 @@ export default function ProviderServicesPage() {
                           <Upload className="h-4 w-4 text-muted-foreground" />
                           <span className="text-sm">Upload registration certificate</span>
                           <input type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => { const f = e.target.files?.[0]; if (f) setConsultantDocFile(f); }} />
+                        </label>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Digital Signature *</Label>
+                      <p className="text-xs text-muted-foreground">Upload consultant's digital signature image (used on prescriptions)</p>
+                      {consultantSignatureFile ? (
+                        <div className="flex items-center gap-2 rounded-md border border-primary/30 bg-primary/5 p-2">
+                          <FileText className="h-4 w-4 text-primary" />
+                          <span className="flex-1 text-sm truncate">{consultantSignatureFile.name}</span>
+                          <Button type="button" variant="ghost" size="icon" onClick={() => setConsultantSignatureFile(null)} data-testid="button-remove-consultant-signature">
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <label className="flex items-center gap-2 rounded-md border border-dashed border-primary/30 p-3 cursor-pointer hover-elevate" data-testid="label-upload-consultant-signature">
+                          <Upload className="h-4 w-4 text-primary" />
+                          <span className="text-sm text-primary">Upload digital signature</span>
+                          <input type="file" className="hidden" accept=".jpg,.jpeg,.png" onChange={(e) => { const f = e.target.files?.[0]; if (f) setConsultantSignatureFile(f); }} />
                         </label>
                       )}
                     </div>
