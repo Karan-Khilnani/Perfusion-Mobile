@@ -290,9 +290,18 @@ export default function ConsultationPage() {
             <Card key={consultant.id} className="overflow-visible" data-testid={`card-consultant-${consultant.id}`}>
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <CardTitle className="text-lg">{consultant.name}</CardTitle>
-                    <p className="text-sm text-muted-foreground">{consultant.qualification}</p>
+                  <div className="flex items-center gap-3">
+                    {(consultant as any).photoUrl ? (
+                      <img src={(consultant as any).photoUrl} alt={consultant.name} className="h-11 w-11 rounded-full object-cover border" />
+                    ) : (
+                      <div className="h-11 w-11 rounded-full bg-muted flex items-center justify-center text-muted-foreground text-base font-medium shrink-0">
+                        {consultant.name.charAt(0)}
+                      </div>
+                    )}
+                    <div>
+                      <CardTitle className="text-lg">{consultant.name}</CardTitle>
+                      <p className="text-sm text-muted-foreground">{consultant.qualification}</p>
+                    </div>
                   </div>
                   <StarRating rating={parseFloat(consultant.rating || "4.0")} size="sm" />
                 </div>

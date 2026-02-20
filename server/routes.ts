@@ -1847,6 +1847,29 @@ export async function registerRoutes(
     }
   });
 
+  app.patch("/api/consultants/:id/photo", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.id;
+      if (req.user.role === "provider") {
+        const provider = await storage.getProviderByUserId(userId);
+        if (!provider) return res.status(403).json({ message: "Provider not found" });
+        const consultant = await storage.getConsultantById(req.params.id);
+        if (!consultant || consultant.providerId !== provider.id) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+      } else if (req.user.role !== "admin") {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      const { photoUrl } = req.body;
+      const updated = await storage.updateConsultant(req.params.id, { photoUrl } as any);
+      if (!updated) return res.status(404).json({ message: "Consultant not found" });
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating consultant photo:", error);
+      res.status(500).json({ message: "Failed to update photo" });
+    }
+  });
+
   // Booking update endpoint (for patient details form)
   app.patch("/api/bookings/:id", isAuthenticated, async (req: any, res) => {
     try {

@@ -15,7 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { StarRating } from "@/components/star-rating";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Plus, Edit2, FlaskConical, IndianRupee, Clock, Building2, Stethoscope, Loader2, AlertCircle, ScanLine, CheckCircle2, ArrowRight, Calendar, Upload, FileText, X } from "lucide-react";
+import { Plus, Edit2, FlaskConical, IndianRupee, Clock, Building2, Stethoscope, Loader2, AlertCircle, ScanLine, CheckCircle2, ArrowRight, Calendar, Upload, FileText, X, Camera } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import type { Lab, LabTest, Consultant, Provider, RadiologyModality, ProviderLabTest } from "@shared/schema";
 import { Link } from "wouter";
@@ -78,6 +78,7 @@ export default function ProviderServicesPage() {
   const [consultantDocFile, setConsultantDocFile] = useState<File | null>(null);
   const [consultantSignatureFile, setConsultantSignatureFile] = useState<File | null>(null);
   const [consultantAffiliation, setConsultantAffiliation] = useState("");
+  const [consultantPhotoFile, setConsultantPhotoFile] = useState<File | null>(null);
   const [isEmergencyDialogOpen, setIsEmergencyDialogOpen] = useState(false);
   const [emergencyRegNo, setEmergencyRegNo] = useState("");
   const [emergencyRegOrg, setEmergencyRegOrg] = useState("");
@@ -160,11 +161,15 @@ export default function ProviderServicesPage() {
     mutationFn: async (data: ConsultantFormData) => {
       let registrationDocumentUrl: string | undefined;
       let digitalSignatureUrl: string | undefined;
+      let photoUrl: string | undefined;
       if (consultantDocFile) {
         registrationDocumentUrl = await uploadDocument(consultantDocFile);
       }
       if (consultantSignatureFile) {
         digitalSignatureUrl = await uploadDocument(consultantSignatureFile);
+      }
+      if (consultantPhotoFile) {
+        photoUrl = await uploadDocument(consultantPhotoFile);
       }
       const response = await apiRequest("POST", "/api/provider/consultants", {
         ...data,
@@ -172,6 +177,7 @@ export default function ProviderServicesPage() {
         registeredOrganization: consultantRegOrg || undefined,
         registrationDocumentUrl,
         digitalSignatureUrl,
+        photoUrl,
         affiliatedInstitution: consultantAffiliation || undefined,
       });
       return response.json();
@@ -185,6 +191,7 @@ export default function ProviderServicesPage() {
       setConsultantDocFile(null);
       setConsultantSignatureFile(null);
       setConsultantAffiliation("");
+      setConsultantPhotoFile(null);
       toast({ title: "Consultant Added", description: "Consultant profile submitted (pending approval)." });
     },
     onError: () => {
@@ -744,6 +751,24 @@ export default function ProviderServicesPage() {
                       />
                     </div>
                     <div className="space-y-2">
+                      <Label>Consultant Photo</Label>
+                      {consultantPhotoFile ? (
+                        <div className="flex items-center gap-2 rounded-md border p-2">
+                          <Camera className="h-4 w-4 text-muted-foreground" />
+                          <span className="flex-1 text-sm truncate">{consultantPhotoFile.name}</span>
+                          <Button type="button" variant="ghost" size="icon" onClick={() => setConsultantPhotoFile(null)} data-testid="button-remove-consultant-photo">
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <label className="flex items-center gap-2 rounded-md border border-dashed p-3 cursor-pointer hover-elevate" data-testid="label-upload-consultant-photo">
+                          <Camera className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-sm">Upload consultant photo</span>
+                          <input type="file" className="hidden" accept=".jpg,.jpeg,.png" onChange={(e) => { const f = e.target.files?.[0]; if (f) setConsultantPhotoFile(f); }} />
+                        </label>
+                      )}
+                    </div>
+                    <div className="space-y-2">
                       <Label>Registration Document</Label>
                       {consultantDocFile ? (
                         <div className="flex items-center gap-2 rounded-md border p-2">
@@ -805,6 +830,13 @@ export default function ProviderServicesPage() {
               {consultants.map((consultant) => (
                 <Card key={consultant.id}>
                   <CardContent className="flex items-center justify-between gap-4 py-4">
+                    {(consultant as any).photoUrl ? (
+                      <img src={(consultant as any).photoUrl} alt={consultant.name} className="h-12 w-12 rounded-full object-cover border" data-testid={`img-consultant-photo-${consultant.id}`} />
+                    ) : (
+                      <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center text-muted-foreground text-lg font-medium">
+                        {consultant.name.charAt(0)}
+                      </div>
+                    )}
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
                         <p className="font-medium">{consultant.name}</p>
@@ -834,6 +866,21 @@ export default function ProviderServicesPage() {
                       )}
                     </div>
                     <div className="flex items-center gap-2">
+                      <label className="cursor-pointer" data-testid={`label-replace-photo-${consultant.id}`}>
+                        <Button size="sm" variant="ghost" asChild>
+                          <span><Camera className="h-3.5 w-3.5" /></span>
+                        </Button>
+                        <input type="file" className="hidden" accept=".jpg,.jpeg,.png" onChange={async (e) => {
+                          const f = e.target.files?.[0];
+                          if (!f) return;
+                          try {
+                            const url = await uploadDocument(f);
+                            await apiRequest("PATCH", `/api/consultants/${consultant.id}/photo`, { photoUrl: url });
+                            queryClient.invalidateQueries({ queryKey: ["/api/provider/my-consultants"] });
+                            toast({ title: "Photo Updated" });
+                          } catch { toast({ title: "Failed to update photo", variant: "destructive" }); }
+                        }} />
+                      </label>
                       <Button
                         size="sm"
                         variant="outline"

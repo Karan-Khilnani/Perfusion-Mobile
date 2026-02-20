@@ -77,6 +77,7 @@ export const consultants = pgTable("consultants", {
   registrationNumber: varchar("registration_number", { length: 100 }),
   registeredOrganization: varchar("registered_organization", { length: 255 }),
   registrationDocumentUrl: varchar("registration_document_url", { length: 500 }),
+  photoUrl: varchar("photo_url", { length: 500 }),
   digitalSignatureUrl: varchar("digital_signature_url", { length: 500 }),
   affiliatedInstitution: varchar("affiliated_institution", { length: 255 }),
   approvalStatus: varchar("approval_status", { length: 20 }).default("pending").$type<SuggestionStatus>(),
