@@ -448,7 +448,7 @@ export default function TeleradiologyPage() {
                           <input type="radio" name="paymentMethod" value="pay_now" checked={paymentMethod === "pay_now"} onChange={() => setPaymentMethod("pay_now")} className="h-4 w-4" />
                           <div>
                             <div className="font-medium">Pay Now</div>
-                            <div className="text-sm text-muted-foreground">Mark as paid immediately (offline payment).</div>
+                            <div className="text-sm text-muted-foreground">Mark as paid immediately.</div>
                           </div>
                         </label>
                       </div>
