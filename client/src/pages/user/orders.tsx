@@ -628,9 +628,90 @@ export default function OrdersPage() {
               {consultationBookings.length === 0 ? (
                 <EmptyState type="Consultation" />
               ) : (
-                consultationBookings.map((booking) => (
-                  <BookingCard key={booking.id} booking={booking} />
-                ))
+                <div className="space-y-3">
+                  <div className="flex flex-wrap items-end gap-3">
+                    <div className="flex-1 min-w-[200px]">
+                      <div className="relative">
+                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          placeholder="Search by patient name..."
+                          className="pl-9"
+                          value={listSearch}
+                          onChange={(e) => setListSearch(e.target.value)}
+                          data-testid="input-consultation-search"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Input type="date" className="w-[140px]" value={listDateFrom} onChange={(e) => setListDateFrom(e.target.value)} data-testid="input-consult-date-from" />
+                      <span className="text-xs text-muted-foreground">to</span>
+                      <Input type="date" className="w-[140px]" value={listDateTo} onChange={(e) => setListDateTo(e.target.value)} data-testid="input-consult-date-to" />
+                    </div>
+                    {(listSearch || listDateFrom || listDateTo) && (
+                      <Button variant="ghost" size="sm" onClick={() => { setListSearch(""); setListDateFrom(""); setListDateTo(""); }} data-testid="button-clear-consult-filters">
+                        <X className="mr-1 h-3 w-3" /> Clear
+                      </Button>
+                    )}
+                  </div>
+                  {(() => {
+                    let filtered = consultationBookings;
+                    if (listSearch.trim()) {
+                      const q = listSearch.toLowerCase();
+                      filtered = filtered.filter((b) => b.patientName.toLowerCase().includes(q));
+                    }
+                    if (listDateFrom) {
+                      const from = new Date(listDateFrom); from.setHours(0,0,0,0);
+                      filtered = filtered.filter((b) => new Date(b.createdAt!) >= from);
+                    }
+                    if (listDateTo) {
+                      const to = new Date(listDateTo); to.setHours(23,59,59,999);
+                      filtered = filtered.filter((b) => new Date(b.createdAt!) <= to);
+                    }
+                    return filtered.length === 0 ? (
+                      <Card><CardContent className="py-8 text-center text-sm text-muted-foreground">No results match your filters</CardContent></Card>
+                    ) : (
+                      <>
+                        <div className="rounded-md border overflow-x-auto">
+                          <table className="w-full text-sm">
+                            <thead>
+                              <tr className="border-b bg-muted/50">
+                                <th className="px-3 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">Date</th>
+                                <th className="px-3 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">Patient</th>
+                                <th className="px-3 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">Consultant</th>
+                                <th className="px-3 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">Booked Slot</th>
+                                <th className="px-3 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">Status</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {filtered.map((b) => (
+                                <tr
+                                  key={b.id}
+                                  className={`border-b hover:bg-muted/30 cursor-pointer transition-colors ${selectedBookingId === b.id ? "bg-primary/5" : ""}`}
+                                  onClick={() => setSelectedBookingId(b.id)}
+                                  data-testid={`row-consultation-${b.id}`}
+                                >
+                                  <td className="px-3 py-2 whitespace-nowrap">{format(new Date(b.createdAt!), "dd/MM/yy")}</td>
+                                  <td className="px-3 py-2 whitespace-nowrap">
+                                    <span>{b.patientName}</span>
+                                    <span className="text-muted-foreground ml-1 text-xs">{b.patientAge}y/{(b.patientGender || "").charAt(0).toUpperCase() || "—"}</span>
+                                  </td>
+                                  <td className="px-3 py-2 whitespace-nowrap">{b.serviceName}</td>
+                                  <td className="px-3 py-2 whitespace-nowrap text-xs">{b.appointmentSlot || "—"}</td>
+                                  <td className="px-3 py-2 whitespace-nowrap">
+                                    <Badge variant={b.status === "completed" ? "default" : "outline"} className="text-xs">
+                                      {b.status}
+                                    </Badge>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                        <p className="text-xs text-muted-foreground">Showing {filtered.length} of {consultationBookings.length} · Click a row to view details</p>
+                      </>
+                    );
+                  })()}
+                </div>
               )}
             </TabsContent>
 
