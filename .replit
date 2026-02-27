@@ -40,3 +40,10 @@ waitForPort = 5000
 
 [agent]
 integrations = ["javascript_log_in_with_replit:2.0.0", "javascript_database:1.0.0"]
+
+[userenv]
+
+[userenv.shared]
+MSG91_AUTH_KEY = "496963ARrroz8R69a19712P1"
+MSG91_VOICE_FLOW_ID = "2371"
+ADMIN_PHONE_NUMBER = "+917869647941"

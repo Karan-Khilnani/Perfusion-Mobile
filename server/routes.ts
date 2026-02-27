@@ -7,6 +7,7 @@ import type { BookingStatus, UserRole, ProviderType, ProviderStatus, ServiceStat
 import multer from "multer";
 import path from "path";
 import fs from "fs";
+import { notifyAdminLabBooking, notifyUserReportReady } from "./services/msg91";
 
 // Daily.co API helper
 async function createDailyRoom(roomName: string): Promise<{ url: string; name: string } | null> {
@@ -724,6 +725,16 @@ export async function registerRoutes(
       }
       
       const booking = await storage.createBooking(bookingData);
+
+      if (booking.bookingType === "lab") {
+        notifyAdminLabBooking(
+          booking.id,
+          booking.patientName || "Unknown Patient",
+          booking.serviceName || "Lab Test",
+          booking.amount || "0"
+        ).catch((err: any) => console.error("[MSG91] Lab booking notification failed:", err));
+      }
+
       res.status(201).json(booking);
     } catch (error) {
       console.error("Error creating booking:", error);
@@ -774,6 +785,24 @@ export async function registerRoutes(
       
       if (!booking) {
         return res.status(404).json({ message: "Booking not found" });
+      }
+
+      if (status === "report_ready" && booking.bookingType !== "consultation") {
+        let userPhone = booking.patientContact;
+        if (!userPhone && booking.userId) {
+          const bookingUser = await storage.getUserById(booking.userId);
+          if (bookingUser?.phone) {
+            userPhone = bookingUser.phone;
+          }
+        }
+        if (userPhone) {
+          notifyUserReportReady(
+            userPhone,
+            booking.patientName || "Patient",
+            booking.serviceName || "Test",
+            booking.id
+          ).catch((err: any) => console.error("[MSG91] Report ready notification failed:", err));
+        }
       }
       
       res.json(booking);
