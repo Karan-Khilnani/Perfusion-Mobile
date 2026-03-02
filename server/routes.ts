@@ -795,13 +795,16 @@ export async function registerRoutes(
             userPhone = bookingUser.phone;
           }
         }
+        if (!userPhone) {
+          userPhone = process.env.ADMIN_PHONE_NUMBER || null;
+        }
         if (userPhone) {
           notifyUserReportReady(
             userPhone,
             booking.patientName || "Patient",
             booking.serviceName || "Test",
             booking.id
-          ).catch((err: any) => console.error("[MSG91] Report ready notification failed:", err));
+          ).catch((err: any) => console.error("[Twilio] Report ready notification failed:", err));
         }
       }
       
