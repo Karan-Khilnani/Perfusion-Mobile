@@ -92,7 +92,8 @@ export default function AdminBookingsPage() {
       !searchTerm ||
       booking.patientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       booking.serviceName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      booking.id.toLowerCase().includes(searchTerm.toLowerCase());
+      booking.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (booking as any).bookingNumber?.toLowerCase().includes(searchTerm.toLowerCase());
     return matchesFilter && matchesSearch;
   });
 
@@ -464,8 +465,8 @@ export default function AdminBookingsPage() {
                       <p className="text-sm text-muted-foreground">
                         {booking.patientName} ({booking.patientAge} yrs) - ₹{booking.amount}
                       </p>
-                      <p className="text-xs text-muted-foreground">
-                        {booking.createdAt && format(new Date(booking.createdAt), "PPp")}
+                      <p className="text-xs font-mono text-muted-foreground">
+                        {(booking as any).bookingNumber || booking.id.substring(0, 12).toUpperCase()} • {booking.createdAt && format(new Date(booking.createdAt), "PPp")}
                       </p>
                     </div>
                   </div>

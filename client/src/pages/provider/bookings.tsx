@@ -268,7 +268,7 @@ export default function ProviderBookingsPage() {
           </div>
         </div>
         <p className="mt-1 text-sm text-muted-foreground">
-          Patient: {booking.patientName} ({booking.patientAge} yrs)
+          Patient: {booking.patientName} ({booking.patientAge} yrs) • <span className="font-mono">{(booking as any).bookingNumber || booking.id.substring(0, 12).toUpperCase()}</span>
         </p>
         {booking.accessionNumber && (
           <p className="text-sm text-muted-foreground">

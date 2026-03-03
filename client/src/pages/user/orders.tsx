@@ -106,6 +106,7 @@ export default function OrdersPage() {
       filtered = filtered.filter((b) =>
         b.patientName.toLowerCase().includes(q) ||
         (b as any).uhidIpNumber?.toLowerCase().includes(q) ||
+        (b as any).bookingNumber?.toLowerCase().includes(q) ||
         b.id.toLowerCase().includes(q) ||
         b.serviceName.toLowerCase().includes(q) ||
         (b as any).accessionNumber?.toLowerCase().includes(q)
@@ -185,7 +186,7 @@ export default function OrdersPage() {
         <dl className="space-y-3">
           <div className="flex justify-between border-b pb-2">
             <dt className="text-muted-foreground">Booking ID</dt>
-            <dd className="font-mono text-sm">{booking.id}</dd>
+            <dd className="font-mono text-sm">{(booking as any).bookingNumber || booking.id}</dd>
           </div>
           <div className="flex justify-between border-b pb-2">
             <dt className="text-muted-foreground">Service</dt>
@@ -493,7 +494,7 @@ export default function OrdersPage() {
                       data-testid={`row-booking-${b.id}`}
                     >
                       <td className="px-3 py-2 whitespace-nowrap">{format(new Date(b.createdAt!), "dd/MM/yy")}</td>
-                      <td className="px-3 py-2 whitespace-nowrap font-mono text-xs" title={b.id}>{b.id.substring(0, 12).toUpperCase()}</td>
+                      <td className="px-3 py-2 whitespace-nowrap font-mono text-xs" title={(b as any).bookingNumber || b.id}>{(b as any).bookingNumber || b.id.substring(0, 12).toUpperCase()}</td>
                       <td className="px-3 py-2 whitespace-nowrap">{(b as any).uhidIpNumber || "—"}</td>
                       <td className="px-3 py-2 whitespace-nowrap">
                         <span>{b.patientName}</span>

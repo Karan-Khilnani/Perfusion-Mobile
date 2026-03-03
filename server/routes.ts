@@ -8,6 +8,7 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import { notifyAdminLabBooking, notifyUserReportReady } from "./services/msg91";
+import { generateBookingNumber } from "./services/booking-number";
 
 // Daily.co API helper
 async function createDailyRoom(roomName: string): Promise<{ url: string; name: string } | null> {
@@ -724,15 +725,17 @@ export async function registerRoutes(
         bookingData.paymentMethod = "pay_later";
       }
       
+      bookingData.bookingNumber = await generateBookingNumber(bookingData.bookingType);
+
       const booking = await storage.createBooking(bookingData);
 
       if (booking.bookingType === "lab") {
         notifyAdminLabBooking(
-          booking.id,
+          booking.bookingNumber || booking.id,
           booking.patientName || "Unknown Patient",
           booking.serviceName || "Lab Test",
           booking.amount || "0"
-        ).catch((err: any) => console.error("[MSG91] Lab booking notification failed:", err));
+        ).catch((err: any) => console.error("[Twilio] Lab booking notification failed:", err));
       }
 
       res.status(201).json(booking);
@@ -803,7 +806,7 @@ export async function registerRoutes(
             userPhone,
             booking.patientName || "Patient",
             booking.serviceName || "Test",
-            booking.id
+            booking.bookingNumber || booking.id
           ).catch((err: any) => console.error("[Twilio] Report ready notification failed:", err));
         }
       }
@@ -915,7 +918,7 @@ export async function registerRoutes(
       
       // Build prescription data object for PDF generation
       const prescriptionData = {
-        prescriptionId: `PFN-${booking.id.substring(0, 8).toUpperCase()}`,
+        prescriptionId: booking.bookingNumber || `PFN-${booking.id.substring(0, 8).toUpperCase()}`,
         dateTime: booking.prescriptionGeneratedAt ? new Date(booking.prescriptionGeneratedAt).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" }) : new Date().toLocaleString("en-IN"),
         mode: "Teleconsultation",
         referringFacility: bookingUser?.hospitalName || null,

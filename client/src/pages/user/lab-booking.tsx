@@ -86,7 +86,7 @@ export default function LabBookingPage() {
       return response.json();
     },
     onSuccess: (data) => {
-      setBookingId(data.id);
+      setBookingId(data.bookingNumber || data.id);
 
       if (paymentMethod === "pay_now") {
         const fee = parseFloat(data.amount || "0");

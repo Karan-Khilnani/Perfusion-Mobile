@@ -163,7 +163,7 @@ export default function ConsultationBookingPage() {
       return response.json();
     },
     onSuccess: (data) => {
-      setBookingId(data.id);
+      setBookingId(data.bookingNumber || data.id);
       if (data.videoRoomId) {
         setVideoRoomId(data.videoRoomId);
       }

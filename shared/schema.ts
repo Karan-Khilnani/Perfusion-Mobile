@@ -235,6 +235,7 @@ export type PaymentStatus = "pending" | "partial" | "paid" | "overdue";
 // Bookings table
 export const bookings = pgTable("bookings", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  bookingNumber: varchar("booking_number", { length: 30 }),
   userId: varchar("user_id").notNull(),
   bookingType: varchar("booking_type", { length: 20 }).notNull().$type<BookingType>(),
   serviceId: varchar("service_id").notNull(),
@@ -294,6 +295,12 @@ export const bookings = pgTable("bookings", {
   razorpayPaymentId: varchar("razorpay_payment_id", { length: 255 }),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Booking Sequences table (for custom booking number generation)
+export const bookingSequences = pgTable("booking_sequences", {
+  financialYear: varchar("financial_year", { length: 10 }).primaryKey(),
+  sequence: integer("sequence").notNull().default(0),
 });
 
 // Platform Settings table

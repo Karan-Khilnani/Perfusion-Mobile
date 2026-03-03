@@ -80,7 +80,7 @@ export default function CriticalCareBookingPage() {
       return response.json();
     },
     onSuccess: (data) => {
-      setBookingId(data.id);
+      setBookingId(data.bookingNumber || data.id);
       setStep("confirmation");
       queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
       toast({
