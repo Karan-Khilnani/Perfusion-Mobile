@@ -849,12 +849,19 @@ export async function registerRoutes(
       const booking = await storage.createBooking(bookingData);
 
       if (booking.bookingType === "lab") {
-        notifyAdminLabBooking(
-          booking.bookingNumber || booking.id,
-          booking.patientName || "Unknown Patient",
-          booking.serviceName || "Lab Test",
-          booking.amount || "0"
-        ).catch((err: any) => console.error("[Twilio] Lab booking notification failed:", err));
+        const seekerProvider = await storage.getProviderByUserId(userId);
+        const bookingDate = new Date();
+        const dateStr = bookingDate.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+        const timeStr = bookingDate.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true });
+
+        notifyAdminLabBooking({
+          bookingId: booking.bookingNumber || booking.id,
+          seekerHospitalName: seekerProvider?.name || "Unknown Hospital",
+          testName: booking.serviceName || "Lab Test",
+          bookingDateTime: `${dateStr}, ${timeStr}`,
+          contactPersonName: "",
+          contactPersonNumber: "",
+        }).catch((err: any) => console.error("[Twilio] Lab booking notification failed:", err));
       }
 
       res.status(201).json(booking);

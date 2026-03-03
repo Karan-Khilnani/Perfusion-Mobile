@@ -82,16 +82,35 @@ export async function sendWhatsAppMessage(
   }
 }
 
-export async function notifyAdminLabBooking(bookingId: number | string, patientName: string, testName: string, amount: string) {
+export interface LabBookingNotification {
+  bookingId: string;
+  seekerHospitalName: string;
+  testName: string;
+  bookingDateTime: string;
+  contactPersonName: string;
+  contactPersonNumber: string;
+}
+
+export async function notifyAdminLabBooking(data: LabBookingNotification) {
   if (!ADMIN_PHONE_NUMBER) {
     console.error("[Twilio] Admin phone number not configured");
     return;
   }
 
-  const voiceMessage = `New lab test booking received on Perfusion. Booking ID: ${bookingId}. Patient: ${patientName}. Test: ${testName}. Amount: ${amount} rupees.`;
+  const contactInfo = data.contactPersonName && data.contactPersonNumber
+    ? `Contact person: ${data.contactPersonName}, ${data.contactPersonNumber}.`
+    : data.contactPersonName
+    ? `Contact person: ${data.contactPersonName}.`
+    : "Contact person: Not available.";
+
+  const voiceMessage = `New lab test booked. Hospital: ${data.seekerHospitalName}. Booking ID: ${data.bookingId}. ${contactInfo} Test: ${data.testName}. Booked on: ${data.bookingDateTime}.`;
   triggerVoiceCall(ADMIN_PHONE_NUMBER, voiceMessage).catch((err: any) => console.error("[Twilio] Admin voice call error:", err));
 
-  const whatsappMessage = `🏥 *New Lab Test Booking*\n\n📋 *Booking ID:* ${bookingId}\n👤 *Patient:* ${patientName}\n🔬 *Test:* ${testName}\n💰 *Amount:* ₹${amount}\n\n_Perfusion Healthcare Platform_`;
+  const contactLine = data.contactPersonName || data.contactPersonNumber
+    ? `👤 *Contact Person:* ${data.contactPersonName || "—"} ${data.contactPersonNumber ? "(" + data.contactPersonNumber + ")" : ""}`
+    : "👤 *Contact Person:* Not available";
+
+  const whatsappMessage = `🏥 *New Lab Test Booked*\n\n🏢 *Hospital:* ${data.seekerHospitalName}\n📋 *Booking ID:* ${data.bookingId}\n${contactLine}\n🔬 *Test:* ${data.testName}\n📅 *Booked On:* ${data.bookingDateTime}\n\n_Perfusion Healthcare Platform_`;
   whatsappAdminMessage(whatsappMessage).catch((err: any) => console.error("[Twilio] Admin WhatsApp error:", err));
 }
 
