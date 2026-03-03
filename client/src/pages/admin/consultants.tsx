@@ -39,10 +39,16 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, MoreHorizontal, Pause, Play, Trash2, Stethoscope, Search, Calendar, Edit, X } from "lucide-react";
+import { Plus, MoreHorizontal, Pause, Play, Trash2, Stethoscope, Search, Calendar, Edit, X, DollarSign } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Consultant } from "@shared/schema";
+
+type EnrichedConsultant = Consultant & {
+  providerBaseCost: string;
+  computedCustomerPrice: string;
+  computedMarginPercent: string;
+};
 
 const consultantSchema = z.object({
   name: z.string().min(2, "Name is required"),
@@ -63,9 +69,13 @@ export default function AdminConsultantsPage() {
   const [slotsList, setSlotsList] = useState<string[]>([]);
   const [selectedDay, setSelectedDay] = useState("Mon");
   const [selectedTime, setSelectedTime] = useState("09:00 AM");
+  const [isPricingDialogOpen, setIsPricingDialogOpen] = useState(false);
+  const [pricingConsultant, setPricingConsultant] = useState<EnrichedConsultant | null>(null);
+  const [pricingMode, setPricingMode] = useState<"price" | "margin">("price");
+  const [pricingValue, setPricingValue] = useState("");
   const { toast } = useToast();
 
-  const { data: consultants, isLoading } = useQuery<Consultant[]>({
+  const { data: consultants, isLoading } = useQuery<EnrichedConsultant[]>({
     queryKey: ["/api/admin/consultants"],
   });
 
@@ -144,6 +154,50 @@ export default function AdminConsultantsPage() {
       toast({ title: "Error", description: "Failed to update slots", variant: "destructive" });
     },
   });
+
+  const updatePricingMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: { customerPrice?: string; marginOverride?: string } }) => {
+      return apiRequest("PATCH", `/api/admin/consultants/${id}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/consultants"] });
+      setIsPricingDialogOpen(false);
+      setPricingConsultant(null);
+      toast({ title: "Success", description: "Pricing updated successfully" });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to update pricing", variant: "destructive" });
+    },
+  });
+
+  const openPricingDialog = (consultant: EnrichedConsultant) => {
+    setPricingConsultant(consultant);
+    setPricingMode("price");
+    setPricingValue(consultant.computedCustomerPrice || "");
+    setIsPricingDialogOpen(true);
+  };
+
+  const handlePricingSave = () => {
+    if (!pricingConsultant || !pricingValue) return;
+    const data = pricingMode === "price"
+      ? { customerPrice: pricingValue }
+      : { marginOverride: pricingValue };
+    updatePricingMutation.mutate({ id: pricingConsultant.id, data });
+  };
+
+  const computePreview = () => {
+    if (!pricingConsultant || !pricingValue) return null;
+    const baseCost = parseFloat(pricingConsultant.providerBaseCost);
+    const val = parseFloat(pricingValue);
+    if (isNaN(val) || isNaN(baseCost)) return null;
+    if (pricingMode === "price") {
+      const margin = baseCost > 0 ? ((val - baseCost) / baseCost) * 100 : 0;
+      return { customerPrice: val.toFixed(2), marginPercent: margin.toFixed(2) };
+    } else {
+      const cp = baseCost + (baseCost * val) / 100;
+      return { customerPrice: cp.toFixed(2), marginPercent: val.toFixed(2) };
+    }
+  };
 
   const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
   const TIMES = [
@@ -352,7 +406,9 @@ export default function AdminConsultantsPage() {
                   <TableHead>Name</TableHead>
                   <TableHead>Specialization</TableHead>
                   <TableHead>Experience</TableHead>
-                  <TableHead>Fee</TableHead>
+                  <TableHead>Base Fee</TableHead>
+                  <TableHead>Customer Price</TableHead>
+                  <TableHead>Margin %</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="w-[70px]">Actions</TableHead>
                 </TableRow>
@@ -368,7 +424,9 @@ export default function AdminConsultantsPage() {
                     </TableCell>
                     <TableCell>{consultant.specialization}</TableCell>
                     <TableCell>{consultant.yearsExperience} years</TableCell>
-                    <TableCell>₹{consultant.consultationFee}</TableCell>
+                    <TableCell data-testid={`text-base-fee-${consultant.id}`}>₹{consultant.providerBaseCost}</TableCell>
+                    <TableCell data-testid={`text-customer-price-${consultant.id}`}>₹{consultant.computedCustomerPrice}</TableCell>
+                    <TableCell data-testid={`text-margin-${consultant.id}`}>{consultant.computedMarginPercent}%</TableCell>
                     <TableCell>{getStatusBadge(consultant.status || "active")}</TableCell>
                     <TableCell>
                       <DropdownMenu>
@@ -378,6 +436,10 @@ export default function AdminConsultantsPage() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => openPricingDialog(consultant)}>
+                            <DollarSign className="mr-2 h-4 w-4" />
+                            Edit Pricing
+                          </DropdownMenuItem>
                           {consultant.status === "active" ? (
                             <DropdownMenuItem
                               onClick={() => updateStatusMutation.mutate({ id: consultant.id, status: "paused" })}
@@ -416,6 +478,105 @@ export default function AdminConsultantsPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Pricing Dialog */}
+      <Dialog open={isPricingDialogOpen} onOpenChange={(open) => {
+        setIsPricingDialogOpen(open);
+        if (!open) setPricingConsultant(null);
+      }}>
+        <DialogContent className="sm:max-w-[450px]">
+          <DialogHeader>
+            <DialogTitle>Edit Pricing</DialogTitle>
+            <DialogDescription>
+              Set customer price or margin for {pricingConsultant?.name}
+            </DialogDescription>
+          </DialogHeader>
+          {pricingConsultant && (
+            <div className="space-y-4">
+              <div className="p-3 border rounded-md space-y-1">
+                <p className="text-sm text-muted-foreground">Provider Base Fee</p>
+                <p className="text-lg font-semibold" data-testid="text-pricing-base-cost">₹{pricingConsultant.providerBaseCost}</p>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Adjust by</label>
+                <div className="flex gap-2">
+                  <Button
+                    variant={pricingMode === "price" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => {
+                      setPricingMode("price");
+                      setPricingValue(pricingConsultant.computedCustomerPrice || "");
+                    }}
+                    data-testid="button-pricing-mode-price"
+                  >
+                    Customer Price
+                  </Button>
+                  <Button
+                    variant={pricingMode === "margin" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => {
+                      setPricingMode("margin");
+                      setPricingValue(pricingConsultant.computedMarginPercent || "");
+                    }}
+                    data-testid="button-pricing-mode-margin"
+                  >
+                    Margin %
+                  </Button>
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-sm font-medium">
+                  {pricingMode === "price" ? "Customer Price (₹)" : "Margin (%)"}
+                </label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={pricingValue}
+                  onChange={(e) => setPricingValue(e.target.value)}
+                  data-testid="input-pricing-value"
+                />
+              </div>
+
+              {computePreview() && (
+                <div className="p-3 border rounded-md space-y-1">
+                  <p className="text-sm text-muted-foreground">Preview</p>
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <p className="text-xs text-muted-foreground">Customer Price</p>
+                      <p className="font-medium" data-testid="text-pricing-preview-price">₹{computePreview()!.customerPrice}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Margin</p>
+                      <p className="font-medium" data-testid="text-pricing-preview-margin">{computePreview()!.marginPercent}%</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Profit</p>
+                      <p className="font-medium" data-testid="text-pricing-preview-profit">
+                        ₹{(parseFloat(computePreview()!.customerPrice) - parseFloat(pricingConsultant.providerBaseCost)).toFixed(2)}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setIsPricingDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handlePricingSave}
+                  disabled={updatePricingMutation.isPending || !pricingValue}
+                  data-testid="button-save-pricing"
+                >
+                  {updatePricingMutation.isPending ? "Saving..." : "Save Pricing"}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={!!editingSlotsFor} onOpenChange={() => setEditingSlotsFor(null)}>
         <DialogContent className="sm:max-w-[500px]">

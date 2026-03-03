@@ -72,7 +72,7 @@ export default function LabsPage() {
             ipdNumber: patientData.ipdNumber || null,
             bedNumber: patientData.bedNumber || null,
             orderingPhysician: patientData.orderingPhysician || null,
-            amount: test.cost,
+            amount: (test as any).computedCustomerPrice || test.cost,
             status: "booked",
             paymentStatus: "pending",
           });
@@ -127,7 +127,7 @@ export default function LabsPage() {
         case "name":
           return a.testName.localeCompare(b.testName);
         case "cost":
-          return parseFloat(a.cost) - parseFloat(b.cost);
+          return parseFloat((a as any).computedCustomerPrice || a.cost) - parseFloat((b as any).computedCustomerPrice || b.cost);
         case "turnaroundTime":
           return parseInt(a.turnaroundTime) - parseInt(b.turnaroundTime);
         default:
@@ -166,7 +166,7 @@ export default function LabsPage() {
     if (!tests) return 0;
     return cart.reduce((sum, id) => {
       const test = tests.find((t) => t.id === id);
-      return sum + (test ? parseFloat(test.cost) : 0);
+      return sum + (test ? parseFloat((test as any).computedCustomerPrice || test.cost) : 0);
     }, 0);
   }, [tests, cart]);
 
@@ -305,7 +305,7 @@ export default function LabsPage() {
                 <CardContent className="space-y-4">
                   <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
                     <span className="font-medium text-foreground">
-                      ₹{parseFloat(test.cost).toFixed(2)}
+                      ₹{parseFloat((test as any).computedCustomerPrice || test.cost).toFixed(2)}
                     </span>
                     <span className="flex items-center gap-1">
                       <Clock className="h-3.5 w-3.5" />

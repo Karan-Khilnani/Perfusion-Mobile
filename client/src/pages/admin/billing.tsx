@@ -12,7 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
   IndianRupee, Calendar, AlertTriangle, CheckCircle, Clock, Settings,
-  CreditCard, CalendarPlus, Percent, FileText
+  CreditCard, CalendarPlus, Percent, FileText, TrendingUp
 } from "lucide-react";
 import type { Booking } from "@shared/schema";
 
@@ -60,6 +60,8 @@ export default function AdminBillingPage() {
   const totalRevenue = invoices?.reduce((sum, b) => sum + parseFloat(b.amount || "0"), 0) || 0;
   const totalPaid = invoices?.reduce((sum, b) => sum + parseFloat(b.amountPaid || "0"), 0) || 0;
   const totalOutstanding = totalRevenue - totalPaid;
+  const totalProviderCost = invoices?.reduce((sum, b) => sum + parseFloat(b.basePrice || b.amount || "0"), 0) || 0;
+  const totalProfit = invoices?.reduce((sum, b) => sum + parseFloat(b.marginAmount || "0"), 0) || 0;
   const overdueCount = invoices?.filter(b => b.dueDate && new Date(b.dueDate) < new Date() && b.paymentStatus !== "paid").length || 0;
 
   const recordPaymentMutation = useMutation({
@@ -170,6 +172,42 @@ export default function AdminBillingPage() {
         </Card>
       </div>
 
+      <div className="grid gap-4 sm:grid-cols-3">
+        <Card data-testid="card-admin-provider-cost">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="rounded-lg bg-slate-500/10 p-2"><FileText className="h-5 w-5 text-slate-500" /></div>
+              <div>
+                <p className="text-sm text-muted-foreground">Provider Cost</p>
+                <p className="text-xl font-bold">₹{totalProviderCost.toFixed(2)}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card data-testid="card-admin-customer-billed">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="rounded-lg bg-blue-500/10 p-2"><CreditCard className="h-5 w-5 text-blue-500" /></div>
+              <div>
+                <p className="text-sm text-muted-foreground">Customer Billed</p>
+                <p className="text-xl font-bold">₹{totalRevenue.toFixed(2)}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card data-testid="card-admin-profit">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="rounded-lg bg-emerald-500/10 p-2"><TrendingUp className="h-5 w-5 text-emerald-500" /></div>
+              <div>
+                <p className="text-sm text-muted-foreground">Profit (Margin)</p>
+                <p className="text-xl font-bold text-emerald-600">₹{totalProfit.toFixed(2)}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
       <Card>
         <CardContent className="p-4">
           <div className="flex flex-wrap items-center gap-4">
@@ -228,8 +266,8 @@ export default function AdminBillingPage() {
                       <div className="flex items-center gap-4 text-xs text-muted-foreground flex-wrap">
                         <span><Calendar className="mr-1 inline h-3 w-3" />{inv.createdAt ? new Date(inv.createdAt).toLocaleDateString() : "N/A"}</span>
                         {inv.dueDate && <span className={isOverdue ? "text-red-500 font-medium" : ""}>Due: {new Date(inv.dueDate).toLocaleDateString()}</span>}
-                        {inv.basePrice && <span>Base: ₹{parseFloat(inv.basePrice).toFixed(2)}</span>}
-                        {inv.marginPercent && <span>Margin: {inv.marginPercent}%</span>}
+                        {inv.basePrice && <span>Provider Cost: ₹{parseFloat(inv.basePrice).toFixed(2)}</span>}
+                        {inv.marginAmount && <span className="text-emerald-600">Profit: ₹{parseFloat(inv.marginAmount).toFixed(2)} ({inv.marginPercent}%)</span>}
                       </div>
                     </div>
                     <div className="flex items-center gap-3">

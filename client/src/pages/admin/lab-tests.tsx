@@ -45,10 +45,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, MoreHorizontal, Pause, Play, Trash2, FlaskConical, Search, Users, Pencil } from "lucide-react";
+import { Plus, MoreHorizontal, Pause, Play, Trash2, FlaskConical, Search, Users, Pencil, DollarSign } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { LabTest, Provider, ProviderLabTest } from "@shared/schema";
+
+type EnrichedLabTest = LabTest & {
+  providerBaseCost: string;
+  computedCustomerPrice: string;
+  computedMarginPercent: string;
+  hasProvider: boolean;
+};
 
 const labTestSchema = z.object({
   testName: z.string().min(2, "Test name is required"),
@@ -90,11 +97,15 @@ export default function AdminLabTestsPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isProviderDialogOpen, setIsProviderDialogOpen] = useState(false);
+  const [isPricingDialogOpen, setIsPricingDialogOpen] = useState(false);
   const [selectedTest, setSelectedTest] = useState<LabTest | null>(null);
   const [editingTest, setEditingTest] = useState<LabTest | null>(null);
+  const [pricingTest, setPricingTest] = useState<EnrichedLabTest | null>(null);
+  const [pricingMode, setPricingMode] = useState<"price" | "margin">("price");
+  const [pricingValue, setPricingValue] = useState("");
   const { toast } = useToast();
 
-  const { data: tests, isLoading } = useQuery<LabTest[]>({
+  const { data: tests, isLoading } = useQuery<EnrichedLabTest[]>({
     queryKey: ["/api/lab-tests/all"],
   });
 
@@ -234,6 +245,21 @@ export default function AdminLabTestsPage() {
     },
   });
 
+  const updatePricingMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: { customerPrice?: string; marginOverride?: string } }) => {
+      return apiRequest("PATCH", `/api/admin/lab-tests/${id}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/lab-tests/all"] });
+      setIsPricingDialogOpen(false);
+      setPricingTest(null);
+      toast({ title: "Success", description: "Pricing updated successfully" });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to update pricing", variant: "destructive" });
+    },
+  });
+
   const onSubmit = (data: LabTestFormData) => {
     createMutation.mutate(data);
   };
@@ -241,6 +267,35 @@ export default function AdminLabTestsPage() {
   const onEditSubmit = (data: LabTestFormData) => {
     if (editingTest) {
       updateMutation.mutate({ id: editingTest.id, data });
+    }
+  };
+
+  const openPricingDialog = (test: EnrichedLabTest) => {
+    setPricingTest(test);
+    setPricingMode("price");
+    setPricingValue(test.computedCustomerPrice || "");
+    setIsPricingDialogOpen(true);
+  };
+
+  const handlePricingSave = () => {
+    if (!pricingTest || !pricingValue) return;
+    const data = pricingMode === "price"
+      ? { customerPrice: pricingValue }
+      : { marginOverride: pricingValue };
+    updatePricingMutation.mutate({ id: pricingTest.id, data });
+  };
+
+  const computePreview = () => {
+    if (!pricingTest || !pricingValue) return null;
+    const baseCost = parseFloat(pricingTest.providerBaseCost);
+    const val = parseFloat(pricingValue);
+    if (isNaN(val) || isNaN(baseCost)) return null;
+    if (pricingMode === "price") {
+      const margin = baseCost > 0 ? ((val - baseCost) / baseCost) * 100 : 0;
+      return { customerPrice: val.toFixed(2), marginPercent: margin.toFixed(2) };
+    } else {
+      const cp = baseCost + (baseCost * val) / 100;
+      return { customerPrice: cp.toFixed(2), marginPercent: val.toFixed(2) };
     }
   };
 
@@ -433,7 +488,9 @@ export default function AdminLabTestsPage() {
                 <TableRow>
                   <TableHead>Test Name</TableHead>
                   <TableHead>Category</TableHead>
-                  <TableHead>Cost</TableHead>
+                  <TableHead>Base Cost</TableHead>
+                  <TableHead>Customer Price</TableHead>
+                  <TableHead>Margin %</TableHead>
                   <TableHead>TAT</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="w-[70px]">Actions</TableHead>
@@ -442,11 +499,20 @@ export default function AdminLabTestsPage() {
               <TableBody>
                 {filteredTests?.map((test) => (
                   <TableRow key={test.id} data-testid={`row-test-${test.id}`}>
-                    <TableCell className="font-medium">{test.testName}</TableCell>
+                    <TableCell className="font-medium">
+                      <div className="flex items-center gap-2">
+                        {test.testName}
+                        {!test.hasProvider && (
+                          <Badge variant="outline" className="text-xs">No Provider</Badge>
+                        )}
+                      </div>
+                    </TableCell>
                     <TableCell>
                       <Badge variant="outline">{test.category}</Badge>
                     </TableCell>
-                    <TableCell>₹{test.cost}</TableCell>
+                    <TableCell data-testid={`text-base-cost-${test.id}`}>₹{test.providerBaseCost}</TableCell>
+                    <TableCell data-testid={`text-customer-price-${test.id}`}>₹{test.computedCustomerPrice}</TableCell>
+                    <TableCell data-testid={`text-margin-${test.id}`}>{test.computedMarginPercent}%</TableCell>
                     <TableCell>{test.turnaroundTime}</TableCell>
                     <TableCell>{getStatusBadge(test.status || "active")}</TableCell>
                     <TableCell>
@@ -459,7 +525,11 @@ export default function AdminLabTestsPage() {
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem onClick={() => openEditDialog(test)}>
                             <Pencil className="mr-2 h-4 w-4" />
-                            Edit Cost/TAT
+                            Edit Details
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => openPricingDialog(test)}>
+                            <DollarSign className="mr-2 h-4 w-4" />
+                            Edit Pricing
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => openProviderDialog(test)}>
                             <Users className="mr-2 h-4 w-4" />
@@ -616,6 +686,105 @@ export default function AdminLabTestsPage() {
               </p>
             )}
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Pricing Dialog */}
+      <Dialog open={isPricingDialogOpen} onOpenChange={(open) => {
+        setIsPricingDialogOpen(open);
+        if (!open) setPricingTest(null);
+      }}>
+        <DialogContent className="sm:max-w-[450px]">
+          <DialogHeader>
+            <DialogTitle>Edit Pricing</DialogTitle>
+            <DialogDescription>
+              Set customer price or margin for {pricingTest?.testName}
+            </DialogDescription>
+          </DialogHeader>
+          {pricingTest && (
+            <div className="space-y-4">
+              <div className="p-3 border rounded-md space-y-1">
+                <p className="text-sm text-muted-foreground">Provider Base Cost</p>
+                <p className="text-lg font-semibold" data-testid="text-pricing-base-cost">₹{pricingTest.providerBaseCost}</p>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Adjust by</label>
+                <div className="flex gap-2">
+                  <Button
+                    variant={pricingMode === "price" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => {
+                      setPricingMode("price");
+                      setPricingValue(pricingTest.computedCustomerPrice || "");
+                    }}
+                    data-testid="button-pricing-mode-price"
+                  >
+                    Customer Price
+                  </Button>
+                  <Button
+                    variant={pricingMode === "margin" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => {
+                      setPricingMode("margin");
+                      setPricingValue(pricingTest.computedMarginPercent || "");
+                    }}
+                    data-testid="button-pricing-mode-margin"
+                  >
+                    Margin %
+                  </Button>
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-sm font-medium">
+                  {pricingMode === "price" ? "Customer Price (₹)" : "Margin (%)"}
+                </label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={pricingValue}
+                  onChange={(e) => setPricingValue(e.target.value)}
+                  data-testid="input-pricing-value"
+                />
+              </div>
+
+              {computePreview() && (
+                <div className="p-3 border rounded-md space-y-1">
+                  <p className="text-sm text-muted-foreground">Preview</p>
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <p className="text-xs text-muted-foreground">Customer Price</p>
+                      <p className="font-medium" data-testid="text-pricing-preview-price">₹{computePreview()!.customerPrice}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Margin</p>
+                      <p className="font-medium" data-testid="text-pricing-preview-margin">{computePreview()!.marginPercent}%</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Profit</p>
+                      <p className="font-medium" data-testid="text-pricing-preview-profit">
+                        ₹{(parseFloat(computePreview()!.customerPrice) - parseFloat(pricingTest.providerBaseCost)).toFixed(2)}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setIsPricingDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handlePricingSave}
+                  disabled={updatePricingMutation.isPending || !pricingValue}
+                  data-testid="button-save-pricing"
+                >
+                  {updatePricingMutation.isPending ? "Saving..." : "Save Pricing"}
+                </Button>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 

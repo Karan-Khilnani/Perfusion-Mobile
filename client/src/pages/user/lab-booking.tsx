@@ -18,8 +18,12 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { ArrowLeft, Check, CreditCard, MapPin, Clock, DollarSign } from "lucide-react";
 import type { Lab, LabTest } from "@shared/schema";
 
+interface LabTestWithPrice extends LabTest {
+  computedCustomerPrice?: string;
+}
+
 interface LabWithTests extends Lab {
-  tests: LabTest[];
+  tests: LabTestWithPrice[];
 }
 
 const bookingSchema = z.object({
@@ -40,7 +44,7 @@ export default function LabBookingPage() {
   const { toast } = useToast();
   const [step, setStep] = useState<"details" | "payment" | "confirmation">("details");
   const [bookingId, setBookingId] = useState<string | null>(null);
-  const [selectedTest, setSelectedTest] = useState<LabTest | null>(null);
+  const [selectedTest, setSelectedTest] = useState<LabTestWithPrice | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<"pay_now" | "pay_later">("pay_later");
   const { openCheckout } = useRazorpay();
 
@@ -78,7 +82,7 @@ export default function LabBookingPage() {
         ipdNumber: data.ipdNumber || null,
         bedNumber: data.bedNumber || null,
         orderingPhysician: data.orderingPhysician || null,
-        amount: test.cost,
+        amount: test.computedCustomerPrice || test.cost,
         status: "booked",
         paymentStatus: "pending",
         paymentMethod: paymentMethod,
@@ -202,7 +206,7 @@ export default function LabBookingPage() {
                 </div>
                 <div className="flex justify-between">
                   <dt className="text-muted-foreground">Amount Paid</dt>
-                  <dd className="font-semibold">₹{selectedTest?.cost}</dd>
+                  <dd className="font-semibold">₹{selectedTest?.computedCustomerPrice || selectedTest?.cost}</dd>
                 </div>
                 <div className="flex justify-between">
                   <dt className="text-muted-foreground">Status</dt>
@@ -295,7 +299,7 @@ export default function LabBookingPage() {
                                 <div className="flex items-center gap-2">
                                   <span>{test.testName}</span>
                                   <span className="text-muted-foreground">
-                                    - ₹{test.cost}
+                                    - ₹{test.computedCustomerPrice || test.cost}
                                   </span>
                                 </div>
                               </SelectItem>
@@ -312,7 +316,7 @@ export default function LabBookingPage() {
                       <div className="flex flex-wrap items-center gap-4 text-sm">
                         <span className="flex items-center gap-1">
                           <DollarSign className="h-4 w-4 text-muted-foreground" />
-                          ₹{selectedTest.cost}
+                          ₹{selectedTest.computedCustomerPrice || selectedTest.cost}
                         </span>
                         <span className="flex items-center gap-1">
                           <Clock className="h-4 w-4 text-muted-foreground" />
@@ -475,7 +479,7 @@ export default function LabBookingPage() {
                       </div>
                       <div className="flex justify-between border-t pt-2">
                         <dt className="font-medium">Total Amount</dt>
-                        <dd className="font-semibold">₹{selectedTest?.cost}</dd>
+                        <dd className="font-semibold">₹{selectedTest?.computedCustomerPrice || selectedTest?.cost}</dd>
                       </div>
                     </dl>
                   </div>

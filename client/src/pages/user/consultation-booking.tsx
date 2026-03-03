@@ -154,7 +154,7 @@ export default function ConsultationBookingPage() {
         documentUrls: uploadedReportUrls.length > 0 ? uploadedReportUrls : null,
         treatmentChartUrls: uploadedChartUrls.length > 0 ? uploadedChartUrls : null,
         appointmentSlot: isEmergencyTeam ? "Emergency - Immediate" : data.appointmentSlot,
-        amount: service.consultationFee,
+        amount: (service as any).computedCustomerPrice || service.consultationFee,
         urgency: isEmergencyTeam ? "emergency" : "routine",
         status: "booked",
         paymentStatus: "pending",
@@ -169,7 +169,7 @@ export default function ConsultationBookingPage() {
       }
 
       if (paymentMethod === "pay_now") {
-        const fee = parseFloat(data.amount || service?.consultationFee || "0");
+        const fee = parseFloat(data.amount || (service as any)?.computedCustomerPrice || service?.consultationFee || "0");
         openCheckout({
           amount: fee,
           bookingId: data.id,
@@ -863,7 +863,7 @@ export default function ConsultationBookingPage() {
                       <span className="font-medium">Payment Option</span>
                     </div>
                     <p className="text-sm text-muted-foreground mb-3">
-                      Consultation fee: ₹{service.consultationFee}
+                      Consultation fee: ₹{(service as any).computedCustomerPrice || service.consultationFee}
                     </p>
                     <div className="space-y-3">
                       <label className="flex items-center gap-3 rounded-lg border p-3 cursor-pointer hover:bg-muted/50" data-testid="radio-pay-later">

@@ -9,6 +9,7 @@ import path from "path";
 import fs from "fs";
 import { notifyAdminLabBooking, notifyUserReportReady } from "./services/msg91";
 import { generateBookingNumber } from "./services/booking-number";
+import { calculateCustomerPrice, deriveMarginFromPrice, derivePriceFromMargin } from "./services/pricing";
 
 // Daily.co API helper
 async function createDailyRoom(roomName: string): Promise<{ url: string; name: string } | null> {
@@ -380,7 +381,20 @@ export async function registerRoutes(
   app.get("/api/emergency-teams", async (req, res) => {
     try {
       const teams = await storage.getActiveEmergencyTeams();
-      res.json(teams);
+      const defaultMarginSetting = await storage.getPlatformSetting("default_margin_percent");
+      const defaultMargin = parseFloat(defaultMarginSetting?.settingValue || "15");
+
+      const enriched = teams.map(t => {
+        const baseCost = parseFloat(t.consultationFee);
+        const pricing = calculateCustomerPrice(baseCost, t.customerPrice, t.marginOverride, defaultMargin);
+        return {
+          ...t,
+          providerBaseCost: baseCost.toFixed(2),
+          computedCustomerPrice: pricing.customerPrice.toFixed(2),
+          computedMarginPercent: pricing.marginPercent.toFixed(2),
+        };
+      });
+      res.json(enriched);
     } catch (error) {
       console.error("Error fetching emergency teams:", error);
       res.status(500).json({ message: "Failed to fetch emergency teams" });
@@ -391,7 +405,14 @@ export async function registerRoutes(
     try {
       const team = await storage.getEmergencyTeamById(req.params.id);
       if (!team) return res.status(404).json({ message: "Emergency team not found" });
-      res.json(team);
+      const defaultMarginSetting = await storage.getPlatformSetting("default_margin_percent");
+      const defaultMargin = parseFloat(defaultMarginSetting?.settingValue || "15");
+      const baseCost = parseFloat(team.consultationFee);
+      const pricing = calculateCustomerPrice(baseCost, team.customerPrice, team.marginOverride, defaultMargin);
+      res.json({
+        ...team,
+        computedCustomerPrice: pricing.customerPrice.toFixed(2),
+      });
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch emergency team" });
     }
@@ -427,7 +448,29 @@ export async function registerRoutes(
   app.get("/api/lab-tests", async (req, res) => {
     try {
       const tests = await storage.getActiveLabTests();
-      res.json(tests);
+      const defaultMarginSetting = await storage.getPlatformSetting("default_margin_percent");
+      const defaultMargin = parseFloat(defaultMarginSetting?.settingValue || "15");
+      const allProviderTests = await storage.getProviderLabTests();
+      const testsWithProviders = new Set(
+        allProviderTests
+          .filter(pt => pt.isActive && pt.approvalStatus === "approved")
+          .map(pt => pt.labTestId)
+      );
+
+      const enrichedTests = tests
+        .filter(t => testsWithProviders.has(t.id))
+        .map(t => {
+          const providerTest = allProviderTests.find(pt => pt.labTestId === t.id && pt.isActive && pt.approvalStatus === "approved");
+          const baseCost = parseFloat(providerTest?.price || t.cost);
+          const pricing = calculateCustomerPrice(baseCost, t.customerPrice, t.marginOverride, defaultMargin);
+          return {
+            ...t,
+            providerBaseCost: baseCost.toFixed(2),
+            computedCustomerPrice: pricing.customerPrice.toFixed(2),
+            computedMarginPercent: pricing.marginPercent.toFixed(2),
+          };
+        });
+      res.json(enrichedTests);
     } catch (error) {
       console.error("Error fetching lab tests:", error);
       res.status(500).json({ message: "Failed to fetch lab tests" });
@@ -437,7 +480,23 @@ export async function registerRoutes(
   app.get("/api/lab-tests/all", isAdmin, async (req, res) => {
     try {
       const tests = await storage.getLabTests();
-      res.json(tests);
+      const defaultMarginSetting = await storage.getPlatformSetting("default_margin_percent");
+      const defaultMargin = parseFloat(defaultMarginSetting?.settingValue || "15");
+      const allProviderTests = await storage.getProviderLabTests();
+
+      const enrichedTests = tests.map(t => {
+        const providerTest = allProviderTests.find(pt => pt.labTestId === t.id && pt.isActive && pt.approvalStatus === "approved");
+        const baseCost = parseFloat(providerTest?.price || t.cost);
+        const pricing = calculateCustomerPrice(baseCost, t.customerPrice, t.marginOverride, defaultMargin);
+        return {
+          ...t,
+          providerBaseCost: baseCost.toFixed(2),
+          computedCustomerPrice: pricing.customerPrice.toFixed(2),
+          computedMarginPercent: pricing.marginPercent.toFixed(2),
+          hasProvider: !!providerTest,
+        };
+      });
+      res.json(enrichedTests);
     } catch (error) {
       console.error("Error fetching all lab tests:", error);
       res.status(500).json({ message: "Failed to fetch lab tests" });
@@ -551,7 +610,20 @@ export async function registerRoutes(
       if (!lab) {
         return res.status(404).json({ message: "Lab not found" });
       }
-      res.json(lab);
+      const defaultMarginSetting = await storage.getPlatformSetting("default_margin_percent");
+      const defaultMargin = parseFloat(defaultMarginSetting?.settingValue || "15");
+      const allProviderTests = await storage.getProviderLabTests();
+
+      const enrichedTests = lab.tests.map(t => {
+        const providerTest = allProviderTests.find(pt => pt.labTestId === t.id && pt.isActive && pt.approvalStatus === "approved");
+        const baseCost = parseFloat(providerTest?.price || t.cost);
+        const pricing = calculateCustomerPrice(baseCost, t.customerPrice, t.marginOverride, defaultMargin);
+        return {
+          ...t,
+          computedCustomerPrice: pricing.customerPrice.toFixed(2),
+        };
+      });
+      res.json({ ...lab, tests: enrichedTests });
     } catch (error) {
       console.error("Error fetching lab:", error);
       res.status(500).json({ message: "Failed to fetch lab" });
@@ -561,8 +633,21 @@ export async function registerRoutes(
   // Consultants (public - only active)
   app.get("/api/consultants", async (req, res) => {
     try {
-      const consultants = await storage.getActiveConsultants();
-      res.json(consultants);
+      const allConsultants = await storage.getActiveConsultants();
+      const defaultMarginSetting = await storage.getPlatformSetting("default_margin_percent");
+      const defaultMargin = parseFloat(defaultMarginSetting?.settingValue || "15");
+
+      const enriched = allConsultants.map(c => {
+        const baseCost = parseFloat(c.consultationFee);
+        const pricing = calculateCustomerPrice(baseCost, c.customerPrice, c.marginOverride, defaultMargin);
+        return {
+          ...c,
+          providerBaseCost: baseCost.toFixed(2),
+          computedCustomerPrice: pricing.customerPrice.toFixed(2),
+          computedMarginPercent: pricing.marginPercent.toFixed(2),
+        };
+      });
+      res.json(enriched);
     } catch (error) {
       console.error("Error fetching consultants:", error);
       res.status(500).json({ message: "Failed to fetch consultants" });
@@ -575,7 +660,14 @@ export async function registerRoutes(
       if (!consultant) {
         return res.status(404).json({ message: "Consultant not found" });
       }
-      res.json(consultant);
+      const defaultMarginSetting = await storage.getPlatformSetting("default_margin_percent");
+      const defaultMargin = parseFloat(defaultMarginSetting?.settingValue || "15");
+      const baseCost = parseFloat(consultant.consultationFee);
+      const pricing = calculateCustomerPrice(baseCost, consultant.customerPrice, consultant.marginOverride, defaultMargin);
+      res.json({
+        ...consultant,
+        computedCustomerPrice: pricing.customerPrice.toFixed(2),
+      });
     } catch (error) {
       console.error("Error fetching consultant:", error);
       res.status(500).json({ message: "Failed to fetch consultant" });
@@ -702,17 +794,44 @@ export async function registerRoutes(
         }
       }
 
-      // Calculate billing fields
+      // Calculate billing fields — amount from frontend should be the customer price
       const defaultMarginSetting = await storage.getPlatformSetting("default_margin_percent");
-      const marginPercent = parseFloat(defaultMarginSetting?.settingValue || "15");
-      const basePrice = parseFloat(bookingData.amount);
-      const marginAmount = (basePrice * marginPercent) / 100;
-      const finalPrice = basePrice + marginAmount;
+      const defaultMarginPct = parseFloat(defaultMarginSetting?.settingValue || "15");
+      let sentAmount = parseFloat(bookingData.amount);
 
-      bookingData.basePrice = basePrice.toFixed(2);
+      let providerBaseCost = sentAmount;
+      let serviceOverridePrice: string | null = null;
+      let serviceOverrideMargin: string | null = null;
+
+      if (bookingData.bookingType === "lab" && bookingData.serviceId) {
+        const labTest = await storage.getLabTestById(bookingData.serviceId);
+        const enabledProvider = await storage.getEnabledProviderForTest(bookingData.serviceId);
+        providerBaseCost = parseFloat(enabledProvider?.price || labTest?.cost || bookingData.amount);
+        serviceOverridePrice = labTest?.customerPrice || null;
+        serviceOverrideMargin = labTest?.marginOverride || null;
+      } else if (bookingData.bookingType === "consultation" && bookingData.serviceId) {
+        const consultant = await storage.getConsultantById(bookingData.serviceId);
+        if (consultant) {
+          providerBaseCost = parseFloat(consultant.consultationFee);
+          serviceOverridePrice = consultant.customerPrice || null;
+          serviceOverrideMargin = consultant.marginOverride || null;
+        }
+      }
+
+      const pricing = calculateCustomerPrice(providerBaseCost, serviceOverridePrice, serviceOverrideMargin, defaultMarginPct);
+
+      if (Math.abs(sentAmount - providerBaseCost) < 0.01) {
+        sentAmount = pricing.customerPrice;
+      }
+
+      const customerAmount = sentAmount;
+      const marginAmount = customerAmount - providerBaseCost;
+      const marginPercent = providerBaseCost > 0 ? (marginAmount / providerBaseCost) * 100 : 0;
+
+      bookingData.basePrice = providerBaseCost.toFixed(2);
       bookingData.marginPercent = marginPercent.toFixed(2);
       bookingData.marginAmount = marginAmount.toFixed(2);
-      bookingData.amount = finalPrice.toFixed(2);
+      bookingData.amount = customerAmount.toFixed(2);
       bookingData.paymentStatus = bookingData.paymentStatus || "pending";
       bookingData.amountPaid = "0";
 
@@ -1400,10 +1519,32 @@ export async function registerRoutes(
 
   app.patch("/api/admin/lab-tests/:id", isAdmin, async (req, res) => {
     try {
-      const test = await storage.updateLabTest(req.params.id, req.body);
-      if (!test) {
+      const existing = await storage.getLabTestById(req.params.id);
+      if (!existing) {
         return res.status(404).json({ message: "Lab test not found" });
       }
+
+      const updateData = { ...req.body };
+
+      if (updateData.customerPrice !== undefined && updateData.marginOverride === undefined) {
+        const allProviderTests = await storage.getProviderLabTests();
+        const providerTest = allProviderTests.find(pt => pt.labTestId === req.params.id && pt.isActive && pt.approvalStatus === "approved");
+        const baseCost = parseFloat(providerTest?.price || existing.cost);
+        const cp = parseFloat(updateData.customerPrice);
+        if (!isNaN(cp) && baseCost > 0) {
+          updateData.marginOverride = deriveMarginFromPrice(baseCost, cp).toFixed(2);
+        }
+      } else if (updateData.marginOverride !== undefined && updateData.customerPrice === undefined) {
+        const allProviderTests = await storage.getProviderLabTests();
+        const providerTest = allProviderTests.find(pt => pt.labTestId === req.params.id && pt.isActive && pt.approvalStatus === "approved");
+        const baseCost = parseFloat(providerTest?.price || existing.cost);
+        const mo = parseFloat(updateData.marginOverride);
+        if (!isNaN(mo)) {
+          updateData.customerPrice = derivePriceFromMargin(baseCost, mo).toFixed(2);
+        }
+      }
+
+      const test = await storage.updateLabTest(req.params.id, updateData);
       res.json(test);
     } catch (error) {
       console.error("Error updating lab test:", error);
@@ -1438,8 +1579,21 @@ export async function registerRoutes(
   // Admin - Consultants CRUD
   app.get("/api/admin/consultants", isAdmin, async (req, res) => {
     try {
-      const consultants = await storage.getConsultants();
-      res.json(consultants);
+      const allConsultants = await storage.getConsultants();
+      const defaultMarginSetting = await storage.getPlatformSetting("default_margin_percent");
+      const defaultMargin = parseFloat(defaultMarginSetting?.settingValue || "15");
+
+      const enriched = allConsultants.map(c => {
+        const baseCost = parseFloat(c.consultationFee);
+        const pricing = calculateCustomerPrice(baseCost, c.customerPrice, c.marginOverride, defaultMargin);
+        return {
+          ...c,
+          providerBaseCost: baseCost.toFixed(2),
+          computedCustomerPrice: pricing.customerPrice.toFixed(2),
+          computedMarginPercent: pricing.marginPercent.toFixed(2),
+        };
+      });
+      res.json(enriched);
     } catch (error) {
       console.error("Error fetching consultants:", error);
       res.status(500).json({ message: "Failed to fetch consultants" });
@@ -1458,10 +1612,27 @@ export async function registerRoutes(
 
   app.patch("/api/admin/consultants/:id", isAdmin, async (req, res) => {
     try {
-      const consultant = await storage.updateConsultant(req.params.id, req.body);
-      if (!consultant) {
+      const existing = await storage.getConsultantById(req.params.id);
+      if (!existing) {
         return res.status(404).json({ message: "Consultant not found" });
       }
+
+      const updateData = { ...req.body };
+      const baseCost = parseFloat(existing.consultationFee);
+
+      if (updateData.customerPrice !== undefined && updateData.marginOverride === undefined) {
+        const cp = parseFloat(updateData.customerPrice);
+        if (!isNaN(cp) && baseCost > 0) {
+          updateData.marginOverride = deriveMarginFromPrice(baseCost, cp).toFixed(2);
+        }
+      } else if (updateData.marginOverride !== undefined && updateData.customerPrice === undefined) {
+        const mo = parseFloat(updateData.marginOverride);
+        if (!isNaN(mo)) {
+          updateData.customerPrice = derivePriceFromMargin(baseCost, mo).toFixed(2);
+        }
+      }
+
+      const consultant = await storage.updateConsultant(req.params.id, updateData);
       res.json(consultant);
     } catch (error) {
       console.error("Error updating consultant:", error);

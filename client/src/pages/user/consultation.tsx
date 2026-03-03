@@ -63,7 +63,7 @@ export default function ConsultationPage() {
         case "rating":
           return parseFloat(b.rating || "0") - parseFloat(a.rating || "0");
         case "cost":
-          return parseFloat(a.consultationFee) - parseFloat(b.consultationFee);
+          return parseFloat((a as any).computedCustomerPrice || a.consultationFee) - parseFloat((b as any).computedCustomerPrice || b.consultationFee);
         case "availability":
           return (b.availableSlots?.length || 0) - (a.availableSlots?.length || 0);
         default:
@@ -184,7 +184,7 @@ export default function ConsultationPage() {
                       </div>
                       <div className="flex items-center gap-2">
                         <IndianRupee className="h-3.5 w-3.5" />
-                        <span>Fee: ₹{team.consultationFee}</span>
+                        <span>Fee: ₹{(team as any).computedCustomerPrice || team.consultationFee}</span>
                       </div>
                     </div>
                     <Link href={`/user/consultation/${team.id}/book`}>
@@ -317,7 +317,7 @@ export default function ConsultationPage() {
                     {consultant.yearsExperience} years exp
                   </span>
                   <span className="flex items-center gap-1">
-                    ₹{consultant.consultationFee}
+                    ₹{(consultant as any).computedCustomerPrice || consultant.consultationFee}
                   </span>
                 </div>
 
