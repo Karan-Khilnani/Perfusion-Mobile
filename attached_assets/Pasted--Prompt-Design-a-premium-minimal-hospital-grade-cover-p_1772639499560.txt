@@ -1,0 +1,45 @@
+**Prompt:**
+
+Design a **premium, minimal, hospital-grade cover page for a medical diagnostic report** for a healthcare platform named **Perfusion**. The design should look **clean, clinical, trustworthy, and professional**, similar to reports from large diagnostic laboratories or hospital documentation. Use a **white background, minimal layout, subtle grey separators, and red accent color matching the Perfusion logo**. Typography should be **modern medical style (Inter / Helvetica / Source Sans)** with clear hierarchy and generous white space.
+
+At the top place the **Perfusion logo** with the tagline **“Connecting Remote Healthcare.”**
+
+Main title centered or aligned cleanly:
+**Diagnostic Report Release**
+Subtitle below: *Processed and delivered via Perfusion Diagnostics Platform.*
+
+Include structured sections with clean dividers:
+
+**Patient Information**
+
+* Patient Name
+* Age / Gender
+* Patient ID
+
+**Test Information**
+
+* Test Name
+* Expected Turnaround Time (TAT)
+* Actual TAT Completed
+
+**Laboratory Information**
+
+* Test Performed At (Provider laboratory name and location)
+
+Add an **Important Note section** in a subtle grey box:
+
+“The following pages contain the original laboratory report issued by the provider laboratory. Perfusion does not modify diagnostic values, interpretations, or clinical comments contained in the report. Perfusion acts as a logistics and accessibility partner, facilitating sample transport and report delivery to improve turnaround time and expand access to diagnostic services in remote and critical care settings. Quality of reporting is periodically reviewed through random quality checks as part of Perfusion's network quality assurance process.”
+
+Below that include **Perfusion services text**:
+
+“Advanced laboratory diagnostics at your ICU door for earliest reporting.”
+“Super Specialist consultation at your patient’s bedside.”
+
+Include a **QR code for report verification** with a small label below it:
+**“Scan to verify this report.”**
+
+Footer with contact information:
+
+**[www.perfusionhealth.com](http://www.perfusionhealth.com) | +91 92448 93295**
+
+Overall aesthetic should be **premium, clinical, trustworthy, and suitable for hospital use**, not promotional or flashy.
