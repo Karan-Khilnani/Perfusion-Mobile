@@ -57,7 +57,8 @@ export async function triggerVoiceCall(
 
 export async function sendWhatsAppMessage(
   phoneNumber: string,
-  body: string
+  body: string,
+  mediaUrl?: string
 ): Promise<boolean> {
   const client = getClient();
   if (!client || !TWILIO_WHATSAPP_NUMBER) {
@@ -68,11 +69,17 @@ export async function sendWhatsAppMessage(
   const formattedPhone = formatPhoneNumber(phoneNumber);
 
   try {
-    const message = await client.messages.create({
+    const messageParams: any = {
       body: body,
       to: `whatsapp:${formattedPhone}`,
       from: `whatsapp:${TWILIO_WHATSAPP_NUMBER}`,
-    });
+    };
+
+    if (mediaUrl) {
+      messageParams.mediaUrl = [mediaUrl];
+    }
+
+    const message = await client.messages.create(messageParams);
 
     console.log("[Twilio] WhatsApp message sent:", formattedPhone, "SID:", message.sid);
     return true;
@@ -114,7 +121,7 @@ export async function notifyAdminLabBooking(data: LabBookingNotification) {
   whatsappAdminMessage(whatsappMessage).catch((err: any) => console.error("[Twilio] Admin WhatsApp error:", err));
 }
 
-export async function notifyUserReportReady(userPhone: string, patientName: string, testName: string, bookingId: number | string) {
+export async function notifyUserReportReady(userPhone: string, patientName: string, testName: string, bookingId: number | string, reportMediaUrl?: string) {
   if (!userPhone) {
     console.error("[Twilio] No user phone number available for report notification");
     return;
@@ -123,14 +130,19 @@ export async function notifyUserReportReady(userPhone: string, patientName: stri
   const voiceMessage = `Hello. Your report for ${testName} is ready on the Perfusion portal. Booking reference: ${bookingId}. Please log in to download your report.`;
   triggerVoiceCall(userPhone, voiceMessage).catch((err: any) => console.error("[Twilio] User voice call error:", err));
 
-  const whatsappMessage = `📄 *Report Ready*\n\n👤 *Patient:* ${patientName}\n🔬 *Test:* ${testName}\n📋 *Booking ID:* ${bookingId}\n\nYour report is ready on the Perfusion portal. Please log in to download it.\n\n_Perfusion Healthcare Platform_`;
-  sendWhatsAppMessage(userPhone, whatsappMessage).catch((err: any) => console.error("[Twilio] User WhatsApp error:", err));
+  const whatsappMessage = `📄 *Report Ready*\n\n👤 *Patient:* ${patientName}\n🔬 *Test:* ${testName}\n📋 *Booking ID:* ${bookingId}\n\nYour report is ready. Please find it attached or log in to the Perfusion portal to download.\n\n_Perfusion Healthcare Platform_`;
+  sendWhatsAppMessage(userPhone, whatsappMessage, reportMediaUrl).catch((err: any) => console.error("[Twilio] User WhatsApp error:", err));
+
+  if (ADMIN_PHONE_NUMBER) {
+    const adminWhatsapp = `📄 *Report Uploaded & Delivered*\n\n👤 *Patient:* ${patientName}\n🔬 *Test:* ${testName}\n📋 *Booking ID:* ${bookingId}\n\nReport has been processed and delivered to the seeker.\n\n_Perfusion Healthcare Platform_`;
+    sendWhatsAppMessage(ADMIN_PHONE_NUMBER, adminWhatsapp, reportMediaUrl).catch((err: any) => console.error("[Twilio] Admin report WhatsApp error:", err));
+  }
 }
 
-async function whatsappAdminMessage(body: string): Promise<boolean> {
+async function whatsappAdminMessage(body: string, mediaUrl?: string): Promise<boolean> {
   if (!ADMIN_PHONE_NUMBER) {
     console.error("[Twilio] Admin phone number not configured");
     return false;
   }
-  return sendWhatsAppMessage(ADMIN_PHONE_NUMBER, body);
+  return sendWhatsAppMessage(ADMIN_PHONE_NUMBER, body, mediaUrl);
 }

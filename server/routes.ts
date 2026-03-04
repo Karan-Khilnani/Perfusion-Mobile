@@ -10,6 +10,7 @@ import fs from "fs";
 import { notifyAdminLabBooking, notifyUserReportReady } from "./services/msg91";
 import { generateBookingNumber } from "./services/booking-number";
 import { calculateCustomerPrice, deriveMarginFromPrice, derivePriceFromMargin } from "./services/pricing";
+import { processReport, type BookingReportData } from "./services/report-processor";
 
 // Daily.co API helper
 async function createDailyRoom(roomName: string): Promise<{ url: string; name: string } | null> {
@@ -917,23 +918,68 @@ export async function registerRoutes(
       }
 
       if (status === "report_ready" && booking.bookingType !== "consultation") {
-        let userPhone = booking.patientContact;
-        if (!userPhone && booking.userId) {
-          const bookingUser = await storage.getUserById(booking.userId);
-          if (bookingUser?.phone) {
-            userPhone = bookingUser.phone;
+        const sendReportNotification = (processedReportPublicUrl?: string) => {
+          let userPhone = booking.patientContact;
+          const lookupAndNotify = async () => {
+            if (!userPhone && booking.userId) {
+              const bookingUser = await storage.getUserById(booking.userId);
+              if (bookingUser?.phone) userPhone = bookingUser.phone;
+            }
+            if (!userPhone) userPhone = process.env.ADMIN_PHONE_NUMBER || null;
+            if (userPhone) {
+              notifyUserReportReady(
+                userPhone,
+                booking.patientName || "Patient",
+                booking.serviceName || "Test",
+                booking.bookingNumber || booking.id,
+                processedReportPublicUrl
+              ).catch((err: any) => console.error("[Twilio] Report ready notification failed:", err));
+            }
+          };
+          lookupAndNotify().catch(console.error);
+        };
+
+        if (booking.reportUrl) {
+          const reportFilePath = booking.reportUrl.startsWith("/")
+            ? path.join(process.cwd(), booking.reportUrl)
+            : booking.reportUrl;
+
+          let providerLabName = "Provider Laboratory";
+          if (booking.providerId) {
+            const provider = await storage.getProviderById(booking.providerId);
+            if (provider?.name) providerLabName = provider.name;
           }
-        }
-        if (!userPhone) {
-          userPhone = process.env.ADMIN_PHONE_NUMBER || null;
-        }
-        if (userPhone) {
-          notifyUserReportReady(
-            userPhone,
-            booking.patientName || "Patient",
-            booking.serviceName || "Test",
-            booking.bookingNumber || booking.id
-          ).catch((err: any) => console.error("[Twilio] Report ready notification failed:", err));
+
+          const appBaseUrl = process.env.REPLIT_DEV_DOMAIN
+            ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+            : "https://perfusionhealth.com";
+
+          const reportData: BookingReportData = {
+            bookingNumber: booking.bookingNumber || String(booking.id),
+            patientName: booking.patientName || "Patient",
+            patientAge: booking.patientAge || "—",
+            patientGender: booking.patientGender || "—",
+            testName: booking.serviceName || "Lab Test",
+            providerLabName,
+            reportDate: new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }),
+            expectedTAT: "As per test",
+            actualTAT: "Completed",
+            verificationUrl: `${appBaseUrl}/verify/${booking.bookingNumber || booking.id}`,
+          };
+
+          processReport(reportFilePath, reportData)
+            .then(async (processedUrl) => {
+              await storage.updateBooking(booking.id, { processedReportUrl: processedUrl });
+              console.log(`[ReportProcessor] Booking ${booking.id} processed report saved: ${processedUrl}`);
+              const publicMediaUrl = `${appBaseUrl}${processedUrl}`;
+              sendReportNotification(publicMediaUrl);
+            })
+            .catch((err) => {
+              console.error(`[ReportProcessor] Failed to process report for booking ${booking.id}:`, err);
+              sendReportNotification();
+            });
+        } else {
+          sendReportNotification();
         }
       }
       

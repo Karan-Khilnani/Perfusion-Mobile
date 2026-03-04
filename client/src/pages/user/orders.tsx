@@ -401,7 +401,7 @@ export default function OrdersPage() {
                 Provider notes: {booking.reportNotes}
               </p>
             )}
-            <a href={booking.reportUrl} target="_blank" rel="noopener noreferrer">
+            <a href={booking.processedReportUrl || booking.reportUrl} target="_blank" rel="noopener noreferrer">
               <Button className="mt-3" variant="default" data-testid="button-download-report">
                 <Download className="mr-2 h-4 w-4" />
                 Download Report
@@ -522,7 +522,7 @@ export default function OrdersPage() {
                       <td className="px-3 py-2 whitespace-nowrap">
                         {reportReady ? (
                           <a
-                            href={b.reportUrl!}
+                            href={b.processedReportUrl || b.reportUrl!}
                             target="_blank"
                             rel="noopener noreferrer"
                             onClick={(e) => e.stopPropagation()}

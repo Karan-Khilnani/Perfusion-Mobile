@@ -289,6 +289,7 @@ export const bookings = pgTable("bookings", {
   imageUrls: text("image_urls").array(),
   // Report fields (for providers to upload, seekers to download)
   reportUrl: varchar("report_url", { length: 500 }),
+  processedReportUrl: varchar("processed_report_url", { length: 500 }),
   reportNotes: text("report_notes"),
   // Prescription fields (for consultation bookings)
   prescriptionDiagnosis: text("prescription_diagnosis"),

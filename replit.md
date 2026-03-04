@@ -56,3 +56,14 @@ Preferred communication style: Simple, everyday language.
 - **Data**: Drizzle ORM, @tanstack/react-query, zod.
 - **Auth**: passport, openid-client, express-session, connect-pg-simple.
 - **Utilities**: date-fns, lucide-react, wouter.
+- **PDF Processing**: pdf-lib (PDF manipulation), qrcode (QR code generation).
+
+## Report Processing
+
+When a provider lab uploads a report and sets booking status to `report_ready`, the system automatically processes the report:
+1. **Cover Page**: A branded Perfusion cover page is prepended with patient info, test details, lab name, QR verification code, and disclaimer
+2. **Footer**: A Perfusion-branded footer is added to every page of the original report (logo, tagline, contact, booking ref)
+3. **Original Untouched**: The original report body/header/signatures remain completely unchanged
+4. **Storage**: Processed PDF saved as `processedReportUrl` on the booking (original preserved as `reportUrl`)
+5. **Delivery**: Processed PDF attached to WhatsApp notifications (admin + seeker) via Twilio `mediaUrl`
+6. Service: `server/services/report-processor.ts`, uses pdf-lib for PDF creation/manipulation
