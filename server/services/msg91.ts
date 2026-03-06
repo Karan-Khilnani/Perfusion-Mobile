@@ -89,6 +89,43 @@ export async function sendWhatsAppMessage(
   }
 }
 
+const REPORT_READY_TEMPLATE_SID = "HX78ef8f43e14cfc2a8e3e56ecd2607e43";
+
+export async function sendWhatsAppTemplate(
+  phoneNumber: string,
+  contentSid: string,
+  contentVariables: Record<string, string>,
+  mediaUrl?: string
+): Promise<boolean> {
+  const client = getClient();
+  if (!client || !TWILIO_WHATSAPP_NUMBER) {
+    console.error("[Twilio] Missing credentials or WhatsApp number");
+    return false;
+  }
+
+  const formattedPhone = formatPhoneNumber(phoneNumber);
+
+  try {
+    const messageParams: any = {
+      to: `whatsapp:${formattedPhone}`,
+      from: `whatsapp:${TWILIO_WHATSAPP_NUMBER}`,
+      contentSid: contentSid,
+      contentVariables: JSON.stringify(contentVariables),
+    };
+
+    if (mediaUrl) {
+      messageParams.mediaUrl = [mediaUrl];
+    }
+
+    const message = await client.messages.create(messageParams);
+    console.log("[Twilio] WhatsApp template sent:", formattedPhone, "SID:", message.sid);
+    return true;
+  } catch (error: any) {
+    console.error("[Twilio] WhatsApp template failed:", error?.message || error);
+    return false;
+  }
+}
+
 export interface LabBookingNotification {
   bookingId: string;
   seekerHospitalName: string;
@@ -121,21 +158,34 @@ export async function notifyAdminLabBooking(data: LabBookingNotification) {
   whatsappAdminMessage(whatsappMessage).catch((err: any) => console.error("[Twilio] Admin WhatsApp error:", err));
 }
 
+async function sendReportReadyWhatsApp(phoneNumber: string, patientName: string, testName: string, bookingId: string, reportMediaUrl?: string) {
+  const templateVars = { "1": patientName, "2": testName, "3": bookingId };
+  const templateSent = await sendWhatsAppTemplate(phoneNumber, REPORT_READY_TEMPLATE_SID, templateVars, reportMediaUrl);
+
+  if (!templateSent) {
+    console.log("[Twilio] Template failed, falling back to free-form message for", phoneNumber);
+    const fallbackMessage = `📄 *Report Ready*\n\n👤 *Patient:* ${patientName}\n🔬 *Test:* ${testName}\n📋 *Booking ID:* ${bookingId}\n\nYour report is ready. Please find it attached or log in to the Perfusion portal to download.\n\n_Perfusion Healthcare Platform_`;
+    await sendWhatsAppMessage(phoneNumber, fallbackMessage, reportMediaUrl);
+  }
+}
+
 export async function notifyUserReportReady(userPhone: string, patientName: string, testName: string, bookingId: number | string, reportMediaUrl?: string) {
   if (!userPhone) {
     console.error("[Twilio] No user phone number available for report notification");
     return;
   }
 
-  const voiceMessage = `Hello. Your report for ${testName} is ready on the Perfusion portal. Booking reference: ${bookingId}. Please log in to download your report.`;
+  const bookingIdStr = String(bookingId);
+
+  const voiceMessage = `Hello. Your report for ${testName} is ready on the Perfusion portal. Booking reference: ${bookingIdStr}. Please log in to download your report.`;
   triggerVoiceCall(userPhone, voiceMessage).catch((err: any) => console.error("[Twilio] User voice call error:", err));
 
-  const whatsappMessage = `📄 *Report Ready*\n\n👤 *Patient:* ${patientName}\n🔬 *Test:* ${testName}\n📋 *Booking ID:* ${bookingId}\n\nYour report is ready. Please find it attached or log in to the Perfusion portal to download.\n\n_Perfusion Healthcare Platform_`;
-  sendWhatsAppMessage(userPhone, whatsappMessage, reportMediaUrl).catch((err: any) => console.error("[Twilio] User WhatsApp error:", err));
+  sendReportReadyWhatsApp(userPhone, patientName, testName, bookingIdStr, reportMediaUrl)
+    .catch((err: any) => console.error("[Twilio] User WhatsApp error:", err));
 
   if (ADMIN_PHONE_NUMBER) {
-    const adminWhatsapp = `📄 *Report Uploaded & Delivered*\n\n👤 *Patient:* ${patientName}\n🔬 *Test:* ${testName}\n📋 *Booking ID:* ${bookingId}\n\nReport has been processed and delivered to the seeker.\n\n_Perfusion Healthcare Platform_`;
-    sendWhatsAppMessage(ADMIN_PHONE_NUMBER, adminWhatsapp, reportMediaUrl).catch((err: any) => console.error("[Twilio] Admin report WhatsApp error:", err));
+    sendReportReadyWhatsApp(ADMIN_PHONE_NUMBER, patientName, testName, bookingIdStr, reportMediaUrl)
+      .catch((err: any) => console.error("[Twilio] Admin report WhatsApp error:", err));
   }
 }
 
