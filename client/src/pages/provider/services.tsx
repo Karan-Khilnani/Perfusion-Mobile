@@ -704,11 +704,12 @@ export default function ProviderServicesPage() {
                   Add Consultant
                 </Button>
               </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
+              <DialogContent className="max-h-[90vh] flex flex-col">
+                <DialogHeader className="shrink-0">
                   <DialogTitle>Add Consultant</DialogTitle>
                   <DialogDescription>Add a new consultant to your practice</DialogDescription>
                 </DialogHeader>
+                <div className="overflow-y-auto flex-1 pr-1">
                 <Form {...consultantForm}>
                   <form onSubmit={consultantForm.handleSubmit((data) => createConsultantMutation.mutate(data))} className="space-y-4">
                     <FormField
@@ -866,6 +867,7 @@ export default function ProviderServicesPage() {
                     </Button>
                   </form>
                 </Form>
+                </div>
               </DialogContent>
             </Dialog>
           </div>
