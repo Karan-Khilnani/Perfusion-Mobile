@@ -89,6 +89,22 @@ export default function ProviderServicesPage() {
     retry: false,
   });
 
+  const { data: currentUser } = useQuery<any>({ queryKey: ["/api/auth/user"] });
+  const [selectedProviderType, setSelectedProviderType] = useState<string>("lab");
+
+  const autoCreateMutation = useMutation({
+    mutationFn: async (type: string) => {
+      const res = await apiRequest("POST", "/api/providers/auto-create", { type });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/providers/me"] });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to set up provider profile.", variant: "destructive" });
+    },
+  });
+
   const { data: labs, isLoading: labsLoading } = useQuery<LabWithTests[]>({
     queryKey: ["/api/provider/my-labs"],
     enabled: !!provider,
@@ -373,21 +389,60 @@ export default function ProviderServicesPage() {
   }
 
   if (!provider) {
+    const providerTypeOptions = [
+      { value: "lab", label: "Diagnostic Lab" },
+      { value: "consultant", label: "Specialist / Consultant" },
+      { value: "hospital", label: "Hospital / Critical Care" },
+      { value: "transport", label: "Transport / Ambulance" },
+    ];
     return (
       <div className="space-y-6">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Service Management</h1>
           <p className="text-muted-foreground">Manage your service listings and pricing</p>
         </div>
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-            <AlertCircle className="mb-4 h-12 w-12 text-muted-foreground/50" />
-            <h3 className="mb-2 text-lg font-medium">Provider Profile Required</h3>
-            <p className="mb-4 text-sm text-muted-foreground">
-              Complete your provider registration to start adding services
-            </p>
-            <Button asChild data-testid="button-complete-registration">
-              <a href="/provider/onboarding">Complete Registration</a>
+        <Card className="max-w-md mx-auto">
+          <CardHeader className="text-center">
+            <div className="mx-auto mb-2 p-3 rounded-full bg-primary/10 w-fit">
+              <Building2 className="h-6 w-6 text-primary" />
+            </div>
+            <CardTitle className="text-lg">One last step</CardTitle>
+            <CardDescription>
+              {currentUser?.hospitalName && (
+                <span className="font-medium text-foreground">{currentUser.hospitalName} — </span>
+              )}
+              What type of services will you offer?
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-2 gap-2">
+              {providerTypeOptions.map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setSelectedProviderType(opt.value)}
+                  className={`rounded-md border-2 p-3 text-sm font-medium text-left transition-colors ${
+                    selectedProviderType === opt.value
+                      ? "border-primary bg-primary/5 text-primary"
+                      : "border-muted hover:border-muted-foreground/30"
+                  }`}
+                  data-testid={`option-type-${opt.value}`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+            <Button
+              className="w-full"
+              disabled={autoCreateMutation.isPending}
+              onClick={() => autoCreateMutation.mutate(selectedProviderType)}
+              data-testid="button-get-started"
+            >
+              {autoCreateMutation.isPending ? (
+                <><Loader2 className="h-4 w-4 animate-spin mr-2" />Setting up...</>
+              ) : (
+                <>Get Started <ArrowRight className="h-4 w-4 ml-2" /></>
+              )}
             </Button>
           </CardContent>
         </Card>

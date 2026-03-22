@@ -177,6 +177,39 @@ export async function registerRoutes(
     }
   });
 
+  // Auto-create provider profile from user's existing signup data
+  app.post("/api/providers/auto-create", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) return res.status(401).json({ message: "Unauthorized" });
+
+      const existing = await storage.getProviderByUserId(userId);
+      if (existing) return res.json(existing);
+
+      const user = req.user as any;
+
+      const providerType = req.body.type || "lab";
+      const provider = await storage.createProvider({
+        userId,
+        name: user.hospitalName || `${user.firstName || ""} ${user.lastName || ""}`.trim() || "My Organization",
+        type: providerType,
+        description: req.body.description || "",
+        location: req.body.location || "",
+        address: user.hospitalAddress || "",
+        phone: user.phone || req.body.phone || "",
+        email: user.email,
+        licenseNumber: user.hospitalRegistrationNo || "",
+        registeredOrganization: user.hospitalRegisteredOrg || "",
+        verificationStatus: "pending",
+      } as any);
+
+      res.status(201).json(provider);
+    } catch (error) {
+      console.error("Error auto-creating provider:", error);
+      res.status(500).json({ message: "Failed to auto-create provider profile" });
+    }
+  });
+
   app.post("/api/providers", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user?.id;
