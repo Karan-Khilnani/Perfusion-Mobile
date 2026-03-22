@@ -164,6 +164,7 @@ export async function completeUserProfile(userId: string, data: {
   hospitalRegistrationNo: string;
   hospitalRegisteredOrg?: string;
   registrationDocumentUrl?: string;
+  phone?: string;
 }): Promise<SafeUser | null> {
   const [user] = await db
     .update(users)
@@ -174,6 +175,7 @@ export async function completeUserProfile(userId: string, data: {
       hospitalRegistrationNo: data.hospitalRegistrationNo,
       hospitalRegisteredOrg: data.hospitalRegisteredOrg,
       registrationDocumentUrl: data.registrationDocumentUrl,
+      phone: data.phone,
       approvalStatus: "pending",
       updatedAt: new Date(),
     })

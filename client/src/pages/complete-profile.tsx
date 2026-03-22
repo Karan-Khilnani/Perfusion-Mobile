@@ -10,7 +10,9 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { Heart, Loader2, User, Building, Upload } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
@@ -21,7 +23,22 @@ const profileSchema = z.object({
   hospitalAddress: z.string().min(5, "Hospital address is required"),
   hospitalRegistrationNo: z.string().min(1, "Registration number is required"),
   hospitalRegisteredOrg: z.string().min(2, "Registered organization is required"),
-});
+  phone: z.string().optional(),
+  providerType: z.enum(["lab", "consultant", "hospital", "transport"]).optional(),
+  description: z.string().optional(),
+  location: z.string().optional(),
+}).refine((data) => {
+  if (data.role === "provider") return !!data.providerType;
+  return true;
+}, { message: "Please select your provider type", path: ["providerType"] })
+  .refine((data) => {
+    if (data.role === "provider") return !!data.phone && data.phone.length >= 10;
+    return true;
+  }, { message: "Valid phone number is required for providers", path: ["phone"] })
+  .refine((data) => {
+    if (data.role === "provider") return !!data.location && data.location.length >= 2;
+    return true;
+  }, { message: "City/location is required for providers", path: ["location"] });
 
 type ProfileFormData = z.infer<typeof profileSchema>;
 
@@ -48,6 +65,10 @@ export default function CompleteProfilePage() {
       hospitalAddress: "",
       hospitalRegistrationNo: "",
       hospitalRegisteredOrg: "",
+      phone: "",
+      providerType: undefined,
+      description: "",
+      location: "",
     },
   });
 
@@ -110,9 +131,9 @@ export default function CompleteProfilePage() {
           <CardTitle>Complete Your Profile</CardTitle>
           <CardDescription>
             {currentUser?.email ? (
-              <>Signed in as <span className="font-medium">{currentUser.email}</span>. Please provide your hospital details to continue.</>
+              <>Signed in as <span className="font-medium">{currentUser.email}</span>. Please provide your details to continue.</>
             ) : (
-              "Please provide your hospital details to continue."
+              "Please provide your details to continue."
             )}
           </CardDescription>
         </CardHeader>
@@ -132,17 +153,11 @@ export default function CompleteProfilePage() {
                         className="grid grid-cols-2 gap-4"
                       >
                         <div>
-                          <RadioGroupItem
-                            value="care_seeker"
-                            id="cp_care_seeker"
-                            className="peer sr-only"
-                          />
+                          <RadioGroupItem value="care_seeker" id="cp_care_seeker" className="peer sr-only" />
                           <Label
                             htmlFor="cp_care_seeker"
                             className={`flex flex-col items-center justify-between rounded-md border-2 p-4 cursor-pointer ${
-                              selectedRole === "care_seeker"
-                                ? "border-primary bg-primary/5"
-                                : "border-muted"
+                              selectedRole === "care_seeker" ? "border-primary bg-primary/5" : "border-muted"
                             }`}
                             data-testid="radio-cp-care-seeker"
                           >
@@ -152,17 +167,11 @@ export default function CompleteProfilePage() {
                           </Label>
                         </div>
                         <div>
-                          <RadioGroupItem
-                            value="provider"
-                            id="cp_provider"
-                            className="peer sr-only"
-                          />
+                          <RadioGroupItem value="provider" id="cp_provider" className="peer sr-only" />
                           <Label
                             htmlFor="cp_provider"
                             className={`flex flex-col items-center justify-between rounded-md border-2 p-4 cursor-pointer ${
-                              selectedRole === "provider"
-                                ? "border-primary bg-primary/5"
-                                : "border-muted"
+                              selectedRole === "provider" ? "border-primary bg-primary/5" : "border-muted"
                             }`}
                             data-testid="radio-cp-provider"
                           >
@@ -183,21 +192,106 @@ export default function CompleteProfilePage() {
                 name="hospitalName"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Hospital / Organization Name</FormLabel>
+                    <FormLabel>
+                      {selectedRole === "provider" ? "Business / Organization Name" : "Hospital / Organization Name"}
+                    </FormLabel>
                     <FormControl>
-                      <Input placeholder="e.g. City General Hospital" {...field} data-testid="input-hospital-name" />
+                      <Input
+                        placeholder={selectedRole === "provider" ? "e.g. CityPath Diagnostics" : "e.g. City General Hospital"}
+                        {...field}
+                        data-testid="input-hospital-name"
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
 
+              {selectedRole === "provider" && (
+                <>
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="providerType"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Provider Type</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger data-testid="select-provider-type">
+                                <SelectValue placeholder="Select type" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="lab">Diagnostic Lab</SelectItem>
+                              <SelectItem value="consultant">Specialist / Consultant</SelectItem>
+                              <SelectItem value="hospital">Hospital / Critical Care</SelectItem>
+                              <SelectItem value="transport">Transport / Ambulance</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="location"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>City / Location</FormLabel>
+                          <FormControl>
+                            <Input placeholder="e.g., Raipur" data-testid="input-location" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <FormField
+                    control={form.control}
+                    name="phone"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Phone Number</FormLabel>
+                        <FormControl>
+                          <Input placeholder="+91 XXXXX XXXXX" data-testid="input-phone" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="description"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Description <span className="text-muted-foreground text-xs">(optional)</span></FormLabel>
+                        <FormControl>
+                          <Textarea
+                            placeholder="Brief description of your services"
+                            data-testid="input-description"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </>
+              )}
+
+              <Separator />
+
               <FormField
                 control={form.control}
                 name="hospitalAddress"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Hospital Address</FormLabel>
+                    <FormLabel>
+                      {selectedRole === "provider" ? "Business Address" : "Hospital Address"}
+                    </FormLabel>
                     <FormControl>
                       <Textarea placeholder="Full address including city, state, and PIN code" {...field} data-testid="input-hospital-address" />
                     </FormControl>
@@ -206,33 +300,35 @@ export default function CompleteProfilePage() {
                 )}
               />
 
-              <FormField
-                control={form.control}
-                name="hospitalRegistrationNo"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Registration Number</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Hospital registration number" {...field} data-testid="input-registration-no" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="hospitalRegistrationNo"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Registration Number</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Registration number" {...field} data-testid="input-registration-no" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-              <FormField
-                control={form.control}
-                name="hospitalRegisteredOrg"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Registered Organization</FormLabel>
-                    <FormControl>
-                      <Input placeholder="e.g., State Medical Council, MCI, NABL, etc." {...field} data-testid="input-registered-org" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                <FormField
+                  control={form.control}
+                  name="hospitalRegisteredOrg"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Registered With</FormLabel>
+                      <FormControl>
+                        <Input placeholder="e.g., MCI, NABL, NMC" {...field} data-testid="input-registered-org" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
 
               <div className="space-y-2">
                 <Label>Registration Certificate (optional)</Label>

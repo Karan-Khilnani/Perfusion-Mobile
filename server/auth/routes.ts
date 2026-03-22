@@ -19,6 +19,7 @@ import {
 import { loginSchema, registerSchema, type UserRole } from "@shared/models/auth";
 import { z } from "zod";
 import { generateVerificationCode, sendVerificationEmail } from "../email";
+import { storage } from "../storage";
 
 function getCallbackURL(req: any): string {
   let protocol = req.headers["x-forwarded-proto"] || req.protocol || "https";
@@ -221,9 +222,31 @@ export function registerAuthRoutes(app: Express): void {
       
       const user = await createUser({
         ...validatedData,
+        phone: validatedData.phone,
         verificationCode: code,
         verificationCodeExpiresAt: expiresAt,
       });
+
+      // Auto-create provider record if registering as provider
+      if (validatedData.role === "provider" && validatedData.providerType) {
+        try {
+          await storage.createProvider({
+            userId: user.id,
+            name: validatedData.hospitalName,
+            type: validatedData.providerType,
+            description: validatedData.description || "",
+            location: validatedData.location || "",
+            address: validatedData.hospitalAddress,
+            phone: validatedData.phone || "",
+            email: validatedData.email,
+            licenseNumber: validatedData.hospitalRegistrationNo,
+            registeredOrganization: validatedData.hospitalRegisteredOrg,
+            verificationStatus: "pending",
+          } as any);
+        } catch (providerErr) {
+          console.error("Provider auto-create error:", providerErr);
+        }
+      }
 
       const emailSent = await sendVerificationEmail(validatedData.email, code, validatedData.firstName);
       
@@ -332,7 +355,7 @@ export function registerAuthRoutes(app: Express): void {
         return res.status(401).json({ message: "User not found" });
       }
 
-      const { role, hospitalName, hospitalAddress, hospitalRegistrationNo, hospitalRegisteredOrg, registrationDocumentUrl } = req.body;
+      const { role, hospitalName, hospitalAddress, hospitalRegistrationNo, hospitalRegisteredOrg, registrationDocumentUrl, phone, providerType, description, location } = req.body;
       if (!role || !["care_seeker", "provider"].includes(role)) {
         return res.status(400).json({ message: "Valid role is required" });
       }
@@ -347,10 +370,35 @@ export function registerAuthRoutes(app: Express): void {
         hospitalRegistrationNo,
         hospitalRegisteredOrg,
         registrationDocumentUrl,
+        phone,
       });
 
       if (!updated) {
         return res.status(500).json({ message: "Failed to update profile" });
+      }
+
+      // Auto-create provider record if registering as provider
+      if (role === "provider" && providerType) {
+        try {
+          const existing = await storage.getProviderByUserId(req.session.userId);
+          if (!existing) {
+            await storage.createProvider({
+              userId: req.session.userId,
+              name: hospitalName,
+              type: providerType,
+              description: description || "",
+              location: location || "",
+              address: hospitalAddress,
+              phone: phone || "",
+              email: user.email,
+              licenseNumber: hospitalRegistrationNo,
+              registeredOrganization: hospitalRegisteredOrg || "",
+              verificationStatus: "pending",
+            } as any);
+          }
+        } catch (providerErr) {
+          console.error("Provider auto-create error:", providerErr);
+        }
       }
 
       res.json({ ...updated, needsApproval: true });

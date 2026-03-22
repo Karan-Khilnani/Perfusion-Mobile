@@ -76,6 +76,11 @@ export const registerSchema = z.object({
   hospitalRegistrationNo: z.string().min(1, "Registration number is required"),
   hospitalRegisteredOrg: z.string().min(2, "Registered organization is required"),
   registrationDocumentUrl: z.string().optional(),
+  // Provider-specific fields (required when role = provider)
+  phone: z.string().optional(),
+  providerType: z.enum(["lab", "consultant", "hospital", "transport"]).optional(),
+  description: z.string().optional(),
+  location: z.string().optional(),
 });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;

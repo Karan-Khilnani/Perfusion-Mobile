@@ -1,5 +1,6 @@
+import { useEffect } from "react";
 import { useLocation } from "wouter";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -14,15 +15,10 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
 const providerSchema = z.object({
-  name: z.string().min(2, "Business name is required"),
-  type: z.enum(["lab", "consultant", "hospital", "transport"]),
-  description: z.string().optional(),
-  location: z.string().min(2, "Location is required"),
-  address: z.string().min(5, "Full address is required"),
+  type: z.enum(["lab", "consultant", "hospital", "transport"], { required_error: "Provider type is required" }),
   phone: z.string().min(10, "Valid phone number is required"),
-  email: z.string().email("Valid email is required"),
-  licenseNumber: z.string().min(1, "License number is required"),
-  registeredOrganization: z.string().min(2, "Registered organization is required"),
+  location: z.string().min(2, "City/location is required"),
+  description: z.string().optional(),
 });
 
 type ProviderFormData = z.infer<typeof providerSchema>;
@@ -32,31 +28,58 @@ export default function ProviderOnboardingPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  const { data: provider, isLoading: providerLoading } = useQuery<any>({
+    queryKey: ["/api/providers/me"],
+    retry: false,
+  });
+
+  const { data: currentUser, isLoading: userLoading } = useQuery<any>({
+    queryKey: ["/api/auth/user"],
+  });
+
+  useEffect(() => {
+    if (!providerLoading && provider) {
+      setLocation("/provider");
+    }
+  }, [provider, providerLoading, setLocation]);
+
   const form = useForm<ProviderFormData>({
     resolver: zodResolver(providerSchema),
     defaultValues: {
-      name: "",
-      type: "lab",
-      description: "",
+      type: undefined,
+      phone: currentUser?.phone || "",
       location: "",
-      address: "",
-      phone: "",
-      email: "",
-      licenseNumber: "",
-      registeredOrganization: "",
+      description: "",
     },
   });
 
+  useEffect(() => {
+    if (currentUser?.phone) {
+      form.setValue("phone", currentUser.phone);
+    }
+  }, [currentUser, form]);
+
   const createProviderMutation = useMutation({
     mutationFn: async (data: ProviderFormData) => {
-      return apiRequest("POST", "/api/providers", data);
+      const payload = {
+        name: currentUser?.hospitalName || "",
+        type: data.type,
+        description: data.description || "",
+        location: data.location,
+        address: currentUser?.hospitalAddress || "",
+        phone: data.phone,
+        email: currentUser?.email || "",
+        licenseNumber: currentUser?.hospitalRegistrationNo || "",
+        registeredOrganization: currentUser?.hospitalRegisteredOrg || "",
+      };
+      return apiRequest("POST", "/api/providers", payload);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
       queryClient.invalidateQueries({ queryKey: ["/api/providers/me"] });
       toast({
-        title: "Registration Submitted",
-        description: "Your provider profile is pending verification. You can start adding services.",
+        title: "Registration Complete",
+        description: "Your provider profile is ready. You can now add services.",
       });
       setLocation("/provider");
     },
@@ -69,38 +92,42 @@ export default function ProviderOnboardingPage() {
     },
   });
 
-  const onSubmit = (data: ProviderFormData) => {
-    createProviderMutation.mutate(data);
-  };
+  if (providerLoading || userLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <Card className="max-w-md w-full">
+          <CardContent className="flex flex-col items-center gap-4 py-10">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <p className="text-muted-foreground">Loading your profile...</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (provider) return null;
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <Card className="max-w-2xl w-full">
+      <Card className="max-w-lg w-full">
         <CardHeader className="text-center">
           <div className="mx-auto mb-4 p-4 rounded-full bg-primary/10">
             <Building2 className="h-8 w-8 text-primary" />
           </div>
-          <CardTitle>Provider Registration</CardTitle>
+          <CardTitle>A Few More Details</CardTitle>
           <CardDescription>
-            Complete your business profile to start offering services on Perfusion
+            Just a couple more things and you're all set. Your organization details from sign-up have already been saved.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-              <FormField
-                control={form.control}
-                name="name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Business Name</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Your lab, clinic, or hospital name" {...field} data-testid="input-provider-name" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+            <form onSubmit={form.handleSubmit((d) => createProviderMutation.mutate(d))} className="space-y-4">
+              {currentUser?.hospitalName && (
+                <div className="rounded-md bg-muted/50 p-3 text-sm">
+                  <p className="font-medium">{currentUser.hospitalName}</p>
+                  <p className="text-muted-foreground text-xs mt-0.5">{currentUser.hospitalAddress}</p>
+                </div>
+              )}
 
               <FormField
                 control={form.control}
@@ -116,9 +143,9 @@ export default function ProviderOnboardingPage() {
                       </FormControl>
                       <SelectContent>
                         <SelectItem value="lab">Diagnostic Lab</SelectItem>
-                        <SelectItem value="consultant">Specialist/Consultant</SelectItem>
-                        <SelectItem value="hospital">Hospital/Critical Care</SelectItem>
-                        <SelectItem value="transport">Transport/Ambulance Service</SelectItem>
+                        <SelectItem value="consultant">Specialist / Consultant</SelectItem>
+                        <SelectItem value="hospital">Hospital / Critical Care</SelectItem>
+                        <SelectItem value="transport">Transport / Ambulance Service</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -126,87 +153,7 @@ export default function ProviderOnboardingPage() {
                 )}
               />
 
-              <FormField
-                control={form.control}
-                name="description"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Description</FormLabel>
-                    <FormControl>
-                      <Textarea 
-                        placeholder="Brief description of your services" 
-                        {...field} 
-                        data-testid="input-provider-description"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="location"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>City/Location</FormLabel>
-                      <FormControl>
-                        <Input placeholder="e.g., Mumbai" {...field} data-testid="input-provider-location" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="licenseNumber"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>License/Registration Number</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Your medical license number" {...field} data-testid="input-provider-license" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <FormField
-                control={form.control}
-                name="registeredOrganization"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Registered Organization</FormLabel>
-                    <FormControl>
-                      <Input placeholder="e.g., State Medical Council, MCI, NABL, etc." {...field} data-testid="input-registered-org" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="address"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Full Address</FormLabel>
-                    <FormControl>
-                      <Textarea 
-                        placeholder="Complete business address" 
-                        {...field} 
-                        data-testid="input-provider-address"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
                   name="phone"
@@ -223,12 +170,12 @@ export default function ProviderOnboardingPage() {
 
                 <FormField
                   control={form.control}
-                  name="email"
+                  name="location"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Business Email</FormLabel>
+                      <FormLabel>City / Location</FormLabel>
                       <FormControl>
-                        <Input type="email" placeholder="contact@yourbusiness.com" {...field} data-testid="input-provider-email" />
+                        <Input placeholder="e.g., Raipur" {...field} data-testid="input-provider-location" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -236,16 +183,35 @@ export default function ProviderOnboardingPage() {
                 />
               </div>
 
-              <Button 
-                type="submit" 
-                className="w-full" 
+              <FormField
+                control={form.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Description <span className="text-xs text-muted-foreground">(optional)</span></FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="Brief description of your services"
+                        {...field}
+                        data-testid="input-provider-description"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <Button
+                type="submit"
+                className="w-full"
                 disabled={createProviderMutation.isPending}
                 data-testid="button-submit-provider"
               >
                 {createProviderMutation.isPending ? (
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                ) : null}
-                Submit Registration
+                  <><Loader2 className="h-4 w-4 animate-spin mr-2" />Saving...</>
+                ) : (
+                  "Complete Setup"
+                )}
               </Button>
             </form>
           </Form>
