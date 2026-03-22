@@ -41,6 +41,7 @@ const consultantSchema = z.object({
   specialization: z.string().min(2, "Specialization is required"),
   yearsExperience: z.coerce.number().min(0, "Experience is required"),
   consultationFee: z.string().min(1, "Fee is required"),
+  portfolio: z.string().optional(),
 });
 
 const emergencyTeamSchema = z.object({
@@ -149,7 +150,7 @@ export default function ProviderServicesPage() {
 
   const consultantForm = useForm<ConsultantFormData>({
     resolver: zodResolver(consultantSchema),
-    defaultValues: { name: "", qualification: "", specialization: "", yearsExperience: 0, consultationFee: "" },
+    defaultValues: { name: "", qualification: "", specialization: "", yearsExperience: 0, consultationFee: "", portfolio: "" },
   });
 
   const emergencyForm = useForm<EmergencyTeamFormData>({
@@ -806,6 +807,24 @@ export default function ProviderServicesPage() {
                         data-testid="input-consultant-affiliation"
                       />
                     </div>
+                    <FormField
+                      control={consultantForm.control}
+                      name="portfolio"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Portfolio / Experience Details</FormLabel>
+                          <FormControl>
+                            <Textarea
+                              placeholder="Describe your clinical experience, past positions, key achievements, areas of expertise, publications, or any other relevant background..."
+                              className="min-h-[100px] resize-none"
+                              data-testid="input-consultant-portfolio"
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
                     <div className="space-y-2">
                       <Label>Consultant Photo</Label>
                       {consultantPhotoFile ? (
