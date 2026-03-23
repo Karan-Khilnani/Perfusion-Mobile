@@ -13,7 +13,7 @@ import { StatusBadge } from "@/components/status-badge";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { format } from "date-fns";
-import { Search, Plus, Edit, Eye, Filter, Stethoscope, FlaskConical, ScanLine, Download, Upload, File, Loader2 } from "lucide-react";
+import { Search, Plus, Edit, Eye, Filter, Stethoscope, FlaskConical, ScanLine, Download, Upload, File, Loader2, ShieldCheck, FileSignature } from "lucide-react";
 import type { Booking, Consultant, LabTest, RadiologyModality, BookingStatus } from "@shared/schema";
 
 type BookingFilter = "all" | "consultation" | "lab" | "teleradiology";
@@ -468,10 +468,42 @@ export default function AdminBookingsPage() {
                       <p className="text-xs font-mono text-muted-foreground">
                         {(booking as any).bookingNumber || booking.id.substring(0, 12).toUpperCase()} • {booking.createdAt && format(new Date(booking.createdAt), "PPp")}
                       </p>
+                      {booking.bookingType === "consultation" && (booking as any).prescriptionApprovedAt && (
+                        <div className="mt-1 flex flex-wrap items-center gap-2">
+                          <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                            <ShieldCheck className="h-3 w-3" />
+                            Rx Signed &amp; Locked
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            {format(new Date((booking as any).prescriptionApprovedAt), "PPp")}
+                          </span>
+                          {(booking as any).prescriptionApproverIp && (
+                            <span className="font-mono text-xs text-muted-foreground">
+                              IP: {(booking as any).prescriptionApproverIp}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                      {booking.bookingType === "consultation" && !(booking as any).prescriptionApprovedAt && (booking as any).prescriptionGeneratedAt && (
+                        <div className="mt-1 flex items-center gap-1">
+                          <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                            <FileSignature className="h-3 w-3" />
+                            Rx Draft (unsigned)
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
                     <StatusBadge status={booking.status} />
+                    {booking.bookingType === "consultation" && (booking as any).prescriptionApprovedAt && (booking as any).prescriptionPdfUrl && (
+                      <a href={(booking as any).prescriptionPdfUrl} target="_blank" rel="noopener noreferrer">
+                        <Button size="sm" variant="outline" className="text-green-700 dark:text-green-400" data-testid={`button-view-signed-rx-${booking.id}`}>
+                          <Download className="mr-1 h-3.5 w-3.5" />
+                          Signed Rx
+                        </Button>
+                      </a>
+                    )}
                     {(booking.bookingType === "lab" || booking.bookingType === "teleradiology") && (
                       booking.reportUrl ? (
                         <a href={booking.reportUrl} target="_blank" rel="noopener noreferrer">

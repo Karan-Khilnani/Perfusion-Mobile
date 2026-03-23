@@ -1056,6 +1056,11 @@ export async function registerRoutes(
       if (booking.bookingType !== "consultation") {
         return res.status(400).json({ message: "Prescriptions can only be generated for consultations" });
       }
+
+      // Reject edits on approved (signed & locked) prescriptions
+      if ((booking as any).prescriptionApprovedAt) {
+        return res.status(409).json({ message: "This prescription has been confirmed and is permanently locked. It cannot be edited." });
+      }
       
       const { diagnosis, medications, advice, followUp, physicianNotes } = req.body as {
         diagnosis: string;

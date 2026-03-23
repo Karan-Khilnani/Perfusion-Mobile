@@ -365,25 +365,40 @@ export default function OrdersPage() {
                 </div>
               )}
             </div>
-            <Button 
-              className="mt-3" 
-              variant="default" 
-              onClick={async () => {
-                try {
-                  const response = await fetch(`/api/bookings/${booking.id}/prescription-pdf`, { credentials: "include" });
-                  if (!response.ok) throw new Error("Failed to fetch prescription data");
-                  const prescriptionData = await response.json();
-                  const { generatePrescriptionPDF } = await import("@/lib/prescription-pdf");
-                  await generatePrescriptionPDF(prescriptionData);
-                } catch (error) {
-                  console.error("PDF generation error:", error);
-                }
-              }}
-              data-testid="button-download-prescription"
-            >
-              <Download className="mr-2 h-4 w-4" />
-              Download Prescription PDF
-            </Button>
+            {(booking as any).prescriptionApprovedAt && (booking as any).prescriptionPdfUrl ? (
+              <a
+                href={(booking as any).prescriptionPdfUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-block mt-3"
+                data-testid="button-download-prescription"
+              >
+                <Button className="gap-2" variant="default">
+                  <Download className="h-4 w-4" />
+                  Download Signed Prescription
+                </Button>
+              </a>
+            ) : (
+              <Button 
+                className="mt-3" 
+                variant="default" 
+                onClick={async () => {
+                  try {
+                    const response = await fetch(`/api/bookings/${booking.id}/prescription-pdf`, { credentials: "include" });
+                    if (!response.ok) throw new Error("Failed to fetch prescription data");
+                    const prescriptionData = await response.json();
+                    const { generatePrescriptionPDF } = await import("@/lib/prescription-pdf");
+                    await generatePrescriptionPDF(prescriptionData);
+                  } catch (error) {
+                    console.error("PDF generation error:", error);
+                  }
+                }}
+                data-testid="button-download-prescription"
+              >
+                <Download className="mr-2 h-4 w-4" />
+                Download Prescription PDF
+              </Button>
+            )}
           </div>
         )}
 
