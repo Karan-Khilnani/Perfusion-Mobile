@@ -145,16 +145,21 @@ export async function generateAndStorePrescriptionPdf(data: PrescriptionPdfData,
       const lh = 40;
       const lw = lh * (logo.width / logo.height);
       page.drawImage(logo, { x: MARGIN, y: PAGE_H - 58, width: lw, height: lh });
-    } catch {}
+    } catch (err) {
+      console.error("[PrescriptionPDF] Failed to embed logo:", err);
+      page.drawText("Perfusion Health Pvt Ltd", { x: MARGIN, y: PAGE_H - 45, size: 16, font: fontBold, color: WHITE });
+    }
   } else {
     page.drawText("Perfusion Health Pvt Ltd", { x: MARGIN, y: PAGE_H - 45, size: 16, font: fontBold, color: WHITE });
   }
 
-  page.drawText("Digital Super Speciality E-Prescription", { x: PAGE_W - MARGIN, y: PAGE_H - 38, size: 10, font: fontBold, color: WHITE, opacity: 0.9, xSkewAngle: 0 });
-  const titleW = fontBold.widthOfTextAtSize("Digital Super Speciality E-Prescription", 10);
-  page.drawText("Digital Super Speciality E-Prescription", { x: PAGE_W - MARGIN - titleW, y: PAGE_H - 38, size: 10, font: fontBold, color: WHITE });
-  page.drawText(`E-Prescription ID: ${prescriptionId}`, { x: PAGE_W - MARGIN - fontBold.widthOfTextAtSize(`E-Prescription ID: ${prescriptionId}`, 8), y: PAGE_H - 53, size: 8, font, color: rgb(1, 0.85, 0.85) });
-  page.drawText(`Mode: Teleconsultation`, { x: PAGE_W - MARGIN - fontBold.widthOfTextAtSize("Mode: Teleconsultation", 8), y: PAGE_H - 65, size: 8, font, color: rgb(1, 0.85, 0.85) });
+  const titleText = "Digital Super Speciality E-Prescription";
+  const titleW = fontBold.widthOfTextAtSize(titleText, 10);
+  page.drawText(titleText, { x: PAGE_W - MARGIN - titleW, y: PAGE_H - 38, size: 10, font: fontBold, color: WHITE });
+  const idText = `E-Prescription ID: ${prescriptionId}`;
+  page.drawText(idText, { x: PAGE_W - MARGIN - fontBold.widthOfTextAtSize(idText, 8), y: PAGE_H - 53, size: 8, font, color: rgb(1, 0.85, 0.85) });
+  const modeText = "Mode: Teleconsultation";
+  page.drawText(modeText, { x: PAGE_W - MARGIN - font.widthOfTextAtSize(modeText, 8), y: PAGE_H - 65, size: 8, font, color: rgb(1, 0.85, 0.85) });
 
   y = PAGE_H - 100;
 
@@ -167,7 +172,9 @@ export async function generateAndStorePrescriptionPdf(data: PrescriptionPdfData,
     const qrLabel = "Scan to verify";
     const qrLW = font.widthOfTextAtSize(qrLabel, 7);
     page.drawText(qrLabel, { x: PAGE_W - MARGIN - qrSize + (qrSize - qrLW) / 2, y: y - 12, size: 7, font, color: GREY });
-  } catch {}
+  } catch (err) {
+    console.error("[PrescriptionPDF] Failed to generate QR code:", err);
+  }
 
   // ── Approval seal ─────────────────────────────────────────────────────────────
   page.drawRectangle({ x: MARGIN, y: y + 30, width: CONTENT_W - 90, height: 42, color: GREEN_BG });
@@ -306,7 +313,9 @@ export async function generateAndStorePrescriptionPdf(data: PrescriptionPdfData,
         page.drawImage(sigImg, { x: sigX, y: y - 36, width: 120, height: 36 });
         y -= 40;
       }
-    } catch {}
+    } catch (err) {
+      console.error("[PrescriptionPDF] Failed to embed consultant signature:", err);
+    }
   }
 
   page.drawText(`Dr. ${data.consultantName}`, { x: sigX, y, size: 10, font: fontBold, color: DARK });
@@ -328,9 +337,9 @@ export async function generateAndStorePrescriptionPdf(data: PrescriptionPdfData,
     const p = pages[i];
     p.drawLine({ start: { x: MARGIN, y: 38 }, end: { x: PAGE_W - MARGIN, y: 38 }, thickness: 0.5, color: RED });
     p.drawText("Perfusion Health Pvt Ltd | Digital Super Speciality Consultation Platform", { x: MARGIN, y: 26, size: 7, font, color: LIGHT_GREY });
-    p.drawText(`Page ${i + 1} of ${total}`, { x: PAGE_W - MARGIN, y: 26, size: 7, font, color: LIGHT_GREY, xSkewAngle: 0 });
-    const pw = font.widthOfTextAtSize(`Page ${i + 1} of ${total}`, 7);
-    p.drawText(`Page ${i + 1} of ${total}`, { x: PAGE_W - MARGIN - pw, y: 26, size: 7, font, color: LIGHT_GREY });
+    const pageNumText = `Page ${i + 1} of ${total}`;
+    const pw = font.widthOfTextAtSize(pageNumText, 7);
+    p.drawText(pageNumText, { x: PAGE_W - MARGIN - pw, y: 26, size: 7, font, color: LIGHT_GREY });
     p.drawText("This is a digitally confirmed e-prescription. Scan QR on page 1 to verify.", { x: MARGIN, y: 16, size: 7, font: fontItalic, color: LIGHT_GREY });
     p.drawText(`Verification: ${verificationUrl}`, { x: MARGIN, y: 6, size: 6.5, font, color: LIGHT_GREY });
   }

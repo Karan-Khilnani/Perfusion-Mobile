@@ -9,6 +9,9 @@ import fs from "fs";
 const app = express();
 const httpServer = createServer(app);
 
+// Trust the first proxy hop so req.ip is correctly set from X-Forwarded-For
+app.set("trust proxy", 1);
+
 declare module "http" {
   interface IncomingMessage {
     rawBody: unknown;

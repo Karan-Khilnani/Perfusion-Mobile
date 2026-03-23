@@ -1118,11 +1118,12 @@ export async function registerRoutes(
         return res.status(404).json({ message: "No prescription generated yet" });
       }
 
-      // For confirmed (signed & locked) prescriptions, only the frozen server-side PDF is valid
+      // For confirmed (signed & locked) prescriptions, serve only the frozen stored PDF
       if ((booking as any).prescriptionApprovedAt && (booking as any).prescriptionPdfUrl) {
-        return res.status(409).json({
-          message: "This prescription has been confirmed and locked. Download the signed PDF instead.",
+        return res.json({
+          locked: true,
           prescriptionPdfUrl: (booking as any).prescriptionPdfUrl,
+          message: "This prescription has been confirmed and is available as a signed PDF.",
         });
       }
       
@@ -1231,7 +1232,8 @@ export async function registerRoutes(
 
       const bookingUser = await storage.getUserById(freshBooking.userId);
       const approvedAt = new Date();
-      const approverIp = (req.headers["x-forwarded-for"] as string || req.socket.remoteAddress || "unknown").split(",")[0].trim();
+      // Use req.ip which respects 'trust proxy' setting for reliable IP attribution
+      const approverIp = req.ip || req.socket?.remoteAddress || "unknown";
 
       // Build base URL for QR code
       const protocol = req.headers["x-forwarded-proto"] || "https";

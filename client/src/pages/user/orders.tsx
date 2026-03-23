@@ -386,7 +386,7 @@ export default function OrdersPage() {
                   try {
                     const response = await fetch(`/api/bookings/${booking.id}/prescription-pdf`, { credentials: "include" });
                     const data = await response.json();
-                    if (response.status === 409 && data.prescriptionPdfUrl) {
+                    if (data.locked && data.prescriptionPdfUrl) {
                       window.open(data.prescriptionPdfUrl, "_blank");
                       return;
                     }
