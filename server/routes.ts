@@ -1117,6 +1117,14 @@ export async function registerRoutes(
       if (!booking.prescriptionGeneratedAt) {
         return res.status(404).json({ message: "No prescription generated yet" });
       }
+
+      // For confirmed (signed & locked) prescriptions, only the frozen server-side PDF is valid
+      if ((booking as any).prescriptionApprovedAt && (booking as any).prescriptionPdfUrl) {
+        return res.status(409).json({
+          message: "This prescription has been confirmed and locked. Download the signed PDF instead.",
+          prescriptionPdfUrl: (booking as any).prescriptionPdfUrl,
+        });
+      }
       
       // Fetch consultant details for the prescription
       let consultant: any = null;
@@ -1167,77 +1175,109 @@ export async function registerRoutes(
     }
   });
 
-  // Confirm & Sign prescription (locks it + generates server-side PDF + audit log)
+  // Confirm & Sign prescription (provider-only: locks + atomically saves current draft + generates server-side frozen PDF + audit log)
   app.post("/api/bookings/:id/prescription/confirm", isAuthenticated, async (req: any, res) => {
     try {
       const user = req.user;
+
+      // Only providers (assigned consultant's owner) may digitally sign — not admins
+      if (user.role !== "provider") {
+        return res.status(403).json({ message: "Only the assigned provider may confirm and sign a prescription." });
+      }
+
       const booking = await storage.getBookingById(req.params.id);
       if (!booking) return res.status(404).json({ message: "Booking not found" });
       if (booking.bookingType !== "consultation") return res.status(400).json({ message: "Only consultation bookings can have prescriptions confirmed" });
-      if (user.role !== "provider" && user.role !== "admin") return res.status(403).json({ message: "Only providers can confirm prescriptions" });
 
-      // Verify ownership
-      if (user.role === "provider") {
-        const provider = await storage.getProviderByUserId(user.id);
-        if (!provider) return res.status(403).json({ message: "Provider profile not found" });
-        const consultant = await storage.getConsultantById(booking.serviceId);
-        if (!consultant || consultant.providerId !== provider.id) return res.status(403).json({ message: "Access denied" });
+      // Strict ownership: verify the consultant belongs to this provider
+      const provider = await storage.getProviderByUserId(user.id);
+      if (!provider) return res.status(403).json({ message: "Provider profile not found" });
+      const consultant = await storage.getConsultantById(booking.serviceId);
+      if (!consultant || consultant.providerId !== provider.id) {
+        return res.status(403).json({ message: "You can only sign prescriptions for your own consultants" });
       }
 
-      if (!booking.prescriptionDiagnosis) return res.status(400).json({ message: "No prescription draft to confirm. Save a draft first." });
-      if ((booking as any).prescriptionApprovedAt) return res.status(400).json({ message: "Prescription is already confirmed and locked." });
+      if ((booking as any).prescriptionApprovedAt) {
+        return res.status(409).json({ message: "Prescription is already confirmed and permanently locked." });
+      }
 
-      // Fetch consultant and referring facility
-      let consultant: any = null;
-      if (booking.serviceId) consultant = await storage.getConsultantById(booking.serviceId);
-      const bookingUser = await storage.getUserById(booking.userId);
+      // Accept current prescription content from request body (atomic save+confirm)
+      const { diagnosis, medications, physicianNotes, followUp } = req.body as {
+        diagnosis?: string;
+        medications?: string;
+        physicianNotes?: string;
+        followUp?: string;
+      };
 
+      const finalDiagnosis = (diagnosis || "").trim() || booking.prescriptionDiagnosis || null;
+      if (!finalDiagnosis) {
+        return res.status(400).json({ message: "Diagnosis is required before confirming a prescription." });
+      }
+
+      // Atomically update prescription content before confirming
+      if (diagnosis !== undefined || medications !== undefined || physicianNotes !== undefined || followUp !== undefined) {
+        await storage.updateBooking(booking.id, {
+          prescriptionDiagnosis: finalDiagnosis,
+          prescriptionMedications: (medications || "").trim() || booking.prescriptionMedications || null,
+          prescriptionPhysicianNotes: (physicianNotes || "").trim() || (booking as any).prescriptionPhysicianNotes || null,
+          prescriptionFollowUp: (followUp || "").trim() || booking.prescriptionFollowUp || null,
+          prescriptionGeneratedAt: new Date(),
+        } as any);
+      }
+
+      // Re-fetch with updated data
+      const freshBooking = await storage.getBookingById(booking.id);
+      if (!freshBooking) return res.status(404).json({ message: "Booking not found after update" });
+
+      const bookingUser = await storage.getUserById(freshBooking.userId);
       const approvedAt = new Date();
       const approverIp = (req.headers["x-forwarded-for"] as string || req.socket.remoteAddress || "unknown").split(",")[0].trim();
 
-      // Get base URL for QR code
+      // Build base URL for QR code
       const protocol = req.headers["x-forwarded-proto"] || "https";
       const host = req.headers.host || "localhost:5000";
       const baseUrl = process.env.REPLIT_DEV_DOMAIN
         ? `https://${process.env.REPLIT_DEV_DOMAIN}`
         : `${protocol}://${host}`;
 
+      const providerDisplayName = `${user.firstName || ""} ${user.lastName || ""}`.trim() || user.email || user.id;
+
       const pdfData: PrescriptionPdfData = {
-        bookingId: booking.id,
-        bookingNumber: (booking as any).bookingNumber || `PFN-${booking.id.substring(0, 8).toUpperCase()}`,
+        bookingId: freshBooking.id,
+        bookingNumber: (freshBooking as any).bookingNumber || `PFN-${freshBooking.id.substring(0, 8).toUpperCase()}`,
         approvedAt,
         approverIp,
         referringFacility: bookingUser?.hospitalName || null,
-        onCallDoctorName: (booking as any).onCallDoctorName || null,
-        onCallDoctorDesignation: (booking as any).onCallDoctorDesignation || null,
-        patientName: booking.patientName,
-        patientAge: booking.patientAge,
-        patientGender: booking.patientGender,
-        uhidIpNumber: (booking as any).uhidIpNumber || null,
-        patientContact: booking.patientContact,
-        patientWeight: (booking as any).patientWeight || null,
-        patientAllergies: (booking as any).patientAllergyNotSpecified ? null : (booking as any).patientAllergies,
-        patientAllergyNotSpecified: (booking as any).patientAllergyNotSpecified ?? true,
-        consultantName: consultant?.name || booking.serviceName,
-        consultantSpecialization: consultant?.specialization || null,
-        consultantQualification: consultant?.qualification || null,
-        consultantRegistrationNo: consultant?.registrationNumber || null,
-        consultantYearsExperience: consultant?.yearsExperience || null,
-        consultantAffiliation: consultant?.affiliatedInstitution || null,
-        consultantSignatureUrl: consultant?.digitalSignatureUrl || null,
-        clinicalHistory: booking.clinicalSummary || null,
-        examination: booking.examination || null,
-        investigations: booking.investigations || null,
-        diagnosis: booking.prescriptionDiagnosis || null,
-        physicianNotes: (booking as any).prescriptionPhysicianNotes || null,
-        treatmentPlan: booking.prescriptionMedications || null,
-        followUp: booking.prescriptionFollowUp || null,
+        onCallDoctorName: (freshBooking as any).onCallDoctorName || null,
+        onCallDoctorDesignation: (freshBooking as any).onCallDoctorDesignation || null,
+        patientName: freshBooking.patientName,
+        patientAge: freshBooking.patientAge,
+        patientGender: freshBooking.patientGender,
+        uhidIpNumber: (freshBooking as any).uhidIpNumber || null,
+        patientContact: freshBooking.patientContact,
+        patientWeight: (freshBooking as any).patientWeight || null,
+        patientAllergies: (freshBooking as any).patientAllergyNotSpecified ? null : (freshBooking as any).patientAllergies,
+        patientAllergyNotSpecified: (freshBooking as any).patientAllergyNotSpecified ?? true,
+        consultantName: consultant.name,
+        consultantSpecialization: consultant.specialization || null,
+        consultantQualification: consultant.qualification || null,
+        consultantRegistrationNo: consultant.registrationNumber || null,
+        consultantYearsExperience: consultant.yearsExperience || null,
+        consultantAffiliation: consultant.affiliatedInstitution || null,
+        consultantSignatureUrl: consultant.digitalSignatureUrl || null,
+        clinicalHistory: freshBooking.clinicalSummary || null,
+        examination: freshBooking.examination || null,
+        investigations: freshBooking.investigations || null,
+        diagnosis: freshBooking.prescriptionDiagnosis || null,
+        physicianNotes: (freshBooking as any).prescriptionPhysicianNotes || null,
+        treatmentPlan: freshBooking.prescriptionMedications || null,
+        followUp: freshBooking.prescriptionFollowUp || null,
       };
 
       const prescriptionPdfUrl = await generateAndStorePrescriptionPdf(pdfData, baseUrl);
 
-      // Update booking with approval metadata
-      const updated = await storage.updateBooking(booking.id, {
+      // Lock the prescription with approval metadata
+      const updated = await storage.updateBooking(freshBooking.id, {
         prescriptionApprovedAt: approvedAt,
         prescriptionApprovedByUserId: user.id,
         prescriptionApproverIp: approverIp,
@@ -1245,17 +1285,19 @@ export async function registerRoutes(
         prescriptionPdfUrl,
       } as any);
 
-      // Write audit log
+      // Write medicolegal audit log
       await storage.createAuditLog({
         userId: user.id,
         action: "PRESCRIPTION_CONFIRMED",
         entityType: "booking",
-        entityId: booking.id,
+        entityId: freshBooking.id,
         details: JSON.stringify({
-          bookingNumber: (booking as any).bookingNumber,
-          consultantName: pdfData.consultantName,
-          consultantRegistrationNo: pdfData.consultantRegistrationNo,
-          patientName: booking.patientName,
+          bookingNumber: (freshBooking as any).bookingNumber,
+          consultantName: consultant.name,
+          consultantRegistrationNo: consultant.registrationNumber || null,
+          providerUserId: user.id,
+          providerDisplayName,
+          patientName: freshBooking.patientName,
           approverIp,
           prescriptionPdfUrl,
           confirmedAt: approvedAt.toISOString(),

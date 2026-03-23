@@ -477,6 +477,11 @@ export default function AdminBookingsPage() {
                           <span className="text-xs text-muted-foreground">
                             {format(new Date((booking as any).prescriptionApprovedAt), "PPp")}
                           </span>
+                          {(booking as any).prescriptionApprovedByUserId && (
+                            <span className="font-mono text-xs text-muted-foreground">
+                              User: {((booking as any).prescriptionApprovedByUserId as string).substring(0, 8)}…
+                            </span>
+                          )}
                           {(booking as any).prescriptionApproverIp && (
                             <span className="font-mono text-xs text-muted-foreground">
                               IP: {(booking as any).prescriptionApproverIp}

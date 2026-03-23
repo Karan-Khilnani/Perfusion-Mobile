@@ -385,10 +385,14 @@ export default function OrdersPage() {
                 onClick={async () => {
                   try {
                     const response = await fetch(`/api/bookings/${booking.id}/prescription-pdf`, { credentials: "include" });
+                    const data = await response.json();
+                    if (response.status === 409 && data.prescriptionPdfUrl) {
+                      window.open(data.prescriptionPdfUrl, "_blank");
+                      return;
+                    }
                     if (!response.ok) throw new Error("Failed to fetch prescription data");
-                    const prescriptionData = await response.json();
                     const { generatePrescriptionPDF } = await import("@/lib/prescription-pdf");
-                    await generatePrescriptionPDF(prescriptionData);
+                    await generatePrescriptionPDF(data);
                   } catch (error) {
                     console.error("PDF generation error:", error);
                   }

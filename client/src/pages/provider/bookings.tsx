@@ -206,8 +206,19 @@ export default function ProviderBookingsPage() {
   });
 
   const confirmPrescriptionMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const response = await apiRequest("POST", `/api/bookings/${id}/prescription/confirm`, {});
+    mutationFn: async ({ id, diagnosis, medications, physicianNotes, followUp }: {
+      id: string;
+      diagnosis: string;
+      medications: string;
+      physicianNotes: string;
+      followUp: string;
+    }) => {
+      const response = await apiRequest("POST", `/api/bookings/${id}/prescription/confirm`, {
+        diagnosis,
+        medications,
+        physicianNotes,
+        followUp,
+      });
       return response.json();
     },
     onSuccess: () => {
@@ -855,7 +866,13 @@ export default function ProviderBookingsPage() {
                   )}
                 </Button>
                 <Button
-                  onClick={() => prescriptionBooking && confirmPrescriptionMutation.mutate(prescriptionBooking.id)}
+                  onClick={() => prescriptionBooking && confirmPrescriptionMutation.mutate({
+                    id: prescriptionBooking.id,
+                    diagnosis: prescriptionDiagnosis,
+                    medications: prescriptionMedications,
+                    physicianNotes: prescriptionPhysicianNotes,
+                    followUp: prescriptionFollowUp,
+                  })}
                   disabled={!prescriptionDiagnosis || prescriptionMutation.isPending || confirmPrescriptionMutation.isPending}
                   className="bg-green-700 hover:bg-green-800 text-white"
                   data-testid="button-confirm-prescription"
