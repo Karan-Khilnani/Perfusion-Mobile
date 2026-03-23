@@ -24,18 +24,22 @@ interface PrescriptionVerification {
 export default function VerifyPrescriptionPage() {
   const { bookingId } = useParams<{ bookingId: string }>();
 
-  const { data, isLoading, isError } = useQuery<PrescriptionVerification>({
+  const { data, isLoading, isError, error } = useQuery<PrescriptionVerification, { status: number; message: string }>({
     queryKey: ["/api/verify/prescription", bookingId],
     queryFn: async () => {
       const res = await fetch(`/api/verify/prescription/${bookingId}`);
+      const body = await res.json().catch(() => ({ message: "Server error" }));
       if (!res.ok) {
-        const err = await res.json().catch(() => ({ message: "Not found" }));
-        throw new Error(err.message || "Not found");
+        const err: any = new Error(body.message || "Not found");
+        err.status = res.status;
+        throw err;
       }
-      return res.json();
+      return body;
     },
     retry: false,
   });
+
+  const isNotFound = isError && (error as any)?.status === 404;
 
   const confirmedDate = data?.confirmedAt ? new Date(data.confirmedAt) : null;
 
@@ -73,9 +77,13 @@ export default function VerifyPrescriptionPage() {
                   <ShieldX className="h-7 w-7 text-red-600 dark:text-red-400" />
                 </div>
                 <div>
-                  <p className="font-semibold text-red-700 dark:text-red-400">Verification Failed</p>
+                  <p className="font-semibold text-red-700 dark:text-red-400">
+                    {isNotFound ? "Prescription Not Found" : "Verification Failed"}
+                  </p>
                   <p className="text-sm text-muted-foreground mt-1">
-                    This prescription could not be verified. It may not exist, or may not have been digitally confirmed yet.
+                    {isNotFound
+                      ? "No prescription record was found for this ID. The QR code may be invalid or the prescription may not exist."
+                      : "This prescription could not be verified. It may not have been digitally confirmed yet."}
                   </p>
                 </div>
               </div>
