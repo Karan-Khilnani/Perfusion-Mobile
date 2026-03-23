@@ -11,6 +11,7 @@ import { notifyAdminLabBooking, notifyUserReportReady } from "./services/msg91";
 import { generateBookingNumber } from "./services/booking-number";
 import { calculateCustomerPrice, deriveMarginFromPrice, derivePriceFromMargin } from "./services/pricing";
 import { processReport, type BookingReportData } from "./services/report-processor";
+import { generateAndStorePrescriptionPdf, type PrescriptionPdfData } from "./services/prescription-pdf";
 
 // Daily.co API helper
 async function createDailyRoom(roomName: string): Promise<{ url: string; name: string } | null> {
@@ -1158,6 +1159,143 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error generating prescription PDF data:", error);
       res.status(500).json({ message: "Failed to generate prescription" });
+    }
+  });
+
+  // Confirm & Sign prescription (locks it + generates server-side PDF + audit log)
+  app.post("/api/bookings/:id/prescription/confirm", isAuthenticated, async (req: any, res) => {
+    try {
+      const user = req.user;
+      const booking = await storage.getBookingById(req.params.id);
+      if (!booking) return res.status(404).json({ message: "Booking not found" });
+      if (booking.bookingType !== "consultation") return res.status(400).json({ message: "Only consultation bookings can have prescriptions confirmed" });
+      if (user.role !== "provider" && user.role !== "admin") return res.status(403).json({ message: "Only providers can confirm prescriptions" });
+
+      // Verify ownership
+      if (user.role === "provider") {
+        const provider = await storage.getProviderByUserId(user.id);
+        if (!provider) return res.status(403).json({ message: "Provider profile not found" });
+        const consultant = await storage.getConsultantById(booking.serviceId);
+        if (!consultant || consultant.providerId !== provider.id) return res.status(403).json({ message: "Access denied" });
+      }
+
+      if (!booking.prescriptionDiagnosis) return res.status(400).json({ message: "No prescription draft to confirm. Save a draft first." });
+      if ((booking as any).prescriptionApprovedAt) return res.status(400).json({ message: "Prescription is already confirmed and locked." });
+
+      // Fetch consultant and referring facility
+      let consultant: any = null;
+      if (booking.serviceId) consultant = await storage.getConsultantById(booking.serviceId);
+      const bookingUser = await storage.getUserById(booking.userId);
+
+      const approvedAt = new Date();
+      const approverIp = (req.headers["x-forwarded-for"] as string || req.socket.remoteAddress || "unknown").split(",")[0].trim();
+
+      // Get base URL for QR code
+      const protocol = req.headers["x-forwarded-proto"] || "https";
+      const host = req.headers.host || "localhost:5000";
+      const baseUrl = process.env.REPLIT_DEV_DOMAIN
+        ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+        : `${protocol}://${host}`;
+
+      const pdfData: PrescriptionPdfData = {
+        bookingId: booking.id,
+        bookingNumber: (booking as any).bookingNumber || `PFN-${booking.id.substring(0, 8).toUpperCase()}`,
+        approvedAt,
+        approverIp,
+        referringFacility: bookingUser?.hospitalName || null,
+        onCallDoctorName: (booking as any).onCallDoctorName || null,
+        onCallDoctorDesignation: (booking as any).onCallDoctorDesignation || null,
+        patientName: booking.patientName,
+        patientAge: booking.patientAge,
+        patientGender: booking.patientGender,
+        uhidIpNumber: (booking as any).uhidIpNumber || null,
+        patientContact: booking.patientContact,
+        patientWeight: (booking as any).patientWeight || null,
+        patientAllergies: (booking as any).patientAllergyNotSpecified ? null : (booking as any).patientAllergies,
+        patientAllergyNotSpecified: (booking as any).patientAllergyNotSpecified ?? true,
+        consultantName: consultant?.name || booking.serviceName,
+        consultantSpecialization: consultant?.specialization || null,
+        consultantQualification: consultant?.qualification || null,
+        consultantRegistrationNo: consultant?.registrationNumber || null,
+        consultantYearsExperience: consultant?.yearsExperience || null,
+        consultantAffiliation: consultant?.affiliatedInstitution || null,
+        consultantSignatureUrl: consultant?.digitalSignatureUrl || null,
+        clinicalHistory: booking.clinicalSummary || null,
+        examination: booking.examination || null,
+        investigations: booking.investigations || null,
+        diagnosis: booking.prescriptionDiagnosis || null,
+        physicianNotes: (booking as any).prescriptionPhysicianNotes || null,
+        treatmentPlan: booking.prescriptionMedications || null,
+        followUp: booking.prescriptionFollowUp || null,
+      };
+
+      const prescriptionPdfUrl = await generateAndStorePrescriptionPdf(pdfData, baseUrl);
+
+      // Update booking with approval metadata
+      const updated = await storage.updateBooking(booking.id, {
+        prescriptionApprovedAt: approvedAt,
+        prescriptionApprovedByUserId: user.id,
+        prescriptionApproverIp: approverIp,
+        prescriptionOtpVerified: false,
+        prescriptionPdfUrl,
+      } as any);
+
+      // Write audit log
+      await storage.createAuditLog({
+        userId: user.id,
+        action: "PRESCRIPTION_CONFIRMED",
+        entityType: "booking",
+        entityId: booking.id,
+        details: JSON.stringify({
+          bookingNumber: (booking as any).bookingNumber,
+          consultantName: pdfData.consultantName,
+          consultantRegistrationNo: pdfData.consultantRegistrationNo,
+          patientName: booking.patientName,
+          approverIp,
+          prescriptionPdfUrl,
+          confirmedAt: approvedAt.toISOString(),
+        }),
+      });
+
+      res.json({ ...updated, prescriptionPdfUrl });
+    } catch (error) {
+      console.error("Error confirming prescription:", error);
+      res.status(500).json({ message: "Failed to confirm prescription" });
+    }
+  });
+
+  // Public verification endpoint (no auth required)
+  app.get("/api/verify/prescription/:bookingId", async (req: any, res) => {
+    try {
+      const booking = await storage.getBookingById(req.params.bookingId);
+      if (!booking || booking.bookingType !== "consultation") {
+        return res.status(404).json({ message: "Prescription not found" });
+      }
+      if (!(booking as any).prescriptionApprovedAt) {
+        return res.status(404).json({ message: "This prescription has not been confirmed yet" });
+      }
+
+      let consultant: any = null;
+      if (booking.serviceId) consultant = await storage.getConsultantById(booking.serviceId);
+      const bookingUser = await storage.getUserById(booking.userId);
+
+      res.json({
+        prescriptionId: (booking as any).bookingNumber || `PFN-${booking.id.substring(0, 8).toUpperCase()}`,
+        patientName: booking.patientName,
+        referringFacility: bookingUser?.hospitalName || null,
+        consultantName: consultant?.name || booking.serviceName,
+        consultantSpecialization: consultant?.specialization || null,
+        consultantQualification: consultant?.qualification || null,
+        consultantRegistrationNo: consultant?.registrationNumber || null,
+        consultantYearsExperience: consultant?.yearsExperience || null,
+        consultantAffiliation: consultant?.affiliatedInstitution || null,
+        confirmedAt: (booking as any).prescriptionApprovedAt,
+        prescriptionPdfUrl: (booking as any).prescriptionPdfUrl || null,
+        isVerified: true,
+      });
+    } catch (error) {
+      console.error("Error verifying prescription:", error);
+      res.status(500).json({ message: "Failed to verify prescription" });
     }
   });
 

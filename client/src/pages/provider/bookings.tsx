@@ -13,7 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { StatusBadge } from "@/components/status-badge";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { ClipboardList, RefreshCw, Video, Upload, Stethoscope, FlaskConical, ScanLine, FileText, Download, Paperclip, FileSignature, Loader2, File } from "lucide-react";
+import { ClipboardList, RefreshCw, Video, Upload, Stethoscope, FlaskConical, ScanLine, FileText, Download, Paperclip, FileSignature, Loader2, File, ShieldCheck, Lock } from "lucide-react";
 import { Link } from "wouter";
 import type { Booking, BookingStatus } from "@shared/schema";
 import { format } from "date-fns";
@@ -191,6 +191,27 @@ export default function ProviderBookingsPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/provider/bookings"] });
+      toast({
+        title: "Draft Saved",
+        description: "Prescription draft saved. Use \"Confirm & Sign\" to lock it permanently.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Failed",
+        description: "Failed to save prescription draft.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const confirmPrescriptionMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const response = await apiRequest("POST", `/api/bookings/${id}/prescription/confirm`, {});
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/provider/bookings"] });
       setShowPrescriptionDialog(false);
       setPrescriptionBooking(null);
       setPrescriptionDiagnosis("");
@@ -199,14 +220,14 @@ export default function ProviderBookingsPage() {
       setPrescriptionFollowUp("");
       setPrescriptionPhysicianNotes("");
       toast({
-        title: "Prescription Generated",
-        description: "Prescription has been saved and is available for download.",
+        title: "Prescription Confirmed & Signed",
+        description: "The prescription is now locked with a medicolegal audit trail. A server-side PDF has been generated.",
       });
     },
-    onError: () => {
+    onError: (error: any) => {
       toast({
-        title: "Failed",
-        description: "Failed to generate prescription.",
+        title: "Confirmation Failed",
+        description: error?.message || "Failed to confirm prescription.",
         variant: "destructive",
       });
     },
@@ -308,35 +329,68 @@ export default function ProviderBookingsPage() {
         )}
         {booking.bookingType === "consultation" && (
           <>
-            <Button
-              size="sm"
-              variant={(booking as any).prescriptionGeneratedAt ? "secondary" : "default"}
-              onClick={() => openPrescriptionDialog(booking)}
-              data-testid={`button-prescription-${booking.id}`}
-            >
-              <FileSignature className="mr-2 h-3.5 w-3.5" />
-              {(booking as any).prescriptionGeneratedAt ? "Edit Prescription" : "Generate Prescription"}
-            </Button>
-            {(booking as any).prescriptionGeneratedAt && (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={async () => {
-                  try {
-                    const response = await fetch(`/api/bookings/${booking.id}/prescription-pdf`, { credentials: "include" });
-                    if (!response.ok) throw new Error("Failed to fetch prescription data");
-                    const prescriptionData = await response.json();
-                    const { generatePrescriptionPDF } = await import("@/lib/prescription-pdf");
-                    await generatePrescriptionPDF(prescriptionData);
-                  } catch (error) {
-                    console.error("PDF generation error:", error);
-                  }
-                }}
-                data-testid={`button-download-prescription-${booking.id}`}
-              >
-                <Download className="mr-2 h-3.5 w-3.5" />
-                Download PDF
-              </Button>
+            {(booking as any).prescriptionApprovedAt ? (
+              <div className="flex flex-col items-end gap-1">
+                <div className="flex items-center gap-1 rounded-full bg-green-100 px-3 py-1 text-xs font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                  <ShieldCheck className="h-3.5 w-3.5" />
+                  Signed & Locked
+                </div>
+                {(booking as any).prescriptionPdfUrl && (
+                  <a
+                    href={(booking as any).prescriptionPdfUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    data-testid={`button-download-prescription-${booking.id}`}
+                  >
+                    <Button size="sm" variant="outline">
+                      <Download className="mr-2 h-3.5 w-3.5" />
+                      Download PDF
+                    </Button>
+                  </a>
+                )}
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 px-2 text-xs text-muted-foreground"
+                  onClick={() => openPrescriptionDialog(booking)}
+                  data-testid={`button-view-prescription-${booking.id}`}
+                >
+                  View Details
+                </Button>
+              </div>
+            ) : (
+              <>
+                <Button
+                  size="sm"
+                  variant={(booking as any).prescriptionGeneratedAt ? "secondary" : "default"}
+                  onClick={() => openPrescriptionDialog(booking)}
+                  data-testid={`button-prescription-${booking.id}`}
+                >
+                  <FileSignature className="mr-2 h-3.5 w-3.5" />
+                  {(booking as any).prescriptionGeneratedAt ? "Edit Draft" : "Generate Prescription"}
+                </Button>
+                {(booking as any).prescriptionGeneratedAt && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={async () => {
+                      try {
+                        const response = await fetch(`/api/bookings/${booking.id}/prescription-pdf`, { credentials: "include" });
+                        if (!response.ok) throw new Error("Failed to fetch prescription data");
+                        const prescriptionData = await response.json();
+                        const { generatePrescriptionPDF } = await import("@/lib/prescription-pdf");
+                        await generatePrescriptionPDF(prescriptionData);
+                      } catch (error) {
+                        console.error("PDF generation error:", error);
+                      }
+                    }}
+                    data-testid={`button-download-prescription-${booking.id}`}
+                  >
+                    <Download className="mr-2 h-3.5 w-3.5" />
+                    Draft PDF
+                  </Button>
+                )}
+              </>
             )}
           </>
         )}
@@ -675,77 +729,151 @@ export default function ProviderBookingsPage() {
       </Dialog>
 
       <Dialog open={showPrescriptionDialog} onOpenChange={setShowPrescriptionDialog}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>
-              {prescriptionBooking?.prescriptionGeneratedAt ? "Edit Prescription" : "Generate Prescription"}
+        <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
+          <DialogHeader className="shrink-0">
+            <DialogTitle className="flex items-center gap-2">
+              {(prescriptionBooking as any)?.prescriptionApprovedAt ? (
+                <>
+                  <ShieldCheck className="h-5 w-5 text-green-600" />
+                  Prescription — Signed & Locked
+                </>
+              ) : (prescriptionBooking as any)?.prescriptionGeneratedAt ? (
+                "Edit Prescription Draft"
+              ) : (
+                "Generate Prescription"
+              )}
             </DialogTitle>
             <DialogDescription>
-              Prescription for {prescriptionBooking?.patientName} - {prescriptionBooking?.serviceName}
+              {prescriptionBooking?.patientName} • {prescriptionBooking?.serviceName}
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 max-h-[60vh] overflow-y-auto">
-            <div className="rounded-lg bg-muted/50 p-3 text-sm text-muted-foreground">
-              Patient details, clinical history, examinations, and investigations will be auto-populated from the booking. Only fill in the fields below.
-            </div>
-            <div className="space-y-2">
-              <Label>Diagnosis <span className="text-destructive">*</span></Label>
-              <Textarea
-                placeholder="Enter diagnosis details..."
-                value={prescriptionDiagnosis}
-                onChange={(e) => setPrescriptionDiagnosis(e.target.value)}
-                rows={3}
-                data-testid="input-prescription-diagnosis"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Physician Notes</Label>
-              <Textarea
-                placeholder="Clinical observations, recommendations, special instructions..."
-                value={prescriptionPhysicianNotes}
-                onChange={(e) => setPrescriptionPhysicianNotes(e.target.value)}
-                rows={3}
-                data-testid="input-prescription-physician-notes"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Suggested Treatment Plan</Label>
-              <Textarea
-                placeholder="List medications with dosage and frequency, procedures, therapy...&#10;e.g., Tab. Paracetamol 500mg - 1 tablet twice daily after meals for 5 days"
-                value={prescriptionMedications}
-                onChange={(e) => setPrescriptionMedications(e.target.value)}
-                rows={5}
-                data-testid="input-prescription-medications"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Follow-up</Label>
-              <Input
-                placeholder="e.g., After 1 week, or if symptoms persist"
-                value={prescriptionFollowUp}
-                onChange={(e) => setPrescriptionFollowUp(e.target.value)}
-                data-testid="input-prescription-followup"
-              />
-            </div>
+          <div className="space-y-4 overflow-y-auto flex-1 pr-1">
+            {(prescriptionBooking as any)?.prescriptionApprovedAt ? (
+              <div className="rounded-lg border border-green-200 bg-green-50 dark:bg-green-900/20 dark:border-green-800 p-4 space-y-3">
+                <div className="flex items-center gap-2 text-green-700 dark:text-green-400 font-medium">
+                  <ShieldCheck className="h-4 w-4" />
+                  This prescription has been digitally confirmed and is permanently locked
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Confirmed on: <span className="font-medium">{new Date((prescriptionBooking as any).prescriptionApprovedAt).toLocaleString("en-IN", { dateStyle: "long", timeStyle: "medium", timeZone: "Asia/Kolkata" })}</span>
+                </p>
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Diagnosis</p>
+                    <p className="font-medium mt-0.5">{prescriptionBooking?.prescriptionDiagnosis || "—"}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Follow-up</p>
+                    <p className="font-medium mt-0.5">{prescriptionBooking?.prescriptionFollowUp || "—"}</p>
+                  </div>
+                </div>
+                {prescriptionBooking?.prescriptionMedications && (
+                  <div className="text-sm">
+                    <p className="text-xs text-muted-foreground">Treatment Plan</p>
+                    <p className="font-medium mt-0.5 whitespace-pre-wrap">{prescriptionBooking.prescriptionMedications}</p>
+                  </div>
+                )}
+                {(prescriptionBooking as any)?.prescriptionPdfUrl && (
+                  <a
+                    href={(prescriptionBooking as any).prescriptionPdfUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 rounded-lg border border-green-300 bg-white dark:bg-transparent px-3 py-2 text-sm font-medium text-green-700 dark:text-green-400 hover:bg-green-50 transition-colors"
+                    data-testid="link-prescription-pdf-signed"
+                  >
+                    <Download className="h-4 w-4" />
+                    Download Signed PDF
+                  </a>
+                )}
+              </div>
+            ) : (
+              <>
+                <div className="rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 p-3 text-sm text-amber-800 dark:text-amber-300">
+                  <strong>Save Draft</strong> to save changes, or <strong>Confirm &amp; Sign</strong> to permanently lock this prescription with a medicolegal audit trail. Signed prescriptions cannot be edited.
+                </div>
+                <div className="space-y-2">
+                  <Label>Diagnosis <span className="text-destructive">*</span></Label>
+                  <Textarea
+                    placeholder="Enter diagnosis details..."
+                    value={prescriptionDiagnosis}
+                    onChange={(e) => setPrescriptionDiagnosis(e.target.value)}
+                    rows={3}
+                    data-testid="input-prescription-diagnosis"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Physician Notes</Label>
+                  <Textarea
+                    placeholder="Clinical observations, recommendations, special instructions..."
+                    value={prescriptionPhysicianNotes}
+                    onChange={(e) => setPrescriptionPhysicianNotes(e.target.value)}
+                    rows={3}
+                    data-testid="input-prescription-physician-notes"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Suggested Treatment Plan</Label>
+                  <Textarea
+                    placeholder="List medications with dosage and frequency, procedures, therapy...&#10;e.g., Tab. Paracetamol 500mg - 1 tablet twice daily after meals for 5 days"
+                    value={prescriptionMedications}
+                    onChange={(e) => setPrescriptionMedications(e.target.value)}
+                    rows={5}
+                    data-testid="input-prescription-medications"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Follow-up</Label>
+                  <Input
+                    placeholder="e.g., After 1 week, or if symptoms persist"
+                    value={prescriptionFollowUp}
+                    onChange={(e) => setPrescriptionFollowUp(e.target.value)}
+                    data-testid="input-prescription-followup"
+                  />
+                </div>
+              </>
+            )}
           </div>
-          <DialogFooter>
+          <DialogFooter className="shrink-0 mt-4 gap-2">
             <Button variant="outline" onClick={() => setShowPrescriptionDialog(false)}>
-              Cancel
+              Close
             </Button>
-            <Button
-              onClick={handleSavePrescription}
-              disabled={!prescriptionDiagnosis || prescriptionMutation.isPending}
-              data-testid="button-save-prescription"
-            >
-              {prescriptionMutation.isPending ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                "Save Prescription"
-              )}
-            </Button>
+            {!(prescriptionBooking as any)?.prescriptionApprovedAt && (
+              <>
+                <Button
+                  variant="secondary"
+                  onClick={handleSavePrescription}
+                  disabled={!prescriptionDiagnosis || prescriptionMutation.isPending || confirmPrescriptionMutation.isPending}
+                  data-testid="button-save-prescription"
+                >
+                  {prescriptionMutation.isPending ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    "Save Draft"
+                  )}
+                </Button>
+                <Button
+                  onClick={() => prescriptionBooking && confirmPrescriptionMutation.mutate(prescriptionBooking.id)}
+                  disabled={!prescriptionDiagnosis || prescriptionMutation.isPending || confirmPrescriptionMutation.isPending}
+                  className="bg-green-700 hover:bg-green-800 text-white"
+                  data-testid="button-confirm-prescription"
+                >
+                  {confirmPrescriptionMutation.isPending ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Confirming...
+                    </>
+                  ) : (
+                    <>
+                      <ShieldCheck className="mr-2 h-4 w-4" />
+                      Confirm &amp; Sign
+                    </>
+                  )}
+                </Button>
+              </>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

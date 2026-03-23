@@ -27,10 +27,13 @@ app.use(express.urlencoded({ extended: false }));
 
 const uploadsReportsDir = path.join(process.cwd(), "uploads", "reports");
 const uploadsDocsDir = path.join(process.cwd(), "uploads", "documents");
+const uploadsPrescriptionsDir = path.join(process.cwd(), "uploads", "prescriptions");
 fs.mkdirSync(uploadsReportsDir, { recursive: true });
 fs.mkdirSync(uploadsDocsDir, { recursive: true });
+fs.mkdirSync(uploadsPrescriptionsDir, { recursive: true });
 app.use("/uploads/reports", express.static(uploadsReportsDir));
 app.use("/uploads/documents", express.static(uploadsDocsDir));
+app.use("/uploads/prescriptions", express.static(uploadsPrescriptionsDir));
 
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {

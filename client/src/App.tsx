@@ -13,6 +13,7 @@ import RegisterPage from "@/pages/register";
 import SelectRolePage from "@/pages/select-role";
 import CompleteProfilePage from "@/pages/complete-profile";
 import VerifyEmailPage from "@/pages/verify-email";
+import VerifyPrescriptionPage from "@/pages/verify-prescription";
 import PendingApprovalPage from "@/pages/pending-approval";
 import UserLayout from "@/pages/user/layout";
 import UserDashboard from "@/pages/user/dashboard";
@@ -85,6 +86,7 @@ function Router() {
       <Route path="/select-role" component={SelectRolePage} />
       <Route path="/complete-profile" component={CompleteProfilePage} />
       <Route path="/verify-email" component={VerifyEmailPage} />
+      <Route path="/verify/prescription/:bookingId" component={VerifyPrescriptionPage} />
       <Route path="/pending-approval" component={PendingApprovalPage} />
       <Route path="/provider/onboarding" component={ProviderOnboardingPage} />
       

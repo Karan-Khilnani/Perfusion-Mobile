@@ -58,6 +58,19 @@ Preferred communication style: Simple, everyday language.
 - **Utilities**: date-fns, lucide-react, wouter.
 - **PDF Processing**: pdf-lib (PDF manipulation), qrcode (QR code generation).
 
+## Prescription Medicolegal Safety System
+
+Consultants can create, draft, and permanently confirm prescriptions for consultation bookings:
+
+1. **Draft Mode**: Providers fill diagnosis, physician notes, treatment plan, and follow-up; click "Save Draft" to persist without locking
+2. **Confirm & Sign**: One-click confirmation that permanently locks the prescription — writes audit log with IP, timestamp, and consultant identity; generates a server-side frozen PDF
+3. **Server-side Frozen PDF**: `server/services/prescription-pdf.ts` uses pdf-lib to generate branded PDFs with QR code linking to public verification URL, approval seal, consultant credentials, legal disclaimer, and page footers; stored in `uploads/prescriptions/`
+4. **Public Verification**: `/verify/prescription/:bookingId` — no auth required; shows consultant details, patient name, confirmation timestamp, and download link for the signed PDF
+5. **Audit Trail**: `PRESCRIPTION_CONFIRMED` audit log entry with consultant name/reg no, patient name, approver IP, timestamp, and PDF URL
+6. **UI States**: BookingRow shows "Signed & Locked" green badge + "Download PDF" when approved; shows "Edit Draft" + "Draft PDF" when unsaved; prescription dialog shows locked read-only view when approved
+
+Key fields on `bookings` table: `prescriptionApprovedAt`, `prescriptionApprovedByUserId`, `prescriptionApproverIp`, `prescriptionOtpVerified`, `prescriptionPdfUrl`
+
 ## Report Processing
 
 When a provider lab uploads a report and sets booking status to `report_ready`, the system automatically processes the report:
