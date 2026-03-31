@@ -730,7 +730,7 @@ export default function AdminConsultantsPage() {
             const res = await fetch("/api/upload/document", { method: "POST", body: formData, credentials: "include" });
             if (!res.ok) throw new Error("Upload failed");
             const { url } = await res.json();
-            await apiRequest("PATCH", `/api/consultants/${cropTargetId}`, { signatureUrl: url });
+            await apiRequest("PATCH", `/api/admin/consultants/${cropTargetId}`, { digitalSignatureUrl: url });
             queryClient.invalidateQueries({ queryKey: ["/api/admin/consultants"] });
             toast({ title: "Signature updated" });
           } catch {

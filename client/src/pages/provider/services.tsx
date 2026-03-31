@@ -1352,7 +1352,7 @@ export default function ProviderServicesPage() {
             const res = await fetch("/api/upload/document", { method: "POST", body: formData, credentials: "include" });
             if (!res.ok) throw new Error("Upload failed");
             const { url } = await res.json();
-            await apiRequest("PATCH", `/api/consultants/${cropTargetConsultantId}`, { signatureUrl: url });
+            await apiRequest("PATCH", `/api/provider/consultants/${cropTargetConsultantId}`, { digitalSignatureUrl: url });
             queryClient.invalidateQueries({ queryKey: ["/api/provider/my-consultants"] });
             toast({ title: "Signature updated" });
           } catch {

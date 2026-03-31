@@ -1,7 +1,29 @@
+import { useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import {
   Table,
   TableBody,
@@ -18,11 +40,31 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Users, Shield, Building, User, Loader2 } from "lucide-react";
+import { Users, Shield, Building, User, Loader2, Edit2, Camera } from "lucide-react";
+import { ImageCropDialog } from "@/components/ui/image-crop-dialog";
+import { apiRequest } from "@/lib/queryClient";
+
+const editProfileSchema = z.object({
+  firstName: z.string().min(1, "First name is required"),
+  lastName: z.string().min(1, "Last name is required"),
+  phone: z.string().optional(),
+  hospitalName: z.string().optional(),
+  hospitalAddress: z.string().optional(),
+  hospitalRegistrationNo: z.string().optional(),
+  hospitalRegisteredOrg: z.string().optional(),
+});
+
+type EditProfileFormData = z.infer<typeof editProfileSchema>;
 
 export default function AdminUsersPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  const [editingUser, setEditingUser] = useState<any | null>(null);
+  const [photoCropOpen, setPhotoCropOpen] = useState(false);
+  const [photoCropRaw, setPhotoCropRaw] = useState<File | null>(null);
+  const [pendingPhotoUrl, setPendingPhotoUrl] = useState<string | null>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
 
   const { data: users = [], isLoading } = useQuery<any[]>({
     queryKey: ["/api/admin/users"],
@@ -68,6 +110,60 @@ export default function AdminUsersPage() {
     },
   });
 
+  const updateProfileMutation = useMutation({
+    mutationFn: async ({ userId, data }: { userId: string; data: EditProfileFormData & { profileImageUrl?: string } }) => {
+      const res = await apiRequest("PATCH", `/api/admin/users/${userId}/profile`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      toast({ title: "Profile updated" });
+      setEditingUser(null);
+      setPendingPhotoUrl(null);
+    },
+    onError: () => {
+      toast({ title: "Failed to update profile", variant: "destructive" });
+    },
+  });
+
+  const form = useForm<EditProfileFormData>({
+    resolver: zodResolver(editProfileSchema),
+    defaultValues: {
+      firstName: "",
+      lastName: "",
+      phone: "",
+      hospitalName: "",
+      hospitalAddress: "",
+      hospitalRegistrationNo: "",
+      hospitalRegisteredOrg: "",
+    },
+  });
+
+  const openEditDialog = (user: any) => {
+    setEditingUser(user);
+    setPendingPhotoUrl(null);
+    form.reset({
+      firstName: user.firstName || "",
+      lastName: user.lastName || "",
+      phone: user.phone || "",
+      hospitalName: user.hospitalName || "",
+      hospitalAddress: user.hospitalAddress || "",
+      hospitalRegistrationNo: user.hospitalRegistrationNo || "",
+      hospitalRegisteredOrg: user.hospitalRegisteredOrg || "",
+    });
+  };
+
+  const onSubmit = (data: EditProfileFormData) => {
+    if (!editingUser) return;
+    updateProfileMutation.mutate({
+      userId: editingUser.id,
+      data: {
+        ...data,
+        profileImageUrl: pendingPhotoUrl || editingUser.profileImageUrl || undefined,
+      },
+    });
+  };
+
   const getRoleIcon = (role: string) => {
     switch (role) {
       case "admin":
@@ -97,6 +193,11 @@ export default function AdminUsersPage() {
       </div>
     );
   }
+
+  const displayPhotoUrl = pendingPhotoUrl || editingUser?.profileImageUrl;
+  const editingInitials = editingUser?.firstName && editingUser?.lastName
+    ? `${editingUser.firstName[0]}${editingUser.lastName[0]}`
+    : editingUser?.email?.[0]?.toUpperCase() || "U";
 
   return (
     <div className="space-y-6" data-testid="page-admin-users">
@@ -129,7 +230,15 @@ export default function AdminUsersPage() {
               {users.map((user: any) => (
                 <TableRow key={user.id} data-testid={`user-row-${user.id}`}>
                   <TableCell className="font-medium">
-                    {user.firstName} {user.lastName}
+                    <div className="flex items-center gap-2">
+                      <Avatar className="h-7 w-7">
+                        <AvatarImage src={user.profileImageUrl || undefined} />
+                        <AvatarFallback className="text-xs">
+                          {user.firstName?.[0]}{user.lastName?.[0]}
+                        </AvatarFallback>
+                      </Avatar>
+                      {user.firstName} {user.lastName}
+                    </div>
                   </TableCell>
                   <TableCell>{user.email}</TableCell>
                   <TableCell>{getRoleBadge(user.role)}</TableCell>
@@ -158,6 +267,14 @@ export default function AdminUsersPage() {
                         </SelectContent>
                       </Select>
                       <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => openEditDialog(user)}
+                        data-testid={`button-edit-profile-${user.id}`}
+                      >
+                        <Edit2 className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
                         variant={user.isActive ? "destructive" : "default"}
                         size="sm"
                         onClick={() => toggleActiveMutation.mutate({ userId: user.id, isActive: !user.isActive })}
@@ -174,6 +291,190 @@ export default function AdminUsersPage() {
           </Table>
         </CardContent>
       </Card>
+
+      {/* Edit Profile Dialog */}
+      <Dialog open={!!editingUser} onOpenChange={(open) => { if (!open) { setEditingUser(null); setPendingPhotoUrl(null); } }}>
+        <DialogContent className="sm:max-w-[500px] max-h-[90vh] flex flex-col">
+          <DialogHeader className="shrink-0">
+            <DialogTitle>Edit User Profile</DialogTitle>
+            <DialogDescription>
+              Update details for {editingUser?.email}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto pr-1">
+            {/* Photo section */}
+            <div className="flex items-center gap-4 pb-4 border-b mb-4">
+              <Avatar className="h-16 w-16">
+                <AvatarImage src={displayPhotoUrl || undefined} />
+                <AvatarFallback className="text-xl">{editingInitials}</AvatarFallback>
+              </Avatar>
+              <div>
+                <p className="text-sm text-muted-foreground mb-2">Profile photo</p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => photoInputRef.current?.click()}
+                  data-testid="button-admin-upload-user-photo"
+                >
+                  <Camera className="h-4 w-4 mr-2" />
+                  {displayPhotoUrl ? "Change Photo" : "Upload Photo"}
+                </Button>
+                <input
+                  ref={photoInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (!f) return;
+                    setPhotoCropRaw(f);
+                    setPhotoCropOpen(true);
+                    e.target.value = "";
+                  }}
+                  data-testid="input-admin-user-photo"
+                />
+              </div>
+            </div>
+
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4" id="admin-edit-profile-form">
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="firstName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>First Name</FormLabel>
+                        <FormControl>
+                          <Input {...field} data-testid="input-admin-first-name" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="lastName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Last Name</FormLabel>
+                        <FormControl>
+                          <Input {...field} data-testid="input-admin-last-name" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <FormField
+                  control={form.control}
+                  name="phone"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Phone</FormLabel>
+                      <FormControl>
+                        <Input placeholder="+91 XXXXX XXXXX" {...field} data-testid="input-admin-phone" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="hospitalName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Organization Name</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Hospital / Org name" {...field} data-testid="input-admin-hospital-name" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="hospitalAddress"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Address</FormLabel>
+                      <FormControl>
+                        <Textarea placeholder="Full address" {...field} data-testid="input-admin-hospital-address" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="hospitalRegistrationNo"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Registration No.</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Reg. number" {...field} data-testid="input-admin-reg-no" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="hospitalRegisteredOrg"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Registered With</FormLabel>
+                        <FormControl>
+                          <Input placeholder="e.g. MCI, NABL" {...field} data-testid="input-admin-reg-org" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </form>
+            </Form>
+          </div>
+          <div className="flex justify-end gap-2 pt-4 border-t shrink-0">
+            <Button variant="outline" onClick={() => { setEditingUser(null); setPendingPhotoUrl(null); }}>
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              form="admin-edit-profile-form"
+              disabled={updateProfileMutation.isPending}
+              data-testid="button-admin-save-profile"
+            >
+              {updateProfileMutation.isPending ? (
+                <><Loader2 className="h-4 w-4 animate-spin mr-2" />Saving...</>
+              ) : "Save Profile"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Photo crop dialog */}
+      <ImageCropDialog
+        open={photoCropOpen}
+        onOpenChange={setPhotoCropOpen}
+        imageFile={photoCropRaw}
+        aspect={1}
+        title="Crop Profile Photo"
+        onCropComplete={async (blob, filename) => {
+          try {
+            const formData = new FormData();
+            formData.append("file", blob, filename);
+            const res = await fetch("/api/upload/document", { method: "POST", body: formData, credentials: "include" });
+            if (!res.ok) throw new Error("Upload failed");
+            const { url } = await res.json();
+            setPendingPhotoUrl(url);
+            toast({ title: "Photo ready", description: "Save the profile to apply the new photo." });
+          } catch {
+            toast({ title: "Failed to upload photo", variant: "destructive" });
+          }
+        }}
+      />
     </div>
   );
 }
