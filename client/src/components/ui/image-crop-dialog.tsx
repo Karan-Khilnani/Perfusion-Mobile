@@ -40,20 +40,21 @@ export function ImageCropDialog({
 
   useEffect(() => {
     if (open && imageFile) {
+      setImgSrc("");
+      setCrop(undefined);
+      setCompletedCrop(undefined);
+      setScale(1);
       const reader = new FileReader();
       reader.onload = (e) => setImgSrc(e.target?.result as string);
       reader.readAsDataURL(imageFile);
     }
-  }, [open, imageFile]);
-
-  useEffect(() => {
     if (!open) {
       setImgSrc("");
       setCrop(undefined);
       setCompletedCrop(undefined);
       setScale(1);
     }
-  }, [open]);
+  }, [open, imageFile]);
 
   const handleImageLoad = useCallback(
     (e: React.SyntheticEvent<HTMLImageElement>) => {
