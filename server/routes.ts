@@ -1779,6 +1779,50 @@ export async function registerRoutes(
     }
   });
 
+  // Admin - Update any user's profile details + photo
+  app.patch("/api/admin/users/:id/profile", isAdmin, async (req: any, res) => {
+    try {
+      const allowedFields = [
+        "firstName", "lastName", "phone",
+        "hospitalName", "hospitalAddress", "hospitalRegistrationNo", "hospitalRegisteredOrg",
+        "profileImageUrl",
+      ];
+      const data: Record<string, any> = {};
+      for (const key of allowedFields) {
+        if (req.body[key] !== undefined) data[key] = req.body[key];
+      }
+      const updated = await storage.updateUser(req.params.id, data);
+      if (!updated) return res.status(404).json({ message: "User not found" });
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating user profile (admin):", error);
+      res.status(500).json({ message: "Failed to update user profile" });
+    }
+  });
+
+  // Self-service profile update (any authenticated user updates their own profile)
+  app.patch("/api/profile", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) return res.status(401).json({ message: "Unauthorized" });
+      const allowedFields = [
+        "firstName", "lastName", "phone",
+        "hospitalName", "hospitalAddress", "hospitalRegistrationNo", "hospitalRegisteredOrg",
+        "profileImageUrl",
+      ];
+      const data: Record<string, any> = {};
+      for (const key of allowedFields) {
+        if (req.body[key] !== undefined) data[key] = req.body[key];
+      }
+      const updated = await storage.updateUser(userId, data);
+      if (!updated) return res.status(404).json({ message: "User not found" });
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating own profile:", error);
+      res.status(500).json({ message: "Failed to update profile" });
+    }
+  });
+
   // Admin - Lab Tests CRUD
   app.post("/api/admin/lab-tests", isAdmin, async (req, res) => {
     try {

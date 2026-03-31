@@ -144,9 +144,11 @@ export default function UserLayout({ children }: { children: React.ReactNode }) 
                     side="top"
                     className="w-[--radix-dropdown-menu-trigger-width]"
                   >
-                    <DropdownMenuItem disabled>
-                      <User className="mr-2 h-4 w-4" />
-                      Profile
+                    <DropdownMenuItem asChild>
+                      <Link href="/user/profile" data-testid="link-user-profile">
+                        <User className="mr-2 h-4 w-4" />
+                        Profile
+                      </Link>
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem

@@ -26,6 +26,8 @@ import OrdersPage from "@/pages/user/orders";
 import UserBillingPage from "@/pages/user/billing";
 import VideoRoomPage from "@/pages/video-room";
 
+import ProfilePage from "@/pages/profile";
+
 import ProviderLayout from "@/pages/provider/layout";
 import ProviderDashboard from "@/pages/provider/dashboard";
 import ProviderBookingsPage from "@/pages/provider/bookings";
@@ -98,12 +100,14 @@ function Router() {
       <Route path="/user/teleradiology" component={withUserLayout(TeleradiologyPage)} />
       <Route path="/user/orders" component={withUserLayout(OrdersPage)} />
       <Route path="/user/billing" component={withUserLayout(UserBillingPage)} />
+      <Route path="/user/profile" component={withUserLayout(ProfilePage)} />
       <Route path="/video/:roomId" component={VideoRoomPage} />
       
       <Route path="/provider" component={withProviderLayout(ProviderDashboard)} />
       <Route path="/provider/bookings" component={withProviderLayout(ProviderBookingsPage)} />
       <Route path="/provider/services" component={withProviderLayout(ProviderServicesPage)} />
       <Route path="/provider/billing" component={withProviderLayout(ProviderBillingPage)} />
+      <Route path="/provider/profile" component={withProviderLayout(ProfilePage)} />
       
       <Route path="/admin" component={withAdminLayout(AdminDashboard)} />
       <Route path="/admin/bookings" component={withAdminLayout(AdminBookingsPage)} />

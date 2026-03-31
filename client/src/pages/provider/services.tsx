@@ -15,11 +15,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { StarRating } from "@/components/star-rating";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Plus, Edit2, FlaskConical, IndianRupee, Clock, Building2, Stethoscope, Loader2, AlertCircle, ScanLine, CheckCircle2, ArrowRight, Calendar, Upload, FileText, X, Camera } from "lucide-react";
+import { Plus, Edit2, FlaskConical, IndianRupee, Clock, Building2, Stethoscope, Loader2, AlertCircle, ScanLine, CheckCircle2, ArrowRight, Calendar, Upload, FileText, X, Camera, PenLine } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import type { Lab, LabTest, Consultant, Provider, RadiologyModality, ProviderLabTest } from "@shared/schema";
 import { Link } from "wouter";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ImageCropDialog } from "@/components/ui/image-crop-dialog";
 
 type ProviderLabTestWithDetails = ProviderLabTest & {
   labTest?: LabTest;
@@ -80,6 +81,15 @@ export default function ProviderServicesPage() {
   const [consultantSignatureFile, setConsultantSignatureFile] = useState<File | null>(null);
   const [consultantAffiliation, setConsultantAffiliation] = useState("");
   const [consultantPhotoFile, setConsultantPhotoFile] = useState<File | null>(null);
+  const [photoCropOpen, setPhotoCropOpen] = useState(false);
+  const [photoCropRaw, setPhotoCropRaw] = useState<File | null>(null);
+  const [sigCropOpen, setSigCropOpen] = useState(false);
+  const [sigCropRaw, setSigCropRaw] = useState<File | null>(null);
+  const [listPhotoCropOpen, setListPhotoCropOpen] = useState(false);
+  const [listPhotoCropRaw, setListPhotoCropRaw] = useState<File | null>(null);
+  const [listSigCropOpen, setListSigCropOpen] = useState(false);
+  const [listSigCropRaw, setListSigCropRaw] = useState<File | null>(null);
+  const [cropTargetConsultantId, setCropTargetConsultantId] = useState<string | null>(null);
   const [isEmergencyDialogOpen, setIsEmergencyDialogOpen] = useState(false);
   const [emergencyRegNo, setEmergencyRegNo] = useState("");
   const [emergencyRegOrg, setEmergencyRegOrg] = useState("");
@@ -830,7 +840,7 @@ export default function ProviderServicesPage() {
                       {consultantPhotoFile ? (
                         <div className="flex items-center gap-2 rounded-md border p-2">
                           <Camera className="h-4 w-4 text-muted-foreground" />
-                          <span className="flex-1 text-sm truncate">{consultantPhotoFile.name}</span>
+                          <span className="flex-1 text-sm truncate">{consultantPhotoFile.name} (cropped)</span>
                           <Button type="button" variant="ghost" size="icon" onClick={() => setConsultantPhotoFile(null)} data-testid="button-remove-consultant-photo">
                             <X className="h-4 w-4" />
                           </Button>
@@ -838,8 +848,8 @@ export default function ProviderServicesPage() {
                       ) : (
                         <label className="flex items-center gap-2 rounded-md border border-dashed p-3 cursor-pointer hover-elevate" data-testid="label-upload-consultant-photo">
                           <Camera className="h-4 w-4 text-muted-foreground" />
-                          <span className="text-sm">Upload consultant photo</span>
-                          <input type="file" className="hidden" accept=".jpg,.jpeg,.png" onChange={(e) => { const f = e.target.files?.[0]; if (f) setConsultantPhotoFile(f); }} />
+                          <span className="text-sm">Upload &amp; crop consultant photo</span>
+                          <input type="file" className="hidden" accept=".jpg,.jpeg,.png" onChange={(e) => { const f = e.target.files?.[0]; if (f) { setPhotoCropRaw(f); setPhotoCropOpen(true); } e.target.value = ""; }} />
                         </label>
                       )}
                     </div>
@@ -866,17 +876,17 @@ export default function ProviderServicesPage() {
                       <p className="text-xs text-muted-foreground">Upload consultant's digital signature image (used on prescriptions)</p>
                       {consultantSignatureFile ? (
                         <div className="flex items-center gap-2 rounded-md border border-primary/30 bg-primary/5 p-2">
-                          <FileText className="h-4 w-4 text-primary" />
-                          <span className="flex-1 text-sm truncate">{consultantSignatureFile.name}</span>
+                          <PenLine className="h-4 w-4 text-primary" />
+                          <span className="flex-1 text-sm truncate">{consultantSignatureFile.name} (cropped)</span>
                           <Button type="button" variant="ghost" size="icon" onClick={() => setConsultantSignatureFile(null)} data-testid="button-remove-consultant-signature">
                             <X className="h-4 w-4" />
                           </Button>
                         </div>
                       ) : (
                         <label className="flex items-center gap-2 rounded-md border border-dashed border-primary/30 p-3 cursor-pointer hover-elevate" data-testid="label-upload-consultant-signature">
-                          <Upload className="h-4 w-4 text-primary" />
-                          <span className="text-sm text-primary">Upload digital signature</span>
-                          <input type="file" className="hidden" accept=".jpg,.jpeg,.png" onChange={(e) => { const f = e.target.files?.[0]; if (f) setConsultantSignatureFile(f); }} />
+                          <PenLine className="h-4 w-4 text-primary" />
+                          <span className="text-sm text-primary">Upload &amp; crop digital signature</span>
+                          <input type="file" className="hidden" accept=".jpg,.jpeg,.png" onChange={(e) => { const f = e.target.files?.[0]; if (f) { setSigCropRaw(f); setSigCropOpen(true); } e.target.value = ""; }} />
                         </label>
                       )}
                     </div>
@@ -942,19 +952,30 @@ export default function ProviderServicesPage() {
                       )}
                     </div>
                     <div className="flex items-center gap-2">
-                      <label className="cursor-pointer" data-testid={`label-replace-photo-${consultant.id}`}>
+                      <label className="cursor-pointer" title="Replace photo" data-testid={`label-replace-photo-${consultant.id}`}>
                         <Button size="sm" variant="ghost" asChild>
                           <span><Camera className="h-3.5 w-3.5" /></span>
                         </Button>
-                        <input type="file" className="hidden" accept=".jpg,.jpeg,.png" onChange={async (e) => {
+                        <input type="file" className="hidden" accept=".jpg,.jpeg,.png" onChange={(e) => {
                           const f = e.target.files?.[0];
                           if (!f) return;
-                          try {
-                            const url = await uploadDocument(f);
-                            await apiRequest("PATCH", `/api/consultants/${consultant.id}/photo`, { photoUrl: url });
-                            queryClient.invalidateQueries({ queryKey: ["/api/provider/my-consultants"] });
-                            toast({ title: "Photo Updated" });
-                          } catch { toast({ title: "Failed to update photo", variant: "destructive" }); }
+                          setCropTargetConsultantId(String(consultant.id));
+                          setListPhotoCropRaw(f);
+                          setListPhotoCropOpen(true);
+                          e.target.value = "";
+                        }} />
+                      </label>
+                      <label className="cursor-pointer" title="Replace signature" data-testid={`label-replace-sig-${consultant.id}`}>
+                        <Button size="sm" variant="ghost" asChild>
+                          <span><PenLine className="h-3.5 w-3.5" /></span>
+                        </Button>
+                        <input type="file" className="hidden" accept=".jpg,.jpeg,.png" onChange={(e) => {
+                          const f = e.target.files?.[0];
+                          if (!f) return;
+                          setCropTargetConsultantId(String(consultant.id));
+                          setListSigCropRaw(f);
+                          setListSigCropOpen(true);
+                          e.target.value = "";
                         }} />
                       </label>
                       <Button
@@ -1265,6 +1286,80 @@ export default function ProviderServicesPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Crop dialog for photo in consultant add form */}
+      <ImageCropDialog
+        open={photoCropOpen}
+        onOpenChange={setPhotoCropOpen}
+        imageFile={photoCropRaw}
+        aspect={1}
+        title="Crop Consultant Photo"
+        onCropComplete={async (blob, filename) => {
+          const croppedFile = new File([blob], filename, { type: blob.type });
+          setConsultantPhotoFile(croppedFile);
+        }}
+      />
+
+      {/* Crop dialog for signature in consultant add form */}
+      <ImageCropDialog
+        open={sigCropOpen}
+        onOpenChange={setSigCropOpen}
+        imageFile={sigCropRaw}
+        aspect={3}
+        title="Crop Digital Signature"
+        onCropComplete={async (blob, filename) => {
+          const croppedFile = new File([blob], filename, { type: blob.type });
+          setConsultantSignatureFile(croppedFile);
+        }}
+      />
+
+      {/* Crop dialog for photo replacement from list */}
+      <ImageCropDialog
+        open={listPhotoCropOpen}
+        onOpenChange={setListPhotoCropOpen}
+        imageFile={listPhotoCropRaw}
+        aspect={1}
+        title="Crop Consultant Photo"
+        onCropComplete={async (blob, filename) => {
+          if (!cropTargetConsultantId) return;
+          try {
+            const formData = new FormData();
+            formData.append("file", blob, filename);
+            const res = await fetch("/api/upload/document", { method: "POST", body: formData, credentials: "include" });
+            if (!res.ok) throw new Error("Upload failed");
+            const { url } = await res.json();
+            await apiRequest("PATCH", `/api/consultants/${cropTargetConsultantId}/photo`, { photoUrl: url });
+            queryClient.invalidateQueries({ queryKey: ["/api/provider/my-consultants"] });
+            toast({ title: "Photo updated" });
+          } catch {
+            toast({ title: "Failed to update photo", variant: "destructive" });
+          }
+        }}
+      />
+
+      {/* Crop dialog for signature replacement from list */}
+      <ImageCropDialog
+        open={listSigCropOpen}
+        onOpenChange={setListSigCropOpen}
+        imageFile={listSigCropRaw}
+        aspect={3}
+        title="Crop Digital Signature"
+        onCropComplete={async (blob, filename) => {
+          if (!cropTargetConsultantId) return;
+          try {
+            const formData = new FormData();
+            formData.append("file", blob, filename);
+            const res = await fetch("/api/upload/document", { method: "POST", body: formData, credentials: "include" });
+            if (!res.ok) throw new Error("Upload failed");
+            const { url } = await res.json();
+            await apiRequest("PATCH", `/api/consultants/${cropTargetConsultantId}`, { signatureUrl: url });
+            queryClient.invalidateQueries({ queryKey: ["/api/provider/my-consultants"] });
+            toast({ title: "Signature updated" });
+          } catch {
+            toast({ title: "Failed to update signature", variant: "destructive" });
+          }
+        }}
+      />
     </div>
   );
 }

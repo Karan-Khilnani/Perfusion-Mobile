@@ -39,10 +39,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, MoreHorizontal, Pause, Play, Trash2, Stethoscope, Search, Calendar, Edit, X, DollarSign } from "lucide-react";
+import { Plus, MoreHorizontal, Pause, Play, Trash2, Stethoscope, Search, Calendar, Edit, X, DollarSign, Camera, PenLine } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Consultant } from "@shared/schema";
+import { ImageCropDialog } from "@/components/ui/image-crop-dialog";
 
 type EnrichedConsultant = Consultant & {
   providerBaseCost: string;
@@ -73,6 +74,11 @@ export default function AdminConsultantsPage() {
   const [pricingConsultant, setPricingConsultant] = useState<EnrichedConsultant | null>(null);
   const [pricingMode, setPricingMode] = useState<"price" | "margin">("price");
   const [pricingValue, setPricingValue] = useState("");
+  const [photoCropOpen, setPhotoCropOpen] = useState(false);
+  const [photoCropRaw, setPhotoCropRaw] = useState<File | null>(null);
+  const [sigCropOpen, setSigCropOpen] = useState(false);
+  const [sigCropRaw, setSigCropRaw] = useState<File | null>(null);
+  const [cropTargetId, setCropTargetId] = useState<string | null>(null);
   const { toast } = useToast();
 
   const { data: consultants, isLoading } = useQuery<EnrichedConsultant[]>({
@@ -440,6 +446,34 @@ export default function AdminConsultantsPage() {
                             <DollarSign className="mr-2 h-4 w-4" />
                             Edit Pricing
                           </DropdownMenuItem>
+                          <DropdownMenuItem asChild>
+                            <label className="flex items-center cursor-pointer" data-testid={`label-admin-photo-${consultant.id}`}>
+                              <Camera className="mr-2 h-4 w-4" />
+                              Replace Photo
+                              <input type="file" className="hidden" accept=".jpg,.jpeg,.png" onChange={(e) => {
+                                const f = e.target.files?.[0];
+                                if (!f) return;
+                                setCropTargetId(String(consultant.id));
+                                setPhotoCropRaw(f);
+                                setPhotoCropOpen(true);
+                                e.target.value = "";
+                              }} />
+                            </label>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem asChild>
+                            <label className="flex items-center cursor-pointer" data-testid={`label-admin-sig-${consultant.id}`}>
+                              <PenLine className="mr-2 h-4 w-4" />
+                              Replace Signature
+                              <input type="file" className="hidden" accept=".jpg,.jpeg,.png" onChange={(e) => {
+                                const f = e.target.files?.[0];
+                                if (!f) return;
+                                setCropTargetId(String(consultant.id));
+                                setSigCropRaw(f);
+                                setSigCropOpen(true);
+                                e.target.value = "";
+                              }} />
+                            </label>
+                          </DropdownMenuItem>
                           {consultant.status === "active" ? (
                             <DropdownMenuItem
                               onClick={() => updateStatusMutation.mutate({ id: consultant.id, status: "paused" })}
@@ -656,6 +690,54 @@ export default function AdminConsultantsPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Crop dialog for admin photo replacement */}
+      <ImageCropDialog
+        open={photoCropOpen}
+        onOpenChange={setPhotoCropOpen}
+        imageFile={photoCropRaw}
+        aspect={1}
+        title="Crop Consultant Photo"
+        onCropComplete={async (blob, filename) => {
+          if (!cropTargetId) return;
+          try {
+            const formData = new FormData();
+            formData.append("file", blob, filename);
+            const res = await fetch("/api/upload/document", { method: "POST", body: formData, credentials: "include" });
+            if (!res.ok) throw new Error("Upload failed");
+            const { url } = await res.json();
+            await apiRequest("PATCH", `/api/consultants/${cropTargetId}/photo`, { photoUrl: url });
+            queryClient.invalidateQueries({ queryKey: ["/api/admin/consultants"] });
+            toast({ title: "Photo updated" });
+          } catch {
+            toast({ title: "Failed to update photo", variant: "destructive" });
+          }
+        }}
+      />
+
+      {/* Crop dialog for admin signature replacement */}
+      <ImageCropDialog
+        open={sigCropOpen}
+        onOpenChange={setSigCropOpen}
+        imageFile={sigCropRaw}
+        aspect={3}
+        title="Crop Digital Signature"
+        onCropComplete={async (blob, filename) => {
+          if (!cropTargetId) return;
+          try {
+            const formData = new FormData();
+            formData.append("file", blob, filename);
+            const res = await fetch("/api/upload/document", { method: "POST", body: formData, credentials: "include" });
+            if (!res.ok) throw new Error("Upload failed");
+            const { url } = await res.json();
+            await apiRequest("PATCH", `/api/consultants/${cropTargetId}`, { signatureUrl: url });
+            queryClient.invalidateQueries({ queryKey: ["/api/admin/consultants"] });
+            toast({ title: "Signature updated" });
+          } catch {
+            toast({ title: "Failed to update signature", variant: "destructive" });
+          }
+        }}
+      />
     </div>
   );
 }
