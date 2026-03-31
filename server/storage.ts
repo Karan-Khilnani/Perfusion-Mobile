@@ -89,6 +89,7 @@ export interface IStorage {
   getEmergencyTeamsByProvider(providerId: string): Promise<EmergencyTeam[]>;
   getPendingEmergencyTeams(): Promise<EmergencyTeam[]>;
   updateEmergencyTeamApproval(id: string, status: "approved" | "rejected"): Promise<EmergencyTeam | undefined>;
+  updateEmergencyTeam(id: string, data: Partial<any>): Promise<EmergencyTeam | undefined>;
   
   // Radiology Modalities
   getRadiologyModalities(): Promise<RadiologyModality[]>;
@@ -320,6 +321,11 @@ export class DatabaseStorage implements IStorage {
     return updated;
   }
 
+  async updateEmergencyTeam(id: string, data: Partial<any>): Promise<EmergencyTeam | undefined> {
+    const [updated] = await db.update(emergencyTeams).set(data).where(eq(emergencyTeams.id, id)).returning();
+    return updated;
+  }
+
   // Radiology Modalities
   async getRadiologyModalities(): Promise<RadiologyModality[]> {
     return await db.select().from(radiologyModalities).orderBy(desc(radiologyModalities.createdAt));
@@ -376,6 +382,11 @@ export class DatabaseStorage implements IStorage {
   async createProviderLabTest(data: InsertProviderLabTest): Promise<ProviderLabTest> {
     const [created] = await db.insert(providerLabTests).values([data as any]).returning();
     return created;
+  }
+
+  async getProviderLabTestById(id: string): Promise<ProviderLabTest | undefined> {
+    const [row] = await db.select().from(providerLabTests).where(eq(providerLabTests.id, id)).limit(1);
+    return row;
   }
 
   async updateProviderLabTest(id: string, data: Partial<InsertProviderLabTest>): Promise<ProviderLabTest | undefined> {
@@ -435,6 +446,11 @@ export class DatabaseStorage implements IStorage {
   async createProviderModality(data: InsertProviderModality): Promise<ProviderModality> {
     const [created] = await db.insert(providerModalities).values([data as any]).returning();
     return created;
+  }
+
+  async getProviderModalityById(id: string): Promise<ProviderModality | undefined> {
+    const [row] = await db.select().from(providerModalities).where(eq(providerModalities.id, id)).limit(1);
+    return row;
   }
 
   async updateProviderModality(id: string, data: Partial<InsertProviderModality>): Promise<ProviderModality | undefined> {

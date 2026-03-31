@@ -94,6 +94,15 @@ export default function ProviderServicesPage() {
   const [emergencyRegNo, setEmergencyRegNo] = useState("");
   const [emergencyRegOrg, setEmergencyRegOrg] = useState("");
   const [emergencyDocFile, setEmergencyDocFile] = useState<File | null>(null);
+  const [editingConsultant, setEditingConsultant] = useState<any | null>(null);
+  const [editConsultantRegNo, setEditConsultantRegNo] = useState("");
+  const [editConsultantRegOrg, setEditConsultantRegOrg] = useState("");
+  const [editConsultantAffiliation, setEditConsultantAffiliation] = useState("");
+  const [editConsultantDocFile, setEditConsultantDocFile] = useState<File | null>(null);
+  const [editingEmergencyTeam, setEditingEmergencyTeam] = useState<any | null>(null);
+  const [editEmergencyRegNo, setEditEmergencyRegNo] = useState("");
+  const [editEmergencyRegOrg, setEditEmergencyRegOrg] = useState("");
+  const [editEmergencyDocFile, setEditEmergencyDocFile] = useState<File | null>(null);
 
   const { data: provider, isLoading: providerLoading } = useQuery<Provider>({
     queryKey: ["/api/providers/me"],
@@ -200,7 +209,7 @@ export default function ProviderServicesPage() {
       }
       const response = await apiRequest("POST", "/api/provider/consultants", {
         ...data,
-        registrationNo: consultantRegNo || undefined,
+        registrationNumber: consultantRegNo || undefined,
         registeredOrganization: consultantRegOrg || undefined,
         registrationDocumentUrl,
         digitalSignatureUrl,
@@ -254,6 +263,96 @@ export default function ProviderServicesPage() {
     },
   });
 
+  const editConsultantForm = useForm<ConsultantFormData>({
+    resolver: zodResolver(consultantSchema),
+    defaultValues: { name: "", qualification: "", specialization: "", yearsExperience: 0, consultationFee: "", portfolio: "" },
+  });
+
+  const editEmergencyForm = useForm<EmergencyTeamFormData>({
+    resolver: zodResolver(emergencyTeamSchema),
+    defaultValues: { teamLeadName: "", qualification: "", department: "", consultationFee: "" },
+  });
+
+  const openEditConsultant = (c: any) => {
+    setEditingConsultant(c);
+    editConsultantForm.reset({
+      name: c.name || "",
+      qualification: c.qualification || "",
+      specialization: c.specialization || "",
+      yearsExperience: c.yearsExperience || 0,
+      consultationFee: c.consultationFee || "",
+      portfolio: c.portfolio || "",
+    });
+    setEditConsultantRegNo(c.registrationNumber || "");
+    setEditConsultantRegOrg(c.registeredOrganization || "");
+    setEditConsultantAffiliation(c.affiliatedInstitution || "");
+    setEditConsultantDocFile(null);
+  };
+
+  const openEditEmergencyTeam = (t: any) => {
+    setEditingEmergencyTeam(t);
+    editEmergencyForm.reset({
+      teamLeadName: t.teamLeadName || "",
+      qualification: t.qualification || "",
+      department: t.department || "",
+      consultationFee: t.consultationFee || "",
+    });
+    setEditEmergencyRegNo(t.registrationNumber || "");
+    setEditEmergencyRegOrg(t.registeredOrganization || "");
+    setEditEmergencyDocFile(null);
+  };
+
+  const updateConsultantMutation = useMutation({
+    mutationFn: async (data: ConsultantFormData) => {
+      if (!editingConsultant) throw new Error("No consultant selected");
+      let registrationDocumentUrl: string | undefined;
+      if (editConsultantDocFile) {
+        registrationDocumentUrl = await uploadDocument(editConsultantDocFile);
+      }
+      const res = await apiRequest("PATCH", `/api/provider/consultants/${editingConsultant.id}`, {
+        ...data,
+        registrationNumber: editConsultantRegNo || undefined,
+        registeredOrganization: editConsultantRegOrg || undefined,
+        affiliatedInstitution: editConsultantAffiliation || undefined,
+        ...(registrationDocumentUrl ? { registrationDocumentUrl } : {}),
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/provider/my-consultants"] });
+      setEditingConsultant(null);
+      toast({ title: "Consultant Updated" });
+    },
+    onError: () => {
+      toast({ title: "Failed", description: "Failed to update consultant.", variant: "destructive" });
+    },
+  });
+
+  const updateEmergencyMutation = useMutation({
+    mutationFn: async (data: EmergencyTeamFormData) => {
+      if (!editingEmergencyTeam) throw new Error("No team selected");
+      let registrationDocumentUrl: string | undefined;
+      if (editEmergencyDocFile) {
+        registrationDocumentUrl = await uploadDocument(editEmergencyDocFile);
+      }
+      const res = await apiRequest("PATCH", `/api/provider/emergency-teams/${editingEmergencyTeam.id}`, {
+        ...data,
+        registrationNumber: editEmergencyRegNo || undefined,
+        registeredOrganization: editEmergencyRegOrg || undefined,
+        ...(registrationDocumentUrl ? { registrationDocumentUrl } : {}),
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/provider/my-emergency-teams"] });
+      setEditingEmergencyTeam(null);
+      toast({ title: "Emergency Team Updated" });
+    },
+    onError: () => {
+      toast({ title: "Failed", description: "Failed to update emergency team.", variant: "destructive" });
+    },
+  });
+
   const updateSlotsMutation = useMutation({
     mutationFn: async ({ id, slots }: { id: string; slots: string[] }) => {
       const response = await apiRequest("PATCH", `/api/consultants/${id}/slots`, { slots });
@@ -291,7 +390,7 @@ export default function ProviderServicesPage() {
         labTestId: selectedPredefinedTest,
         price: testPrice,
         turnaroundTime: testTAT,
-        registrationNo: testRegNo || undefined,
+        registrationNumber: testRegNo || undefined,
         registeredOrganization: testRegOrg || undefined,
         registrationDocumentUrl,
       });
@@ -952,6 +1051,15 @@ export default function ProviderServicesPage() {
                       )}
                     </div>
                     <div className="flex items-center gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => openEditConsultant(consultant)}
+                        data-testid={`button-edit-consultant-${consultant.id}`}
+                      >
+                        <Edit2 className="mr-1 h-3.5 w-3.5" />
+                        Edit
+                      </Button>
                       <label className="cursor-pointer" title="Replace photo" data-testid={`label-replace-photo-${consultant.id}`}>
                         <Button size="sm" variant="ghost" asChild>
                           <span><Camera className="h-3.5 w-3.5" /></span>
@@ -1138,6 +1246,15 @@ export default function ProviderServicesPage() {
                         <span>Fee: ₹{team.consultationFee}</span>
                       </div>
                     </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => openEditEmergencyTeam(team)}
+                      data-testid={`button-edit-emergency-${team.id}`}
+                    >
+                      <Edit2 className="mr-1 h-3.5 w-3.5" />
+                      Edit
+                    </Button>
                   </CardContent>
                 </Card>
               ))}
@@ -1210,6 +1327,138 @@ export default function ProviderServicesPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <Dialog open={!!editingConsultant} onOpenChange={(open) => !open && setEditingConsultant(null)}>
+        <DialogContent className="max-h-[90vh] flex flex-col">
+          <DialogHeader className="shrink-0">
+            <DialogTitle>Edit Consultant</DialogTitle>
+            <DialogDescription>Update consultant details</DialogDescription>
+          </DialogHeader>
+          <div className="overflow-y-auto flex-1 pr-1">
+            <Form {...editConsultantForm}>
+              <form onSubmit={editConsultantForm.handleSubmit((data) => updateConsultantMutation.mutate(data))} className="space-y-4">
+                <FormField control={editConsultantForm.control} name="name" render={({ field }) => (
+                  <FormItem><FormLabel>Name</FormLabel><FormControl><Input {...field} data-testid="input-edit-consultant-name" /></FormControl><FormMessage /></FormItem>
+                )} />
+                <FormField control={editConsultantForm.control} name="qualification" render={({ field }) => (
+                  <FormItem><FormLabel>Qualification</FormLabel><FormControl><Input {...field} data-testid="input-edit-consultant-qualification" /></FormControl><FormMessage /></FormItem>
+                )} />
+                <FormField control={editConsultantForm.control} name="specialization" render={({ field }) => (
+                  <FormItem><FormLabel>Specialization</FormLabel><FormControl><Input {...field} data-testid="input-edit-consultant-specialization" /></FormControl><FormMessage /></FormItem>
+                )} />
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField control={editConsultantForm.control} name="yearsExperience" render={({ field }) => (
+                    <FormItem><FormLabel>Years Experience</FormLabel><FormControl><Input type="number" {...field} data-testid="input-edit-consultant-experience" /></FormControl><FormMessage /></FormItem>
+                  )} />
+                  <FormField control={editConsultantForm.control} name="consultationFee" render={({ field }) => (
+                    <FormItem><FormLabel>Consultation Fee (INR)</FormLabel><FormControl><Input {...field} data-testid="input-edit-consultant-fee" /></FormControl><FormMessage /></FormItem>
+                  )} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Registration No.</Label>
+                  <Input value={editConsultantRegNo} onChange={(e) => setEditConsultantRegNo(e.target.value)} placeholder="Medical registration number" data-testid="input-edit-consultant-reg-no" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Registered Organization</Label>
+                  <Input value={editConsultantRegOrg} onChange={(e) => setEditConsultantRegOrg(e.target.value)} placeholder="e.g., State Medical Council" data-testid="input-edit-consultant-reg-org" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Affiliated Institution</Label>
+                  <Input value={editConsultantAffiliation} onChange={(e) => setEditConsultantAffiliation(e.target.value)} placeholder="e.g., AIIMS Delhi" data-testid="input-edit-consultant-affiliation" />
+                </div>
+                <FormField control={editConsultantForm.control} name="portfolio" render={({ field }) => (
+                  <FormItem><FormLabel>Portfolio / Experience Details</FormLabel><FormControl><Textarea className="min-h-[80px] resize-none" data-testid="input-edit-consultant-portfolio" {...field} /></FormControl><FormMessage /></FormItem>
+                )} />
+                <div className="space-y-2">
+                  <Label>Registration Document</Label>
+                  {editingConsultant?.registrationDocumentUrl && !editConsultantDocFile && (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
+                      <FileText className="h-3.5 w-3.5" />
+                      <a href={editingConsultant.registrationDocumentUrl} target="_blank" rel="noopener noreferrer" className="text-primary underline">Current document</a>
+                    </div>
+                  )}
+                  {editConsultantDocFile ? (
+                    <div className="flex items-center gap-2 rounded-md border p-2">
+                      <FileText className="h-4 w-4 text-muted-foreground" />
+                      <span className="flex-1 text-sm truncate">{editConsultantDocFile.name}</span>
+                      <Button type="button" variant="ghost" size="icon" onClick={() => setEditConsultantDocFile(null)}><X className="h-4 w-4" /></Button>
+                    </div>
+                  ) : (
+                    <label className="flex items-center gap-2 rounded-md border border-dashed p-3 cursor-pointer hover:bg-muted/50 transition-colors">
+                      <Upload className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm">{editingConsultant?.registrationDocumentUrl ? "Replace document" : "Upload document"}</span>
+                      <input type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => { const f = e.target.files?.[0]; if (f) setEditConsultantDocFile(f); e.target.value = ""; }} />
+                    </label>
+                  )}
+                </div>
+                <Button type="submit" className="w-full" disabled={updateConsultantMutation.isPending} data-testid="button-save-edit-consultant">
+                  {updateConsultantMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                  Save Changes
+                </Button>
+              </form>
+            </Form>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!editingEmergencyTeam} onOpenChange={(open) => !open && setEditingEmergencyTeam(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Emergency Team</DialogTitle>
+            <DialogDescription>Update emergency team details</DialogDescription>
+          </DialogHeader>
+          <Form {...editEmergencyForm}>
+            <form onSubmit={editEmergencyForm.handleSubmit((data) => updateEmergencyMutation.mutate(data))} className="space-y-4">
+              <FormField control={editEmergencyForm.control} name="teamLeadName" render={({ field }) => (
+                <FormItem><FormLabel>Team Lead Name</FormLabel><FormControl><Input {...field} data-testid="input-edit-emergency-lead" /></FormControl><FormMessage /></FormItem>
+              )} />
+              <FormField control={editEmergencyForm.control} name="qualification" render={({ field }) => (
+                <FormItem><FormLabel>Qualification</FormLabel><FormControl><Input {...field} data-testid="input-edit-emergency-qualification" /></FormControl><FormMessage /></FormItem>
+              )} />
+              <FormField control={editEmergencyForm.control} name="department" render={({ field }) => (
+                <FormItem><FormLabel>Department</FormLabel><FormControl><Input {...field} data-testid="input-edit-emergency-department" /></FormControl><FormMessage /></FormItem>
+              )} />
+              <FormField control={editEmergencyForm.control} name="consultationFee" render={({ field }) => (
+                <FormItem><FormLabel>Consultation Fee (INR)</FormLabel><FormControl><Input {...field} data-testid="input-edit-emergency-fee" /></FormControl><FormMessage /></FormItem>
+              )} />
+              <div className="space-y-2">
+                <Label>Registration No.</Label>
+                <Input value={editEmergencyRegNo} onChange={(e) => setEditEmergencyRegNo(e.target.value)} placeholder="Registration number" data-testid="input-edit-emergency-reg-no" />
+              </div>
+              <div className="space-y-2">
+                <Label>Registered Organization</Label>
+                <Input value={editEmergencyRegOrg} onChange={(e) => setEditEmergencyRegOrg(e.target.value)} placeholder="e.g., State Medical Council" data-testid="input-edit-emergency-reg-org" />
+              </div>
+              <div className="space-y-2">
+                <Label>Registration Document</Label>
+                {editingEmergencyTeam?.registrationDocumentUrl && !editEmergencyDocFile && (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
+                    <FileText className="h-3.5 w-3.5" />
+                    <a href={editingEmergencyTeam.registrationDocumentUrl} target="_blank" rel="noopener noreferrer" className="text-primary underline">Current document</a>
+                  </div>
+                )}
+                {editEmergencyDocFile ? (
+                  <div className="flex items-center gap-2 rounded-md border p-2">
+                    <FileText className="h-4 w-4 text-muted-foreground" />
+                    <span className="flex-1 text-sm truncate">{editEmergencyDocFile.name}</span>
+                    <Button type="button" variant="ghost" size="icon" onClick={() => setEditEmergencyDocFile(null)}><X className="h-4 w-4" /></Button>
+                  </div>
+                ) : (
+                  <label className="flex items-center gap-2 rounded-md border border-dashed p-3 cursor-pointer hover:bg-muted/50 transition-colors">
+                    <Upload className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm">{editingEmergencyTeam?.registrationDocumentUrl ? "Replace document" : "Upload document"}</span>
+                    <input type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => { const f = e.target.files?.[0]; if (f) setEditEmergencyDocFile(f); e.target.value = ""; }} />
+                  </label>
+                )}
+              </div>
+              <Button type="submit" className="w-full" disabled={updateEmergencyMutation.isPending} data-testid="button-save-edit-emergency">
+                {updateEmergencyMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                Save Changes
+              </Button>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={!!editingSlotsFor} onOpenChange={(open) => !open && setEditingSlotsFor(null)}>
         <DialogContent>

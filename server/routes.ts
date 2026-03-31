@@ -479,6 +479,21 @@ export async function registerRoutes(
     }
   });
 
+  app.patch("/api/provider/emergency-teams/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.id;
+      const provider = await storage.getProviderByUserId(userId);
+      if (!provider) return res.status(403).json({ message: "Provider profile required" });
+      const team = await storage.getEmergencyTeamById(req.params.id);
+      if (!team || team.providerId !== provider.id) return res.status(404).json({ message: "Emergency team not found or access denied" });
+      const updated = await storage.updateEmergencyTeam(req.params.id, req.body);
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating emergency team:", error);
+      res.status(500).json({ message: "Failed to update emergency team" });
+    }
+  });
+
   // Lab Tests - Direct Catalog (no providers)
   app.get("/api/lab-tests", async (req, res) => {
     try {
@@ -1493,8 +1508,14 @@ export async function registerRoutes(
   });
 
   // Update provider's test offering (price, turnaround)
-  app.patch("/api/provider/lab-tests/:id", isAuthenticated, async (req: any, res) => {
+  app.patch("/api/provider/lab-tests/:id", isAuthenticated, isProvider, async (req: any, res) => {
     try {
+      const provider = await storage.getProviderByUserId(req.user.id);
+      if (!provider) return res.status(403).json({ message: "Not a provider" });
+      const existing = await storage.getProviderLabTestById(req.params.id);
+      if (existing && String(existing.providerId) !== String(provider.id)) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
       const updated = await storage.updateProviderLabTest(req.params.id, req.body);
       res.json(updated);
     } catch (error) {
@@ -1504,8 +1525,14 @@ export async function registerRoutes(
   });
 
   // Remove a test from provider's offerings
-  app.delete("/api/provider/lab-tests/:id", isAuthenticated, async (req: any, res) => {
+  app.delete("/api/provider/lab-tests/:id", isAuthenticated, isProvider, async (req: any, res) => {
     try {
+      const provider = await storage.getProviderByUserId(req.user.id);
+      if (!provider) return res.status(403).json({ message: "Not a provider" });
+      const existing = await storage.getProviderLabTestById(req.params.id);
+      if (existing && String(existing.providerId) !== String(provider.id)) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
       await storage.deleteProviderLabTest(req.params.id);
       res.json({ message: "Lab test removed" });
     } catch (error) {
@@ -1618,8 +1645,14 @@ export async function registerRoutes(
     }
   });
 
-  app.patch("/api/provider/modalities/:id", isAuthenticated, async (req: any, res) => {
+  app.patch("/api/provider/modalities/:id", isAuthenticated, isProvider, async (req: any, res) => {
     try {
+      const provider = await storage.getProviderByUserId(req.user.id);
+      if (!provider) return res.status(403).json({ message: "Not a provider" });
+      const existing = await storage.getProviderModalityById(req.params.id);
+      if (existing && String(existing.providerId) !== String(provider.id)) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
       const updated = await storage.updateProviderModality(req.params.id, req.body);
       res.json(updated);
     } catch (error) {
@@ -1628,8 +1661,14 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/provider/modalities/:id", isAuthenticated, async (req: any, res) => {
+  app.delete("/api/provider/modalities/:id", isAuthenticated, isProvider, async (req: any, res) => {
     try {
+      const provider = await storage.getProviderByUserId(req.user.id);
+      if (!provider) return res.status(403).json({ message: "Not a provider" });
+      const existing = await storage.getProviderModalityById(req.params.id);
+      if (existing && String(existing.providerId) !== String(provider.id)) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
       await storage.deleteProviderModality(req.params.id);
       res.json({ message: "Modality removed" });
     } catch (error) {
@@ -1783,9 +1822,9 @@ export async function registerRoutes(
   app.patch("/api/admin/users/:id/profile", isAdmin, async (req: any, res) => {
     try {
       const allowedFields = [
-        "firstName", "lastName", "phone",
+        "firstName", "lastName", "phone", "email",
         "hospitalName", "hospitalAddress", "hospitalRegistrationNo", "hospitalRegisteredOrg",
-        "profileImageUrl",
+        "profileImageUrl", "registrationDocumentUrl",
       ];
       const data: Record<string, any> = {};
       for (const key of allowedFields) {
@@ -1806,9 +1845,9 @@ export async function registerRoutes(
       const userId = req.user?.id;
       if (!userId) return res.status(401).json({ message: "Unauthorized" });
       const allowedFields = [
-        "firstName", "lastName", "phone",
+        "firstName", "lastName", "phone", "email",
         "hospitalName", "hospitalAddress", "hospitalRegistrationNo", "hospitalRegisteredOrg",
-        "profileImageUrl",
+        "profileImageUrl", "registrationDocumentUrl",
       ];
       const data: Record<string, any> = {};
       for (const key of allowedFields) {

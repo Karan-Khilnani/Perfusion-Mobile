@@ -18,13 +18,6 @@ import {
   SidebarGroupLabel,
   SidebarGroupContent,
 } from "@/components/ui/sidebar";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Home,
@@ -34,7 +27,6 @@ import {
   ClipboardList,
   IndianRupee,
   LogOut,
-  ChevronUp,
   User,
 } from "lucide-react";
 import logoImage from "@assets/Perfusion_website_logo_1766464970393.png";
@@ -46,6 +38,7 @@ const menuItems = [
   { title: "Teleradiology", url: "/user/teleradiology", icon: ScanLine },
   { title: "My Orders", url: "/user/orders", icon: ClipboardList },
   { title: "Billing", url: "/user/billing", icon: IndianRupee },
+  { title: "My Profile", url: "/user/profile", icon: User },
 ];
 
 export default function UserLayout({ children }: { children: React.ReactNode }) {
@@ -120,46 +113,22 @@ export default function UserLayout({ children }: { children: React.ReactNode }) 
           <SidebarFooter className="border-t p-2">
             <SidebarMenu>
               <SidebarMenuItem>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <SidebarMenuButton
-                      className="w-full justify-between"
-                      data-testid="button-user-menu"
-                    >
-                      <div className="flex items-center gap-2">
-                        <Avatar className="h-6 w-6">
-                          <AvatarImage src={user?.profileImageUrl || undefined} />
-                          <AvatarFallback className="text-xs">
-                            {userInitials}
-                          </AvatarFallback>
-                        </Avatar>
-                        <span className="truncate text-sm">
-                          {user?.firstName || user?.email || "User"}
-                        </span>
-                      </div>
-                      <ChevronUp className="h-4 w-4" />
-                    </SidebarMenuButton>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent
-                    side="top"
-                    className="w-[--radix-dropdown-menu-trigger-width]"
-                  >
-                    <DropdownMenuItem asChild>
-                      <Link href="/user/profile" data-testid="link-user-profile">
-                        <User className="mr-2 h-4 w-4" />
-                        Profile
-                      </Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                      onClick={() => logout()}
-                      data-testid="button-logout"
-                    >
-                      <LogOut className="mr-2 h-4 w-4" />
-                      Logout
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                <SidebarMenuButton
+                  className="w-full"
+                  onClick={() => logout()}
+                  data-testid="button-logout"
+                >
+                  <Avatar className="h-6 w-6">
+                    <AvatarImage src={user?.profileImageUrl || undefined} />
+                    <AvatarFallback className="text-xs">
+                      {userInitials}
+                    </AvatarFallback>
+                  </Avatar>
+                  <span className="truncate text-sm flex-1">
+                    {user?.firstName || user?.email || "User"}
+                  </span>
+                  <LogOut className="h-4 w-4" />
+                </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>
           </SidebarFooter>

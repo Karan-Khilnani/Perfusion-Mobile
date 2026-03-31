@@ -39,7 +39,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, MoreHorizontal, Pause, Play, Trash2, Stethoscope, Search, Calendar, Edit, X, DollarSign, Camera, PenLine } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Plus, MoreHorizontal, Pause, Play, Trash2, Stethoscope, Search, Calendar, Edit, X, DollarSign, Camera, PenLine, Upload, FileText, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Consultant } from "@shared/schema";
@@ -79,6 +81,11 @@ export default function AdminConsultantsPage() {
   const [sigCropOpen, setSigCropOpen] = useState(false);
   const [sigCropRaw, setSigCropRaw] = useState<File | null>(null);
   const [cropTargetId, setCropTargetId] = useState<string | null>(null);
+  const [editingConsultant, setEditingConsultant] = useState<any | null>(null);
+  const [editRegNo, setEditRegNo] = useState("");
+  const [editRegOrg, setEditRegOrg] = useState("");
+  const [editAffiliation, setEditAffiliation] = useState("");
+  const [editDocFile, setEditDocFile] = useState<File | null>(null);
   const { toast } = useToast();
 
   const { data: consultants, isLoading } = useQuery<EnrichedConsultant[]>({
@@ -173,6 +180,72 @@ export default function AdminConsultantsPage() {
     },
     onError: () => {
       toast({ title: "Error", description: "Failed to update pricing", variant: "destructive" });
+    },
+  });
+
+  const editConsultantForm = useForm<ConsultantFormData>({
+    resolver: zodResolver(consultantSchema),
+    defaultValues: { name: "", qualification: "", specialization: "", yearsExperience: 0, consultationFee: "", rating: "4.0", availableSlots: "" },
+  });
+
+  const openEditDetails = (c: any) => {
+    setEditingConsultant(c);
+    editConsultantForm.reset({
+      name: c.name || "",
+      qualification: c.qualification || "",
+      specialization: c.specialization || "",
+      yearsExperience: c.yearsExperience || 0,
+      consultationFee: c.consultationFee || "",
+      rating: c.rating || "4.0",
+      availableSlots: c.availableSlots?.join(", ") || "",
+    });
+    setEditRegNo(c.registrationNumber || "");
+    setEditRegOrg(c.registeredOrganization || "");
+    setEditAffiliation(c.affiliatedInstitution || "");
+    setEditDocFile(null);
+  };
+
+  const uploadDocument = async (file: File): Promise<string | undefined> => {
+    const formData = new FormData();
+    formData.append("file", file);
+    const res = await fetch("/api/upload/document", { method: "POST", body: formData, credentials: "include" });
+    if (res.ok) {
+      const result = await res.json();
+      return result.url;
+    }
+    return undefined;
+  };
+
+  const updateDetailsMutation = useMutation({
+    mutationFn: async (data: ConsultantFormData) => {
+      if (!editingConsultant) throw new Error("No consultant");
+      let registrationDocumentUrl: string | undefined;
+      if (editDocFile) {
+        registrationDocumentUrl = await uploadDocument(editDocFile);
+      }
+      const slots = data.availableSlots
+        ? data.availableSlots.split(",").map((s: string) => s.trim()).filter(Boolean)
+        : undefined;
+      return apiRequest("PATCH", `/api/admin/consultants/${editingConsultant.id}`, {
+        name: data.name,
+        qualification: data.qualification,
+        specialization: data.specialization,
+        yearsExperience: data.yearsExperience,
+        consultationFee: data.consultationFee,
+        ...(slots ? { availableSlots: slots } : {}),
+        registrationNumber: editRegNo || undefined,
+        registeredOrganization: editRegOrg || undefined,
+        affiliatedInstitution: editAffiliation || undefined,
+        ...(registrationDocumentUrl ? { registrationDocumentUrl } : {}),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/consultants"] });
+      setEditingConsultant(null);
+      toast({ title: "Consultant details updated" });
+    },
+    onError: () => {
+      toast({ title: "Failed to update consultant", variant: "destructive" });
     },
   });
 
@@ -442,6 +515,10 @@ export default function AdminConsultantsPage() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => openEditDetails(consultant)}>
+                            <Edit className="mr-2 h-4 w-4" />
+                            Edit Details
+                          </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => openPricingDialog(consultant)}>
                             <DollarSign className="mr-2 h-4 w-4" />
                             Edit Pricing
@@ -609,6 +686,78 @@ export default function AdminConsultantsPage() {
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!editingConsultant} onOpenChange={(open) => !open && setEditingConsultant(null)}>
+        <DialogContent className="max-h-[90vh] flex flex-col sm:max-w-[500px]">
+          <DialogHeader className="shrink-0">
+            <DialogTitle>Edit Consultant Details</DialogTitle>
+            <DialogDescription>Update all fields for {editingConsultant?.name}</DialogDescription>
+          </DialogHeader>
+          <div className="overflow-y-auto flex-1 pr-1">
+            <Form {...editConsultantForm}>
+              <form onSubmit={editConsultantForm.handleSubmit((data) => updateDetailsMutation.mutate(data))} className="space-y-4" id="admin-edit-consultant-form">
+                <FormField control={editConsultantForm.control} name="name" render={({ field }) => (
+                  <FormItem><FormLabel>Name</FormLabel><FormControl><Input {...field} data-testid="input-admin-edit-name" /></FormControl><FormMessage /></FormItem>
+                )} />
+                <FormField control={editConsultantForm.control} name="qualification" render={({ field }) => (
+                  <FormItem><FormLabel>Qualification</FormLabel><FormControl><Input {...field} data-testid="input-admin-edit-qualification" /></FormControl><FormMessage /></FormItem>
+                )} />
+                <FormField control={editConsultantForm.control} name="specialization" render={({ field }) => (
+                  <FormItem><FormLabel>Specialization</FormLabel><FormControl><Input {...field} data-testid="input-admin-edit-specialization" /></FormControl><FormMessage /></FormItem>
+                )} />
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField control={editConsultantForm.control} name="yearsExperience" render={({ field }) => (
+                    <FormItem><FormLabel>Years Experience</FormLabel><FormControl><Input type="number" {...field} data-testid="input-admin-edit-experience" /></FormControl><FormMessage /></FormItem>
+                  )} />
+                  <FormField control={editConsultantForm.control} name="consultationFee" render={({ field }) => (
+                    <FormItem><FormLabel>Fee (INR)</FormLabel><FormControl><Input {...field} data-testid="input-admin-edit-fee" /></FormControl><FormMessage /></FormItem>
+                  )} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Registration No.</Label>
+                  <Input value={editRegNo} onChange={(e) => setEditRegNo(e.target.value)} placeholder="Medical registration number" data-testid="input-admin-edit-reg-no" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Registered Organization</Label>
+                  <Input value={editRegOrg} onChange={(e) => setEditRegOrg(e.target.value)} placeholder="e.g., State Medical Council" data-testid="input-admin-edit-reg-org" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Affiliated Institution</Label>
+                  <Input value={editAffiliation} onChange={(e) => setEditAffiliation(e.target.value)} placeholder="e.g., AIIMS Delhi" data-testid="input-admin-edit-affiliation" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Registration Document</Label>
+                  {editingConsultant?.registrationDocumentUrl && !editDocFile && (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
+                      <FileText className="h-3.5 w-3.5" />
+                      <a href={editingConsultant.registrationDocumentUrl} target="_blank" rel="noopener noreferrer" className="text-primary underline">Current document</a>
+                    </div>
+                  )}
+                  {editDocFile ? (
+                    <div className="flex items-center gap-2 rounded-md border p-2">
+                      <FileText className="h-4 w-4 text-muted-foreground" />
+                      <span className="flex-1 text-sm truncate">{editDocFile.name}</span>
+                      <Button type="button" variant="ghost" size="icon" onClick={() => setEditDocFile(null)}><X className="h-4 w-4" /></Button>
+                    </div>
+                  ) : (
+                    <label className="flex items-center gap-2 rounded-md border border-dashed p-3 cursor-pointer hover:bg-muted/50 transition-colors">
+                      <Upload className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm">{editingConsultant?.registrationDocumentUrl ? "Replace document" : "Upload document"}</span>
+                      <input type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => { const f = e.target.files?.[0]; if (f) setEditDocFile(f); e.target.value = ""; }} />
+                    </label>
+                  )}
+                </div>
+              </form>
+            </Form>
+          </div>
+          <div className="flex justify-end gap-2 pt-4 border-t shrink-0">
+            <Button variant="outline" onClick={() => setEditingConsultant(null)}>Cancel</Button>
+            <Button type="submit" form="admin-edit-consultant-form" disabled={updateDetailsMutation.isPending} data-testid="button-admin-save-consultant-details">
+              {updateDetailsMutation.isPending ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Saving...</> : "Save Details"}
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
 

@@ -13,16 +13,17 @@ import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { ImageCropDialog } from "@/components/ui/image-crop-dialog";
 import { apiRequest } from "@/lib/queryClient";
-import { Camera, Loader2, Save, Building, User } from "lucide-react";
+import { Camera, Loader2, Save, Building, User, Upload, FileText, X } from "lucide-react";
 
 const userProfileSchema = z.object({
   firstName: z.string().min(1, "First name is required"),
   lastName: z.string().min(1, "Last name is required"),
   phone: z.string().optional(),
-  hospitalName: z.string().min(2, "Organization name is required"),
-  hospitalAddress: z.string().min(5, "Address is required"),
-  hospitalRegistrationNo: z.string().min(1, "Registration number is required"),
-  hospitalRegisteredOrg: z.string().min(1, "Registered organization is required"),
+  email: z.string().email("Invalid email").optional().or(z.literal("")),
+  hospitalName: z.string().optional(),
+  hospitalAddress: z.string().optional(),
+  hospitalRegistrationNo: z.string().optional(),
+  hospitalRegisteredOrg: z.string().optional(),
 });
 
 const providerSchema = z.object({
@@ -59,6 +60,8 @@ export default function ProfilePage() {
   const [cropOpen, setCropOpen] = useState(false);
   const [photoUploading, setPhotoUploading] = useState(false);
   const [currentPhotoUrl, setCurrentPhotoUrl] = useState<string | null>(null);
+  const [regDocFile, setRegDocFile] = useState<File | null>(null);
+  const [regDocUploading, setRegDocUploading] = useState(false);
   const photoInputRef = useRef<HTMLInputElement>(null);
 
   const userForm = useForm<UserProfileFormData>({
@@ -68,6 +71,7 @@ export default function ProfilePage() {
           firstName: user.firstName || "",
           lastName: user.lastName || "",
           phone: user.phone || "",
+          email: user.email || "",
           hospitalName: user.hospitalName || "",
           hospitalAddress: user.hospitalAddress || "",
           hospitalRegistrationNo: user.hospitalRegistrationNo || "",
@@ -138,6 +142,19 @@ export default function ProfilePage() {
       toast({ title: "Upload failed", description: "Could not upload photo.", variant: "destructive" });
     } finally {
       setPhotoUploading(false);
+    }
+  };
+
+  const handleRegDocUpload = async (file: File) => {
+    setRegDocUploading(true);
+    try {
+      const url = await uploadImage(file, file.name);
+      await updateProfileMutation.mutateAsync({ ...userForm.getValues(), registrationDocumentUrl: url });
+    } catch {
+      toast({ title: "Upload failed", description: "Could not upload document.", variant: "destructive" });
+    } finally {
+      setRegDocUploading(false);
+      setRegDocFile(null);
     }
   };
 
@@ -276,6 +293,20 @@ export default function ProfilePage() {
                 )}
               />
 
+              <FormField
+                control={userForm.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Email</FormLabel>
+                    <FormControl>
+                      <Input placeholder="you@example.com" type="email" {...field} data-testid="input-email" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
               <Separator />
 
               <FormField
@@ -339,6 +370,38 @@ export default function ProfilePage() {
                     </FormItem>
                   )}
                 />
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Registration Document</p>
+                {user?.registrationDocumentUrl ? (
+                  <div className="flex items-center gap-2 rounded-md border p-2">
+                    <FileText className="h-4 w-4 text-muted-foreground" />
+                    <a href={user.registrationDocumentUrl} target="_blank" rel="noopener noreferrer" className="flex-1 text-sm truncate text-primary underline">
+                      View Document
+                    </a>
+                    <label className="cursor-pointer">
+                      <Button type="button" variant="ghost" size="sm" asChild disabled={regDocUploading}>
+                        <span>{regDocUploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Replace"}</span>
+                      </Button>
+                      <input type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        if (f) handleRegDocUpload(f);
+                        if (e.target) e.target.value = "";
+                      }} data-testid="input-replace-reg-doc" />
+                    </label>
+                  </div>
+                ) : (
+                  <label className="flex items-center gap-2 rounded-md border border-dashed p-3 cursor-pointer hover:bg-muted/50 transition-colors" data-testid="label-upload-reg-doc">
+                    <Upload className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm">{regDocUploading ? "Uploading..." : "Upload registration certificate"}</span>
+                    <input type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) handleRegDocUpload(f);
+                      if (e.target) e.target.value = "";
+                    }} />
+                  </label>
+                )}
               </div>
 
               <Button
