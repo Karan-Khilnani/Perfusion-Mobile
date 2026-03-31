@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -86,6 +86,9 @@ export default function AdminConsultantsPage() {
   const [editRegOrg, setEditRegOrg] = useState("");
   const [editAffiliation, setEditAffiliation] = useState("");
   const [editDocFile, setEditDocFile] = useState<File | null>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
+  const sigInputRef = useRef<HTMLInputElement>(null);
+  const pendingConsultantIdRef = useRef<string | null>(null);
   const { toast } = useToast();
 
   const { data: consultants, isLoading } = useQuery<EnrichedConsultant[]>({
@@ -523,33 +526,19 @@ export default function AdminConsultantsPage() {
                             <DollarSign className="mr-2 h-4 w-4" />
                             Edit Pricing
                           </DropdownMenuItem>
-                          <DropdownMenuItem asChild>
-                            <label className="flex items-center cursor-pointer" data-testid={`label-admin-photo-${consultant.id}`}>
-                              <Camera className="mr-2 h-4 w-4" />
-                              Replace Photo
-                              <input type="file" className="hidden" accept=".jpg,.jpeg,.png" onChange={(e) => {
-                                const f = e.target.files?.[0];
-                                if (!f) return;
-                                setCropTargetId(String(consultant.id));
-                                setPhotoCropRaw(f);
-                                setPhotoCropOpen(true);
-                                e.target.value = "";
-                              }} />
-                            </label>
+                          <DropdownMenuItem onClick={() => {
+                            pendingConsultantIdRef.current = String(consultant.id);
+                            setTimeout(() => photoInputRef.current?.click(), 0);
+                          }} data-testid={`label-admin-photo-${consultant.id}`}>
+                            <Camera className="mr-2 h-4 w-4" />
+                            Replace Photo
                           </DropdownMenuItem>
-                          <DropdownMenuItem asChild>
-                            <label className="flex items-center cursor-pointer" data-testid={`label-admin-sig-${consultant.id}`}>
-                              <PenLine className="mr-2 h-4 w-4" />
-                              Replace Signature
-                              <input type="file" className="hidden" accept=".jpg,.jpeg,.png" onChange={(e) => {
-                                const f = e.target.files?.[0];
-                                if (!f) return;
-                                setCropTargetId(String(consultant.id));
-                                setSigCropRaw(f);
-                                setSigCropOpen(true);
-                                e.target.value = "";
-                              }} />
-                            </label>
+                          <DropdownMenuItem onClick={() => {
+                            pendingConsultantIdRef.current = String(consultant.id);
+                            setTimeout(() => sigInputRef.current?.click(), 0);
+                          }} data-testid={`label-admin-sig-${consultant.id}`}>
+                            <PenLine className="mr-2 h-4 w-4" />
+                            Replace Signature
                           </DropdownMenuItem>
                           {consultant.status === "active" ? (
                             <DropdownMenuItem
@@ -839,6 +828,35 @@ export default function AdminConsultantsPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <input
+        ref={photoInputRef}
+        type="file"
+        className="hidden"
+        accept=".jpg,.jpeg,.png"
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (!f) return;
+          setCropTargetId(pendingConsultantIdRef.current);
+          setPhotoCropRaw(f);
+          setPhotoCropOpen(true);
+          e.target.value = "";
+        }}
+      />
+      <input
+        ref={sigInputRef}
+        type="file"
+        className="hidden"
+        accept=".jpg,.jpeg,.png"
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (!f) return;
+          setCropTargetId(pendingConsultantIdRef.current);
+          setSigCropRaw(f);
+          setSigCropOpen(true);
+          e.target.value = "";
+        }}
+      />
 
       {/* Crop dialog for admin photo replacement */}
       <ImageCropDialog
