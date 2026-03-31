@@ -1554,7 +1554,7 @@ export default function ProviderServicesPage() {
         open={sigCropOpen}
         onOpenChange={setSigCropOpen}
         imageFile={sigCropRaw}
-        aspect={3}
+        aspect={undefined}
         title="Crop Digital Signature"
         onCropComplete={async (blob, filename) => {
           const croppedFile = new File([blob], filename, { type: blob.type });
@@ -1591,7 +1591,7 @@ export default function ProviderServicesPage() {
         open={listSigCropOpen}
         onOpenChange={setListSigCropOpen}
         imageFile={listSigCropRaw}
-        aspect={3}
+        aspect={undefined}
         title="Crop Digital Signature"
         onCropComplete={async (blob, filename) => {
           if (!cropTargetConsultantId) return;

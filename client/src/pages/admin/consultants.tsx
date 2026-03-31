@@ -81,7 +81,7 @@ export default function AdminConsultantsPage() {
   const [sigCropOpen, setSigCropOpen] = useState(false);
   const [sigCropRaw, setSigCropRaw] = useState<File | null>(null);
   const [cropTargetId, setCropTargetId] = useState<string | null>(null);
-  const [editingConsultant, setEditingConsultant] = useState<any | null>(null);
+  const [editingConsultant, setEditingConsultant] = useState<EnrichedConsultant | null>(null);
   const [editRegNo, setEditRegNo] = useState("");
   const [editRegOrg, setEditRegOrg] = useState("");
   const [editAffiliation, setEditAffiliation] = useState("");
@@ -188,7 +188,7 @@ export default function AdminConsultantsPage() {
     defaultValues: { name: "", qualification: "", specialization: "", yearsExperience: 0, consultationFee: "", rating: "4.0", availableSlots: "" },
   });
 
-  const openEditDetails = (c: any) => {
+  const openEditDetails = (c: EnrichedConsultant) => {
     setEditingConsultant(c);
     editConsultantForm.reset({
       name: c.name || "",
@@ -869,7 +869,7 @@ export default function AdminConsultantsPage() {
         open={sigCropOpen}
         onOpenChange={setSigCropOpen}
         imageFile={sigCropRaw}
-        aspect={3}
+        aspect={undefined}
         title="Crop Digital Signature"
         onCropComplete={async (blob, filename) => {
           if (!cropTargetId) return;

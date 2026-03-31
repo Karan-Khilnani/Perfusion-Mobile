@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import { users } from "@shared/schema";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -61,7 +62,7 @@ export default function AdminUsersPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const [editingUser, setEditingUser] = useState<any | null>(null);
+  const [editingUser, setEditingUser] = useState<typeof users.$inferSelect | null>(null);
   const [photoCropOpen, setPhotoCropOpen] = useState(false);
   const [photoCropRaw, setPhotoCropRaw] = useState<File | null>(null);
   const [pendingPhotoUrl, setPendingPhotoUrl] = useState<string | null>(null);

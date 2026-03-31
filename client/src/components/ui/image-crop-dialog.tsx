@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import ReactCrop, { type Crop, type PixelCrop, centerCrop, makeAspectCrop } from "react-image-crop";
 import "react-image-crop/dist/ReactCrop.css";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -38,6 +38,23 @@ export function ImageCropDialog({
   const [isProcessing, setIsProcessing] = useState(false);
   const imgRef = useRef<HTMLImageElement>(null);
 
+  useEffect(() => {
+    if (open && imageFile) {
+      const reader = new FileReader();
+      reader.onload = (e) => setImgSrc(e.target?.result as string);
+      reader.readAsDataURL(imageFile);
+    }
+  }, [open, imageFile]);
+
+  useEffect(() => {
+    if (!open) {
+      setImgSrc("");
+      setCrop(undefined);
+      setCompletedCrop(undefined);
+      setScale(1);
+    }
+  }, [open]);
+
   const handleImageLoad = useCallback(
     (e: React.SyntheticEvent<HTMLImageElement>) => {
       const { naturalWidth: width, naturalHeight: height } = e.currentTarget;
@@ -49,19 +66,6 @@ export function ImageCropDialog({
     },
     [aspect]
   );
-
-  if (open && imageFile && !imgSrc) {
-    const reader = new FileReader();
-    reader.onload = (e) => setImgSrc(e.target?.result as string);
-    reader.readAsDataURL(imageFile);
-  }
-
-  if (!open && imgSrc) {
-    setImgSrc("");
-    setCrop(undefined);
-    setCompletedCrop(undefined);
-    setScale(1);
-  }
 
   const handleConfirm = async () => {
     if (!imgRef.current || !completedCrop || !imageFile) return;

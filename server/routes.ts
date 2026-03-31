@@ -1825,8 +1825,8 @@ export async function registerRoutes(
         "firstName", "lastName", "phone", "email",
         "hospitalName", "hospitalAddress", "hospitalRegistrationNo", "hospitalRegisteredOrg",
         "profileImageUrl", "registrationDocumentUrl",
-      ];
-      const data: Record<string, any> = {};
+      ] as const;
+      const data: Record<string, string | null> = {};
       for (const key of allowedFields) {
         if (req.body[key] !== undefined) data[key] = req.body[key];
       }
@@ -1848,8 +1848,8 @@ export async function registerRoutes(
         "firstName", "lastName", "phone", "email",
         "hospitalName", "hospitalAddress", "hospitalRegistrationNo", "hospitalRegisteredOrg",
         "profileImageUrl", "registrationDocumentUrl",
-      ];
-      const data: Record<string, any> = {};
+      ] as const;
+      const data: Record<string, string | null> = {};
       for (const key of allowedFields) {
         if (req.body[key] !== undefined) data[key] = req.body[key];
       }
