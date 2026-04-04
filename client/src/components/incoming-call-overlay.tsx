@@ -62,7 +62,7 @@ export function IncomingCallOverlay({ callEvent, onDismiss }: Props) {
       // callerRole tells us who called; recipient is the opposite role
       const returnTo = callEvent.callerRole === "provider" ? "/user/orders" : "/provider/bookings";
       // accepted=true tells video-room to skip precall and go straight to connected
-      navigate(`/video-room/${encodeURIComponent(callEvent.videoRoomUrl || "")}?returnTo=${returnTo}&accepted=true`);
+      navigate(`/video/${encodeURIComponent(callEvent.videoRoomUrl || "")}?returnTo=${returnTo}&accepted=true`);
     } catch {
       setAccepting(false);
     }

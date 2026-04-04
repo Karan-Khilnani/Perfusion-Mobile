@@ -35,7 +35,7 @@ self.addEventListener("push", (event) => {
         type,
         bookingId,
         videoRoomUrl,
-        url: `/video-room/${encodeURIComponent(videoRoomUrl)}?returnTo=${returnTo}&accepted=true`,
+        url: `/video/${encodeURIComponent(videoRoomUrl)}?returnTo=${returnTo}&accepted=true`,
       },
       actions: [
         { action: "accept", title: "Accept" },
