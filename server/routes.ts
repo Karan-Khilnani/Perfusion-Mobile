@@ -3276,7 +3276,12 @@ export async function registerRoutes(
         body: `${callerName} is calling for ${booking.serviceName || "consultation"}`,
       };
       for (const sub of subscriptions) {
-        sendPushNotification(sub, payload).catch(() => {});
+        sendPushNotification(sub, payload).then((result) => {
+          if (result.expired) {
+            // Remove expired/invalid subscriptions so future deliveries aren't degraded
+            storage.deletePushSubscription(recipientUserId, sub.endpoint).catch(() => {});
+          }
+        }).catch(() => {});
       }
 
       res.json({ success: true, session: { bookingId, status: "ringing" } });

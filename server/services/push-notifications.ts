@@ -6,8 +6,13 @@ const VAPID_EMAIL = process.env.VAPID_EMAIL || "mailto:admin@perfusion.health";
 
 if (VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
   webpush.setVapidDetails(VAPID_EMAIL, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
+  console.log("[PushNotifications] VAPID configured — push notifications enabled");
 } else {
-  console.warn("[PushNotifications] VAPID keys not configured — push notifications disabled");
+  // Warn clearly at startup so broken push config is immediately visible
+  console.error(
+    "[PushNotifications] VAPID keys not configured — push notifications DISABLED. " +
+    "Set VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, and VAPID_EMAIL environment variables."
+  );
 }
 
 export interface PushPayload {
@@ -27,13 +32,15 @@ export interface PushSubscriptionData {
   auth: string;
 }
 
+export type PushResult = { sent: boolean; expired: boolean };
+
 export async function sendPushNotification(
   subscription: PushSubscriptionData,
   payload: PushPayload
-): Promise<boolean> {
+): Promise<PushResult> {
   if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
     console.warn("[PushNotifications] Skipping — VAPID keys not set");
-    return false;
+    return { sent: false, expired: false };
   }
 
   try {
@@ -48,14 +55,14 @@ export async function sendPushNotification(
       JSON.stringify(payload)
     );
     console.log("[PushNotifications] Sent to endpoint:", subscription.endpoint.substring(0, 50));
-    return true;
+    return { sent: true, expired: false };
   } catch (error: any) {
     if (error.statusCode === 410 || error.statusCode === 404) {
-      console.log("[PushNotifications] Subscription expired/invalid — should be removed");
-      return false;
+      console.log("[PushNotifications] Subscription expired/invalid — will be pruned:", subscription.endpoint.substring(0, 50));
+      return { sent: false, expired: true };
     }
     console.error("[PushNotifications] Failed:", error?.message || error);
-    return false;
+    return { sent: false, expired: false };
   }
 }
 
