@@ -12,6 +12,7 @@ import { generateBookingNumber } from "./services/booking-number";
 import { calculateCustomerPrice, deriveMarginFromPrice, derivePriceFromMargin } from "./services/pricing";
 import { processReport, type BookingReportData } from "./services/report-processor";
 import { generateAndStorePrescriptionPdf, type PrescriptionPdfData } from "./services/prescription-pdf";
+import { sendPushNotification, getVapidPublicKey, type PushPayload } from "./services/push-notifications";
 
 // Daily.co API helper
 async function createDailyRoom(roomName: string): Promise<{ url: string; name: string } | null> {
@@ -791,6 +792,18 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error fetching bookings:", error);
       res.status(500).json({ message: "Failed to fetch bookings" });
+    }
+  });
+
+  // Get booking by video room URL (for video-room page to know booking context)
+  app.get("/api/bookings/room/:roomUrl", isAuthenticated, async (req: any, res) => {
+    try {
+      const roomUrl = decodeURIComponent(req.params.roomUrl);
+      const booking = await storage.getBookingByVideoRoomUrl(roomUrl);
+      if (!booking) return res.status(404).json({ message: "Booking not found" });
+      res.json(booking);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch booking" });
     }
   });
 
@@ -3074,7 +3087,7 @@ export async function registerRoutes(
         }
       }
 
-      for (const userId of usersToDisable) {
+      for (const userId of Array.from(usersToDisable)) {
         const user = await storage.getUserById(userId);
         if (user && user.approvalStatus !== "rejected") {
           await storage.updateUser(userId, { approvalStatus: "rejected" });
@@ -3096,6 +3109,260 @@ export async function registerRoutes(
       console.error("[Billing] Error checking overdue bookings:", error);
     }
   }, 60 * 60 * 1000);
+
+  // ─── Push Subscription Routes ────────────────────────────────────────
+  app.get("/api/push/vapid-public-key", (req, res) => {
+    const key = getVapidPublicKey();
+    if (!key) return res.status(503).json({ error: "Push notifications not configured" });
+    res.json({ publicKey: key });
+  });
+
+  app.post("/api/push/subscribe", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) return res.status(401).json({ error: "Not authenticated" });
+      const { endpoint, p256dh, auth } = req.body;
+      if (!endpoint || !p256dh || !auth) return res.status(400).json({ error: "Missing subscription fields" });
+      await storage.savePushSubscription(userId, endpoint, p256dh, auth);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("[Push] Subscribe error:", error);
+      res.status(500).json({ error: "Failed to save subscription" });
+    }
+  });
+
+  app.delete("/api/push/unsubscribe", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) return res.status(401).json({ error: "Not authenticated" });
+      const { endpoint } = req.body;
+      if (!endpoint) return res.status(400).json({ error: "Missing endpoint" });
+      await storage.deletePushSubscription(userId, endpoint);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to remove subscription" });
+    }
+  });
+
+  // ─── Call Session State (in-memory) ──────────────────────────────────
+  type CallStatus = "ringing" | "accepted" | "declined" | "timeout";
+  interface CallSession {
+    bookingId: string;
+    callerId: string;
+    callerName: string;
+    callerRole: "seeker" | "provider";
+    videoRoomUrl: string;
+    status: CallStatus;
+    createdAt: number;
+  }
+
+  const callSessions = new Map<string, CallSession>(); // key = bookingId
+  const sseClients = new Map<string, Set<any>>(); // key = userId → set of res objects
+
+  function broadcastCallEvent(userId: string, event: object) {
+    const clients = sseClients.get(userId);
+    if (!clients || clients.size === 0) return;
+    const data = `data: ${JSON.stringify(event)}\n\n`;
+    Array.from(clients).forEach(client => {
+      try { client.write(data); } catch {}
+    });
+  }
+
+  // SSE endpoint — clients connect here to receive real-time call events
+  app.get("/api/call-events", isAuthenticated, (req: any, res) => {
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).end();
+
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+    res.setHeader("X-Accel-Buffering", "no");
+    res.flushHeaders();
+
+    // Send heartbeat every 25s to keep connection alive
+    const heartbeat = setInterval(() => {
+      try { res.write(": heartbeat\n\n"); } catch { clearInterval(heartbeat); }
+    }, 25000);
+
+    if (!sseClients.has(userId)) sseClients.set(userId, new Set());
+    sseClients.get(userId)!.add(res);
+
+    req.on("close", () => {
+      clearInterval(heartbeat);
+      sseClients.get(userId)?.delete(res);
+    });
+  });
+
+  // Initiate a call ring — called by Person A when they click Join Call
+  app.post("/api/call/ring/:bookingId", isAuthenticated, async (req: any, res) => {
+    try {
+      const callerId = req.user?.id;
+      if (!callerId) return res.status(401).json({ error: "Not authenticated" });
+
+      const { bookingId } = req.params;
+      const booking = await storage.getBookingById(bookingId);
+      if (!booking) return res.status(404).json({ error: "Booking not found" });
+
+      // Check caller is part of this booking
+      const provider = await storage.getProviderById(booking.providerId!);
+      const isSeeker = booking.userId === callerId;
+      const isProviderUser = provider?.userId === callerId;
+      if (!isSeeker && !isProviderUser) return res.status(403).json({ error: "Not part of this booking" });
+
+      const callerRole: "seeker" | "provider" = isSeeker ? "seeker" : "provider";
+
+      // Get caller display name
+      const callerUser = await storage.getUserById(callerId);
+      const callerName = callerUser?.name || callerUser?.email || "Unknown";
+
+      const videoRoomUrl = booking.videoRoomId || "";
+      if (!videoRoomUrl) return res.status(400).json({ error: "No video room for this booking" });
+
+      // Find recipient userId
+      const recipientUserId = isSeeker ? provider?.userId : booking.userId;
+      if (!recipientUserId) return res.status(400).json({ error: "Cannot find recipient" });
+
+      // Store/update call session
+      const session: CallSession = {
+        bookingId,
+        callerId,
+        callerName,
+        callerRole,
+        videoRoomUrl,
+        status: "ringing",
+        createdAt: Date.now(),
+      };
+      callSessions.set(bookingId, session);
+
+      // Auto-timeout after 65s
+      setTimeout(() => {
+        const s = callSessions.get(bookingId);
+        if (s && s.status === "ringing") {
+          s.status = "timeout";
+          broadcastCallEvent(callerId, { type: "call_timeout", bookingId });
+          broadcastCallEvent(recipientUserId, { type: "call_timeout", bookingId });
+          setTimeout(() => callSessions.delete(bookingId), 5000);
+        }
+      }, 65000);
+
+      // Notify recipient via SSE if they're online
+      broadcastCallEvent(recipientUserId, {
+        type: "incoming_call",
+        bookingId,
+        callerName,
+        callerRole,
+        videoRoomUrl,
+        serviceName: booking.serviceName,
+      });
+
+      // Send push notification to recipient (even if browser closed)
+      const subscriptions = await storage.getPushSubscriptionsByUserId(recipientUserId);
+      const payload: PushPayload = {
+        type: "incoming_call",
+        bookingId,
+        callerName,
+        callerRole,
+        videoRoomUrl,
+        title: "Incoming Consultation Call",
+        body: `${callerName} is calling for ${booking.serviceName || "consultation"}`,
+      };
+      for (const sub of subscriptions) {
+        sendPushNotification(sub, payload).catch(() => {});
+      }
+
+      res.json({ success: true, session: { bookingId, status: "ringing" } });
+    } catch (error) {
+      console.error("[Call] Ring error:", error);
+      res.status(500).json({ error: "Failed to initiate ring" });
+    }
+  });
+
+  // Accept a call
+  app.post("/api/call/accept/:bookingId", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) return res.status(401).json({ error: "Not authenticated" });
+
+      const { bookingId } = req.params;
+      const session = callSessions.get(bookingId);
+      if (!session) return res.status(404).json({ error: "No active call session" });
+      if (session.status !== "ringing") return res.json({ success: true, status: session.status });
+
+      session.status = "accepted";
+
+      // Notify caller that call was accepted
+      broadcastCallEvent(session.callerId, {
+        type: "call_accepted",
+        bookingId,
+        videoRoomUrl: session.videoRoomUrl,
+      });
+
+      // Clean up after 10s
+      setTimeout(() => callSessions.delete(bookingId), 10000);
+
+      res.json({ success: true, videoRoomUrl: session.videoRoomUrl });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to accept call" });
+    }
+  });
+
+  // Decline a call
+  app.post("/api/call/decline/:bookingId", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) return res.status(401).json({ error: "Not authenticated" });
+
+      const { bookingId } = req.params;
+      const session = callSessions.get(bookingId);
+      if (!session) return res.status(404).json({ error: "No active call session" });
+
+      session.status = "declined";
+
+      broadcastCallEvent(session.callerId, {
+        type: "call_declined",
+        bookingId,
+      });
+
+      setTimeout(() => callSessions.delete(bookingId), 5000);
+
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to decline call" });
+    }
+  });
+
+  // Cancel a call (caller hangs up while ringing)
+  app.post("/api/call/cancel/:bookingId", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.id;
+      const { bookingId } = req.params;
+      const session = callSessions.get(bookingId);
+      if (session && session.callerId === userId) {
+        session.status = "declined";
+        // Find recipient to notify
+        const booking = await storage.getBookingById(bookingId);
+        if (booking) {
+          const provider = await storage.getProviderById(booking.providerId!);
+          const recipientUserId = session.callerRole === "seeker" ? provider?.userId : booking.userId;
+          if (recipientUserId) {
+            broadcastCallEvent(recipientUserId, { type: "call_cancelled", bookingId });
+          }
+        }
+        setTimeout(() => callSessions.delete(bookingId), 5000);
+      }
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to cancel call" });
+    }
+  });
+
+  // Get current call session status
+  app.get("/api/call/status/:bookingId", isAuthenticated, (req: any, res) => {
+    const { bookingId } = req.params;
+    const session = callSessions.get(bookingId);
+    if (!session) return res.json({ status: "none" });
+    res.json({ status: session.status, videoRoomUrl: session.videoRoomUrl });
+  });
 
   return httpServer;
 }

@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/components/theme-provider";
 import NotFound from "@/pages/not-found";
+import { CallProvider } from "@/components/call-provider";
 
 import Home from "@/pages/home";
 import LandingPage from "@/pages/landing";
@@ -131,8 +132,10 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider defaultTheme="light" storageKey="perfusion-theme">
         <TooltipProvider>
-          <Router />
-          <Toaster />
+          <CallProvider>
+            <Router />
+            <Toaster />
+          </CallProvider>
         </TooltipProvider>
       </ThemeProvider>
     </QueryClientProvider>

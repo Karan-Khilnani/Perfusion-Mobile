@@ -19,6 +19,7 @@ import {
   users,
   platformSettings,
   auditLog,
+  pushSubscriptions,
   type Lab,
   type LabTest,
   type Consultant,
@@ -158,6 +159,7 @@ export interface IStorage {
   // Bookings
   getBookingsByUserId(userId: string): Promise<Booking[]>;
   getBookingById(id: string): Promise<Booking | undefined>;
+  getBookingByVideoRoomUrl(videoRoomUrl: string): Promise<Booking | undefined>;
   createBooking(booking: InsertBooking): Promise<Booking>;
   updateBooking(id: string, data: Partial<InsertBooking>): Promise<Booking | undefined>;
   updateBookingStatus(id: string, status: BookingStatus): Promise<Booking | undefined>;
@@ -214,6 +216,11 @@ export interface IStorage {
   getBookingsByDateRange(startDate: Date, endDate: Date, filters?: { userId?: string; providerId?: string; paymentStatus?: string }): Promise<Booking[]>;
   recordPayment(bookingId: string, amount: number, method: string): Promise<Booking | undefined>;
   getOverdueBookings(): Promise<Booking[]>;
+
+  // Push Subscriptions
+  savePushSubscription(userId: string, endpoint: string, p256dh: string, auth: string): Promise<void>;
+  getPushSubscriptionsByUserId(userId: string): Promise<Array<{ endpoint: string; p256dh: string; auth: string }>>;
+  deletePushSubscription(userId: string, endpoint: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -572,6 +579,11 @@ export class DatabaseStorage implements IStorage {
     return booking;
   }
 
+  async getBookingByVideoRoomUrl(videoRoomUrl: string): Promise<Booking | undefined> {
+    const [booking] = await db.select().from(bookings).where(eq(bookings.videoRoomId, videoRoomUrl));
+    return booking;
+  }
+
   async createBooking(booking: InsertBooking): Promise<Booking> {
     const [created] = await db.insert(bookings).values([booking as any]).returning();
     return created;
@@ -857,6 +869,24 @@ export class DatabaseStorage implements IStorage {
         )
       )
       .orderBy(desc(bookings.createdAt));
+  }
+
+  async savePushSubscription(userId: string, endpoint: string, p256dh: string, auth: string): Promise<void> {
+    await db.delete(pushSubscriptions).where(
+      and(eq(pushSubscriptions.userId, userId), eq(pushSubscriptions.endpoint, endpoint))
+    );
+    await db.insert(pushSubscriptions).values({ userId, endpoint, p256dh, auth });
+  }
+
+  async getPushSubscriptionsByUserId(userId: string): Promise<Array<{ endpoint: string; p256dh: string; auth: string }>> {
+    const subs = await db.select().from(pushSubscriptions).where(eq(pushSubscriptions.userId, userId));
+    return subs.map(s => ({ endpoint: s.endpoint, p256dh: s.p256dh, auth: s.auth }));
+  }
+
+  async deletePushSubscription(userId: string, endpoint: string): Promise<void> {
+    await db.delete(pushSubscriptions).where(
+      and(eq(pushSubscriptions.userId, userId), eq(pushSubscriptions.endpoint, endpoint))
+    );
   }
 }
 

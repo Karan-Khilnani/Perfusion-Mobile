@@ -2,7 +2,7 @@
 
 ## Overview
 
-Perfusion is a healthcare operations platform designed to connect resource-limited hospitals with diagnostic labs, specialists, and critical care services. It offers three core services: Super Speciality Consultations (video consultations), Lab Tests (diagnostic test catalog with booking), and Teleradiology Reporting (medical imaging interpretation). The platform uses INR (₹) currency, features role-based access (Admin, Provider, Care Seeker), and comprehensive admin controls for managing services. It includes a robust billing and financial system with a pay-per-use model, Razorpay integration for payments, and a B2B registration approval workflow for hospitals. Key features also include Twilio-based voice call and WhatsApp notifications, an emergency teams feature for urgent consultations, and a prescription generation system. Custom booking number format: `PHC/YYYY-YY/MM/X00000` (financial year, financial month, type letter L/C/R + sequence). Generator at `server/services/booking-number.ts`, sequence tracked in `booking_sequences` table. Pricing follows Provider Base Cost → Admin Margin/Price Override → Customer Price. `server/services/pricing.ts` handles price calculation. `customerPrice` and `marginOverride` fields on `lab_tests`, `consultants`, `emergency_teams` allow per-service admin overrides; global `default_margin_percent` in platform_settings is fallback. Seeker catalog only shows tests with active provider assignments. The platform aims to improve healthcare accessibility by leveraging technology to bridge geographical gaps.
+Perfusion is a healthcare operations platform designed to connect resource-limited hospitals with diagnostic labs, specialists, and critical care services. It offers three core services: Super Speciality Consultations (video consultations), Lab Tests (diagnostic test catalog with booking), and Teleradiology Reporting (medical imaging interpretation). The platform uses INR (₹) currency, features role-based access (Admin, Provider, Care Seeker), and comprehensive admin controls for managing services. It includes a robust billing and financial system with a pay-per-use model, Razorpay integration for payments, and a B2B registration approval workflow for hospitals. Key features also include Twilio-based voice call and WhatsApp notifications, an emergency teams feature for urgent consultations, a prescription generation system, and a PWA call ringing system for video consultations. Custom booking number format: `PHC/YYYY-YY/MM/X00000` (financial year, financial month, type letter L/C/R + sequence). Generator at `server/services/booking-number.ts`, sequence tracked in `booking_sequences` table. Pricing follows Provider Base Cost → Admin Margin/Price Override → Customer Price. `server/services/pricing.ts` handles price calculation. `customerPrice` and `marginOverride` fields on `lab_tests`, `consultants`, `emergency_teams` allow per-service admin overrides; global `default_margin_percent` in platform_settings is fallback. Seeker catalog only shows tests with active provider assignments. The platform aims to improve healthcare accessibility by leveraging technology to bridge geographical gaps.
 
 ## User Preferences
 
@@ -70,6 +70,17 @@ Consultants can create, draft, and permanently confirm prescriptions for consult
 6. **UI States**: BookingRow shows "Signed & Locked" green badge + "Download PDF" when approved; shows "Edit Draft" + "Draft PDF" when unsaved; prescription dialog shows locked read-only view when approved
 
 Key fields on `bookings` table: `prescriptionApprovedAt`, `prescriptionApprovedByUserId`, `prescriptionApproverIp`, `prescriptionOtpVerified`, `prescriptionPdfUrl`
+
+## PWA Call Ringing System
+
+When a consultation booking's "Join Call" is clicked, a WhatsApp-style ringing flow starts:
+1. **PWA Setup**: `client/public/manifest.json` + `client/public/sw.js` make the portal installable and enable background push notifications. Service worker registered in `client/index.html`.
+2. **Push Subscriptions**: `push_subscriptions` DB table stores per-user Web Push subscriptions. VAPID keys stored in env vars (`VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`). `web-push` npm package used. Endpoints: `GET /api/push/vapid-public-key`, `POST /api/push/subscribe`, `DELETE /api/push/unsubscribe`.
+3. **Permission Prompt**: `client/src/components/call-provider.tsx` wraps app globally, prompts for notification permission on login, subscribes via `client/src/lib/push-subscription.ts`.
+4. **Call Flow**: Person A clicks Join Call → pre-call form (seeker only) → `POST /api/call/ring/:bookingId` → server sends push notification + SSE event to Person B → Person B sees incoming call overlay or receives push notification → accept/decline → Daily.co video room loads.
+5. **Real-time Events**: SSE endpoint `GET /api/call-events` broadcasts call events (ringing, accepted, declined, timeout) between parties. In-memory `callSessions` Map tracks state. Auto-timeout at 65s.
+6. **Incoming Call UI**: `client/src/components/incoming-call-overlay.tsx` — full-screen ringing overlay with ringtone (Web Audio API oscillator), Accept/Decline buttons.
+7. **Caller Waiting Screen**: `client/src/pages/video-room.tsx` shows ringing animation + counter while waiting for other party; shows declined/timeout screens with retry option.
 
 ## Report Processing
 
