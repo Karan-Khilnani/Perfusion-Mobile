@@ -3241,7 +3241,7 @@ export async function registerRoutes(
       };
       callSessions.set(bookingId, session);
 
-      // Auto-timeout after 65s
+      // Auto-timeout after 60s
       setTimeout(() => {
         const s = callSessions.get(bookingId);
         if (s && s.status === "ringing") {
@@ -3250,7 +3250,7 @@ export async function registerRoutes(
           broadcastCallEvent(recipientUserId, { type: "call_timeout", bookingId });
           setTimeout(() => callSessions.delete(bookingId), 5000);
         }
-      }, 65000);
+      }, 60000);
 
       // Notify recipient via SSE if they're online
       broadcastCallEvent(recipientUserId, {
@@ -3264,11 +3264,13 @@ export async function registerRoutes(
 
       // Send push notification to recipient (even if browser closed)
       const subscriptions = await storage.getPushSubscriptionsByUserId(recipientUserId);
+      const recipientRole: "seeker" | "provider" = callerRole === "seeker" ? "provider" : "seeker";
       const payload: PushPayload = {
         type: "incoming_call",
         bookingId,
         callerName,
         callerRole,
+        recipientRole,
         videoRoomUrl,
         title: "Incoming Consultation Call",
         body: `${callerName} is calling for ${booking.serviceName || "consultation"}`,

@@ -29,6 +29,8 @@ export default function VideoRoomPage() {
   const [onCallDoctorDesignation, setOnCallDoctorDesignation] = useState("");
   const [phase, setPhase] = useState<CallPhase>("precall");
   const [ringingSeconds, setRingingSeconds] = useState(0);
+  // Tracks whether we've applied the initial accepted=true jump (avoid re-render loop)
+  const joinedAsCalleeApplied = useRef(false);
 
   // Use refs for timers to avoid stale closures
   const ringTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -38,6 +40,8 @@ export default function VideoRoomPage() {
   const urlParams = new URLSearchParams(window.location.search);
   const returnTo = urlParams.get("returnTo") || "/user/orders";
   const isProvider = returnTo.includes("/provider");
+  // If the user accepted an incoming call, skip precall and go straight to connected
+  const joinedAsCallee = urlParams.get("accepted") === "true";
 
   const { data: booking } = useQuery<Booking>({
     queryKey: ["/api/bookings/room", roomId],
@@ -65,6 +69,14 @@ export default function VideoRoomPage() {
   useEffect(() => {
     phaseRef.current = phase;
   }, [phase]);
+
+  // Callee who accepted an incoming call skips precall → goes straight to connected
+  useEffect(() => {
+    if (joinedAsCallee && !joinedAsCalleeApplied.current && phase === "precall") {
+      joinedAsCalleeApplied.current = true;
+      setPhase("connected");
+    }
+  }, [joinedAsCallee, phase]);
 
   function clearRingTimer() {
     if (ringTimeoutRef.current) {
@@ -137,16 +149,16 @@ export default function VideoRoomPage() {
       clearInterval(interval);
       ringingIntervalRef.current = null;
       setPhase("timeout");
-    }, 65000);
+    }, 60000);
     ringTimeoutRef.current = t;
   }, [booking, isProvider, onCallDoctorName, onCallDoctorDesignation]);
 
-  // Provider skips pre-call form and rings immediately
+  // Provider skips pre-call form and rings immediately (unless they accepted an incoming call)
   useEffect(() => {
-    if (isProvider && phase === "precall" && booking) {
+    if (isProvider && !joinedAsCallee && phase === "precall" && booking) {
       handleRing();
     }
-  }, [isProvider, booking, handleRing, phase]);
+  }, [isProvider, joinedAsCallee, booking, handleRing, phase]);
 
   const handleCancelRing = async () => {
     clearRingTimer();

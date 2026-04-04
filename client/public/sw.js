@@ -19,9 +19,11 @@ self.addEventListener("push", (event) => {
     return;
   }
 
-  const { type, title, body, bookingId, callerName, videoRoomUrl } = payload;
+  const { type, title, body, bookingId, callerName, videoRoomUrl, recipientRole } = payload;
 
   if (type === "incoming_call") {
+    // Derive returnTo based on recipient's role so they land on the right portal page
+    const returnTo = recipientRole === "provider" ? "/provider/bookings" : "/user/orders";
     const notificationOptions = {
       body: body || `${callerName} is calling`,
       icon: "/favicon.png",
@@ -33,7 +35,7 @@ self.addEventListener("push", (event) => {
         type,
         bookingId,
         videoRoomUrl,
-        url: `/video-room/${encodeURIComponent(videoRoomUrl)}?returnTo=/user/orders`,
+        url: `/video-room/${encodeURIComponent(videoRoomUrl)}?returnTo=${returnTo}&accepted=true`,
       },
       actions: [
         { action: "accept", title: "Accept" },

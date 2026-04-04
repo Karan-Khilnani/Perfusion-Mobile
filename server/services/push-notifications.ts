@@ -15,6 +15,7 @@ export interface PushPayload {
   bookingId: string;
   callerName: string;
   callerRole: "seeker" | "provider";
+  recipientRole: "seeker" | "provider";
   videoRoomUrl: string;
   title: string;
   body: string;
