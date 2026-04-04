@@ -798,9 +798,16 @@ export async function registerRoutes(
   // Get booking by video room URL (for video-room page to know booking context)
   app.get("/api/bookings/room/:roomUrl", isAuthenticated, async (req: any, res) => {
     try {
+      const userId = req.user?.id;
+      if (!userId) return res.status(401).json({ message: "Unauthorized" });
       const roomUrl = decodeURIComponent(req.params.roomUrl);
       const booking = await storage.getBookingByVideoRoomUrl(roomUrl);
       if (!booking) return res.status(404).json({ message: "Booking not found" });
+      // Only allow the seeker or the provider assigned to this booking
+      const provider = booking.providerId ? await storage.getProviderById(booking.providerId) : null;
+      const isSeeker = booking.userId === userId;
+      const isProviderUser = provider?.userId === userId;
+      if (!isSeeker && !isProviderUser) return res.status(403).json({ message: "Access denied" });
       res.json(booking);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch booking" });
@@ -3277,7 +3284,7 @@ export async function registerRoutes(
     }
   });
 
-  // Accept a call
+  // Accept a call — only the intended recipient may accept
   app.post("/api/call/accept/:bookingId", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user?.id;
@@ -3286,6 +3293,16 @@ export async function registerRoutes(
       const { bookingId } = req.params;
       const session = callSessions.get(bookingId);
       if (!session) return res.status(404).json({ error: "No active call session" });
+
+      // Verify the acceptor is NOT the caller and IS a participant in the booking
+      const booking = await storage.getBookingById(bookingId);
+      if (!booking) return res.status(404).json({ error: "Booking not found" });
+      const provider = booking.providerId ? await storage.getProviderById(booking.providerId) : null;
+      const isSeeker = booking.userId === userId;
+      const isProviderUser = provider?.userId === userId;
+      if (!isSeeker && !isProviderUser) return res.status(403).json({ error: "Not part of this booking" });
+      if (session.callerId === userId) return res.status(403).json({ error: "Caller cannot accept their own call" });
+
       if (session.status !== "ringing") return res.json({ success: true, status: session.status });
 
       session.status = "accepted";
@@ -3306,7 +3323,7 @@ export async function registerRoutes(
     }
   });
 
-  // Decline a call
+  // Decline a call — only the intended recipient may decline
   app.post("/api/call/decline/:bookingId", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user?.id;
@@ -3315,6 +3332,15 @@ export async function registerRoutes(
       const { bookingId } = req.params;
       const session = callSessions.get(bookingId);
       if (!session) return res.status(404).json({ error: "No active call session" });
+
+      // Verify the decliner is NOT the caller and IS a participant in the booking
+      const booking = await storage.getBookingById(bookingId);
+      if (!booking) return res.status(404).json({ error: "Booking not found" });
+      const provider = booking.providerId ? await storage.getProviderById(booking.providerId) : null;
+      const isSeeker = booking.userId === userId;
+      const isProviderUser = provider?.userId === userId;
+      if (!isSeeker && !isProviderUser) return res.status(403).json({ error: "Not part of this booking" });
+      if (session.callerId === userId) return res.status(403).json({ error: "Caller should use cancel endpoint" });
 
       session.status = "declined";
 
@@ -3356,12 +3382,28 @@ export async function registerRoutes(
     }
   });
 
-  // Get current call session status
-  app.get("/api/call/status/:bookingId", isAuthenticated, (req: any, res) => {
-    const { bookingId } = req.params;
-    const session = callSessions.get(bookingId);
-    if (!session) return res.json({ status: "none" });
-    res.json({ status: session.status, videoRoomUrl: session.videoRoomUrl });
+  // Get current call session status — only booking participants may query
+  app.get("/api/call/status/:bookingId", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) return res.status(401).json({ error: "Not authenticated" });
+
+      const { bookingId } = req.params;
+
+      // Verify user is a participant in this booking
+      const booking = await storage.getBookingById(bookingId);
+      if (!booking) return res.status(404).json({ error: "Booking not found" });
+      const provider = booking.providerId ? await storage.getProviderById(booking.providerId) : null;
+      const isSeeker = booking.userId === userId;
+      const isProviderUser = provider?.userId === userId;
+      if (!isSeeker && !isProviderUser) return res.status(403).json({ error: "Not part of this booking" });
+
+      const session = callSessions.get(bookingId);
+      if (!session) return res.json({ status: "none" });
+      res.json({ status: session.status, videoRoomUrl: session.videoRoomUrl });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch call status" });
+    }
   });
 
   return httpServer;

@@ -27,7 +27,9 @@ export function IncomingCallOverlay({ callEvent, onDismiss }: Props) {
     function playRing() {
       if (stopped) return;
       try {
-        audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+        type WebkitWindow = typeof window & { webkitAudioContext?: typeof AudioContext };
+        const AudioCtx = window.AudioContext || (window as WebkitWindow).webkitAudioContext;
+        audioContext = new AudioCtx();
         const osc = audioContext.createOscillator();
         const gain = audioContext.createGain();
         osc.connect(gain);
