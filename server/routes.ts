@@ -3311,6 +3311,10 @@ export async function registerRoutes(
 
       // Send push notification to recipient (even if browser closed)
       const subscriptions = await storage.getPushSubscriptionsByUserId(recipientUserId);
+      console.log(`[Ring] Recipient ${recipientUserId} has ${subscriptions.length} push subscription(s)`);
+      if (subscriptions.length === 0) {
+        console.log(`[Ring] No push subscriptions — recipient will only be alerted via SSE + Twilio voice`);
+      }
       const recipientRole: "seeker" | "provider" = callerRole === "seeker" ? "provider" : "seeker";
       const payload: PushPayload = {
         type: "incoming_call",

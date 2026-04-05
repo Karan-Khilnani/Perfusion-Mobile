@@ -2,22 +2,37 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useCallEvents, type CallEvent } from "@/hooks/use-call-events";
 import { IncomingCallOverlay } from "./incoming-call-overlay";
-import { subscribeToPush, isPushSupported, getNotificationPermission } from "@/lib/push-subscription";
+import { subscribeToPush, isPushSupported, getNotificationPermission, hasPushSubscription } from "@/lib/push-subscription";
 import { useToast } from "@/hooks/use-toast";
-import { Bell } from "lucide-react";
+import { Bell, BellOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
+
+const PUSH_DISMISSED_KEY = "push_prompt_dismissed_until";
+
+function getPromptDismissedUntil(): number {
+  try {
+    return parseInt(localStorage.getItem(PUSH_DISMISSED_KEY) || "0", 10);
+  } catch {
+    return 0;
+  }
+}
+
+function setPromptDismissedFor24h() {
+  try {
+    localStorage.setItem(PUSH_DISMISSED_KEY, String(Date.now() + 24 * 60 * 60 * 1000));
+  } catch {}
+}
 
 export function CallProvider({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, user } = useAuth();
   const { toast } = useToast();
   const [incomingCall, setIncomingCall] = useState<CallEvent | null>(null);
   const [showPermissionPrompt, setShowPermissionPrompt] = useState(false);
+  const [notificationsEnabled, setNotificationsEnabled] = useState<boolean | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioUnlocked = useRef(false);
 
   // Create the audio element once and unlock it on first user interaction.
-  // Browsers block audio that isn't triggered by a direct user gesture, so we
-  // silently play-then-pause on the first click to satisfy the autoplay policy.
   useEffect(() => {
     const audio = new Audio("/ringing.mp3");
     audio.loop = true;
@@ -59,10 +74,8 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
     }
   }, [incomingCall]);
 
-  // Pending call received via SW message while page was hidden
   const pendingSwCall = useRef<CallEvent | null>(null);
 
-  // Close the OS push notification for a call by its tag
   const dismissNotification = useCallback((bookingId: string) => {
     if (!("serviceWorker" in navigator)) return;
     navigator.serviceWorker.ready.then((reg) => {
@@ -72,15 +85,10 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
     }).catch(() => {});
   }, []);
 
-  // Handle incoming call events (from SSE or SW message)
   const handleCallEvent = useCallback((event: CallEvent) => {
     if (event.type === "incoming_call") {
       setIncomingCall(event);
-    } else if (
-      event.type === "call_timeout" ||
-      event.type === "call_cancelled"
-    ) {
-      // Dismiss OS notification so it doesn't linger after the call ends
+    } else if (event.type === "call_timeout" || event.type === "call_cancelled") {
       if (event.bookingId) dismissNotification(event.bookingId);
       setIncomingCall(null);
     }
@@ -88,9 +96,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
 
   useCallEvents(handleCallEvent);
 
-  // Listen for INCOMING_CALL messages posted by the service worker when a
-  // push arrives. If the page is hidden (backgrounded), queue the call and
-  // fire it the moment the page becomes visible again (user taps notification).
+  // Listen for SW postMessage INCOMING_CALL events
   useEffect(() => {
     if (!("serviceWorker" in navigator)) return;
 
@@ -108,7 +114,6 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
       };
 
       if (document.hidden) {
-        // Page is backgrounded — queue and trigger when visible
         pendingSwCall.current = callEvent;
       } else {
         handleCallEvent(callEvent);
@@ -131,37 +136,77 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
     };
   }, [handleCallEvent]);
 
-  // Check push permission and prompt if needed
+  // Check push subscription status and prompt when needed
   useEffect(() => {
     if (!isAuthenticated || !user) return;
-    if (!isPushSupported()) return;
+    if (!isPushSupported()) {
+      setNotificationsEnabled(false);
+      return;
+    }
 
     const permission = getNotificationPermission();
-    if (permission === "default") {
-      // Show prompt after a short delay to not be intrusive on load
-      const t = setTimeout(() => setShowPermissionPrompt(true), 3000);
-      return () => clearTimeout(t);
-    } else if (permission === "granted") {
-      // Already granted — silently re-subscribe (handles refresh/updates)
-      subscribeToPush().catch(() => {});
+
+    if (permission === "granted") {
+      // Already allowed — silently ensure the subscription is registered in the DB.
+      // This handles: first load after granting, re-subscribe after DB wipe, key rotation.
+      hasPushSubscription().then((hasSub) => {
+        if (hasSub) {
+          // Browser has a subscription — re-save it to DB in case it was lost
+          subscribeToPush()
+            .then((ok) => setNotificationsEnabled(ok))
+            .catch(() => setNotificationsEnabled(false));
+        } else {
+          // Browser has no subscription at all — need user to re-grant
+          setNotificationsEnabled(false);
+          const dismissedUntil = getPromptDismissedUntil();
+          if (Date.now() > dismissedUntil) {
+            setTimeout(() => setShowPermissionPrompt(true), 2000);
+          }
+        }
+      });
+    } else if (permission === "default") {
+      // Never asked — show prompt unless recently dismissed
+      setNotificationsEnabled(false);
+      const dismissedUntil = getPromptDismissedUntil();
+      if (Date.now() > dismissedUntil) {
+        setTimeout(() => setShowPermissionPrompt(true), 2000);
+      }
+    } else {
+      // "denied" — user has blocked notifications in browser settings
+      setNotificationsEnabled(false);
     }
   }, [isAuthenticated, user]);
 
   const handleEnableNotifications = async () => {
     setShowPermissionPrompt(false);
     const success = await subscribeToPush();
+    setNotificationsEnabled(success);
     if (success) {
       toast({
         title: "Notifications enabled",
-        description: "You'll receive ringing notifications for incoming consultation calls.",
+        description: "You'll receive incoming call alerts even when the app is in the background.",
       });
     } else {
-      toast({
-        title: "Notifications not enabled",
-        description: "You can enable them later from your browser settings.",
-        variant: "destructive",
-      });
+      const permission = getNotificationPermission();
+      if (permission === "denied") {
+        toast({
+          title: "Notifications blocked",
+          description: "Please allow notifications in your browser settings, then reload.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Could not enable notifications",
+          description: "Something went wrong. Please try again.",
+          variant: "destructive",
+        });
+      }
     }
+  };
+
+  const handleDismissPrompt = () => {
+    setShowPermissionPrompt(false);
+    setPromptDismissedFor24h();
   };
 
   return (
@@ -186,7 +231,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium">Enable call notifications</p>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Get notified when a consultation call starts — even if the app is closed.
+                Required to receive incoming consultation call alerts when this tab is not active.
               </p>
               <div className="flex items-center gap-2 mt-3">
                 <Button
@@ -199,14 +244,31 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
                 <Button
                   size="sm"
                   variant="ghost"
-                  onClick={() => setShowPermissionPrompt(false)}
+                  onClick={handleDismissPrompt}
                   data-testid="button-dismiss-notifications"
                 >
-                  Not now
+                  Remind me later
                 </Button>
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Persistent mini-indicator when notifications are off and prompt is hidden */}
+      {!showPermissionPrompt && notificationsEnabled === false && isAuthenticated && isPushSupported() && getNotificationPermission() !== "denied" && (
+        <div className="fixed bottom-4 right-4 z-40">
+          <Button
+            size="sm"
+            variant="outline"
+            className="gap-1.5 shadow-md text-xs"
+            onClick={() => setShowPermissionPrompt(true)}
+            data-testid="button-notifications-off-indicator"
+            title="Call notifications are off — click to enable"
+          >
+            <BellOff className="h-3.5 w-3.5 text-muted-foreground" />
+            Notifications off
+          </Button>
         </div>
       )}
     </>
