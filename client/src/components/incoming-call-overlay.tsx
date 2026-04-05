@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { Phone, PhoneOff, Stethoscope } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { apiRequest } from "@/lib/queryClient";
@@ -13,24 +13,7 @@ interface Props {
 export function IncomingCallOverlay({ callEvent, onDismiss }: Props) {
   const [, navigate] = useLocation();
   const [accepting, setAccepting] = useState(false);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-
-  // Play ringtone while incoming call is active
-  useEffect(() => {
-    if (!callEvent) return;
-
-    const audio = new Audio("/ringing.mp3");
-    audio.loop = true;
-    audio.volume = 1.0;
-    audioRef.current = audio;
-    audio.play().catch(() => {});
-
-    return () => {
-      audio.pause();
-      audio.currentTime = 0;
-      audioRef.current = null;
-    };
-  }, [callEvent]);
+  // Audio is managed by CallProvider (unlocked on first user interaction)
 
   if (!callEvent) return null;
 

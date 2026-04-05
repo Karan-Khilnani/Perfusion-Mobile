@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useCallEvents, type CallEvent } from "@/hooks/use-call-events";
 import { IncomingCallOverlay } from "./incoming-call-overlay";
@@ -12,6 +12,52 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
   const { toast } = useToast();
   const [incomingCall, setIncomingCall] = useState<CallEvent | null>(null);
   const [showPermissionPrompt, setShowPermissionPrompt] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioUnlocked = useRef(false);
+
+  // Create the audio element once and unlock it on first user interaction.
+  // Browsers block audio that isn't triggered by a direct user gesture, so we
+  // silently play-then-pause on the first click to satisfy the autoplay policy.
+  useEffect(() => {
+    const audio = new Audio("/ringing.mp3");
+    audio.loop = true;
+    audio.volume = 1.0;
+    audio.preload = "auto";
+    audioRef.current = audio;
+
+    function unlock() {
+      if (audioUnlocked.current) return;
+      audioUnlocked.current = true;
+      audio.play().then(() => { audio.pause(); audio.currentTime = 0; }).catch(() => {});
+      document.removeEventListener("click", unlock);
+      document.removeEventListener("touchstart", unlock);
+      document.removeEventListener("keydown", unlock);
+    }
+
+    document.addEventListener("click", unlock);
+    document.addEventListener("touchstart", unlock);
+    document.addEventListener("keydown", unlock);
+
+    return () => {
+      document.removeEventListener("click", unlock);
+      document.removeEventListener("touchstart", unlock);
+      document.removeEventListener("keydown", unlock);
+      audio.pause();
+    };
+  }, []);
+
+  // Play/stop ringing based on incoming call state
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    if (incomingCall) {
+      audio.currentTime = 0;
+      audio.play().catch(() => {});
+    } else {
+      audio.pause();
+      audio.currentTime = 0;
+    }
+  }, [incomingCall]);
 
   // Handle incoming call events
   const handleCallEvent = useCallback((event: CallEvent) => {
