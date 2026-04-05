@@ -1,5 +1,6 @@
+import { useState } from "react";
 import { Link } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { format } from "date-fns";
 import {
   Video,
@@ -12,17 +13,26 @@ import {
   IndianRupee,
   Stethoscope,
   Activity,
+  ShieldCheck,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Booking } from "@shared/schema";
 
 interface ActiveConsultation extends Booking {
@@ -149,18 +159,18 @@ function FileListDialog({
 
 function ConsultationCardSkeleton() {
   return (
-    <div className="rounded-2xl border bg-card p-6 space-y-5">
+    <div className="rounded-2xl border bg-card p-4 sm:p-6 space-y-4">
       <Skeleton className="h-6 w-3/4" />
       <Skeleton className="h-4 w-1/2" />
       <Skeleton className="h-4 w-2/5" />
-      <div className="grid grid-cols-2 gap-3">
-        <Skeleton className="h-11 rounded-xl" />
-        <Skeleton className="h-11 rounded-xl" />
+      <div className="grid grid-cols-2 gap-2.5">
+        <Skeleton className="h-10 rounded-xl" />
+        <Skeleton className="h-10 rounded-xl" />
       </div>
       <div className="grid grid-cols-3 gap-2">
-        <Skeleton className="h-9 rounded-lg" />
-        <Skeleton className="h-9 rounded-lg" />
-        <Skeleton className="h-9 rounded-lg" />
+        <Skeleton className="h-14 rounded-lg" />
+        <Skeleton className="h-14 rounded-lg" />
+        <Skeleton className="h-14 rounded-lg" />
       </div>
     </div>
   );
@@ -180,12 +190,68 @@ function RevenueSkeleton() {
 }
 
 export default function ProviderDashboard() {
+  const { toast } = useToast();
   const { data, isLoading } = useQuery<DashboardData>({
     queryKey: ["/api/provider/dashboard"],
   });
 
+  const [showSummaryDialog, setShowSummaryDialog] = useState(false);
+  const [summaryBooking, setSummaryBooking] = useState<ActiveConsultation | null>(null);
+  const [diagnosis, setDiagnosis] = useState("");
+  const [medications, setMedications] = useState("");
+  const [physicianNotes, setPhysicianNotes] = useState("");
+  const [followUp, setFollowUp] = useState("");
+
+  const saveDraftMutation = useMutation({
+    mutationFn: async ({ id, ...body }: { id: string; diagnosis: string; medications: string; advice: string; followUp: string; physicianNotes: string }) => {
+      const res = await apiRequest("PATCH", `/api/bookings/${id}/prescription`, body);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/provider/dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/provider/bookings"] });
+      toast({ title: "Draft Saved", description: "Consultation summary draft saved. Use \"Confirm & Sign\" to lock it permanently." });
+    },
+    onError: () => {
+      toast({ title: "Failed", description: "Failed to save consultation summary draft.", variant: "destructive" });
+    },
+  });
+
+  const confirmMutation = useMutation({
+    mutationFn: async ({ id, ...body }: { id: string; diagnosis: string; medications: string; physicianNotes: string; followUp: string }) => {
+      const res = await apiRequest("POST", `/api/bookings/${id}/prescription/confirm`, body);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/provider/dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/provider/bookings"] });
+      setShowSummaryDialog(false);
+      setSummaryBooking(null);
+      toast({ title: "Summary Confirmed & Signed", description: "The consultation summary is now locked with a medicolegal audit trail." });
+    },
+    onError: (error: any) => {
+      toast({ title: "Confirmation Failed", description: error?.message || "Failed to confirm consultation summary.", variant: "destructive" });
+    },
+  });
+
+  const openSummaryDialog = (booking: ActiveConsultation) => {
+    setSummaryBooking(booking);
+    setDiagnosis(booking.prescriptionDiagnosis || "");
+    setMedications(booking.prescriptionMedications || "");
+    setPhysicianNotes((booking as any).prescriptionPhysicianNotes || "");
+    setFollowUp(booking.prescriptionFollowUp || "");
+    setShowSummaryDialog(true);
+  };
+
+  const handleSaveDraft = () => {
+    if (!summaryBooking || !diagnosis) return;
+    saveDraftMutation.mutate({ id: summaryBooking.id, diagnosis, medications, advice: "", followUp, physicianNotes });
+  };
+
   const activeConsultations = data?.activeConsultations ?? [];
   const revenue = data?.revenue ?? { total: 0, paid: 0, pending: 0 };
+  const isApproved = !!(summaryBooking as any)?.prescriptionApprovedAt;
+  const isBusy = saveDraftMutation.isPending || confirmMutation.isPending;
 
   return (
     <div className="min-h-full bg-background">
@@ -259,7 +325,7 @@ export default function ProviderDashboard() {
 
                     <div className="grid grid-cols-2 gap-2.5">
                       {booking.videoRoomId ? (
-                        <Link href={`/video/${encodeURIComponent(booking.videoRoomId)}?returnTo=/provider`} className="block w-full">
+                        <Link href={`/video/${encodeURIComponent(booking.videoRoomId)}?returnTo=/provider`} className="block">
                           <Button
                             className="w-full h-10 gap-2 rounded-xl text-sm"
                             data-testid={`button-join-call-${booking.id}`}
@@ -275,16 +341,19 @@ export default function ProviderDashboard() {
                         </Button>
                       )}
 
-                      <Link href="/provider/bookings" className="block w-full">
-                        <Button
-                          variant="secondary"
-                          className="w-full h-10 gap-2 rounded-xl text-sm"
-                          data-testid={`button-generate-summary-${booking.id}`}
-                        >
-                          <FileText className="h-4 w-4 shrink-0" />
-                          Generate Summary
-                        </Button>
-                      </Link>
+                      <Button
+                        variant="secondary"
+                        className="w-full h-10 gap-2 rounded-xl text-sm"
+                        onClick={() => openSummaryDialog(booking)}
+                        data-testid={`button-generate-summary-${booking.id}`}
+                      >
+                        <FileText className="h-4 w-4 shrink-0" />
+                        {(booking as any).prescriptionApprovedAt
+                          ? "View Summary"
+                          : (booking as any).prescriptionGeneratedAt
+                            ? "Edit Draft"
+                            : "Generate Summary"}
+                      </Button>
                     </div>
 
                     <div className="grid grid-cols-3 gap-2">
@@ -387,6 +456,147 @@ export default function ProviderDashboard() {
         </section>
 
       </div>
+
+      <Dialog open={showSummaryDialog} onOpenChange={setShowSummaryDialog}>
+        <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
+          <DialogHeader className="shrink-0">
+            <DialogTitle className="flex items-center gap-2">
+              {isApproved ? (
+                <>
+                  <ShieldCheck className="h-5 w-5 text-green-600" />
+                  Summary — Signed &amp; Locked
+                </>
+              ) : (summaryBooking as any)?.prescriptionGeneratedAt ? (
+                "Edit Summary Draft"
+              ) : (
+                "Generate Summary"
+              )}
+            </DialogTitle>
+            <DialogDescription>
+              {summaryBooking?.patientName} • {summaryBooking?.serviceName}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 overflow-y-auto flex-1 pr-1">
+            {isApproved ? (
+              <div className="rounded-lg border border-green-200 bg-green-50 dark:bg-green-900/20 dark:border-green-800 p-4 space-y-3">
+                <div className="flex items-center gap-2 text-green-700 dark:text-green-400 font-medium">
+                  <ShieldCheck className="h-4 w-4" />
+                  This consultation summary has been digitally confirmed and is permanently locked
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Confirmed on: <span className="font-medium">{new Date((summaryBooking as any).prescriptionApprovedAt).toLocaleString("en-IN", { dateStyle: "long", timeStyle: "medium", timeZone: "Asia/Kolkata" })}</span>
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Diagnosis</p>
+                    <p className="font-medium mt-0.5">{summaryBooking?.prescriptionDiagnosis || "—"}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Follow-up</p>
+                    <p className="font-medium mt-0.5">{summaryBooking?.prescriptionFollowUp || "—"}</p>
+                  </div>
+                </div>
+                {summaryBooking?.prescriptionMedications && (
+                  <div className="text-sm">
+                    <p className="text-xs text-muted-foreground">Treatment Plan</p>
+                    <p className="font-medium mt-0.5 whitespace-pre-wrap">{summaryBooking.prescriptionMedications}</p>
+                  </div>
+                )}
+                {(summaryBooking as any)?.prescriptionPdfUrl && (
+                  <a
+                    href={(summaryBooking as any).prescriptionPdfUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 rounded-lg border border-green-300 bg-white dark:bg-transparent px-3 py-2 text-sm font-medium text-green-700 dark:text-green-400 hover:bg-green-50 transition-colors"
+                    data-testid="link-summary-pdf-signed"
+                  >
+                    <Download className="h-4 w-4" />
+                    Download Signed PDF
+                  </a>
+                )}
+              </div>
+            ) : (
+              <>
+                <div className="rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 p-3 text-sm text-amber-800 dark:text-amber-300">
+                  <strong>Save Draft</strong> to save changes, or <strong>Confirm &amp; Sign</strong> to permanently lock this consultation summary with a medicolegal audit trail. Signed summaries cannot be edited.
+                </div>
+                <div className="space-y-2">
+                  <Label>Diagnosis <span className="text-destructive">*</span></Label>
+                  <Textarea
+                    placeholder="Enter diagnosis details..."
+                    value={diagnosis}
+                    onChange={(e) => setDiagnosis(e.target.value)}
+                    rows={3}
+                    data-testid="input-summary-diagnosis"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Physician Notes</Label>
+                  <Textarea
+                    placeholder="Clinical observations, recommendations, special instructions..."
+                    value={physicianNotes}
+                    onChange={(e) => setPhysicianNotes(e.target.value)}
+                    rows={3}
+                    data-testid="input-summary-physician-notes"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Suggested Treatment Plan</Label>
+                  <Textarea
+                    placeholder={"List medications with dosage and frequency, procedures, therapy...\ne.g., Tab. Paracetamol 500mg - 1 tablet twice daily after meals for 5 days"}
+                    value={medications}
+                    onChange={(e) => setMedications(e.target.value)}
+                    rows={5}
+                    data-testid="input-summary-medications"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Follow-up</Label>
+                  <Input
+                    placeholder="e.g., After 1 week, or if symptoms persist"
+                    value={followUp}
+                    onChange={(e) => setFollowUp(e.target.value)}
+                    data-testid="input-summary-followup"
+                  />
+                </div>
+              </>
+            )}
+          </div>
+          <DialogFooter className="shrink-0 mt-4 gap-2 flex-col sm:flex-row">
+            <Button variant="outline" onClick={() => setShowSummaryDialog(false)}>
+              Close
+            </Button>
+            {!isApproved && (
+              <>
+                <Button
+                  variant="secondary"
+                  onClick={handleSaveDraft}
+                  disabled={!diagnosis || isBusy}
+                  data-testid="button-save-draft"
+                >
+                  {saveDraftMutation.isPending ? (
+                    <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving...</>
+                  ) : (
+                    "Save Draft"
+                  )}
+                </Button>
+                <Button
+                  onClick={() => summaryBooking && confirmMutation.mutate({ id: summaryBooking.id, diagnosis, medications, physicianNotes, followUp })}
+                  disabled={!diagnosis || isBusy}
+                  className="bg-green-700 hover:bg-green-800 text-white"
+                  data-testid="button-confirm-sign"
+                >
+                  {confirmMutation.isPending ? (
+                    <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Confirming...</>
+                  ) : (
+                    <><ShieldCheck className="mr-2 h-4 w-4" />Confirm &amp; Sign</>
+                  )}
+                </Button>
+              </>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
