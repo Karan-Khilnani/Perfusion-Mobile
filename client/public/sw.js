@@ -51,7 +51,7 @@ self.addEventListener("push", (event) => {
     event.waitUntil(
       Promise.all([
         // Show the notification (triggers OS sound + vibration)
-        self.registration.showNotification(title || "Incoming Consultation Call", notificationOptions),
+        self.registration.showNotification(title || "Perfusion", notificationOptions),
         // Also message any open page clients so the in-app overlay + ringtone
         // can fire the moment the user brings the app to the foreground
         clients.matchAll({ type: "window", includeUncontrolled: true }).then((openClients) => {
