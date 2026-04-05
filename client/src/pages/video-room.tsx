@@ -149,7 +149,7 @@ export default function VideoRoomPage() {
       clearInterval(interval);
       ringingIntervalRef.current = null;
       setPhase("timeout");
-    }, 60000);
+    }, 300000);
     ringTimeoutRef.current = t;
   }, [booking, isProvider, onCallDoctorName, onCallDoctorDesignation]);
 

@@ -3241,7 +3241,7 @@ export async function registerRoutes(
       };
       callSessions.set(bookingId, session);
 
-      // Auto-timeout after 60s
+      // Auto-timeout after 5 minutes
       setTimeout(() => {
         const s = callSessions.get(bookingId);
         if (s && s.status === "ringing") {
@@ -3250,7 +3250,7 @@ export async function registerRoutes(
           broadcastCallEvent(recipientUserId, { type: "call_timeout", bookingId });
           setTimeout(() => callSessions.delete(bookingId), 5000);
         }
-      }, 60000);
+      }, 300000);
 
       // Notify recipient via SSE if they're online
       broadcastCallEvent(recipientUserId, {
