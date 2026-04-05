@@ -3158,7 +3158,9 @@ export async function registerRoutes(
     callerId: string;
     callerName: string;
     callerRole: "seeker" | "provider";
+    recipientUserId: string;
     videoRoomUrl: string;
+    serviceName: string;
     status: CallStatus;
     createdAt: number;
   }
@@ -3193,6 +3195,25 @@ export async function registerRoutes(
 
     if (!sseClients.has(userId)) sseClients.set(userId, new Set());
     sseClients.get(userId)!.add(res);
+
+    // Replay any active ringing session for this user so they see the
+    // incoming call overlay when opening the app directly (e.g. after
+    // hearing a Twilio voice alert) rather than via push notification.
+    for (const s of callSessions.values()) {
+      if (s.status === "ringing" && s.recipientUserId === userId) {
+        try {
+          res.write(`data: ${JSON.stringify({
+            type: "incoming_call",
+            bookingId: s.bookingId,
+            callerName: s.callerName,
+            callerRole: s.callerRole,
+            videoRoomUrl: s.videoRoomUrl,
+            serviceName: s.serviceName,
+          })}\n\n`);
+        } catch {}
+        break; // at most one active ringing session per user
+      }
+    }
 
     req.on("close", () => {
       clearInterval(heartbeat);
@@ -3235,7 +3256,9 @@ export async function registerRoutes(
         callerId,
         callerName,
         callerRole,
+        recipientUserId,
         videoRoomUrl,
+        serviceName: booking.serviceName || "",
         status: "ringing",
         createdAt: Date.now(),
       };
