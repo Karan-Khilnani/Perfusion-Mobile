@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "wouter";
+import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { format } from "date-fns";
 import {
@@ -190,6 +190,7 @@ function RevenueSkeleton() {
 }
 
 export default function ProviderDashboard() {
+  const [, navigate] = useLocation();
   const { toast } = useToast();
   const { data, isLoading } = useQuery<DashboardData>({
     queryKey: ["/api/provider/dashboard"],
@@ -325,34 +326,35 @@ export default function ProviderDashboard() {
 
                     <div className="grid grid-cols-2 gap-2.5">
                       {booking.videoRoomId ? (
-                        <Link href={`/video/${encodeURIComponent(booking.videoRoomId)}?returnTo=/provider`} className="block">
-                          <Button
-                            className="w-full h-10 gap-2 rounded-xl text-sm"
-                            data-testid={`button-join-call-${booking.id}`}
-                          >
-                            <Video className="h-4 w-4 shrink-0" />
-                            Join Call
-                          </Button>
-                        </Link>
+                        <Button
+                          className="w-full h-10 gap-2 rounded-xl text-sm overflow-hidden"
+                          onClick={() => navigate(`/video/${encodeURIComponent(booking.videoRoomId!)}?returnTo=/provider`)}
+                          data-testid={`button-join-call-${booking.id}`}
+                        >
+                          <Video className="h-4 w-4 shrink-0" />
+                          <span className="truncate">Join Call</span>
+                        </Button>
                       ) : (
-                        <Button className="w-full h-10 rounded-xl text-sm" disabled variant="outline">
-                          <Video className="h-4 w-4 mr-1.5 shrink-0" />
-                          No Room Yet
+                        <Button className="w-full h-10 rounded-xl text-sm overflow-hidden" disabled variant="outline">
+                          <Video className="h-4 w-4 shrink-0 mr-1.5" />
+                          <span className="truncate">No Room Yet</span>
                         </Button>
                       )}
 
                       <Button
                         variant="secondary"
-                        className="w-full h-10 gap-2 rounded-xl text-sm"
+                        className="w-full h-10 gap-2 rounded-xl text-sm overflow-hidden"
                         onClick={() => openSummaryDialog(booking)}
                         data-testid={`button-generate-summary-${booking.id}`}
                       >
                         <FileText className="h-4 w-4 shrink-0" />
-                        {(booking as any).prescriptionApprovedAt
-                          ? "View Summary"
-                          : (booking as any).prescriptionGeneratedAt
-                            ? "Edit Draft"
-                            : "Generate Summary"}
+                        <span className="truncate">
+                          {(booking as any).prescriptionApprovedAt
+                            ? "View Summary"
+                            : (booking as any).prescriptionGeneratedAt
+                              ? "Edit Draft"
+                              : "Generate Summary"}
+                        </span>
                       </Button>
                     </div>
 
