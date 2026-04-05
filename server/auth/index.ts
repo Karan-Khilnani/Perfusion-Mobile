@@ -13,7 +13,7 @@ declare module "express-session" {
 }
 
 export function getSession(): RequestHandler {
-  const sessionTtl = 7 * 24 * 60 * 60 * 1000; // 1 week
+  const sessionTtl = 30 * 24 * 60 * 60 * 1000; // 30 days
   const pgStore = connectPg(session);
   const sessionStore = new pgStore({
     conString: process.env.DATABASE_URL,
@@ -21,16 +21,19 @@ export function getSession(): RequestHandler {
     ttl: sessionTtl,
     tableName: "sessions",
   });
-  
+
+  const isProduction = process.env.NODE_ENV === "production";
+
   return session({
     secret: process.env.SESSION_SECRET || "development-secret-change-in-production",
     store: sessionStore,
     resave: false,
     saveUninitialized: false,
+    rolling: true,
     proxy: true,
     cookie: {
       httpOnly: true,
-      secure: false,
+      secure: isProduction,
       maxAge: sessionTtl,
       sameSite: "lax",
     },

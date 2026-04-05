@@ -1,4 +1,4 @@
-import { Link } from "wouter";
+import { Link, Redirect } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Phone, Mail, MapPin, ArrowRight } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -6,8 +6,18 @@ import logoImage from "@assets/Pitchdeck_logo_1769590061051.png";
 import indiaMapImage from "@assets/ChatGPT_Image_Dec_18__2025__08_43_37_PM-removebg-preview_1769521462134.png";
 import bedsideImage from "@assets/ChatGPT_Image_Jan_29,_2026,_01_37_39_PM_1769674310991.png";
 import labVideo from "@assets/perfusion_video_h264.mp4";
+import { useAuth } from "@/hooks/use-auth";
 
 export default function LandingPage() {
+  const { user, isLoading } = useAuth();
+
+  // Redirect authenticated users straight to their dashboard
+  if (!isLoading && user) {
+    if (user.role === "admin") return <Redirect to="/admin/dashboard" />;
+    if (user.role === "provider") return <Redirect to="/provider/dashboard" />;
+    return <Redirect to="/user/dashboard" />;
+  }
+
   return (
     <div className="min-h-screen w-full bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-gray-950 dark:via-gray-900 dark:to-black text-gray-900 dark:text-white overflow-x-hidden transition-colors duration-500">
       {/* Theme Toggle - Fixed position using global component */}
