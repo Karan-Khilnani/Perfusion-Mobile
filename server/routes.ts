@@ -35,7 +35,7 @@ async function createDailyRoom(roomName: string): Promise<{ url: string; name: s
           enable_chat: true,
           enable_screenshare: true,
           enable_recording: "cloud",
-          exp: Math.floor(Date.now() / 1000) + 86400, // Expires in 24 hours
+          exp: Math.floor(Date.now() / 1000) + 30 * 24 * 3600, // Expires in 30 days
         },
       }),
     });
@@ -51,6 +51,38 @@ async function createDailyRoom(roomName: string): Promise<{ url: string; name: s
   } catch (error) {
     console.error("Error creating Daily room:", error);
     return null;
+  }
+}
+
+// Verify a Daily.co room exists and hasn't expired. Returns true if valid.
+async function isDailyRoomValid(roomUrl: string): Promise<boolean> {
+  const apiKey = process.env.DAILY_API_KEY;
+  if (!apiKey || !roomUrl) return false;
+
+  try {
+    // Extract room name from URL: https://<domain>.daily.co/<roomName>
+    const roomName = roomUrl.split("/").pop();
+    if (!roomName) return false;
+
+    const res = await fetch(`https://api.daily.co/v1/rooms/${roomName}`, {
+      headers: { Authorization: `Bearer ${apiKey}` },
+    });
+
+    if (res.status === 404) {
+      console.log(`[Daily] Room "${roomName}" does not exist`);
+      return false;
+    }
+    if (!res.ok) return false;
+
+    const room = await res.json();
+    // Check if the room has an expiry that has already passed
+    if (room.config?.exp && room.config.exp < Math.floor(Date.now() / 1000)) {
+      console.log(`[Daily] Room "${roomName}" has expired`);
+      return false;
+    }
+    return true;
+  } catch {
+    return false;
   }
 }
 
@@ -3263,8 +3295,20 @@ export async function registerRoutes(
         subtitle = callerUser?.hospitalName || callerName;
       }
 
-      const videoRoomUrl = booking.videoRoomId || "";
+      let videoRoomUrl = booking.videoRoomId || "";
       if (!videoRoomUrl) return res.status(400).json({ error: "No video room for this booking" });
+
+      // Validate the room still exists (Daily.co rooms expire). Recreate if needed.
+      const roomValid = await isDailyRoomValid(videoRoomUrl);
+      if (!roomValid) {
+        console.log(`[Ring] Daily room expired or missing for booking ${bookingId} — recreating`);
+        const roomName = `perfusion-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        const newRoom = await createDailyRoom(roomName);
+        if (!newRoom) return res.status(500).json({ error: "Could not create video room" });
+        videoRoomUrl = newRoom.url;
+        await storage.updateBooking(bookingId, { videoRoomId: videoRoomUrl });
+        console.log(`[Ring] New room created: ${videoRoomUrl}`);
+      }
 
       // Find recipient userId
       const recipientUserId = isSeeker ? provider?.userId : booking.userId;
