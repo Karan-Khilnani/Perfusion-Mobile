@@ -259,7 +259,7 @@ export default function ProviderDashboard() {
 
                     <div className="grid grid-cols-2 gap-2.5">
                       {booking.videoRoomId ? (
-                        <Link href={`/video/${encodeURIComponent(booking.videoRoomId)}?returnTo=/provider`}>
+                        <Link href={`/video/${encodeURIComponent(booking.videoRoomId)}?returnTo=/provider`} className="block w-full">
                           <Button
                             className="w-full h-10 gap-2 rounded-xl text-sm"
                             data-testid={`button-join-call-${booking.id}`}
@@ -275,7 +275,7 @@ export default function ProviderDashboard() {
                         </Button>
                       )}
 
-                      <Link href="/provider/bookings">
+                      <Link href="/provider/bookings" className="block w-full">
                         <Button
                           variant="secondary"
                           className="w-full h-10 gap-2 rounded-xl text-sm"
