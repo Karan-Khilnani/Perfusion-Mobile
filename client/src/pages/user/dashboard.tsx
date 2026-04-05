@@ -273,28 +273,26 @@ export default function UserDashboard() {
                       </div>
                     </div>
 
-                    {booking.processedReportUrl ? (
-                      <a
-                        href={booking.processedReportUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        download
-                      >
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="w-full gap-2 border-green-500/30 text-green-700 dark:text-green-400 hover:bg-green-500/5"
-                          data-testid={`button-download-report-${booking.id}`}
-                        >
-                          <Download className="h-4 w-4" />
-                          Download Report
+                    {(() => {
+                      const downloadUrl = booking.processedReportUrl || booking.reportUrl;
+                      return downloadUrl ? (
+                        <a href={downloadUrl} target="_blank" rel="noopener noreferrer" download>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="w-full gap-2 border-green-500/30 text-green-700 dark:text-green-400 hover:bg-green-500/5"
+                            data-testid={`button-download-report-${booking.id}`}
+                          >
+                            <Download className="h-4 w-4" />
+                            Download Report
+                          </Button>
+                        </a>
+                      ) : (
+                        <Button size="sm" variant="outline" className="w-full" disabled>
+                          Report processing…
                         </Button>
-                      </a>
-                    ) : (
-                      <Button size="sm" variant="outline" className="w-full" disabled>
-                        Report processing…
-                      </Button>
-                    )}
+                      );
+                    })()}
                   </div>
                 ))}
               </div>
