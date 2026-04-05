@@ -378,7 +378,7 @@ export default function ProviderBookingsPage() {
                   data-testid={`button-prescription-${booking.id}`}
                 >
                   <FileSignature className="mr-2 h-3.5 w-3.5" />
-                  {(booking as any).prescriptionGeneratedAt ? "Edit Draft" : "Generate Summary"}
+                  {(booking as any).prescriptionGeneratedAt ? "Edit Summary Draft" : "Generate Summary"}
                 </Button>
                 {(booking as any).prescriptionGeneratedAt && (
                   <Button
