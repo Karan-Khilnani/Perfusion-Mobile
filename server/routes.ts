@@ -827,6 +827,43 @@ export async function registerRoutes(
     }
   });
 
+  // Dashboard summary — active consultations + ready lab reports for the current seeker
+  app.get("/api/user/dashboard", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) return res.status(401).json({ message: "Unauthorized" });
+
+      const allBookings = await storage.getBookingsByUserId(userId);
+
+      // Active consultations: consultation bookings where prescription NOT yet signed
+      const consultationBookings = allBookings.filter(
+        (b) => b.bookingType === "consultation" &&
+          !["cancelled", "completed"].includes(b.status) &&
+          !b.prescriptionApprovedAt
+      );
+      const activeConsultations = await Promise.all(
+        consultationBookings.map(async (b) => {
+          const consultant = b.serviceId ? await storage.getConsultantById(b.serviceId) : null;
+          return {
+            ...b,
+            consultantSpecialization: consultant?.specialization || null,
+          };
+        })
+      );
+
+      // Ready lab reports: lab bookings where report is available
+      const readyReports = allBookings.filter(
+        (b) => b.bookingType === "lab" &&
+          (b.status === "report_ready" || !!b.processedReportUrl || !!b.reportUrl)
+      );
+
+      res.json({ activeConsultations, readyReports });
+    } catch (error) {
+      console.error("Error fetching dashboard data:", error);
+      res.status(500).json({ message: "Failed to fetch dashboard data" });
+    }
+  });
+
   // Get booking by video room URL (for video-room page to know booking context)
   app.get("/api/bookings/room/:roomUrl", isAuthenticated, async (req: any, res) => {
     try {
