@@ -24,6 +24,13 @@ interface DashboardData {
   readyReports: Booking[];
 }
 
+function formatAppointmentSlot(slot: string | null | undefined): string {
+  if (!slot) return "To be scheduled";
+  const d = new Date(slot);
+  if (isNaN(d.getTime())) return slot;
+  return format(d, "dd MMM yyyy, hh:mm a");
+}
+
 function BookingCardSkeleton() {
   return (
     <div className="rounded-xl border bg-card p-5 space-y-3">
@@ -188,12 +195,7 @@ export default function UserDashboard() {
                         <Calendar className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                         <span className="text-muted-foreground">Appointment:</span>
                         <span className="font-medium">
-                          {booking.appointmentSlot
-                            ? (() => {
-                                try { return format(new Date(booking.appointmentSlot), "dd MMM yyyy, hh:mm a"); }
-                                catch { return booking.appointmentSlot; }
-                              })()
-                            : "To be scheduled"}
+                          {formatAppointmentSlot(booking.appointmentSlot)}
                         </span>
                       </div>
                     </div>

@@ -851,10 +851,10 @@ export async function registerRoutes(
         })
       );
 
-      // Ready lab reports: lab bookings where report is available
+      // Ready lab reports: lab bookings where status=report_ready or processedReportUrl set
       const readyReports = allBookings.filter(
         (b) => b.bookingType === "lab" &&
-          (b.status === "report_ready" || !!b.processedReportUrl || !!b.reportUrl)
+          (b.status === "report_ready" || !!b.processedReportUrl)
       );
 
       res.json({ activeConsultations, readyReports });
