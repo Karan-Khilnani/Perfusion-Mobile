@@ -11,11 +11,14 @@ import { useAuth } from "@/hooks/use-auth";
 export default function LandingPage() {
   const { user, isLoading } = useAuth();
 
-  // Redirect authenticated users straight to their dashboard
-  if (!isLoading && user) {
-    if (user.role === "admin") return <Redirect to="/admin/dashboard" />;
-    if (user.role === "provider") return <Redirect to="/provider/dashboard" />;
-    return <Redirect to="/user/dashboard" />;
+  // Show nothing while auth loads to prevent a flash of landing content
+  if (isLoading) return null;
+
+  // Redirect authenticated users straight to their role dashboard
+  if (user) {
+    if (user.role === "admin") return <Redirect to="/admin" />;
+    if (user.role === "provider") return <Redirect to="/provider" />;
+    return <Redirect to="/user" />;
   }
 
   return (
