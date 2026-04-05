@@ -19,36 +19,16 @@ export function IncomingCallOverlay({ callEvent, onDismiss }: Props) {
   useEffect(() => {
     if (!callEvent) return;
 
-    // Create oscillator-based ringtone using Web Audio API
-    let audioContext: AudioContext | null = null;
-    let interval: ReturnType<typeof setInterval>;
-    let stopped = false;
-
-    function playRing() {
-      if (stopped) return;
-      try {
-        type WebkitWindow = typeof window & { webkitAudioContext?: typeof AudioContext };
-        const AudioCtx = window.AudioContext || (window as WebkitWindow).webkitAudioContext;
-        audioContext = new AudioCtx();
-        const osc = audioContext.createOscillator();
-        const gain = audioContext.createGain();
-        osc.connect(gain);
-        gain.connect(audioContext.destination);
-        osc.frequency.value = 480;
-        gain.gain.setValueAtTime(0.3, audioContext.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.4);
-        osc.start(audioContext.currentTime);
-        osc.stop(audioContext.currentTime + 0.4);
-      } catch {}
-    }
-
-    playRing();
-    interval = setInterval(playRing, 1200);
+    const audio = new Audio("/ringing.mp3");
+    audio.loop = true;
+    audio.volume = 1.0;
+    audioRef.current = audio;
+    audio.play().catch(() => {});
 
     return () => {
-      stopped = true;
-      clearInterval(interval);
-      try { audioContext?.close(); } catch {}
+      audio.pause();
+      audio.currentTime = 0;
+      audioRef.current = null;
     };
   }, [callEvent]);
 
