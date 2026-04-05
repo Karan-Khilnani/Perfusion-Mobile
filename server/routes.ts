@@ -1527,6 +1527,55 @@ export async function registerRoutes(
     }
   });
 
+  // Provider dashboard — active consultations + revenue summary
+  app.get("/api/provider/dashboard", isAuthenticated, async (req: any, res) => {
+    try {
+      const user = req.user;
+      if (user.role !== "provider") {
+        return res.status(403).json({ message: "Access denied. Only providers can access this endpoint." });
+      }
+      const provider = await storage.getProviderByUserId(user.id);
+      if (!provider) {
+        return res.status(404).json({ message: "Provider profile not found" });
+      }
+
+      const allBookings = await storage.getBookingsByProviderId(provider.id);
+      const consultationBookings = allBookings.filter((b) => b.bookingType === "consultation");
+
+      // Active consultations (not cancelled or completed), enriched with seeker hospital name
+      const activeRaw = consultationBookings.filter(
+        (b) => !["cancelled", "completed"].includes(b.status)
+      );
+      const activeConsultations = await Promise.all(
+        activeRaw.map(async (b) => {
+          const seeker = await storage.getUserById(b.userId);
+          return {
+            ...b,
+            seekerHospitalName:
+              seeker?.hospitalName || seeker?.firstName || "Unknown Hospital",
+          };
+        })
+      );
+
+      // Revenue from ALL consultation bookings for this provider
+      const sum = (filter: (b: (typeof consultationBookings)[0]) => boolean) =>
+        consultationBookings
+          .filter(filter)
+          .reduce((acc, b) => acc + parseFloat(b.basePrice || b.amount || "0"), 0);
+
+      const revenue = {
+        total: sum(() => true),
+        paid: sum((b) => b.paymentStatus === "paid"),
+        pending: sum((b) => b.paymentStatus === "pending" || b.paymentStatus === "partial"),
+      };
+
+      res.json({ activeConsultations, revenue });
+    } catch (error) {
+      console.error("Error fetching provider dashboard:", error);
+      res.status(500).json({ message: "Failed to fetch dashboard data" });
+    }
+  });
+
   app.get("/api/provider/labs", isAuthenticated, async (req: any, res) => {
     try {
       const labs = await storage.getLabs();
