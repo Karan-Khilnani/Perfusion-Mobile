@@ -163,7 +163,6 @@ export default function ProviderDashboard() {
               {activeConsultations.map((booking) => {
                 const docUrls = (booking.documentUrls ?? []).filter(Boolean);
                 const chartUrls = (booking.treatmentChartUrls ?? []).filter(Boolean);
-                const isSigned = !!booking.prescriptionApprovedAt;
 
                 return (
                   <div
@@ -249,35 +248,6 @@ export default function ProviderDashboard() {
                         </Button>
                       )}
 
-                      {isSigned && booking.prescriptionPdfUrl ? (
-                        <a
-                          href={booking.prescriptionPdfUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          download
-                          className="flex-1 min-w-[140px]"
-                        >
-                          <Button
-                            variant="secondary"
-                            className="w-full gap-2"
-                            data-testid={`button-view-summary-${booking.id}`}
-                          >
-                            <Download className="h-4 w-4" />
-                            View Summary
-                          </Button>
-                        </a>
-                      ) : (
-                        <Link href="/provider/bookings" className="flex-1 min-w-[140px]">
-                          <Button
-                            variant="outline"
-                            className="w-full gap-2"
-                            data-testid={`button-generate-summary-${booking.id}`}
-                          >
-                            <FileText className="h-4 w-4" />
-                            Generate Summary
-                          </Button>
-                        </Link>
-                      )}
                     </div>
                   </div>
                 );

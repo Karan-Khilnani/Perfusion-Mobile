@@ -1557,11 +1557,11 @@ export async function registerRoutes(
         })
       );
 
-      // Revenue from ALL consultation bookings for this provider
+      // Revenue from ALL consultation bookings for this provider (basePrice only)
       const sum = (filter: (b: (typeof consultationBookings)[0]) => boolean) =>
         consultationBookings
           .filter(filter)
-          .reduce((acc, b) => acc + parseFloat(b.basePrice || b.amount || "0"), 0);
+          .reduce((acc, b) => acc + parseFloat(b.basePrice || "0"), 0);
 
       const revenue = {
         total: sum(() => true),
