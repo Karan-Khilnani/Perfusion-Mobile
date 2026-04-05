@@ -101,6 +101,7 @@ export default function LabBookingPage() {
           prefill: { name: form.getValues("patientName") },
           onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
+            queryClient.invalidateQueries({ queryKey: ["/api/user/dashboard"] });
             queryClient.invalidateQueries({ queryKey: ["/api/billing/my-invoices"] });
             setStep("confirmation");
             toast({ title: "Payment Successful", description: "Your lab test has been booked and paid." });
@@ -113,6 +114,7 @@ export default function LabBookingPage() {
       } else {
         setStep("confirmation");
         queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/user/dashboard"] });
         toast({ title: "Booking Confirmed", description: "Your lab test has been booked successfully." });
       }
     },

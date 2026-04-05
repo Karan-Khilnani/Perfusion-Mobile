@@ -177,6 +177,7 @@ export default function ConsultationBookingPage() {
           prefill: { name: form.getValues("patientName"), contact: form.getValues("contactNumber") },
           onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
+            queryClient.invalidateQueries({ queryKey: ["/api/user/dashboard"] });
             queryClient.invalidateQueries({ queryKey: ["/api/billing/my-invoices"] });
             setStep("confirmation");
             toast({ title: "Payment Successful", description: "Your consultation has been booked and paid." });
@@ -189,6 +190,7 @@ export default function ConsultationBookingPage() {
       } else {
         setStep("confirmation");
         queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/user/dashboard"] });
         toast({ title: "Appointment Confirmed", description: "Your consultation has been booked successfully." });
       }
     },
