@@ -59,7 +59,10 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
     }
   }, [incomingCall]);
 
-  // Handle incoming call events
+  // Pending call received via SW message while page was hidden
+  const pendingSwCall = useRef<CallEvent | null>(null);
+
+  // Handle incoming call events (from SSE or SW message)
   const handleCallEvent = useCallback((event: CallEvent) => {
     if (event.type === "incoming_call") {
       setIncomingCall(event);
@@ -72,6 +75,48 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useCallEvents(handleCallEvent);
+
+  // Listen for INCOMING_CALL messages posted by the service worker when a
+  // push arrives. If the page is hidden (backgrounded), queue the call and
+  // fire it the moment the page becomes visible again (user taps notification).
+  useEffect(() => {
+    if (!("serviceWorker" in navigator)) return;
+
+    function onSwMessage(event: MessageEvent) {
+      if (!event.data || event.data.type !== "INCOMING_CALL") return;
+
+      const callEvent: CallEvent = {
+        type: "incoming_call",
+        bookingId: event.data.bookingId,
+        callerName: event.data.callerName,
+        callerRole: event.data.callerRole,
+        videoRoomUrl: event.data.videoRoomUrl,
+        serviceName: event.data.serviceName,
+      };
+
+      if (document.hidden) {
+        // Page is backgrounded — queue and trigger when visible
+        pendingSwCall.current = callEvent;
+      } else {
+        handleCallEvent(callEvent);
+      }
+    }
+
+    function onVisibilityChange() {
+      if (!document.hidden && pendingSwCall.current) {
+        handleCallEvent(pendingSwCall.current);
+        pendingSwCall.current = null;
+      }
+    }
+
+    navigator.serviceWorker.addEventListener("message", onSwMessage);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
+    return () => {
+      navigator.serviceWorker.removeEventListener("message", onSwMessage);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [handleCallEvent]);
 
   // Check push permission and prompt if needed
   useEffect(() => {

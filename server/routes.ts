@@ -7,7 +7,7 @@ import type { BookingStatus, UserRole, ProviderType, ProviderStatus, ServiceStat
 import multer from "multer";
 import path from "path";
 import fs from "fs";
-import { notifyAdminLabBooking, notifyUserReportReady } from "./services/msg91";
+import { notifyAdminLabBooking, notifyUserReportReady, triggerVoiceCall } from "./services/msg91";
 import { generateBookingNumber } from "./services/booking-number";
 import { calculateCustomerPrice, deriveMarginFromPrice, derivePriceFromMargin } from "./services/pricing";
 import { processReport, type BookingReportData } from "./services/report-processor";
@@ -3282,6 +3282,21 @@ export async function registerRoutes(
             storage.deletePushSubscription(recipientUserId, sub.endpoint).catch(() => {});
           }
         }).catch(() => {});
+      }
+
+      // Twilio voice call fallback — rings the recipient's actual phone number
+      // even when the phone is locked or the browser is fully closed.
+      // Fire-and-forget; never block the response or the call flow.
+      const recipientUser = await storage.getUserById(recipientUserId);
+      if (recipientUser?.phone) {
+        const serviceName = booking.serviceName || "consultation";
+        const voiceMsg =
+          `Hello. You have an incoming ${serviceName} call on Perfusion from ${callerName}. ` +
+          `Please open the Perfusion app to join the call. ` +
+          `This call is from ${callerName} on Perfusion Healthcare.`;
+        triggerVoiceCall(recipientUser.phone, voiceMsg).catch((err: any) =>
+          console.error("[Call] Twilio fallback voice call failed:", err?.message || err)
+        );
       }
 
       res.json({ success: true, session: { bookingId, status: "ringing" } });

@@ -29,12 +29,17 @@ self.addEventListener("push", (event) => {
       icon: "/favicon.png",
       badge: "/favicon.png",
       tag: `call-${bookingId}`,
+      renotify: true,
+      silent: false,
       requireInteraction: true,
-      vibrate: [200, 100, 200, 100, 200],
+      vibrate: [300, 100, 300, 100, 300, 100, 300],
       data: {
         type,
         bookingId,
+        callerName,
+        callerRole: payload.callerRole,
         videoRoomUrl,
+        serviceName: payload.serviceName,
         url: `/video/${encodeURIComponent(videoRoomUrl)}?returnTo=${returnTo}&accepted=true`,
       },
       actions: [
@@ -44,7 +49,24 @@ self.addEventListener("push", (event) => {
     };
 
     event.waitUntil(
-      self.registration.showNotification(title || "Incoming Consultation Call", notificationOptions)
+      Promise.all([
+        // Show the notification (triggers OS sound + vibration)
+        self.registration.showNotification(title || "Incoming Consultation Call", notificationOptions),
+        // Also message any open page clients so the in-app overlay + ringtone
+        // can fire the moment the user brings the app to the foreground
+        clients.matchAll({ type: "window", includeUncontrolled: true }).then((openClients) => {
+          for (const client of openClients) {
+            client.postMessage({
+              type: "INCOMING_CALL",
+              bookingId,
+              callerName,
+              callerRole: payload.callerRole,
+              videoRoomUrl,
+              serviceName: payload.serviceName,
+            });
+          }
+        }),
+      ])
     );
   }
 });
