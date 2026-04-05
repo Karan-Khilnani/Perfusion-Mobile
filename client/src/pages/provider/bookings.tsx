@@ -193,13 +193,13 @@ export default function ProviderBookingsPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/provider/bookings"] });
       toast({
         title: "Draft Saved",
-        description: "Prescription draft saved. Use \"Confirm & Sign\" to lock it permanently.",
+        description: "Consultation summary draft saved. Use \"Confirm & Sign\" to lock it permanently.",
       });
     },
     onError: () => {
       toast({
         title: "Failed",
-        description: "Failed to save prescription draft.",
+        description: "Failed to save consultation summary draft.",
         variant: "destructive",
       });
     },
@@ -231,14 +231,14 @@ export default function ProviderBookingsPage() {
       setPrescriptionFollowUp("");
       setPrescriptionPhysicianNotes("");
       toast({
-        title: "Prescription Confirmed & Signed",
-        description: "The prescription is now locked with a medicolegal audit trail. A server-side PDF has been generated.",
+        title: "Summary Confirmed & Signed",
+        description: "The consultation summary is now locked with a medicolegal audit trail. A server-side PDF has been generated.",
       });
     },
     onError: (error: any) => {
       toast({
         title: "Confirmation Failed",
-        description: error?.message || "Failed to confirm prescription.",
+        description: error?.message || "Failed to confirm consultation summary.",
         variant: "destructive",
       });
     },
@@ -378,7 +378,7 @@ export default function ProviderBookingsPage() {
                   data-testid={`button-prescription-${booking.id}`}
                 >
                   <FileSignature className="mr-2 h-3.5 w-3.5" />
-                  {(booking as any).prescriptionGeneratedAt ? "Edit Draft" : "Generate Prescription"}
+                  {(booking as any).prescriptionGeneratedAt ? "Edit Draft" : "Generate Summary"}
                 </Button>
                 {(booking as any).prescriptionGeneratedAt && (
                   <Button
@@ -746,12 +746,12 @@ export default function ProviderBookingsPage() {
               {(prescriptionBooking as any)?.prescriptionApprovedAt ? (
                 <>
                   <ShieldCheck className="h-5 w-5 text-green-600" />
-                  Prescription — Signed & Locked
+                  Summary — Signed & Locked
                 </>
               ) : (prescriptionBooking as any)?.prescriptionGeneratedAt ? (
-                "Edit Prescription Draft"
+                "Edit Summary Draft"
               ) : (
-                "Generate Prescription"
+                "Generate Summary"
               )}
             </DialogTitle>
             <DialogDescription>
@@ -763,7 +763,7 @@ export default function ProviderBookingsPage() {
               <div className="rounded-lg border border-green-200 bg-green-50 dark:bg-green-900/20 dark:border-green-800 p-4 space-y-3">
                 <div className="flex items-center gap-2 text-green-700 dark:text-green-400 font-medium">
                   <ShieldCheck className="h-4 w-4" />
-                  This prescription has been digitally confirmed and is permanently locked
+                  This consultation summary has been digitally confirmed and is permanently locked
                 </div>
                 <p className="text-sm text-muted-foreground">
                   Confirmed on: <span className="font-medium">{new Date((prescriptionBooking as any).prescriptionApprovedAt).toLocaleString("en-IN", { dateStyle: "long", timeStyle: "medium", timeZone: "Asia/Kolkata" })}</span>
@@ -800,7 +800,7 @@ export default function ProviderBookingsPage() {
             ) : (
               <>
                 <div className="rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 p-3 text-sm text-amber-800 dark:text-amber-300">
-                  <strong>Save Draft</strong> to save changes, or <strong>Confirm &amp; Sign</strong> to permanently lock this prescription with a medicolegal audit trail. Signed prescriptions cannot be edited.
+                  <strong>Save Draft</strong> to save changes, or <strong>Confirm &amp; Sign</strong> to permanently lock this consultation summary with a medicolegal audit trail. Signed summaries cannot be edited.
                 </div>
                 <div className="space-y-2">
                   <Label>Diagnosis <span className="text-destructive">*</span></Label>

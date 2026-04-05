@@ -972,7 +972,7 @@ export default function ProviderServicesPage() {
                     </div>
                     <div className="space-y-2">
                       <Label>Digital Signature *</Label>
-                      <p className="text-xs text-muted-foreground">Upload consultant's digital signature image (used on prescriptions)</p>
+                      <p className="text-xs text-muted-foreground">Upload consultant's digital signature image (used on consultation summaries)</p>
                       {consultantSignatureFile ? (
                         <div className="flex items-center gap-2 rounded-md border border-primary/30 bg-primary/5 p-2">
                           <PenLine className="h-4 w-4 text-primary" />

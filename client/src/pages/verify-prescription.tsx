@@ -50,7 +50,7 @@ export default function VerifyPrescriptionPage() {
           <div className="inline-flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 mb-3">
             <ShieldCheck className="h-8 w-8 text-primary" />
           </div>
-          <h1 className="text-2xl font-bold">Prescription Verification</h1>
+          <h1 className="text-2xl font-bold">Consultation Summary Verification</h1>
           <p className="text-muted-foreground text-sm mt-1">
             Perfusion Health — Digital Super Speciality Consultation Platform
           </p>
@@ -78,12 +78,12 @@ export default function VerifyPrescriptionPage() {
                 </div>
                 <div>
                   <p className="font-semibold text-red-700 dark:text-red-400">
-                    {isNotFound ? "Prescription Not Found" : "Verification Failed"}
+                    {isNotFound ? "Consultation Summary Not Found" : "Verification Failed"}
                   </p>
                   <p className="text-sm text-muted-foreground mt-1">
                     {isNotFound
-                      ? "No prescription record was found for this ID. The QR code may be invalid or the prescription may not exist."
-                      : "This prescription could not be verified. It may not have been digitally confirmed yet."}
+                      ? "No consultation summary record was found for this ID. The QR code may be invalid or the record may not exist."
+                      : "This consultation summary could not be verified. It may not have been digitally confirmed yet."}
                   </p>
                 </div>
               </div>
@@ -108,10 +108,10 @@ export default function VerifyPrescriptionPage() {
                   <ShieldCheck className="h-5 w-5 text-green-600 mt-0.5 shrink-0" />
                   <div>
                     <p className="font-medium text-green-800 dark:text-green-300">
-                      This is a genuine, digitally confirmed prescription
+                      This is a genuine, digitally confirmed consultation summary
                     </p>
                     <p className="text-green-700 dark:text-green-400 mt-0.5">
-                      Prescription ID: <span className="font-mono font-medium">{data.prescriptionId}</span>
+                      Summary ID: <span className="font-mono font-medium">{data.prescriptionId}</span>
                     </p>
                   </div>
                 </div>
@@ -199,7 +199,7 @@ export default function VerifyPrescriptionPage() {
               >
                 <Button className="w-full gap-2" variant="outline">
                   <Download className="h-4 w-4" />
-                  Download Signed Prescription PDF
+                  Download Signed Summary PDF
                 </Button>
               </a>
             )}
@@ -208,7 +208,7 @@ export default function VerifyPrescriptionPage() {
               <CardContent className="pt-4">
                 <p className="text-xs text-muted-foreground text-center flex items-start gap-1.5">
                   <FileText className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-                  This verification is provided by Perfusion Health Pvt Ltd. The QR code on the prescription links to this page for authenticity confirmation. For queries, contact your healthcare provider.
+                  This verification is provided by Perfusion Health Pvt Ltd. The QR code on the consultation summary links to this page for authenticity confirmation. For queries, contact your healthcare provider.
                 </p>
               </CardContent>
             </Card>
