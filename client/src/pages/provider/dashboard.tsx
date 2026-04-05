@@ -189,7 +189,7 @@ export default function ProviderDashboard() {
 
   return (
     <div className="min-h-full bg-background">
-      <div className="max-w-4xl mx-auto px-6 py-8 space-y-12">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-10 sm:space-y-12">
 
         <section>
           <div className="flex items-center justify-between mb-6">
@@ -226,62 +226,62 @@ export default function ProviderDashboard() {
                 return (
                   <div
                     key={booking.id}
-                    className="rounded-2xl border bg-card p-6 space-y-5"
+                    className="rounded-2xl border bg-card p-4 sm:p-6 space-y-4"
                     data-testid={`card-consultation-${booking.id}`}
                   >
                     <div className="space-y-1.5">
-                      <div className="flex items-center gap-2.5">
-                        <p className="text-xl font-bold tracking-tight">{booking.patientName}</p>
-                        {booking.patientAge && (
-                          <Badge variant="secondary" className="font-normal">
-                            {booking.patientAge} yrs
-                          </Badge>
-                        )}
-                        {booking.patientGender && (
-                          <Badge variant="outline" className="font-normal capitalize">
-                            {booking.patientGender}
-                          </Badge>
-                        )}
+                      <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5 min-w-0">
+                        <p className="text-lg sm:text-xl font-bold tracking-tight break-words">{booking.patientName}</p>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {booking.patientAge && (
+                            <Badge variant="secondary" className="font-normal text-xs">
+                              {booking.patientAge} yrs
+                            </Badge>
+                          )}
+                          {booking.patientGender && (
+                            <Badge variant="outline" className="font-normal capitalize text-xs">
+                              {booking.patientGender}
+                            </Badge>
+                          )}
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2 text-muted-foreground">
-                        <Building2 className="h-3.5 w-3.5 shrink-0" />
-                        <span className="text-sm">{booking.seekerHospitalName}</span>
+                      <div className="flex items-start gap-2 text-muted-foreground">
+                        <Building2 className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                        <span className="text-sm leading-snug">{booking.seekerHospitalName}</span>
                       </div>
-                      <div className="flex items-center gap-2 text-muted-foreground">
-                        <Calendar className="h-3.5 w-3.5 shrink-0" />
-                        <span className="text-sm font-medium text-foreground">
+                      <div className="flex items-start gap-2 text-muted-foreground">
+                        <Calendar className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                        <span className="text-sm font-medium text-foreground leading-snug">
                           {formatSlot(booking.appointmentSlot)}
                         </span>
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-2 gap-2.5">
                       {booking.videoRoomId ? (
                         <Link href={`/video/${encodeURIComponent(booking.videoRoomId)}?returnTo=/provider`}>
                           <Button
-                            size="lg"
-                            className="w-full h-11 gap-2 rounded-xl"
+                            className="w-full h-10 gap-2 rounded-xl text-sm"
                             data-testid={`button-join-call-${booking.id}`}
                           >
-                            <Video className="h-4 w-4" />
+                            <Video className="h-4 w-4 shrink-0" />
                             Join Call
                           </Button>
                         </Link>
                       ) : (
-                        <Button size="lg" className="w-full h-11 rounded-xl" disabled variant="outline">
-                          <Video className="h-4 w-4 mr-2" />
+                        <Button className="w-full h-10 rounded-xl text-sm" disabled variant="outline">
+                          <Video className="h-4 w-4 mr-1.5 shrink-0" />
                           No Room Yet
                         </Button>
                       )}
 
                       <Link href="/provider/bookings">
                         <Button
-                          size="lg"
                           variant="secondary"
-                          className="w-full h-11 gap-2 rounded-xl"
+                          className="w-full h-10 gap-2 rounded-xl text-sm"
                           data-testid={`button-generate-summary-${booking.id}`}
                         >
-                          <FileText className="h-4 w-4" />
+                          <FileText className="h-4 w-4 shrink-0" />
                           Generate Summary
                         </Button>
                       </Link>
@@ -293,12 +293,11 @@ export default function ProviderDashboard() {
                         trigger={
                           <Button
                             variant="outline"
-                            size="sm"
-                            className="w-full gap-1.5 text-xs"
+                            className="w-full flex flex-col items-center gap-1 h-auto py-2.5 px-1"
                             data-testid={`button-patient-details-${booking.id}`}
                           >
-                            <User className="h-3.5 w-3.5" />
-                            Patient Details
+                            <User className="h-4 w-4 shrink-0" />
+                            <span className="text-[10px] sm:text-xs leading-tight text-center">Patient Details</span>
                           </Button>
                         }
                       />
@@ -310,19 +309,18 @@ export default function ProviderDashboard() {
                           trigger={
                             <Button
                               variant="outline"
-                              size="sm"
-                              className="w-full gap-1.5 text-xs"
+                              className="w-full flex flex-col items-center gap-1 h-auto py-2.5 px-1"
                               data-testid={`button-view-reports-${booking.id}`}
                             >
-                              <Activity className="h-3.5 w-3.5" />
-                              View Reports
+                              <Activity className="h-4 w-4 shrink-0" />
+                              <span className="text-[10px] sm:text-xs leading-tight text-center">View Reports</span>
                             </Button>
                           }
                         />
                       ) : (
-                        <Button variant="outline" size="sm" className="w-full gap-1.5 text-xs" disabled>
-                          <Activity className="h-3.5 w-3.5" />
-                          No Reports
+                        <Button variant="outline" className="w-full flex flex-col items-center gap-1 h-auto py-2.5 px-1" disabled>
+                          <Activity className="h-4 w-4 shrink-0" />
+                          <span className="text-[10px] sm:text-xs leading-tight text-center">No Reports</span>
                         </Button>
                       )}
 
@@ -333,19 +331,18 @@ export default function ProviderDashboard() {
                           trigger={
                             <Button
                               variant="outline"
-                              size="sm"
-                              className="w-full gap-1.5 text-xs"
+                              className="w-full flex flex-col items-center gap-1 h-auto py-2.5 px-1"
                               data-testid={`button-view-charts-${booking.id}`}
                             >
-                              <ClipboardList className="h-3.5 w-3.5" />
-                              Treatment Charts
+                              <ClipboardList className="h-4 w-4 shrink-0" />
+                              <span className="text-[10px] sm:text-xs leading-tight text-center">Treatment Charts</span>
                             </Button>
                           }
                         />
                       ) : (
-                        <Button variant="outline" size="sm" className="w-full gap-1.5 text-xs" disabled>
-                          <ClipboardList className="h-3.5 w-3.5" />
-                          No Charts
+                        <Button variant="outline" className="w-full flex flex-col items-center gap-1 h-auto py-2.5 px-1" disabled>
+                          <ClipboardList className="h-4 w-4 shrink-0" />
+                          <span className="text-[10px] sm:text-xs leading-tight text-center">No Charts</span>
                         </Button>
                       )}
                     </div>
