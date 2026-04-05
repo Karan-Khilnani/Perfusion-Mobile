@@ -24,6 +24,7 @@ export interface PushPayload {
   videoRoomUrl: string;
   title: string;
   body: string;
+  subtitle?: string;
 }
 
 export interface PushSubscriptionData {

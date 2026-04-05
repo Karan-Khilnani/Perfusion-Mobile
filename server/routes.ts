@@ -3161,6 +3161,7 @@ export async function registerRoutes(
     recipientUserId: string;
     videoRoomUrl: string;
     serviceName: string;
+    subtitle: string;
     status: CallStatus;
     createdAt: number;
     twilioCallSid?: string;
@@ -3210,6 +3211,7 @@ export async function registerRoutes(
             callerRole: s.callerRole,
             videoRoomUrl: s.videoRoomUrl,
             serviceName: s.serviceName,
+            subtitle: s.subtitle,
           })}\n\n`);
         } catch {}
         break; // at most one active ringing session per user
@@ -3244,6 +3246,23 @@ export async function registerRoutes(
       const callerUser = await storage.getUserById(callerId);
       const callerName = callerUser?.name || callerUser?.email || "Unknown";
 
+      // Build a clean subtitle for the notification/overlay:
+      // - Provider calling seeker → "Dr. Name (Specialization)"
+      // - Seeker calling provider → "Hospital Name"
+      let subtitle = callerName;
+      if (callerRole === "provider") {
+        const consultant = await storage.getConsultantById(booking.serviceId);
+        if (consultant) {
+          subtitle = consultant.specialization
+            ? `${consultant.name} (${consultant.specialization})`
+            : consultant.name;
+        } else {
+          subtitle = booking.serviceName || callerName;
+        }
+      } else {
+        subtitle = callerUser?.hospitalName || callerName;
+      }
+
       const videoRoomUrl = booking.videoRoomId || "";
       if (!videoRoomUrl) return res.status(400).json({ error: "No video room for this booking" });
 
@@ -3260,6 +3279,7 @@ export async function registerRoutes(
         recipientUserId,
         videoRoomUrl,
         serviceName: booking.serviceName || "",
+        subtitle,
         status: "ringing",
         createdAt: Date.now(),
       };
@@ -3286,6 +3306,7 @@ export async function registerRoutes(
         callerRole,
         videoRoomUrl,
         serviceName: booking.serviceName,
+        subtitle,
       });
 
       // Send push notification to recipient (even if browser closed)
@@ -3298,8 +3319,9 @@ export async function registerRoutes(
         callerRole,
         recipientRole,
         videoRoomUrl,
-        title: "Incoming Consultation Call",
-        body: `${callerName} is calling for ${booking.serviceName || "consultation"}`,
+        subtitle,
+        title: "Perfusion",
+        body: subtitle,
       };
       for (const sub of subscriptions) {
         sendPushNotification(sub, payload).then((result) => {

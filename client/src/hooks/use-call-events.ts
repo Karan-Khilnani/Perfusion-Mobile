@@ -15,6 +15,7 @@ export interface CallEvent {
   callerRole?: "seeker" | "provider";
   videoRoomUrl?: string;
   serviceName?: string;
+  subtitle?: string;
 }
 
 type CallEventHandler = (event: CallEvent) => void;

@@ -62,13 +62,10 @@ export function IncomingCallOverlay({ callEvent, onDismiss }: Props) {
         </div>
 
         <div className="space-y-2">
-          <p className="text-sm font-medium text-white/70 uppercase tracking-wider">
-            Incoming Consultation
+          <h2 className="text-2xl font-bold tracking-wide">Perfusion</h2>
+          <p className="text-base text-white/80">
+            {callEvent.subtitle || callEvent.callerName}
           </p>
-          <h2 className="text-2xl font-bold">{callEvent.callerName}</h2>
-          {callEvent.serviceName && (
-            <p className="text-sm text-white/60">{callEvent.serviceName}</p>
-          )}
         </div>
 
         <div className="flex items-center gap-12">

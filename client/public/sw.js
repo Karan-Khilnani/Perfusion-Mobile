@@ -63,6 +63,7 @@ self.addEventListener("push", (event) => {
               callerRole: payload.callerRole,
               videoRoomUrl,
               serviceName: payload.serviceName,
+              subtitle: payload.subtitle,
             });
           }
         }),
