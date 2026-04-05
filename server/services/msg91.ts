@@ -29,11 +29,11 @@ function formatPhoneNumber(phone: string): string {
 export async function triggerVoiceCall(
   phoneNumber: string,
   message: string
-): Promise<boolean> {
+): Promise<string | null> {
   const client = getClient();
   if (!client || !TWILIO_PHONE_NUMBER) {
     console.error("[Twilio] Missing credentials or phone number");
-    return false;
+    return null;
   }
 
   const formattedPhone = formatPhoneNumber(phoneNumber);
@@ -48,10 +48,23 @@ export async function triggerVoiceCall(
     });
 
     console.log("[Twilio] Voice call triggered:", formattedPhone, "SID:", call.sid);
-    return true;
+    return call.sid;
   } catch (error: any) {
     console.error("[Twilio] Voice call failed:", error?.message || error);
-    return false;
+    return null;
+  }
+}
+
+export async function cancelVoiceCall(callSid: string): Promise<void> {
+  const client = getClient();
+  if (!client) return;
+  try {
+    // Use "completed" which ends both queued/ringing and in-progress calls
+    await client.calls(callSid).update({ status: "completed" });
+    console.log("[Twilio] Voice call cancelled:", callSid);
+  } catch (error: any) {
+    // Silently ignore — call may have already ended on its own
+    console.log("[Twilio] Cancel voice call skipped:", error?.message || error);
   }
 }
 

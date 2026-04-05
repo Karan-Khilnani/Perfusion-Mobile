@@ -17,10 +17,21 @@ export function IncomingCallOverlay({ callEvent, onDismiss }: Props) {
 
   if (!callEvent) return null;
 
+  // Close the OS push notification for this call (if still showing)
+  const dismissNotification = (bookingId: string) => {
+    if (!("serviceWorker" in navigator)) return;
+    navigator.serviceWorker.ready.then((reg) => {
+      reg.getNotifications({ tag: `call-${bookingId}` }).then((notifs) => {
+        notifs.forEach((n) => n.close());
+      });
+    }).catch(() => {});
+  };
+
   const handleAccept = async () => {
     setAccepting(true);
     try {
       await apiRequest("POST", `/api/call/accept/${callEvent.bookingId}`, {});
+      dismissNotification(callEvent.bookingId);
       onDismiss();
       // callerRole tells us who called; recipient is the opposite role
       const returnTo = callEvent.callerRole === "provider" ? "/user/orders" : "/provider/bookings";
@@ -35,6 +46,7 @@ export function IncomingCallOverlay({ callEvent, onDismiss }: Props) {
     try {
       await apiRequest("POST", `/api/call/decline/${callEvent.bookingId}`, {});
     } catch {}
+    dismissNotification(callEvent.bookingId);
     onDismiss();
   };
 

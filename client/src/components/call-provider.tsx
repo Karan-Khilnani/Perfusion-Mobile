@@ -62,6 +62,16 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
   // Pending call received via SW message while page was hidden
   const pendingSwCall = useRef<CallEvent | null>(null);
 
+  // Close the OS push notification for a call by its tag
+  const dismissNotification = useCallback((bookingId: string) => {
+    if (!("serviceWorker" in navigator)) return;
+    navigator.serviceWorker.ready.then((reg) => {
+      reg.getNotifications({ tag: `call-${bookingId}` }).then((notifs) => {
+        notifs.forEach((n) => n.close());
+      });
+    }).catch(() => {});
+  }, []);
+
   // Handle incoming call events (from SSE or SW message)
   const handleCallEvent = useCallback((event: CallEvent) => {
     if (event.type === "incoming_call") {
@@ -70,9 +80,11 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
       event.type === "call_timeout" ||
       event.type === "call_cancelled"
     ) {
+      // Dismiss OS notification so it doesn't linger after the call ends
+      if (event.bookingId) dismissNotification(event.bookingId);
       setIncomingCall(null);
     }
-  }, []);
+  }, [dismissNotification]);
 
   useCallEvents(handleCallEvent);
 

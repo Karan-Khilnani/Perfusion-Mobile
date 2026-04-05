@@ -7,7 +7,7 @@ import type { BookingStatus, UserRole, ProviderType, ProviderStatus, ServiceStat
 import multer from "multer";
 import path from "path";
 import fs from "fs";
-import { notifyAdminLabBooking, notifyUserReportReady, triggerVoiceCall } from "./services/msg91";
+import { notifyAdminLabBooking, notifyUserReportReady, triggerVoiceCall, cancelVoiceCall } from "./services/msg91";
 import { generateBookingNumber } from "./services/booking-number";
 import { calculateCustomerPrice, deriveMarginFromPrice, derivePriceFromMargin } from "./services/pricing";
 import { processReport, type BookingReportData } from "./services/report-processor";
@@ -3163,6 +3163,7 @@ export async function registerRoutes(
     serviceName: string;
     status: CallStatus;
     createdAt: number;
+    twilioCallSid?: string;
   }
 
   const callSessions = new Map<string, CallSession>(); // key = bookingId
@@ -3269,6 +3270,8 @@ export async function registerRoutes(
         const s = callSessions.get(bookingId);
         if (s && s.status === "ringing") {
           s.status = "timeout";
+          // Cancel the Twilio voice call if it somehow never ended
+          if (s.twilioCallSid) cancelVoiceCall(s.twilioCallSid).catch(() => {});
           broadcastCallEvent(callerId, { type: "call_timeout", bookingId });
           broadcastCallEvent(recipientUserId, { type: "call_timeout", bookingId });
           setTimeout(() => callSessions.delete(bookingId), 5000);
@@ -3312,17 +3315,25 @@ export async function registerRoutes(
       // Twilio voice call fallback — rings the recipient's actual phone number
       // even when the phone is locked or the browser is fully closed.
       // Runs entirely after the response is sent so it never adds latency.
-      storage.getUserById(recipientUserId).then((recipientUser) => {
+      // The returned SID is stored on the session so we can cancel the call
+      // the moment the recipient accepts, declines, or the call times out.
+      storage.getUserById(recipientUserId).then(async (recipientUser) => {
         if (!recipientUser?.phone) return;
-        const serviceName = (booking.serviceName || "consultation").replace(/[<>&'"]/g, "");
+        const svcName = (booking.serviceName || "consultation").replace(/[<>&'"]/g, "");
         const safeCallerName = callerName.replace(/[<>&'"]/g, "");
         const voiceMsg =
-          `Hello. You have an incoming ${serviceName} call on Perfusion from ${safeCallerName}. ` +
+          `Hello. You have an incoming ${svcName} call on Perfusion from ${safeCallerName}. ` +
           `Please open the Perfusion app to join the call. ` +
           `This call is from ${safeCallerName} on Perfusion Healthcare.`;
-        triggerVoiceCall(recipientUser.phone, voiceMsg).catch((err: any) =>
-          console.error("[Call] Twilio fallback voice call failed:", err?.message || err)
-        );
+        const sid = await triggerVoiceCall(recipientUser.phone, voiceMsg).catch((err: any) => {
+          console.error("[Call] Twilio fallback voice call failed:", err?.message || err);
+          return null;
+        });
+        if (sid) {
+          // Attach SID to the session so it can be cancelled on accept/decline/timeout
+          const s = callSessions.get(bookingId);
+          if (s) s.twilioCallSid = sid;
+        }
       }).catch(() => {});
     } catch (error) {
       console.error("[Call] Ring error:", error);
@@ -3352,6 +3363,11 @@ export async function registerRoutes(
       if (session.status !== "ringing") return res.json({ success: true, status: session.status });
 
       session.status = "accepted";
+
+      // Cancel the Twilio voice call if it's still ringing
+      if (session.twilioCallSid) {
+        cancelVoiceCall(session.twilioCallSid).catch(() => {});
+      }
 
       // Notify caller that call was accepted
       broadcastCallEvent(session.callerId, {
@@ -3390,6 +3406,11 @@ export async function registerRoutes(
 
       session.status = "declined";
 
+      // Cancel the Twilio voice call if it's still ringing
+      if (session.twilioCallSid) {
+        cancelVoiceCall(session.twilioCallSid).catch(() => {});
+      }
+
       broadcastCallEvent(session.callerId, {
         type: "call_declined",
         bookingId,
@@ -3411,6 +3432,8 @@ export async function registerRoutes(
       const session = callSessions.get(bookingId);
       if (session && session.callerId === userId) {
         session.status = "declined";
+        // Cancel the Twilio voice call if it's still ringing
+        if (session.twilioCallSid) cancelVoiceCall(session.twilioCallSid).catch(() => {});
         // Find recipient to notify
         const booking = await storage.getBookingById(bookingId);
         if (booking) {
