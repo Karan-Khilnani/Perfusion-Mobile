@@ -3284,22 +3284,23 @@ export async function registerRoutes(
         }).catch(() => {});
       }
 
+      res.json({ success: true, session: { bookingId, status: "ringing" } });
+
       // Twilio voice call fallback — rings the recipient's actual phone number
       // even when the phone is locked or the browser is fully closed.
-      // Fire-and-forget; never block the response or the call flow.
-      const recipientUser = await storage.getUserById(recipientUserId);
-      if (recipientUser?.phone) {
-        const serviceName = booking.serviceName || "consultation";
+      // Runs entirely after the response is sent so it never adds latency.
+      storage.getUserById(recipientUserId).then((recipientUser) => {
+        if (!recipientUser?.phone) return;
+        const serviceName = (booking.serviceName || "consultation").replace(/[<>&'"]/g, "");
+        const safeCallerName = callerName.replace(/[<>&'"]/g, "");
         const voiceMsg =
-          `Hello. You have an incoming ${serviceName} call on Perfusion from ${callerName}. ` +
+          `Hello. You have an incoming ${serviceName} call on Perfusion from ${safeCallerName}. ` +
           `Please open the Perfusion app to join the call. ` +
-          `This call is from ${callerName} on Perfusion Healthcare.`;
+          `This call is from ${safeCallerName} on Perfusion Healthcare.`;
         triggerVoiceCall(recipientUser.phone, voiceMsg).catch((err: any) =>
           console.error("[Call] Twilio fallback voice call failed:", err?.message || err)
         );
-      }
-
-      res.json({ success: true, session: { bookingId, status: "ringing" } });
+      }).catch(() => {});
     } catch (error) {
       console.error("[Call] Ring error:", error);
       res.status(500).json({ error: "Failed to initiate ring" });
