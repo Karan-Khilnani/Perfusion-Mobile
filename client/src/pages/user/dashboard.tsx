@@ -63,7 +63,6 @@ export default function UserDashboard() {
     <div className="min-h-full bg-background">
       <div className="max-w-6xl mx-auto px-6 py-8 space-y-10">
 
-        {/* ── Area 1: New Booking ─────────────────────────────────── */}
         <section>
           <div className="flex items-center gap-2 mb-5">
             <Plus className="h-4 w-4 text-primary" />
@@ -73,7 +72,6 @@ export default function UserDashboard() {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* Consultation card */}
             <Link href="/user/consultation">
               <div
                 className="group relative overflow-hidden rounded-2xl border border-border/60 bg-card p-7 cursor-pointer transition-all duration-200 hover:border-primary/40 hover:shadow-lg hover:shadow-primary/5 hover:-translate-y-0.5"
@@ -98,7 +96,6 @@ export default function UserDashboard() {
               </div>
             </Link>
 
-            {/* Lab Tests card */}
             <Link href="/user/labs">
               <div
                 className="group relative overflow-hidden rounded-2xl border border-border/60 bg-card p-7 cursor-pointer transition-all duration-200 hover:border-primary/40 hover:shadow-lg hover:shadow-primary/5 hover:-translate-y-0.5"
@@ -125,7 +122,6 @@ export default function UserDashboard() {
           </div>
         </section>
 
-        {/* ── Area 2: Your Activity ───────────────────────────────── */}
         <section className="space-y-8">
           <div className="flex items-center gap-2">
             <Calendar className="h-4 w-4 text-primary" />
@@ -134,7 +130,6 @@ export default function UserDashboard() {
             </h2>
           </div>
 
-          {/* Active Consultations */}
           <div>
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-semibold text-base">Active Consultations</h3>
@@ -163,7 +158,6 @@ export default function UserDashboard() {
                     className="rounded-xl border bg-card p-5 space-y-4 hover:border-primary/30 transition-colors"
                     data-testid={`card-consultation-${booking.id}`}
                   >
-                    {/* Doctor */}
                     <div className="flex items-start gap-3">
                       <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 mt-0.5">
                         <Stethoscope className="h-4 w-4 text-primary" />
@@ -181,10 +175,8 @@ export default function UserDashboard() {
                       </div>
                     </div>
 
-                    {/* Divider */}
                     <div className="border-t" />
 
-                    {/* Details */}
                     <div className="space-y-2">
                       <div className="flex items-center gap-2 text-sm">
                         <User className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
@@ -200,7 +192,6 @@ export default function UserDashboard() {
                       </div>
                     </div>
 
-                    {/* Join Call */}
                     {booking.videoRoomId ? (
                       <Link href={`/video/${encodeURIComponent(booking.videoRoomId)}?returnTo=/user`}>
                         <Button
@@ -223,7 +214,6 @@ export default function UserDashboard() {
             )}
           </div>
 
-          {/* Lab Reports */}
           <div>
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-semibold text-base">Lab Reports</h3>
@@ -252,7 +242,6 @@ export default function UserDashboard() {
                     className="rounded-xl border bg-card p-5 space-y-4 hover:border-green-500/30 transition-colors"
                     data-testid={`card-report-${booking.id}`}
                   >
-                    {/* Test info */}
                     <div className="flex items-start gap-3">
                       <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-green-500/10 mt-0.5">
                         <FlaskConical className="h-4 w-4 text-green-600 dark:text-green-400" />
@@ -265,10 +254,8 @@ export default function UserDashboard() {
                       </div>
                     </div>
 
-                    {/* Divider */}
                     <div className="border-t" />
 
-                    {/* Details */}
                     <div className="space-y-2">
                       <div className="flex items-center gap-2 text-sm">
                         <User className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
@@ -286,10 +273,9 @@ export default function UserDashboard() {
                       </div>
                     </div>
 
-                    {/* Download */}
-                    {(booking.processedReportUrl || booking.reportUrl) ? (
+                    {booking.processedReportUrl ? (
                       <a
-                        href={booking.processedReportUrl || booking.reportUrl || "#"}
+                        href={booking.processedReportUrl}
                         target="_blank"
                         rel="noopener noreferrer"
                         download
