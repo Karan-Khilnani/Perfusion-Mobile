@@ -2072,8 +2072,11 @@ export async function registerRoutes(
 
   app.post("/api/admin/bulk-import-lab-tests", isAdmin, async (req, res) => {
     try {
-      const { providerId, tests } = req.body as { providerId: string; tests?: { name: string; price: number }[] };
-      if (!providerId) return res.status(400).json({ message: "providerId is required" });
+      const { providerUserId, tests } = req.body as { providerUserId: string; tests?: { name: string; price: number }[] };
+      if (!providerUserId) return res.status(400).json({ message: "providerUserId is required" });
+
+      const provider = await storage.getProviderByUserId(providerUserId);
+      if (!provider) return res.status(404).json({ message: "No provider found for that user ID" });
 
       let importTests: { name: string; price: number }[];
       if (tests && Array.isArray(tests) && tests.length > 0) {
@@ -2092,7 +2095,7 @@ export async function registerRoutes(
         existingByName.set(t.testName.toLowerCase().trim(), t);
       }
 
-      const existingProviderTests = await storage.getProviderLabTestsByProvider(providerId);
+      const existingProviderTests = await storage.getProviderLabTestsByProvider(provider.id);
       const existingPLTByTestId = new Set(existingProviderTests.map(plt => plt.labTestId));
 
       let testsCreated = 0;
@@ -2116,7 +2119,7 @@ export async function registerRoutes(
 
         if (!existingPLTByTestId.has(labTest.id)) {
           await storage.createProviderLabTest({
-            providerId,
+            providerId: provider.id,
             labTestId: labTest.id,
             price: item.price.toFixed(2),
             approvalStatus: "approved",
@@ -2131,6 +2134,7 @@ export async function registerRoutes(
 
       res.json({
         message: "Bulk import completed",
+        provider: { id: provider.id, name: provider.name, type: provider.type },
         totalInFile: importTests.length,
         testsCreated,
         assignmentsCreated,

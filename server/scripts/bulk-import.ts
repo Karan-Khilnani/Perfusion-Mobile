@@ -21,7 +21,7 @@ async function main() {
       "Content-Type": "application/json",
       "Cookie": sessionCookie,
     },
-    body: JSON.stringify({ providerId: PROVIDER_ID, tests: importTests }),
+    body: JSON.stringify({ providerUserId: PROVIDER_ID, tests: importTests }),
   });
 
   if (!response.ok) {
