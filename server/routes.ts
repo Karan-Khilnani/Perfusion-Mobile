@@ -2089,6 +2089,11 @@ export async function registerRoutes(
         importTests = JSON.parse(fs.readFileSync(testDataPath, "utf-8"));
       }
 
+      const invalidItems = importTests.filter(t => !t.name || typeof t.name !== "string" || !t.name.trim() || typeof t.price !== "number" || !isFinite(t.price) || t.price <= 0);
+      if (invalidItems.length > 0) {
+        return res.status(400).json({ message: `${invalidItems.length} items have invalid name or price`, firstInvalid: invalidItems[0] });
+      }
+
       const existingTests = await storage.getLabTests();
       const existingByName = new Map<string, typeof existingTests[0]>();
       for (const t of existingTests) {
