@@ -158,6 +158,12 @@ const uploadDocument = multer({
   },
 });
 
+// In-memory multer for Excel file parsing (no disk write needed)
+const uploadExcel = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 },
+});
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -1702,6 +1708,118 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error suggesting lab test:", error);
       res.status(500).json({ message: "Failed to suggest lab test" });
+    }
+  });
+
+  // Download Excel template for bulk lab test import
+  app.get("/api/provider/lab-test-import-template", isAuthenticated, isProvider, async (_req, res) => {
+    try {
+      const XLSX = await import("xlsx");
+      const wb = XLSX.utils.book_new();
+      const rows = [
+        ["Test Name", "Price (INR)"],
+        ["Complete Blood Count (CBC)", 250],
+        ["Lipid Profile", 500],
+        ["Thyroid Stimulating Hormone (TSH)", 350],
+      ];
+      const ws = XLSX.utils.aoa_to_sheet(rows);
+      ws["!cols"] = [{ wch: 40 }, { wch: 15 }];
+      XLSX.utils.book_append_sheet(wb, ws, "Lab Tests");
+      const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+      res.setHeader("Content-Disposition", "attachment; filename=lab-test-import-template.xlsx");
+      res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+      res.send(buf);
+    } catch (error) {
+      console.error("Error generating template:", error);
+      res.status(500).json({ message: "Failed to generate template" });
+    }
+  });
+
+  // Bulk import lab tests from uploaded Excel file
+  app.post("/api/provider/bulk-import-lab-tests", isAuthenticated, isProvider, uploadExcel.single("file"), async (req: any, res) => {
+    try {
+      const provider = await storage.getProviderByUserId(req.user.id);
+      if (!provider) return res.status(404).json({ message: "Provider profile not found" });
+
+      if (!req.file) return res.status(400).json({ message: "Excel file is required" });
+
+      const marginPercent = parseFloat(req.body.marginPercent ?? "0");
+      if (isNaN(marginPercent) || marginPercent < 0 || marginPercent >= 100) {
+        return res.status(400).json({ message: "marginPercent must be a number between 0 and 99" });
+      }
+
+      const XLSX = await import("xlsx");
+      const wb = XLSX.read(req.file.buffer, { type: "buffer" });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
+
+      // Skip header row, parse name + price
+      const dataRows = rows.slice(1);
+
+      const existingTests = await storage.getLabTests();
+      const existingByName = new Map<string, typeof existingTests[0]>();
+      for (const t of existingTests) {
+        existingByName.set(t.testName.toLowerCase().trim(), t);
+      }
+
+      const existingPLTs = await storage.getProviderLabTestsByProvider(provider.id);
+      const assignedTestIds = new Set(existingPLTs.map(p => p.labTestId));
+
+      let added = 0;
+      let alreadyRegistered = 0;
+      let skippedInvalid = 0;
+
+      for (const row of dataRows) {
+        const rawName = String(row[0] ?? "").trim();
+        const rawPrice = row[1];
+        const price = typeof rawPrice === "number" ? rawPrice : parseFloat(String(rawPrice ?? "").replace(/[^0-9.]/g, ""));
+
+        if (!rawName || isNaN(price) || price <= 0) {
+          skippedInvalid++;
+          continue;
+        }
+
+        const cost = Math.round(price * (1 - marginPercent / 100) * 100) / 100;
+        const normalizedName = rawName.toLowerCase().trim();
+
+        let labTest = existingByName.get(normalizedName);
+        if (!labTest) {
+          labTest = await storage.createLabTest({
+            testName: rawName,
+            cost: cost.toFixed(2),
+            turnaroundTime: "As per lab",
+            customerPrice: price.toFixed(2),
+            status: "active",
+          });
+          existingByName.set(normalizedName, labTest);
+        } else {
+          // Update cost and customerPrice on existing catalog entry
+          await storage.updateLabTest(labTest.id, {
+            cost: cost.toFixed(2),
+            customerPrice: price.toFixed(2),
+          });
+        }
+
+        if (assignedTestIds.has(labTest.id)) {
+          alreadyRegistered++;
+          continue;
+        }
+
+        await storage.createProviderLabTest({
+          providerId: provider.id,
+          labTestId: labTest.id,
+          price: cost.toFixed(2),
+          approvalStatus: "approved",
+          isActive: true,
+        });
+        assignedTestIds.add(labTest.id);
+        added++;
+      }
+
+      res.json({ message: "Import complete", added, alreadyRegistered, skippedInvalid, total: dataRows.length });
+    } catch (error) {
+      console.error("Error in provider bulk import:", error);
+      res.status(500).json({ message: "Failed to import lab tests" });
     }
   });
 

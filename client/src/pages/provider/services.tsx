@@ -15,7 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { StarRating } from "@/components/star-rating";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Plus, Edit2, FlaskConical, IndianRupee, Clock, Building2, Stethoscope, Loader2, AlertCircle, ScanLine, CheckCircle2, ArrowRight, Calendar, Upload, FileText, X, Camera, PenLine } from "lucide-react";
+import { Plus, Edit2, FlaskConical, IndianRupee, Clock, Building2, Stethoscope, Loader2, AlertCircle, ScanLine, CheckCircle2, ArrowRight, Calendar, Upload, FileText, X, Camera, PenLine, FileSpreadsheet, Download } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import type { Lab, LabTest, Consultant, Provider, RadiologyModality, ProviderLabTest } from "@shared/schema";
 import { Link } from "wouter";
@@ -66,6 +66,10 @@ export default function ProviderServicesPage() {
   const [selectedTime, setSelectedTime] = useState("09:00 AM");
   const [isAddTestDialogOpen, setIsAddTestDialogOpen] = useState(false);
   const [isSuggestTestDialogOpen, setIsSuggestTestDialogOpen] = useState(false);
+  const [isBulkImportDialogOpen, setIsBulkImportDialogOpen] = useState(false);
+  const [bulkImportFile, setBulkImportFile] = useState<File | null>(null);
+  const [bulkMarginPercent, setBulkMarginPercent] = useState("0");
+  const [bulkImportResult, setBulkImportResult] = useState<{ added: number; alreadyRegistered: number; skippedInvalid: number; total: number } | null>(null);
   const [selectedPredefinedTest, setSelectedPredefinedTest] = useState<string>("");
   const [testPrice, setTestPrice] = useState("");
   const [testTAT, setTestTAT] = useState("");
@@ -447,6 +451,34 @@ export default function ProviderServicesPage() {
     },
   });
 
+  // Bulk import tests from Excel
+  const bulkImportMutation = useMutation({
+    mutationFn: async () => {
+      if (!bulkImportFile) throw new Error("No file selected");
+      const formData = new FormData();
+      formData.append("file", bulkImportFile);
+      formData.append("marginPercent", bulkMarginPercent);
+      const res = await fetch("/api/provider/bulk-import-lab-tests", {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ message: "Import failed" }));
+        throw new Error(err.message || "Import failed");
+      }
+      return res.json() as Promise<{ added: number; alreadyRegistered: number; skippedInvalid: number; total: number }>;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/provider/my-lab-tests"] });
+      setBulkImportResult(data);
+      setBulkImportFile(null);
+    },
+    onError: (err: any) => {
+      toast({ title: "Import Failed", description: err.message || "Failed to import tests.", variant: "destructive" });
+    },
+  });
+
   const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
   const TIMES = [
     "06:00 AM", "06:30 AM", "07:00 AM", "07:30 AM",
@@ -748,6 +780,116 @@ export default function ProviderServicesPage() {
                       {suggestTestMutation.isPending ? "Submitting..." : "Submit for Approval"}
                     </Button>
                   </div>
+                </DialogContent>
+              </Dialog>
+              <Dialog open={isBulkImportDialogOpen} onOpenChange={(open) => {
+                setIsBulkImportDialogOpen(open);
+                if (!open) { setBulkImportFile(null); setBulkImportResult(null); setBulkMarginPercent("0"); }
+              }}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" data-testid="button-bulk-import">
+                    <FileSpreadsheet className="mr-2 h-4 w-4" />
+                    Bulk Import
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Bulk Import Lab Tests via Excel</DialogTitle>
+                    <DialogDescription>Upload your price list. Tests go live immediately.</DialogDescription>
+                  </DialogHeader>
+                  {bulkImportResult ? (
+                    <div className="space-y-4">
+                      <div className="rounded-lg border bg-green-50 dark:bg-green-900/20 p-4 space-y-2">
+                        <div className="flex items-center gap-2 text-green-700 dark:text-green-400 font-medium">
+                          <CheckCircle2 className="h-5 w-5" />
+                          Import Complete
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 text-sm">
+                          <span className="text-muted-foreground">Tests added:</span>
+                          <span className="font-semibold text-green-700 dark:text-green-400">{bulkImportResult.added}</span>
+                          <span className="text-muted-foreground">Already registered:</span>
+                          <span className="font-semibold">{bulkImportResult.alreadyRegistered}</span>
+                          <span className="text-muted-foreground">Skipped (invalid):</span>
+                          <span className="font-semibold">{bulkImportResult.skippedInvalid}</span>
+                          <span className="text-muted-foreground">Total rows processed:</span>
+                          <span className="font-semibold">{bulkImportResult.total}</span>
+                        </div>
+                      </div>
+                      <Button className="w-full" onClick={() => { setIsBulkImportDialogOpen(false); setBulkImportResult(null); }} data-testid="button-bulk-import-done">Done</Button>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="rounded-lg border bg-muted/40 p-3 flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-medium">Download Template</p>
+                          <p className="text-xs text-muted-foreground">Excel file with required column format</p>
+                        </div>
+                        <a href="/api/provider/lab-test-import-template" download data-testid="link-download-template">
+                          <Button variant="outline" size="sm" type="button">
+                            <Download className="mr-1.5 h-3.5 w-3.5" />
+                            Template
+                          </Button>
+                        </a>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Your Margin % <span className="text-muted-foreground font-normal">(applied to all imported tests)</span></label>
+                        <div className="relative">
+                          <Input
+                            type="number"
+                            min="0"
+                            max="99"
+                            step="0.5"
+                            value={bulkMarginPercent}
+                            onChange={(e) => setBulkMarginPercent(e.target.value)}
+                            placeholder="e.g. 50"
+                            className="pr-8"
+                            data-testid="input-bulk-margin"
+                          />
+                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">%</span>
+                        </div>
+                        {parseFloat(bulkMarginPercent) > 0 && (
+                          <p className="text-xs text-muted-foreground">
+                            Example: ₹100 list price → Customer pays ₹100, Perfusion cost ₹{(100 * (1 - parseFloat(bulkMarginPercent) / 100)).toFixed(0)}, Perfusion earns ₹{(100 * parseFloat(bulkMarginPercent) / 100).toFixed(0)}
+                          </p>
+                        )}
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Excel File <span className="text-muted-foreground font-normal">(.xlsx or .xls)</span></label>
+                        {bulkImportFile ? (
+                          <div className="flex items-center gap-2 rounded-md border p-2">
+                            <FileSpreadsheet className="h-4 w-4 text-green-600" />
+                            <span className="flex-1 text-sm truncate">{bulkImportFile.name}</span>
+                            <Button type="button" variant="ghost" size="icon" onClick={() => setBulkImportFile(null)} data-testid="button-remove-bulk-file">
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <label className="flex items-center gap-2 rounded-md border border-dashed p-4 cursor-pointer hover:bg-muted/50 transition-colors" data-testid="label-bulk-upload">
+                            <Upload className="h-5 w-5 text-muted-foreground" />
+                            <span className="text-sm text-muted-foreground">Click to select your Excel price list</span>
+                            <input
+                              type="file"
+                              className="hidden"
+                              accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+                              onChange={(e) => { const f = e.target.files?.[0]; if (f) setBulkImportFile(f); }}
+                            />
+                          </label>
+                        )}
+                      </div>
+                      <Button
+                        className="w-full"
+                        onClick={() => bulkImportMutation.mutate()}
+                        disabled={!bulkImportFile || bulkImportMutation.isPending}
+                        data-testid="button-run-bulk-import"
+                      >
+                        {bulkImportMutation.isPending ? (
+                          <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Importing...</>
+                        ) : (
+                          "Import Tests"
+                        )}
+                      </Button>
+                    </div>
+                  )}
                 </DialogContent>
               </Dialog>
             </div>
