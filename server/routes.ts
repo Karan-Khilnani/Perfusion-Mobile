@@ -1782,7 +1782,7 @@ export async function registerRoutes(
         const normalizedName = rawName.toLowerCase().trim();
         const existingTest = existingByName.get(normalizedName);
 
-        // If provider already has this test assigned, skip without touching catalog data
+        // If provider already has this test assigned, skip entirely without touching catalog data
         if (existingTest && assignedTestIds.has(existingTest.id)) {
           alreadyRegistered++;
           continue;
@@ -1790,8 +1790,8 @@ export async function registerRoutes(
 
         const cost = Math.round(price * (1 - marginPercent / 100) * 100) / 100;
 
-        let labTest = existingTest;
-        if (!labTest) {
+        let labTest: typeof existingTest;
+        if (!existingTest) {
           // Create new catalog entry with pricing from this import
           labTest = await storage.createLabTest({
             testName: rawName,
@@ -1801,17 +1801,23 @@ export async function registerRoutes(
             status: "active",
           });
           existingByName.set(normalizedName, labTest);
+        } else {
+          // Update pricing on existing catalog entry (provider is not yet assigned)
+          await storage.updateLabTest(existingTest.id, {
+            cost: cost.toFixed(2),
+            customerPrice: price.toFixed(2),
+          });
+          labTest = existingTest;
         }
-        // Note: existing catalog entries are not mutated — only new ones are created with pricing
 
         await storage.createProviderLabTest({
           providerId: provider.id,
-          labTestId: labTest.id,
+          labTestId: labTest!.id,
           price: cost.toFixed(2),
           approvalStatus: "approved",
           isActive: true,
         });
-        assignedTestIds.add(labTest.id);
+        assignedTestIds.add(labTest!.id);
         added++;
       }
 
