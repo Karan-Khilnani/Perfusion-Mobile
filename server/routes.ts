@@ -2070,6 +2070,73 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/admin/bulk-import-lab-tests", isAdmin, async (req, res) => {
+    try {
+      const { providerId } = req.body as { providerId: string };
+      if (!providerId) return res.status(400).json({ message: "providerId is required" });
+
+      const testDataPath = path.join(process.cwd(), "server/data/ganga-lab-tests.json");
+      if (!fs.existsSync(testDataPath)) {
+        return res.status(404).json({ message: "Import data file not found" });
+      }
+      const importTests: { name: string; price: number }[] = JSON.parse(fs.readFileSync(testDataPath, "utf-8"));
+
+      const existingTests = await storage.getLabTests();
+      const existingByName = new Map<string, typeof existingTests[0]>();
+      for (const t of existingTests) {
+        existingByName.set(t.testName.toLowerCase().trim(), t);
+      }
+
+      const existingProviderTests = await storage.getProviderLabTestsByProvider(providerId);
+      const existingPLTByTestId = new Set(existingProviderTests.map(plt => plt.labTestId));
+
+      let testsCreated = 0;
+      let assignmentsCreated = 0;
+      let skippedDuplicates = 0;
+
+      for (const item of importTests) {
+        const normalizedName = item.name.toLowerCase().trim();
+        let labTest = existingByName.get(normalizedName);
+
+        if (!labTest) {
+          labTest = await storage.createLabTest({
+            testName: item.name,
+            cost: item.price.toFixed(2),
+            turnaroundTime: "As per lab",
+            status: "active",
+          });
+          existingByName.set(normalizedName, labTest);
+          testsCreated++;
+        }
+
+        if (!existingPLTByTestId.has(labTest.id)) {
+          await storage.createProviderLabTest({
+            providerId,
+            labTestId: labTest.id,
+            price: item.price.toFixed(2),
+            approvalStatus: "approved",
+            isActive: true,
+          });
+          existingPLTByTestId.add(labTest.id);
+          assignmentsCreated++;
+        } else {
+          skippedDuplicates++;
+        }
+      }
+
+      res.json({
+        message: "Bulk import completed",
+        totalInFile: importTests.length,
+        testsCreated,
+        assignmentsCreated,
+        skippedDuplicates,
+      });
+    } catch (error) {
+      console.error("Error in bulk import:", error);
+      res.status(500).json({ message: "Failed to bulk import lab tests" });
+    }
+  });
+
   // Admin - Consultants CRUD
   app.get("/api/admin/consultants", isAdmin, async (req, res) => {
     try {
