@@ -98,8 +98,8 @@ export function ImageCropDialog({
       canvas.toBlob(
         (blob) => {
           if (blob) {
-            const ext = imageFile.name.split(".").pop() || "png";
-            const filename = `${imageFile.name.replace(/\.[^/.]+$/, "")}-cropped.${ext}`;
+            const baseName = imageFile.name.replace(/\.[^/.]+$/, "");
+            const filename = `${baseName}-cropped.png`;
             onCropComplete(blob, filename);
             onOpenChange(false);
           }
