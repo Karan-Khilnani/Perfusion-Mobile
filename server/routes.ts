@@ -2072,14 +2072,19 @@ export async function registerRoutes(
 
   app.post("/api/admin/bulk-import-lab-tests", isAdmin, async (req, res) => {
     try {
-      const { providerId } = req.body as { providerId: string };
+      const { providerId, tests } = req.body as { providerId: string; tests?: { name: string; price: number }[] };
       if (!providerId) return res.status(400).json({ message: "providerId is required" });
 
-      const testDataPath = path.join(process.cwd(), "server/data/ganga-lab-tests.json");
-      if (!fs.existsSync(testDataPath)) {
-        return res.status(404).json({ message: "Import data file not found" });
+      let importTests: { name: string; price: number }[];
+      if (tests && Array.isArray(tests) && tests.length > 0) {
+        importTests = tests;
+      } else {
+        const testDataPath = path.join(process.cwd(), "server/data/ganga-lab-tests.json");
+        if (!fs.existsSync(testDataPath)) {
+          return res.status(404).json({ message: "No tests provided and no import data file found" });
+        }
+        importTests = JSON.parse(fs.readFileSync(testDataPath, "utf-8"));
       }
-      const importTests: { name: string; price: number }[] = JSON.parse(fs.readFileSync(testDataPath, "utf-8"));
 
       const existingTests = await storage.getLabTests();
       const existingByName = new Map<string, typeof existingTests[0]>();
