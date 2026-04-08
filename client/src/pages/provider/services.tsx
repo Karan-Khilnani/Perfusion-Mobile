@@ -1715,12 +1715,15 @@ export default function ProviderServicesPage() {
           if (!cropTargetConsultantId) return;
           try {
             const formData = new FormData();
-            formData.append("file", blob, filename);
-            const res = await fetch("/api/upload/document", { method: "POST", body: formData, credentials: "include" });
-            if (!res.ok) throw new Error("Upload failed");
-            const { url } = await res.json();
-            await apiRequest("PATCH", `/api/consultants/${cropTargetConsultantId}/photo`, { photoUrl: url });
+            formData.append("photo", blob, filename);
+            const res = await fetch(`/api/consultants/${cropTargetConsultantId}/upload-photo`, { method: "POST", body: formData, credentials: "include" });
+            if (!res.ok) {
+              const err = await res.json().catch(() => ({}));
+              if (res.status === 401) { toast({ title: "Session expired", description: "Please refresh the page and try again.", variant: "destructive" }); return; }
+              throw new Error(err.message || "Upload failed");
+            }
             queryClient.invalidateQueries({ queryKey: ["/api/provider/my-consultants"] });
+            queryClient.invalidateQueries({ queryKey: ["/api/consultants"] });
             toast({ title: "Photo updated" });
           } catch {
             toast({ title: "Failed to update photo", variant: "destructive" });

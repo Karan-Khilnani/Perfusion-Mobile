@@ -2781,6 +2781,31 @@ export async function registerRoutes(
     }
   });
 
+  // Combined upload + DB update in one authenticated request (avoids 2-step auth failure)
+  app.post("/api/consultants/:id/upload-photo", isAuthenticated, uploadDocument.single("photo"), async (req: any, res) => {
+    try {
+      const userId = req.user?.id;
+      if (req.user.role === "provider") {
+        const provider = await storage.getProviderByUserId(userId);
+        if (!provider) return res.status(403).json({ message: "Provider not found" });
+        const consultant = await storage.getConsultantById(req.params.id);
+        if (!consultant || consultant.providerId !== provider.id) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+      } else if (req.user.role !== "admin") {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      if (!req.file) return res.status(400).json({ message: "No file uploaded" });
+      const photoUrl = `/uploads/documents/${req.file.filename}`;
+      const updated = await storage.updateConsultant(req.params.id, { photoUrl } as any);
+      if (!updated) return res.status(404).json({ message: "Consultant not found" });
+      res.json({ photoUrl, consultant: updated });
+    } catch (error) {
+      console.error("Error uploading consultant photo:", error);
+      res.status(500).json({ message: "Failed to upload photo" });
+    }
+  });
+
   // Booking update endpoint (for patient details form)
   app.patch("/api/bookings/:id", isAuthenticated, async (req: any, res) => {
     try {
