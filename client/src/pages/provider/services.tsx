@@ -795,7 +795,7 @@ export default function ProviderServicesPage() {
                 <DialogContent>
                   <DialogHeader>
                     <DialogTitle>Bulk Import Lab Tests via Excel</DialogTitle>
-                    <DialogDescription>Upload your price list. Tests go live immediately.</DialogDescription>
+                    <DialogDescription>Upload your price list with test name, price, and turnaround time. Tests go live immediately.</DialogDescription>
                   </DialogHeader>
                   {bulkImportResult ? (
                     <div className="space-y-4">
@@ -822,7 +822,7 @@ export default function ProviderServicesPage() {
                       <div className="rounded-lg border bg-muted/40 p-3 flex items-center justify-between gap-3">
                         <div>
                           <p className="text-sm font-medium">Download Template</p>
-                          <p className="text-xs text-muted-foreground">Excel file with required column format</p>
+                          <p className="text-xs text-muted-foreground">3 columns: Test Name · Price (INR) · Turnaround Time</p>
                         </div>
                         <a href="/api/provider/lab-test-import-template" download data-testid="link-download-template">
                           <Button variant="outline" size="sm" type="button">

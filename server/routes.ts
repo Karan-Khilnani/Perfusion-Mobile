@@ -1717,13 +1717,13 @@ export async function registerRoutes(
       const XLSX = await import("xlsx");
       const wb = XLSX.utils.book_new();
       const rows = [
-        ["Test Name", "Price (INR)"],
-        ["Complete Blood Count (CBC)", 250],
-        ["Lipid Profile", 500],
-        ["Thyroid Stimulating Hormone (TSH)", 350],
+        ["Test Name", "Price (INR)", "Turnaround Time"],
+        ["Complete Blood Count (CBC)", 250, "24 hours"],
+        ["Lipid Profile", 500, "24 hours"],
+        ["Thyroid Stimulating Hormone (TSH)", 350, "48 hours"],
       ];
       const ws = XLSX.utils.aoa_to_sheet(rows);
-      ws["!cols"] = [{ wch: 40 }, { wch: 15 }];
+      ws["!cols"] = [{ wch: 40 }, { wch: 15 }, { wch: 20 }];
       XLSX.utils.book_append_sheet(wb, ws, "Lab Tests");
       const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
       res.setHeader("Content-Disposition", "attachment; filename=lab-test-import-template.xlsx");
@@ -1773,6 +1773,8 @@ export async function registerRoutes(
         const rawName = String(row[0] ?? "").trim();
         const rawPrice = row[1];
         const price = typeof rawPrice === "number" ? rawPrice : parseFloat(String(rawPrice ?? "").replace(/[^0-9.]/g, ""));
+        const rawTat = String(row[2] ?? "").trim();
+        const turnaroundTime = rawTat || "As per lab";
 
         if (!rawName || isNaN(price) || price <= 0) {
           skippedInvalid++;
@@ -1792,20 +1794,21 @@ export async function registerRoutes(
 
         let labTest: typeof existingTest;
         if (!existingTest) {
-          // Create new catalog entry with pricing from this import
+          // Create new catalog entry with pricing + TAT from this import
           labTest = await storage.createLabTest({
             testName: rawName,
             cost: cost.toFixed(2),
-            turnaroundTime: "As per lab",
+            turnaroundTime,
             customerPrice: price.toFixed(2),
             status: "active",
           });
           existingByName.set(normalizedName, labTest);
         } else {
-          // Update pricing on existing catalog entry (provider is not yet assigned)
+          // Update pricing + TAT on existing catalog entry (provider is not yet assigned)
           await storage.updateLabTest(existingTest.id, {
             cost: cost.toFixed(2),
             customerPrice: price.toFixed(2),
+            turnaroundTime,
           });
           labTest = existingTest;
         }
