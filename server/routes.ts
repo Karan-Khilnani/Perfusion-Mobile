@@ -1776,7 +1776,7 @@ export async function registerRoutes(
         const rawTat = String(row[2] ?? "").trim();
         const turnaroundTime = rawTat || "As per lab";
 
-        if (!rawName || isNaN(price) || price <= 0) {
+        if (!rawName || isNaN(price) || price <= 0 || price >= 100000000) {
           skippedInvalid++;
           continue;
         }
@@ -1792,36 +1792,41 @@ export async function registerRoutes(
 
         const cost = Math.round(price * (1 - marginPercent / 100) * 100) / 100;
 
-        let labTest: typeof existingTest;
-        if (!existingTest) {
-          // Create new catalog entry with pricing + TAT from this import
-          labTest = await storage.createLabTest({
-            testName: rawName,
-            cost: cost.toFixed(2),
-            turnaroundTime,
-            customerPrice: price.toFixed(2),
-            status: "active",
-          });
-          existingByName.set(normalizedName, labTest);
-        } else {
-          // Update pricing + TAT on existing catalog entry (provider is not yet assigned)
-          await storage.updateLabTest(existingTest.id, {
-            cost: cost.toFixed(2),
-            customerPrice: price.toFixed(2),
-            turnaroundTime,
-          });
-          labTest = existingTest;
-        }
+        try {
+          let labTest: typeof existingTest;
+          if (!existingTest) {
+            // Create new catalog entry with pricing + TAT from this import
+            labTest = await storage.createLabTest({
+              testName: rawName,
+              cost: cost.toFixed(2),
+              turnaroundTime,
+              customerPrice: price.toFixed(2),
+              status: "active",
+            });
+            existingByName.set(normalizedName, labTest);
+          } else {
+            // Update pricing + TAT on existing catalog entry (provider is not yet assigned)
+            await storage.updateLabTest(existingTest.id, {
+              cost: cost.toFixed(2),
+              customerPrice: price.toFixed(2),
+              turnaroundTime,
+            });
+            labTest = existingTest;
+          }
 
-        await storage.createProviderLabTest({
-          providerId: provider.id,
-          labTestId: labTest!.id,
-          price: cost.toFixed(2),
-          approvalStatus: "approved",
-          isActive: true,
-        });
-        assignedTestIds.add(labTest!.id);
-        added++;
+          await storage.createProviderLabTest({
+            providerId: provider.id,
+            labTestId: labTest!.id,
+            price: cost.toFixed(2),
+            approvalStatus: "approved",
+            isActive: true,
+          });
+          assignedTestIds.add(labTest!.id);
+          added++;
+        } catch (rowError) {
+          console.error(`Bulk import: skipping row "${rawName}" due to error:`, rowError);
+          skippedInvalid++;
+        }
       }
 
       res.json({ message: "Import complete", added, alreadyRegistered, skippedInvalid, total: dataRows.length });
