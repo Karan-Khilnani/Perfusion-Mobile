@@ -1818,6 +1818,7 @@ export async function registerRoutes(
             providerId: provider.id,
             labTestId: labTest!.id,
             price: cost.toFixed(2),
+            turnaroundTime,
             approvalStatus: "approved",
             isActive: true,
           });

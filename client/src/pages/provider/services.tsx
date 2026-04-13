@@ -927,7 +927,7 @@ export default function ProviderServicesPage() {
                           <IndianRupee className="h-3.5 w-3.5" />₹{pt.price}
                         </span>
                         <span className="flex items-center gap-1">
-                          <Clock className="h-3.5 w-3.5" />{pt.turnaroundTime || "N/A"}
+                          <Clock className="h-3.5 w-3.5" />{pt.turnaroundTime || pt.labTest?.turnaroundTime || "N/A"}
                         </span>
                       </div>
                     </div>
