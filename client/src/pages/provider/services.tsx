@@ -15,7 +15,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { StarRating } from "@/components/star-rating";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Plus, Edit2, FlaskConical, IndianRupee, Clock, Building2, Stethoscope, Loader2, AlertCircle, ScanLine, CheckCircle2, ArrowRight, Calendar, Upload, FileText, X, Camera, PenLine, FileSpreadsheet, Download } from "lucide-react";
+import { Plus, Edit2, FlaskConical, IndianRupee, Clock, Building2, Stethoscope, Loader2, AlertCircle, ScanLine, CheckCircle2, ArrowRight, Calendar, Upload, FileText, X, Camera, PenLine, FileSpreadsheet, Download, Trash2 } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import type { Lab, LabTest, Consultant, Provider, RadiologyModality, ProviderLabTest } from "@shared/schema";
 import { Link } from "wouter";
@@ -78,6 +79,10 @@ export default function ProviderServicesPage() {
   const [suggestTestPrice, setSuggestTestPrice] = useState("");
   const [testRegNo, setTestRegNo] = useState("");
   const [testRegOrg, setTestRegOrg] = useState("");
+  const [editingTest, setEditingTest] = useState<ProviderLabTestWithDetails | null>(null);
+  const [editPrice, setEditPrice] = useState("");
+  const [editTAT, setEditTAT] = useState("");
+  const [selectedTestIds, setSelectedTestIds] = useState<Set<string>>(new Set());
   const [testDocFile, setTestDocFile] = useState<File | null>(null);
   const [consultantRegNo, setConsultantRegNo] = useState("");
   const [consultantRegOrg, setConsultantRegOrg] = useState("");
@@ -448,6 +453,36 @@ export default function ProviderServicesPage() {
     },
     onError: () => {
       toast({ title: "Failed", description: "Failed to remove test.", variant: "destructive" });
+    },
+  });
+
+  const editTestMutation = useMutation({
+    mutationFn: async ({ id, price, turnaroundTime }: { id: string; price: string; turnaroundTime: string }) => {
+      return apiRequest("PATCH", `/api/provider/lab-tests/${id}`, { price, turnaroundTime });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/provider/my-lab-tests"] });
+      setEditingTest(null);
+      toast({ title: "Test Updated" });
+    },
+    onError: () => {
+      toast({ title: "Failed to update test", variant: "destructive" });
+    },
+  });
+
+  const bulkDeleteMutation = useMutation({
+    mutationFn: async (ids: string[]) => {
+      for (const id of ids) {
+        await apiRequest("DELETE", `/api/provider/lab-tests/${id}`);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/provider/my-lab-tests"] });
+      setSelectedTestIds(new Set());
+      toast({ title: "Tests Removed", description: "Selected tests removed from your catalog." });
+    },
+    onError: () => {
+      toast({ title: "Failed to remove tests", variant: "destructive" });
     },
   });
 
@@ -906,15 +941,55 @@ export default function ProviderServicesPage() {
               </CardContent>
             </Card>
           ) : (
+            <>
             <Card>
               <CardHeader>
-                <CardTitle>My Lab Tests ({myLabTests.length})</CardTitle>
-                <CardDescription>Tests you offer to care seekers</CardDescription>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>My Lab Tests ({myLabTests.length})</CardTitle>
+                    <CardDescription>Tests you offer to care seekers</CardDescription>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    {selectedTestIds.size > 0 && (
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => bulkDeleteMutation.mutate(Array.from(selectedTestIds))}
+                        disabled={bulkDeleteMutation.isPending}
+                        data-testid="button-bulk-delete"
+                      >
+                        {bulkDeleteMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+                        Delete Selected ({selectedTestIds.size})
+                      </Button>
+                    )}
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        id="select-all-tests"
+                        checked={myLabTests.length > 0 && selectedTestIds.size === myLabTests.length}
+                        onCheckedChange={(checked) => {
+                          if (checked) setSelectedTestIds(new Set(myLabTests.map(t => t.id)));
+                          else setSelectedTestIds(new Set());
+                        }}
+                        data-testid="checkbox-select-all-tests"
+                      />
+                      <label htmlFor="select-all-tests" className="text-sm text-muted-foreground cursor-pointer select-none">Select all</label>
+                    </div>
+                  </div>
+                </div>
               </CardHeader>
               <CardContent className="space-y-2">
                 {myLabTests.map((pt) => (
-                  <div key={pt.id} className="flex items-center justify-between rounded-lg border p-3" data-testid={`my-test-row-${pt.id}`}>
-                    <div>
+                  <div key={pt.id} className="flex items-center gap-2 rounded-lg border p-3" data-testid={`my-test-row-${pt.id}`}>
+                    <Checkbox
+                      checked={selectedTestIds.has(pt.id)}
+                      onCheckedChange={(checked) => {
+                        const next = new Set(selectedTestIds);
+                        if (checked) next.add(pt.id); else next.delete(pt.id);
+                        setSelectedTestIds(next);
+                      }}
+                      data-testid={`checkbox-test-${pt.id}`}
+                    />
+                    <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <p className="font-medium">{pt.labTest?.testName || "Unknown Test"}</p>
                         {(pt as any).approvalStatus === "pending" && <Badge variant="outline" className="text-yellow-600 border-yellow-500">Pending</Badge>}
@@ -931,19 +1006,70 @@ export default function ProviderServicesPage() {
                         </span>
                       </div>
                     </div>
-                    <Button 
-                      variant="ghost" 
-                      size="icon"
-                      onClick={() => removeTestMutation.mutate(pt.id)}
-                      disabled={removeTestMutation.isPending}
-                      data-testid={`button-remove-test-${pt.id}`}
-                    >
-                      <AlertCircle className="h-4 w-4 text-destructive" />
-                    </Button>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => { setEditingTest(pt); setEditPrice(pt.price); setEditTAT(pt.turnaroundTime || pt.labTest?.turnaroundTime || ""); }}
+                        data-testid={`button-edit-test-${pt.id}`}
+                      >
+                        <Edit2 className="h-4 w-4" />
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="icon"
+                        onClick={() => removeTestMutation.mutate(pt.id)}
+                        disabled={removeTestMutation.isPending}
+                        data-testid={`button-remove-test-${pt.id}`}
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
                   </div>
                 ))}
               </CardContent>
             </Card>
+
+            {/* Edit test dialog */}
+            <Dialog open={!!editingTest} onOpenChange={(open) => { if (!open) setEditingTest(null); }}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Edit Test</DialogTitle>
+                  <DialogDescription>{editingTest?.labTest?.testName}</DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 pt-2">
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium">Price (₹)</label>
+                    <Input
+                      type="number"
+                      min="1"
+                      value={editPrice}
+                      onChange={(e) => setEditPrice(e.target.value)}
+                      placeholder="e.g. 500"
+                      data-testid="input-edit-price"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium">Turnaround Time</label>
+                    <Input
+                      value={editTAT}
+                      onChange={(e) => setEditTAT(e.target.value)}
+                      placeholder="e.g. 24 hours"
+                      data-testid="input-edit-tat"
+                    />
+                  </div>
+                  <Button
+                    className="w-full"
+                    onClick={() => editTestMutation.mutate({ id: editingTest!.id, price: editPrice, turnaroundTime: editTAT })}
+                    disabled={!editPrice || editTestMutation.isPending}
+                    data-testid="button-save-edit-test"
+                  >
+                    {editTestMutation.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving...</> : "Save Changes"}
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+            </>
           )}
         </TabsContent>
 
