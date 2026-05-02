@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,11 +8,166 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Separator } from "@/components/ui/separator";
 import { StarRating } from "@/components/star-rating";
-import { Search, Stethoscope, ArrowUpDown, Briefcase, Calendar, AlertTriangle, IndianRupee, Users } from "lucide-react";
+import { Search, Stethoscope, ArrowUpDown, Briefcase, Calendar, AlertTriangle, IndianRupee, Users, Building2, BookOpen, Clock, User } from "lucide-react";
 import type { Consultant } from "@shared/schema";
 
 type SortOption = "rating" | "cost" | "availability";
+
+function ConsultantProfileSheet({
+  consultant,
+  open,
+  onOpenChange,
+}: {
+  consultant: (Consultant & { computedCustomerPrice?: string }) | null;
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+}) {
+  const [, navigate] = useLocation();
+
+  if (!consultant) return null;
+
+  const fee = (consultant as any).computedCustomerPrice || consultant.consultationFee;
+  const initials = consultant.name
+    .split(" ")
+    .map((w) => w[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent className="w-full sm:max-w-lg overflow-y-auto" data-testid="sheet-consultant-profile">
+        <SheetHeader className="pb-4">
+          <SheetTitle>Consultant Profile</SheetTitle>
+        </SheetHeader>
+
+        {/* Photo + identity */}
+        <div className="flex items-start gap-4 mb-6">
+          {consultant.photoUrl ? (
+            <img
+              src={consultant.photoUrl}
+              alt={consultant.name}
+              className="h-24 w-24 rounded-full object-cover border shrink-0"
+              data-testid="img-consultant-profile-photo"
+            />
+          ) : (
+            <div className="h-24 w-24 rounded-full bg-muted flex items-center justify-center text-muted-foreground text-2xl font-semibold shrink-0">
+              {initials}
+            </div>
+          )}
+          <div className="min-w-0">
+            <h2 className="text-xl font-semibold leading-tight" data-testid="text-profile-name">{consultant.name}</h2>
+            <p className="text-sm text-muted-foreground mt-0.5" data-testid="text-profile-qualification">{consultant.qualification}</p>
+            {consultant.specialization && (
+              <Badge variant="secondary" className="mt-2" data-testid="badge-profile-specialization">
+                {consultant.specialization}
+              </Badge>
+            )}
+            {consultant.rating && (
+              <div className="mt-2">
+                <StarRating rating={parseFloat(consultant.rating)} size="sm" />
+              </div>
+            )}
+          </div>
+        </div>
+
+        <Separator className="mb-5" />
+
+        {/* Key stats */}
+        <div className="grid grid-cols-2 gap-3 mb-5">
+          <div className="rounded-lg border bg-muted/30 p-3">
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1">
+              <Briefcase className="h-3.5 w-3.5" />
+              Experience
+            </div>
+            <p className="font-semibold text-sm" data-testid="text-profile-experience">{consultant.yearsExperience} years</p>
+          </div>
+          <div className="rounded-lg border bg-muted/30 p-3">
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1">
+              <IndianRupee className="h-3.5 w-3.5" />
+              Consultation Fee
+            </div>
+            <p className="font-semibold text-sm" data-testid="text-profile-fee">₹{fee}</p>
+          </div>
+        </div>
+
+        {/* Affiliated institution */}
+        {consultant.affiliatedInstitution && (
+          <div className="mb-5">
+            <div className="flex items-center gap-1.5 text-sm font-medium mb-1.5">
+              <Building2 className="h-4 w-4 text-muted-foreground" />
+              Affiliated Institution
+            </div>
+            <p className="text-sm text-muted-foreground pl-5" data-testid="text-profile-affiliation">{consultant.affiliatedInstitution}</p>
+          </div>
+        )}
+
+        {/* Bio / Portfolio */}
+        {consultant.portfolio && (
+          <div className="mb-5">
+            <div className="flex items-center gap-1.5 text-sm font-medium mb-1.5">
+              <BookOpen className="h-4 w-4 text-muted-foreground" />
+              About
+            </div>
+            <p className="text-sm text-muted-foreground pl-5 leading-relaxed whitespace-pre-line" data-testid="text-profile-bio">
+              {consultant.portfolio}
+            </p>
+          </div>
+        )}
+
+        {/* Available slots */}
+        {consultant.availableSlots && consultant.availableSlots.length > 0 && (
+          <div className="mb-6">
+            <div className="flex items-center gap-1.5 text-sm font-medium mb-2">
+              <Clock className="h-4 w-4 text-muted-foreground" />
+              Available Slots
+            </div>
+            <div className="flex flex-wrap gap-2 pl-5">
+              {consultant.availableSlots.map((slot, i) => (
+                <Badge key={i} variant="outline" className="text-xs" data-testid={`badge-slot-${i}`}>
+                  {slot}
+                </Badge>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Registration info */}
+        {(consultant.registrationNumber || consultant.registeredOrganization) && (
+          <div className="mb-6">
+            <div className="flex items-center gap-1.5 text-sm font-medium mb-1.5">
+              <User className="h-4 w-4 text-muted-foreground" />
+              Registration
+            </div>
+            <div className="pl-5 space-y-0.5 text-sm text-muted-foreground">
+              {consultant.registrationNumber && (
+                <p data-testid="text-profile-reg-no">Reg. No: {consultant.registrationNumber}</p>
+              )}
+              {consultant.registeredOrganization && (
+                <p data-testid="text-profile-reg-org">{consultant.registeredOrganization}</p>
+              )}
+            </div>
+          </div>
+        )}
+
+        <Separator className="mb-5" />
+
+        <Link href={`/user/consultation/${consultant.id}/book`}>
+          <Button
+            className="w-full"
+            data-testid="button-profile-book"
+            onClick={() => onOpenChange(false)}
+          >
+            Book Consultation
+          </Button>
+        </Link>
+      </SheetContent>
+    </Sheet>
+  );
+}
 
 export default function ConsultationPage() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -20,6 +175,7 @@ export default function ConsultationPage() {
   const [sortBy, setSortBy] = useState<SortOption>("rating");
   const [showEmergency, setShowEmergency] = useState(false);
   const [selectedDepartment, setSelectedDepartment] = useState("All Departments");
+  const [profileConsultant, setProfileConsultant] = useState<(Consultant & { computedCustomerPrice?: string }) | null>(null);
 
   const { data: consultants, isLoading } = useQuery<Consultant[]>({
     queryKey: ["/api/consultants"],
@@ -342,11 +498,21 @@ export default function ConsultationPage() {
                   </div>
                 )}
 
-                <Link href={`/user/consultation/${consultant.id}/book`}>
-                  <Button className="w-full" data-testid={`button-book-consultant-${consultant.id}`}>
-                    Book Consultation
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    className="flex-1"
+                    data-testid={`button-view-profile-${consultant.id}`}
+                    onClick={() => setProfileConsultant(consultant as any)}
+                  >
+                    View Profile
                   </Button>
-                </Link>
+                  <Link href={`/user/consultation/${consultant.id}/book`} className="flex-1">
+                    <Button className="w-full" data-testid={`button-book-consultant-${consultant.id}`}>
+                      Book
+                    </Button>
+                  </Link>
+                </div>
               </CardContent>
             </Card>
           ))}
@@ -354,6 +520,12 @@ export default function ConsultationPage() {
       )}
       </>
       )}
+
+      <ConsultantProfileSheet
+        consultant={profileConsultant}
+        open={!!profileConsultant}
+        onOpenChange={(v) => { if (!v) setProfileConsultant(null); }}
+      />
     </div>
   );
 }
