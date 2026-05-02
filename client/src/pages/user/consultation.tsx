@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Link, useLocation } from "wouter";
+import { Link } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,21 +15,20 @@ import { Search, Stethoscope, ArrowUpDown, Briefcase, Calendar, AlertTriangle, I
 import type { Consultant } from "@shared/schema";
 
 type SortOption = "rating" | "cost" | "availability";
+type ConsultantWithPrice = Consultant & { computedCustomerPrice?: string };
 
 function ConsultantProfileSheet({
   consultant,
   open,
   onOpenChange,
 }: {
-  consultant: (Consultant & { computedCustomerPrice?: string }) | null;
+  consultant: ConsultantWithPrice | null;
   open: boolean;
   onOpenChange: (v: boolean) => void;
 }) {
-  const [, navigate] = useLocation();
-
   if (!consultant) return null;
 
-  const fee = (consultant as any).computedCustomerPrice || consultant.consultationFee;
+  const fee = consultant.computedCustomerPrice ?? consultant.consultationFee;
   const initials = consultant.name
     .split(" ")
     .map((w) => w[0])
@@ -175,9 +174,9 @@ export default function ConsultationPage() {
   const [sortBy, setSortBy] = useState<SortOption>("rating");
   const [showEmergency, setShowEmergency] = useState(false);
   const [selectedDepartment, setSelectedDepartment] = useState("All Departments");
-  const [profileConsultant, setProfileConsultant] = useState<(Consultant & { computedCustomerPrice?: string }) | null>(null);
+  const [profileConsultant, setProfileConsultant] = useState<ConsultantWithPrice | null>(null);
 
-  const { data: consultants, isLoading } = useQuery<Consultant[]>({
+  const { data: consultants, isLoading } = useQuery<ConsultantWithPrice[]>({
     queryKey: ["/api/consultants"],
   });
 
@@ -219,7 +218,7 @@ export default function ConsultationPage() {
         case "rating":
           return parseFloat(b.rating || "0") - parseFloat(a.rating || "0");
         case "cost":
-          return parseFloat((a as any).computedCustomerPrice || a.consultationFee) - parseFloat((b as any).computedCustomerPrice || b.consultationFee);
+          return parseFloat((a as ConsultantWithPrice).computedCustomerPrice ?? a.consultationFee) - parseFloat((b as ConsultantWithPrice).computedCustomerPrice ?? b.consultationFee);
         case "availability":
           return (b.availableSlots?.length || 0) - (a.availableSlots?.length || 0);
         default:
@@ -340,7 +339,7 @@ export default function ConsultationPage() {
                       </div>
                       <div className="flex items-center gap-2">
                         <IndianRupee className="h-3.5 w-3.5" />
-                        <span>Fee: ₹{(team as any).computedCustomerPrice || team.consultationFee}</span>
+                        <span>Fee: ₹{team.computedCustomerPrice || team.consultationFee}</span>
                       </div>
                     </div>
                     <Link href={`/user/consultation/${team.id}/book`}>
@@ -447,8 +446,8 @@ export default function ConsultationPage() {
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex items-center gap-3">
-                    {(consultant as any).photoUrl ? (
-                      <img src={(consultant as any).photoUrl} alt={consultant.name} className="h-[132px] w-[132px] rounded-full object-cover border shrink-0" />
+                    {consultant.photoUrl ? (
+                      <img src={consultant.photoUrl} alt={consultant.name} className="h-[132px] w-[132px] rounded-full object-cover border shrink-0" />
                     ) : (
                       <div className="h-[132px] w-[132px] rounded-full bg-muted flex items-center justify-center text-muted-foreground text-4xl font-medium shrink-0">
                         {consultant.name.charAt(0)}
@@ -473,7 +472,7 @@ export default function ConsultationPage() {
                     {consultant.yearsExperience} years exp
                   </span>
                   <span className="flex items-center gap-1">
-                    ₹{(consultant as any).computedCustomerPrice || consultant.consultationFee}
+                    ₹{consultant.computedCustomerPrice ?? consultant.consultationFee}
                   </span>
                 </div>
 
@@ -503,7 +502,7 @@ export default function ConsultationPage() {
                     variant="outline"
                     className="flex-1"
                     data-testid={`button-view-profile-${consultant.id}`}
-                    onClick={() => setProfileConsultant(consultant as any)}
+                    onClick={() => setProfileConsultant(consultant)}
                   >
                     View Profile
                   </Button>
