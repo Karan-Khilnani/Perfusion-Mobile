@@ -218,7 +218,7 @@ export default function ConsultationPage() {
         case "rating":
           return parseFloat(b.rating || "0") - parseFloat(a.rating || "0");
         case "cost":
-          return parseFloat((a as ConsultantWithPrice).computedCustomerPrice ?? a.consultationFee) - parseFloat((b as ConsultantWithPrice).computedCustomerPrice ?? b.consultationFee);
+          return parseFloat(a.computedCustomerPrice ?? a.consultationFee) - parseFloat(b.computedCustomerPrice ?? b.consultationFee);
         case "availability":
           return (b.availableSlots?.length || 0) - (a.availableSlots?.length || 0);
         default:
@@ -508,7 +508,7 @@ export default function ConsultationPage() {
                   </Button>
                   <Link href={`/user/consultation/${consultant.id}/book`} className="flex-1">
                     <Button className="w-full" data-testid={`button-book-consultant-${consultant.id}`}>
-                      Book
+                      Book Consultation
                     </Button>
                   </Link>
                 </div>
