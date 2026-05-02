@@ -895,11 +895,12 @@ export default function AdminConsultantsPage() {
           if (!cropTargetId) return;
           try {
             const formData = new FormData();
-            formData.append("file", blob, filename);
-            const res = await fetch("/api/upload/document", { method: "POST", body: formData, credentials: "include" });
-            if (!res.ok) throw new Error("Upload failed");
-            const { url } = await res.json();
-            await apiRequest("PATCH", `/api/admin/consultants/${cropTargetId}`, { digitalSignatureUrl: url });
+            formData.append("signature", blob, filename);
+            const res = await fetch(`/api/consultants/${cropTargetId}/upload-signature`, { method: "POST", body: formData, credentials: "include" });
+            if (!res.ok) {
+              if (res.status === 401) { toast({ title: "Session expired", description: "Please refresh and try again.", variant: "destructive" }); return; }
+              throw new Error("Upload failed");
+            }
             queryClient.invalidateQueries({ queryKey: ["/api/admin/consultants"] });
             toast({ title: "Signature updated" });
           } catch {

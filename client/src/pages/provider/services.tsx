@@ -113,6 +113,14 @@ export default function ProviderServicesPage() {
   const [editEmergencyRegOrg, setEditEmergencyRegOrg] = useState("");
   const [editEmergencyDocFile, setEditEmergencyDocFile] = useState<File | null>(null);
 
+  const fileToDataUrl = (file: File): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+
   const { data: provider, isLoading: providerLoading } = useQuery<Provider>({
     queryKey: ["/api/providers/me"],
     retry: false,
@@ -211,10 +219,10 @@ export default function ProviderServicesPage() {
         registrationDocumentUrl = await uploadDocument(consultantDocFile);
       }
       if (consultantSignatureFile) {
-        digitalSignatureUrl = await uploadDocument(consultantSignatureFile);
+        digitalSignatureUrl = await fileToDataUrl(consultantSignatureFile);
       }
       if (consultantPhotoFile) {
-        photoUrl = await uploadDocument(consultantPhotoFile);
+        photoUrl = await fileToDataUrl(consultantPhotoFile);
       }
       const response = await apiRequest("POST", "/api/provider/consultants", {
         ...data,
@@ -1868,11 +1876,12 @@ export default function ProviderServicesPage() {
           if (!cropTargetConsultantId) return;
           try {
             const formData = new FormData();
-            formData.append("file", blob, filename);
-            const res = await fetch("/api/upload/document", { method: "POST", body: formData, credentials: "include" });
-            if (!res.ok) throw new Error("Upload failed");
-            const { url } = await res.json();
-            await apiRequest("PATCH", `/api/provider/consultants/${cropTargetConsultantId}`, { digitalSignatureUrl: url });
+            formData.append("signature", blob, filename);
+            const res = await fetch(`/api/consultants/${cropTargetConsultantId}/upload-signature`, { method: "POST", body: formData, credentials: "include" });
+            if (!res.ok) {
+              if (res.status === 401) { toast({ title: "Session expired", description: "Please refresh and try again.", variant: "destructive" }); return; }
+              throw new Error("Upload failed");
+            }
             queryClient.invalidateQueries({ queryKey: ["/api/provider/my-consultants"] });
             toast({ title: "Signature updated" });
           } catch {

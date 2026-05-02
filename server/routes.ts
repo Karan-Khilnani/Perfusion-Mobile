@@ -164,6 +164,12 @@ const uploadExcel = multer({
   limits: { fileSize: 10 * 1024 * 1024 },
 });
 
+// In-memory multer for photo/signature uploads (converts to base64, no disk persistence)
+const uploadImageMemory = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+});
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -2790,8 +2796,8 @@ export async function registerRoutes(
     }
   });
 
-  // Combined upload + DB update in one authenticated request (avoids 2-step auth failure)
-  app.post("/api/consultants/:id/upload-photo", isAuthenticated, uploadDocument.single("photo"), async (req: any, res) => {
+  // Combined upload + DB update in one authenticated request — stores as base64 (no filesystem)
+  app.post("/api/consultants/:id/upload-photo", isAuthenticated, uploadImageMemory.single("photo"), async (req: any, res) => {
     try {
       const userId = req.user?.id;
       if (req.user.role === "provider") {
@@ -2805,13 +2811,38 @@ export async function registerRoutes(
         return res.status(403).json({ message: "Access denied" });
       }
       if (!req.file) return res.status(400).json({ message: "No file uploaded" });
-      const photoUrl = `/uploads/documents/${req.file.filename}`;
+      const photoUrl = `data:${req.file.mimetype};base64,${req.file.buffer.toString("base64")}`;
       const updated = await storage.updateConsultant(req.params.id, { photoUrl } as any);
       if (!updated) return res.status(404).json({ message: "Consultant not found" });
       res.json({ photoUrl, consultant: updated });
     } catch (error) {
       console.error("Error uploading consultant photo:", error);
       res.status(500).json({ message: "Failed to upload photo" });
+    }
+  });
+
+  // Upload + store digital signature as base64 (no filesystem)
+  app.post("/api/consultants/:id/upload-signature", isAuthenticated, uploadImageMemory.single("signature"), async (req: any, res) => {
+    try {
+      const userId = req.user?.id;
+      if (req.user.role === "provider") {
+        const provider = await storage.getProviderByUserId(userId);
+        if (!provider) return res.status(403).json({ message: "Provider not found" });
+        const consultant = await storage.getConsultantById(req.params.id);
+        if (!consultant || consultant.providerId !== provider.id) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+      } else if (req.user.role !== "admin") {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      if (!req.file) return res.status(400).json({ message: "No file uploaded" });
+      const digitalSignatureUrl = `data:${req.file.mimetype};base64,${req.file.buffer.toString("base64")}`;
+      const updated = await storage.updateConsultant(req.params.id, { digitalSignatureUrl } as any);
+      if (!updated) return res.status(404).json({ message: "Consultant not found" });
+      res.json({ digitalSignatureUrl, consultant: updated });
+    } catch (error) {
+      console.error("Error uploading consultant signature:", error);
+      res.status(500).json({ message: "Failed to upload signature" });
     }
   });
 
