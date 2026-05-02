@@ -1291,8 +1291,8 @@ export default function ProviderServicesPage() {
               {consultants.map((consultant) => (
                 <Card key={consultant.id}>
                   <CardContent className="flex items-center justify-between gap-4 py-4">
-                    {(consultant as any).photoUrl ? (
-                      <img src={(consultant as any).photoUrl} alt={consultant.name} className="h-36 w-36 rounded-full object-cover border shrink-0" data-testid={`img-consultant-photo-${consultant.id}`} />
+                    {consultant.photoUrl ? (
+                      <img src={consultant.photoUrl} alt={consultant.name} className="h-36 w-36 rounded-full object-cover border shrink-0" data-testid={`img-consultant-photo-${consultant.id}`} />
                     ) : (
                       <div className="h-36 w-36 rounded-full bg-muted flex items-center justify-center text-muted-foreground text-4xl font-medium shrink-0">
                         {consultant.name.charAt(0)}
@@ -1325,6 +1325,18 @@ export default function ProviderServicesPage() {
                           )}
                         </div>
                       )}
+                      <div className="mt-3 flex items-center gap-2" data-testid={`sig-section-${consultant.id}`}>
+                        {consultant.digitalSignatureUrl ? (
+                          <img
+                            src={consultant.digitalSignatureUrl}
+                            alt="Digital signature"
+                            className="h-8 max-w-[140px] object-contain rounded border bg-white px-1"
+                            data-testid={`img-consultant-signature-${consultant.id}`}
+                          />
+                        ) : (
+                          <span className="text-xs text-muted-foreground italic" data-testid={`text-no-signature-${consultant.id}`}>No signature uploaded</span>
+                        )}
+                      </div>
                     </div>
                     <div className="flex items-center gap-2">
                       <Button
