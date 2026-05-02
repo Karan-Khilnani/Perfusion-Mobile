@@ -499,9 +499,23 @@ export default function AdminConsultantsPage() {
                 {filteredConsultants?.map((consultant) => (
                   <TableRow key={consultant.id} data-testid={`row-consultant-${consultant.id}`}>
                     <TableCell>
-                      <div>
-                        <p className="font-medium">{consultant.name}</p>
-                        <p className="text-sm text-muted-foreground">{consultant.qualification}</p>
+                      <div className="flex items-center gap-3">
+                        {consultant.photoUrl ? (
+                          <img
+                            src={consultant.photoUrl}
+                            alt={consultant.name}
+                            className="h-9 w-9 rounded-full object-cover border shrink-0"
+                            data-testid={`img-consultant-avatar-${consultant.id}`}
+                          />
+                        ) : (
+                          <div className="h-9 w-9 rounded-full bg-muted flex items-center justify-center text-muted-foreground text-sm font-medium shrink-0" data-testid={`avatar-initials-${consultant.id}`}>
+                            {consultant.name.charAt(0).toUpperCase()}
+                          </div>
+                        )}
+                        <div>
+                          <p className="font-medium">{consultant.name}</p>
+                          <p className="text-sm text-muted-foreground">{consultant.qualification}</p>
+                        </div>
                       </div>
                     </TableCell>
                     <TableCell>{consultant.specialization}</TableCell>
@@ -685,6 +699,29 @@ export default function AdminConsultantsPage() {
             <DialogDescription>Update all fields for {editingConsultant?.name}</DialogDescription>
           </DialogHeader>
           <div className="overflow-y-auto flex-1 pr-1">
+            {editingConsultant && (
+              <div className="flex items-center gap-4 mb-5 pb-4 border-b">
+                {editingConsultant.photoUrl ? (
+                  <img
+                    src={editingConsultant.photoUrl}
+                    alt={editingConsultant.name}
+                    className="h-16 w-16 rounded-full object-cover border shrink-0"
+                    data-testid="img-edit-consultant-photo"
+                  />
+                ) : (
+                  <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center text-muted-foreground text-xl font-semibold shrink-0" data-testid="avatar-edit-consultant-initials">
+                    {editingConsultant.name.charAt(0).toUpperCase()}
+                  </div>
+                )}
+                <div className="min-w-0">
+                  <p className="font-semibold truncate">{editingConsultant.name}</p>
+                  <p className="text-sm text-muted-foreground truncate">{editingConsultant.qualification}</p>
+                  {!editingConsultant.photoUrl && (
+                    <p className="text-xs text-muted-foreground mt-0.5">No photo uploaded</p>
+                  )}
+                </div>
+              </div>
+            )}
             <Form {...editConsultantForm}>
               <form onSubmit={editConsultantForm.handleSubmit((data) => updateDetailsMutation.mutate(data))} className="space-y-4" id="admin-edit-consultant-form">
                 <FormField control={editConsultantForm.control} name="name" render={({ field }) => (
