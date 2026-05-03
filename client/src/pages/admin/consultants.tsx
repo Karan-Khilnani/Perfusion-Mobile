@@ -241,7 +241,7 @@ export default function AdminConsultantsPage() {
         registrationNumber: editRegNo || undefined,
         registeredOrganization: editRegOrg || undefined,
         affiliatedInstitution: editAffiliation || undefined,
-        portfolio: data.portfolio || undefined,
+        portfolio: data.portfolio ?? "",
         ...(registrationDocumentUrl ? { registrationDocumentUrl } : {}),
       });
     },
