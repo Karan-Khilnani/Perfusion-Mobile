@@ -61,6 +61,7 @@ const consultantSchema = z.object({
   consultationFee: z.string().min(1, "Fee is required"),
   rating: z.string().optional(),
   availableSlots: z.string().optional(),
+  portfolio: z.string().optional(),
 });
 
 type ConsultantFormData = z.infer<typeof consultantSchema>;
@@ -188,7 +189,7 @@ export default function AdminConsultantsPage() {
 
   const editConsultantForm = useForm<ConsultantFormData>({
     resolver: zodResolver(consultantSchema),
-    defaultValues: { name: "", qualification: "", specialization: "", yearsExperience: 0, consultationFee: "", rating: "4.0", availableSlots: "" },
+    defaultValues: { name: "", qualification: "", specialization: "", yearsExperience: 0, consultationFee: "", rating: "4.0", availableSlots: "", portfolio: "" },
   });
 
   const openEditDetails = (c: EnrichedConsultant) => {
@@ -201,6 +202,7 @@ export default function AdminConsultantsPage() {
       consultationFee: c.consultationFee || "",
       rating: c.rating || "4.0",
       availableSlots: c.availableSlots?.join(", ") || "",
+      portfolio: c.portfolio || "",
     });
     setEditRegNo(c.registrationNumber || "");
     setEditRegOrg(c.registeredOrganization || "");
@@ -239,6 +241,7 @@ export default function AdminConsultantsPage() {
         registrationNumber: editRegNo || undefined,
         registeredOrganization: editRegOrg || undefined,
         affiliatedInstitution: editAffiliation || undefined,
+        portfolio: data.portfolio || undefined,
         ...(registrationDocumentUrl ? { registrationDocumentUrl } : {}),
       });
     },
@@ -753,6 +756,15 @@ export default function AdminConsultantsPage() {
                   <Label>Affiliated Institution</Label>
                   <Input value={editAffiliation} onChange={(e) => setEditAffiliation(e.target.value)} placeholder="e.g., AIIMS Delhi" data-testid="input-admin-edit-affiliation" />
                 </div>
+                <FormField control={editConsultantForm.control} name="portfolio" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Portfolio / Bio</FormLabel>
+                    <FormControl>
+                      <Textarea {...field} rows={4} placeholder="Consultant's background, expertise, achievements..." data-testid="textarea-admin-edit-portfolio" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
                 <div className="space-y-2">
                   <Label>Registration Document</Label>
                   {editingConsultant?.registrationDocumentUrl && !editDocFile && (
