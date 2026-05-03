@@ -864,9 +864,6 @@ export default function ConsultationBookingPage() {
                       <CreditCard className="h-5 w-5 text-muted-foreground" />
                       <span className="font-medium">Payment Option</span>
                     </div>
-                    <p className="text-sm text-muted-foreground mb-3">
-                      Consultation fee: ₹{(service as any).computedCustomerPrice || service.consultationFee}
-                    </p>
                     <div className="space-y-3">
                       <label className="flex items-center gap-3 rounded-lg border p-3 cursor-pointer hover:bg-muted/50" data-testid="radio-pay-later">
                         <input type="radio" name="paymentMethod" value="pay_later" checked={paymentMethod === "pay_later"} onChange={() => setPaymentMethod("pay_later")} className="h-4 w-4" />

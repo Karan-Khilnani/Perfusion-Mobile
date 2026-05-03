@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Separator } from "@/components/ui/separator";
 import { StarRating } from "@/components/star-rating";
-import { Search, Stethoscope, ArrowUpDown, Briefcase, Calendar, AlertTriangle, IndianRupee, Users, Building2, BookOpen, Clock, User } from "lucide-react";
+import { Search, Stethoscope, ArrowUpDown, Briefcase, Calendar, AlertTriangle, Users, Building2, BookOpen, Clock, User } from "lucide-react";
 import type { Consultant } from "@shared/schema";
 
 type SortOption = "rating" | "cost" | "availability";
@@ -28,7 +28,6 @@ function ConsultantProfileSheet({
 }) {
   if (!consultant) return null;
 
-  const fee = consultant.computedCustomerPrice ?? consultant.consultationFee;
   const initials = consultant.name
     .split(" ")
     .map((w) => w[0])
@@ -83,13 +82,6 @@ function ConsultantProfileSheet({
               Experience
             </div>
             <p className="font-semibold text-sm" data-testid="text-profile-experience">{consultant.yearsExperience} years</p>
-          </div>
-          <div className="rounded-lg border bg-muted/30 p-3">
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1">
-              <IndianRupee className="h-3.5 w-3.5" />
-              Consultation Fee
-            </div>
-            <p className="font-semibold text-sm" data-testid="text-profile-fee">₹{fee}</p>
           </div>
         </div>
 
@@ -337,10 +329,6 @@ export default function ConsultationPage() {
                         <Stethoscope className="h-3.5 w-3.5" />
                         <span>{team.qualification}</span>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <IndianRupee className="h-3.5 w-3.5" />
-                        <span>Fee: ₹{team.computedCustomerPrice || team.consultationFee}</span>
-                      </div>
                     </div>
                     <Link href={`/user/consultation/${team.id}/book`}>
                       <Button className="w-full bg-red-600 text-white border-red-600 no-default-hover-elevate no-default-active-elevate" data-testid={`button-book-emergency-${team.id}`}>
@@ -470,9 +458,6 @@ export default function ConsultationPage() {
                   <span className="flex items-center gap-1">
                     <Briefcase className="h-3.5 w-3.5" />
                     {consultant.yearsExperience} years exp
-                  </span>
-                  <span className="flex items-center gap-1">
-                    ₹{consultant.computedCustomerPrice ?? consultant.consultationFee}
                   </span>
                 </div>
 
