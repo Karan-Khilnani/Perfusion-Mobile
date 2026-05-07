@@ -164,18 +164,30 @@ export default function LandingPage() {
               </blockquote>
             </div>
             
-            <Link href="/home">
-              <Button 
-                size="lg"
-                className="mt-6 bg-gradient-to-r from-red-700 via-red-600 to-red-700 text-white font-semibold tracking-wide shadow-lg shadow-red-900/30 border border-red-500/30"
-                data-testid="button-enter-perfusion"
-              >
-                Enter Perfusion
-                <ArrowRight className="ml-2 h-5 w-5" />
-              </Button>
-            </Link>
+            <div className="flex flex-wrap items-center gap-3 mt-6">
+              <Link href="/home">
+                <Button
+                  size="lg"
+                  className="bg-gradient-to-r from-red-700 via-red-600 to-red-700 text-white font-semibold tracking-wide shadow-lg shadow-red-900/30 border border-red-500/30"
+                  data-testid="button-enter-perfusion"
+                >
+                  Enter Perfusion
+                  <ArrowRight className="ml-2 h-5 w-5" />
+                </Button>
+              </Link>
+              <Link href="/consultants">
+                <Button size="lg" variant="outline" className="border-gray-400 dark:border-gray-600 text-gray-700 dark:text-gray-300" data-testid="button-browse-doctors">
+                  Browse Doctors
+                </Button>
+              </Link>
+              <Link href="/lab-tests">
+                <Button size="lg" variant="outline" className="border-gray-400 dark:border-gray-600 text-gray-700 dark:text-gray-300" data-testid="button-browse-labs">
+                  Lab Tests
+                </Button>
+              </Link>
+            </div>
           </div>
-          
+
           {/* Right side - India map */}
           <div className="relative flex items-center justify-center lg:justify-end">
             <div className="relative">

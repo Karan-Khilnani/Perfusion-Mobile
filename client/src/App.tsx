@@ -26,6 +26,8 @@ import TeleradiologyPage from "@/pages/user/teleradiology";
 import OrdersPage from "@/pages/user/orders";
 import UserBillingPage from "@/pages/user/billing";
 import VideoRoomPage from "@/pages/video-room";
+import PublicConsultantsPage from "@/pages/public/consultants";
+import PublicLabTestsPage from "@/pages/public/lab-tests";
 
 import ProfilePage from "@/pages/profile";
 
@@ -91,6 +93,8 @@ function Router() {
       <Route path="/verify-email" component={VerifyEmailPage} />
       <Route path="/verify/prescription/:bookingId" component={VerifyPrescriptionPage} />
       <Route path="/pending-approval" component={PendingApprovalPage} />
+      <Route path="/consultants" component={PublicConsultantsPage} />
+      <Route path="/lab-tests" component={PublicLabTestsPage} />
       <Route path="/provider/onboarding" component={ProviderOnboardingPage} />
       
       <Route path="/user" component={withUserLayout(UserDashboard)} />

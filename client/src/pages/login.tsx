@@ -80,6 +80,11 @@ export default function LoginPage() {
       }
       
       toast({ title: "Welcome back!", description: "You have been logged in successfully." });
+      const redirectTo = new URLSearchParams(searchString).get("redirect");
+      if (redirectTo) {
+        setLocation(redirectTo);
+        return;
+      }
       if (user.role === "admin") {
         setLocation("/admin");
       } else if (user.role === "provider") {
