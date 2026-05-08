@@ -62,9 +62,8 @@ export default function ProviderServicesPage() {
   const [isLabDialogOpen, setIsLabDialogOpen] = useState(false);
   const [isConsultantDialogOpen, setIsConsultantDialogOpen] = useState(false);
   const [editingSlotsFor, setEditingSlotsFor] = useState<Consultant | null>(null);
-  const [slotsList, setSlotsList] = useState<string[]>([]);
-  const [selectedDay, setSelectedDay] = useState("Mon");
-  const [selectedTime, setSelectedTime] = useState("09:00 AM");
+  const [editFromTime, setEditFromTime] = useState("09:00 AM");
+  const [editToTime, setEditToTime] = useState("05:00 PM");
   const [isAddTestDialogOpen, setIsAddTestDialogOpen] = useState(false);
   const [isSuggestTestDialogOpen, setIsSuggestTestDialogOpen] = useState(false);
   const [isBulkImportDialogOpen, setIsBulkImportDialogOpen] = useState(false);
@@ -371,18 +370,17 @@ export default function ProviderServicesPage() {
   });
 
   const updateSlotsMutation = useMutation({
-    mutationFn: async ({ id, slots }: { id: string; slots: string[] }) => {
-      const response = await apiRequest("PATCH", `/api/consultants/${id}/slots`, { slots });
+    mutationFn: async ({ id, availabilityFrom, availabilityTo }: { id: string; availabilityFrom: string; availabilityTo: string }) => {
+      const response = await apiRequest("PATCH", `/api/consultants/${id}/slots`, { availabilityFrom, availabilityTo });
       return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/provider/my-consultants"] });
       setEditingSlotsFor(null);
-      setSlotsList([]);
-      toast({ title: "Slots Updated", description: "Booking slots have been saved." });
+      toast({ title: "Availability Updated", description: "Availability hours have been saved." });
     },
     onError: () => {
-      toast({ title: "Failed", description: "Failed to update slots.", variant: "destructive" });
+      toast({ title: "Failed", description: "Failed to update availability.", variant: "destructive" });
     },
   });
 
@@ -522,7 +520,6 @@ export default function ProviderServicesPage() {
     },
   });
 
-  const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
   const TIMES = [
     "06:00 AM", "06:30 AM", "07:00 AM", "07:30 AM",
     "08:00 AM", "08:30 AM", "09:00 AM", "09:30 AM",
@@ -537,25 +534,13 @@ export default function ProviderServicesPage() {
 
   const handleOpenSlotsEditor = (consultant: Consultant) => {
     setEditingSlotsFor(consultant);
-    setSlotsList(consultant.availableSlots ? [...consultant.availableSlots] : []);
-    setSelectedDay("Mon");
-    setSelectedTime("09:00 AM");
-  };
-
-  const handleAddSlot = () => {
-    const slot = `${selectedDay} ${selectedTime}`;
-    if (!slotsList.includes(slot)) {
-      setSlotsList([...slotsList, slot]);
-    }
-  };
-
-  const handleRemoveSlot = (index: number) => {
-    setSlotsList(slotsList.filter((_, i) => i !== index));
+    setEditFromTime(consultant.availabilityFrom || "09:00 AM");
+    setEditToTime(consultant.availabilityTo || "05:00 PM");
   };
 
   const handleSaveSlots = () => {
     if (!editingSlotsFor) return;
-    updateSlotsMutation.mutate({ id: editingSlotsFor.id, slots: slotsList });
+    updateSlotsMutation.mutate({ id: editingSlotsFor.id, availabilityFrom: editFromTime, availabilityTo: editToTime });
   };
 
   const isLoading = providerLoading || labsLoading;
@@ -1311,18 +1296,10 @@ export default function ProviderServicesPage() {
                         <span>{consultant.yearsExperience} years exp.</span>
                         <span>₹{consultant.consultationFee}</span>
                       </div>
-                      {consultant.availableSlots && consultant.availableSlots.length > 0 && (
-                        <div className="mt-2 flex flex-wrap gap-1">
-                          {consultant.availableSlots.slice(0, 3).map((slot, i) => (
-                            <Badge key={i} variant="secondary" className="text-xs">
-                              {slot}
-                            </Badge>
-                          ))}
-                          {consultant.availableSlots.length > 3 && (
-                            <Badge variant="outline" className="text-xs">
-                              +{consultant.availableSlots.length - 3} more
-                            </Badge>
-                          )}
+                      {(consultant.availabilityFrom || consultant.availabilityTo) && (
+                        <div className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
+                          <Clock className="h-3 w-3" />
+                          {consultant.availabilityFrom} – {consultant.availabilityTo}
                         </div>
                       )}
                       <div className="mt-3 flex items-center gap-2" data-testid={`sig-section-${consultant.id}`}>
@@ -1751,66 +1728,40 @@ export default function ProviderServicesPage() {
       <Dialog open={!!editingSlotsFor} onOpenChange={(open) => !open && setEditingSlotsFor(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Manage Booking Slots</DialogTitle>
+            <DialogTitle>Set Availability Hours</DialogTitle>
             <DialogDescription>
-              {editingSlotsFor?.name} - Add or edit available appointment slots
+              Set the daily availability window for {editingSlotsFor?.name}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Add a Slot</label>
-              <div className="flex gap-2 items-end">
-                <div className="flex-1">
-                  <label className="text-xs text-muted-foreground mb-1 block">Day</label>
-                  <Select value={selectedDay} onValueChange={setSelectedDay}>
-                    <SelectTrigger data-testid="select-slot-day">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {DAYS.map((d) => (
-                        <SelectItem key={d} value={d}>{d}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="flex-1">
-                  <label className="text-xs text-muted-foreground mb-1 block">Time</label>
-                  <Select value={selectedTime} onValueChange={setSelectedTime}>
-                    <SelectTrigger data-testid="select-slot-time">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {TIMES.map((t) => (
-                        <SelectItem key={t} value={t}>{t}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <Button type="button" size="sm" onClick={handleAddSlot} data-testid="button-add-slot">
-                  <Plus className="h-4 w-4" />
-                </Button>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">From</label>
+                <Select value={editFromTime} onValueChange={setEditFromTime}>
+                  <SelectTrigger data-testid="select-availability-from">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {TIMES.map((t) => (
+                      <SelectItem key={t} value={t}>{t}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">To</label>
+                <Select value={editToTime} onValueChange={setEditToTime}>
+                  <SelectTrigger data-testid="select-availability-to">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {TIMES.map((t) => (
+                      <SelectItem key={t} value={t}>{t}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
-            {slotsList.length > 0 && (
-              <div className="space-y-2">
-                <p className="text-sm font-medium">Slots ({slotsList.length}):</p>
-                <div className="flex flex-wrap gap-2">
-                  {slotsList.map((slot, i) => (
-                    <Badge key={i} variant="secondary" className="flex items-center gap-1 pr-1">
-                      {slot}
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveSlot(i)}
-                        className="ml-1 rounded-full hover:bg-muted p-0.5"
-                        data-testid={`button-remove-slot-${i}`}
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => setEditingSlotsFor(null)}>
@@ -1818,7 +1769,7 @@ export default function ProviderServicesPage() {
             </Button>
             <Button onClick={handleSaveSlots} disabled={updateSlotsMutation.isPending} data-testid="button-save-slots">
               {updateSlotsMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              Save Slots
+              Save
             </Button>
           </div>
         </DialogContent>

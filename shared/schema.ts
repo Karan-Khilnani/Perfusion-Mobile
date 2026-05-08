@@ -78,6 +78,8 @@ export const consultants = pgTable("consultants", {
   customerPrice: decimal("customer_price", { precision: 10, scale: 2 }),
   marginOverride: decimal("margin_override", { precision: 5, scale: 2 }),
   availableSlots: text("available_slots").array(),
+  availabilityFrom: text("availability_from"),
+  availabilityTo: text("availability_to"),
   registrationNumber: varchar("registration_number", { length: 100 }),
   registeredOrganization: varchar("registered_organization", { length: 255 }),
   registrationDocumentUrl: varchar("registration_document_url", { length: 500 }),

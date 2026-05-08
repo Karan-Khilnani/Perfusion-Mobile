@@ -60,7 +60,8 @@ const consultantSchema = z.object({
   yearsExperience: z.coerce.number().min(0, "Experience must be positive"),
   consultationFee: z.string().min(1, "Fee is required"),
   rating: z.string().optional(),
-  availableSlots: z.string().optional(),
+  availabilityFrom: z.string().optional(),
+  availabilityTo: z.string().optional(),
   portfolio: z.string().optional(),
 });
 
@@ -70,9 +71,8 @@ export default function AdminConsultantsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingSlotsFor, setEditingSlotsFor] = useState<Consultant | null>(null);
-  const [slotsList, setSlotsList] = useState<string[]>([]);
-  const [selectedDay, setSelectedDay] = useState("Mon");
-  const [selectedTime, setSelectedTime] = useState("09:00 AM");
+  const [editFromTime, setEditFromTime] = useState("09:00 AM");
+  const [editToTime, setEditToTime] = useState("05:00 PM");
   const [isPricingDialogOpen, setIsPricingDialogOpen] = useState(false);
   const [pricingConsultant, setPricingConsultant] = useState<EnrichedConsultant | null>(null);
   const [pricingMode, setPricingMode] = useState<"price" | "margin">("price");
@@ -105,18 +105,15 @@ export default function AdminConsultantsPage() {
       yearsExperience: 0,
       consultationFee: "",
       rating: "4.5",
-      availableSlots: "",
+      availabilityFrom: "09:00 AM",
+      availabilityTo: "05:00 PM",
     },
   });
 
   const createMutation = useMutation({
     mutationFn: async (data: ConsultantFormData) => {
-      const slots = data.availableSlots
-        ? data.availableSlots.split(",").map((s) => s.trim())
-        : [];
       return apiRequest("POST", "/api/admin/consultants", {
         ...data,
-        availableSlots: slots,
         status: "active",
       });
     },
@@ -158,17 +155,16 @@ export default function AdminConsultantsPage() {
   });
 
   const updateSlotsMutation = useMutation({
-    mutationFn: async ({ id, slots }: { id: string; slots: string[] }) => {
-      return apiRequest("PATCH", `/api/consultants/${id}/slots`, { slots });
+    mutationFn: async ({ id, availabilityFrom, availabilityTo }: { id: string; availabilityFrom: string; availabilityTo: string }) => {
+      return apiRequest("PATCH", `/api/consultants/${id}/slots`, { availabilityFrom, availabilityTo });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/consultants"] });
       setEditingSlotsFor(null);
-      setSlotsList([]);
-      toast({ title: "Success", description: "Slots updated successfully" });
+      toast({ title: "Success", description: "Availability hours updated" });
     },
     onError: () => {
-      toast({ title: "Error", description: "Failed to update slots", variant: "destructive" });
+      toast({ title: "Error", description: "Failed to update availability", variant: "destructive" });
     },
   });
 
@@ -189,7 +185,7 @@ export default function AdminConsultantsPage() {
 
   const editConsultantForm = useForm<ConsultantFormData>({
     resolver: zodResolver(consultantSchema),
-    defaultValues: { name: "", qualification: "", specialization: "", yearsExperience: 0, consultationFee: "", rating: "4.0", availableSlots: "", portfolio: "" },
+    defaultValues: { name: "", qualification: "", specialization: "", yearsExperience: 0, consultationFee: "", rating: "4.0", availabilityFrom: "09:00 AM", availabilityTo: "05:00 PM", portfolio: "" },
   });
 
   const openEditDetails = (c: EnrichedConsultant) => {
@@ -201,7 +197,8 @@ export default function AdminConsultantsPage() {
       yearsExperience: c.yearsExperience || 0,
       consultationFee: c.consultationFee || "",
       rating: c.rating || "4.0",
-      availableSlots: c.availableSlots?.join(", ") || "",
+      availabilityFrom: c.availabilityFrom || "09:00 AM",
+      availabilityTo: c.availabilityTo || "05:00 PM",
       portfolio: c.portfolio || "",
     });
     setEditRegNo(c.registrationNumber || "");
@@ -228,16 +225,14 @@ export default function AdminConsultantsPage() {
       if (editDocFile) {
         registrationDocumentUrl = await uploadDocument(editDocFile);
       }
-      const slots = data.availableSlots
-        ? data.availableSlots.split(",").map((s: string) => s.trim()).filter(Boolean)
-        : undefined;
       return apiRequest("PATCH", `/api/admin/consultants/${editingConsultant.id}`, {
         name: data.name,
         qualification: data.qualification,
         specialization: data.specialization,
         yearsExperience: data.yearsExperience,
         consultationFee: data.consultationFee,
-        ...(slots ? { availableSlots: slots } : {}),
+        availabilityFrom: data.availabilityFrom || undefined,
+        availabilityTo: data.availabilityTo || undefined,
         registrationNumber: editRegNo || undefined,
         registeredOrganization: editRegOrg || undefined,
         affiliatedInstitution: editAffiliation || undefined,
@@ -284,7 +279,6 @@ export default function AdminConsultantsPage() {
     }
   };
 
-  const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
   const TIMES = [
     "06:00 AM", "06:30 AM", "07:00 AM", "07:30 AM",
     "08:00 AM", "08:30 AM", "09:00 AM", "09:30 AM",
@@ -299,25 +293,13 @@ export default function AdminConsultantsPage() {
 
   const handleOpenSlotsEditor = (consultant: Consultant) => {
     setEditingSlotsFor(consultant);
-    setSlotsList(consultant.availableSlots ? [...consultant.availableSlots] : []);
-    setSelectedDay("Mon");
-    setSelectedTime("09:00 AM");
-  };
-
-  const handleAddSlot = () => {
-    const slot = `${selectedDay} ${selectedTime}`;
-    if (!slotsList.includes(slot)) {
-      setSlotsList([...slotsList, slot]);
-    }
-  };
-
-  const handleRemoveSlot = (index: number) => {
-    setSlotsList(slotsList.filter((_, i) => i !== index));
+    setEditFromTime(consultant.availabilityFrom || "09:00 AM");
+    setEditToTime(consultant.availabilityTo || "05:00 PM");
   };
 
   const handleSaveSlots = () => {
     if (!editingSlotsFor) return;
-    updateSlotsMutation.mutate({ id: editingSlotsFor.id, slots: slotsList });
+    updateSlotsMutation.mutate({ id: editingSlotsFor.id, availabilityFrom: editFromTime, availabilityTo: editToTime });
   };
 
   const onSubmit = (data: ConsultantFormData) => {
@@ -435,19 +417,52 @@ export default function AdminConsultantsPage() {
                     )}
                   />
                 </div>
-                <FormField
-                  control={form.control}
-                  name="availableSlots"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Available Slots (comma separated)</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Mon 10:00 AM, Wed 2:00 PM" {...field} data-testid="input-slots" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="availabilityFrom"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Available From</FormLabel>
+                        <Select value={field.value} onValueChange={field.onChange}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-availability-from">
+                              <SelectValue />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {TIMES.map((t) => (
+                              <SelectItem key={t} value={t}>{t}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="availabilityTo"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Available To</FormLabel>
+                        <Select value={field.value} onValueChange={field.onChange}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-availability-to">
+                              <SelectValue />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {TIMES.map((t) => (
+                              <SelectItem key={t} value={t}>{t}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
                 <Button type="submit" className="w-full" disabled={createMutation.isPending} data-testid="button-save-consultant">
                   {createMutation.isPending ? "Adding..." : "Add Consultant"}
                 </Button>
@@ -800,68 +815,40 @@ export default function AdminConsultantsPage() {
       </Dialog>
 
       <Dialog open={!!editingSlotsFor} onOpenChange={() => setEditingSlotsFor(null)}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="sm:max-w-[400px]">
           <DialogHeader>
-            <DialogTitle>Edit Available Slots</DialogTitle>
+            <DialogTitle>Set Availability Hours</DialogTitle>
             <DialogDescription>
-              Manage appointment slots for {editingSlotsFor?.name}
+              Set the daily availability window for {editingSlotsFor?.name}
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Add a Slot</label>
-              <div className="flex gap-2 items-end">
-                <div className="flex-1">
-                  <label className="text-xs text-muted-foreground mb-1 block">Day</label>
-                  <Select value={selectedDay} onValueChange={setSelectedDay}>
-                    <SelectTrigger data-testid="select-slot-day">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {DAYS.map((d) => (
-                        <SelectItem key={d} value={d}>{d}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="flex-1">
-                  <label className="text-xs text-muted-foreground mb-1 block">Time</label>
-                  <Select value={selectedTime} onValueChange={setSelectedTime}>
-                    <SelectTrigger data-testid="select-slot-time">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {TIMES.map((t) => (
-                        <SelectItem key={t} value={t}>{t}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <Button type="button" size="sm" onClick={handleAddSlot} data-testid="button-add-slot">
-                  <Plus className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-            {slotsList.length > 0 && (
-              <div className="space-y-2">
-                <p className="text-sm font-medium">Slots ({slotsList.length}):</p>
-                <div className="flex flex-wrap gap-2">
-                  {slotsList.map((slot, i) => (
-                    <Badge key={i} variant="secondary" className="flex items-center gap-1 pr-1">
-                      {slot}
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveSlot(i)}
-                        className="ml-1 rounded-full hover:bg-muted p-0.5"
-                        data-testid={`button-remove-slot-${i}`}
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </Badge>
+          <div className="grid grid-cols-2 gap-4 py-2">
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">From</label>
+              <Select value={editFromTime} onValueChange={setEditFromTime}>
+                <SelectTrigger data-testid="select-availability-from">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {TIMES.map((t) => (
+                    <SelectItem key={t} value={t}>{t}</SelectItem>
                   ))}
-                </div>
-              </div>
-            )}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">To</label>
+              <Select value={editToTime} onValueChange={setEditToTime}>
+                <SelectTrigger data-testid="select-availability-to">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {TIMES.map((t) => (
+                    <SelectItem key={t} value={t}>{t}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           <div className="flex justify-end gap-2 pt-4">
             <Button variant="outline" onClick={() => setEditingSlotsFor(null)}>
@@ -872,7 +859,7 @@ export default function AdminConsultantsPage() {
               disabled={updateSlotsMutation.isPending}
               data-testid="button-save-slots"
             >
-              {updateSlotsMutation.isPending ? "Saving..." : "Save Slots"}
+              {updateSlotsMutation.isPending ? "Saving..." : "Save"}
             </Button>
           </div>
         </DialogContent>

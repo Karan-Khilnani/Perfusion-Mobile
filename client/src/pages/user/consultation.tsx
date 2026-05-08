@@ -109,20 +109,16 @@ function ConsultantProfileSheet({
           </div>
         )}
 
-        {/* Available slots */}
-        {consultant.availableSlots && consultant.availableSlots.length > 0 && (
+        {/* Availability range */}
+        {(consultant.availabilityFrom || consultant.availabilityTo) && (
           <div className="mb-6">
             <div className="flex items-center gap-1.5 text-sm font-medium mb-2">
               <Clock className="h-4 w-4 text-muted-foreground" />
-              Available Slots
+              Available Hours
             </div>
-            <div className="flex flex-wrap gap-2 pl-5">
-              {consultant.availableSlots.map((slot, i) => (
-                <Badge key={i} variant="outline" className="text-xs" data-testid={`badge-slot-${i}`}>
-                  {slot}
-                </Badge>
-              ))}
-            </div>
+            <p className="text-sm text-muted-foreground pl-5" data-testid="text-availability-range">
+              {consultant.availabilityFrom} – {consultant.availabilityTo}
+            </p>
           </div>
         )}
 
@@ -212,7 +208,7 @@ export default function ConsultationPage() {
         case "cost":
           return parseFloat(a.computedCustomerPrice ?? a.consultationFee) - parseFloat(b.computedCustomerPrice ?? b.consultationFee);
         case "availability":
-          return (b.availableSlots?.length || 0) - (a.availableSlots?.length || 0);
+          return (b.availabilityFrom ? 1 : 0) - (a.availabilityFrom ? 1 : 0);
         default:
           return 0;
       }
@@ -461,24 +457,10 @@ export default function ConsultationPage() {
                   </span>
                 </div>
 
-                {consultant.availableSlots && consultant.availableSlots.length > 0 && (
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-1 text-sm font-medium">
-                      <Calendar className="h-3.5 w-3.5" />
-                      Available Slots
-                    </div>
-                    <div className="flex flex-wrap gap-1">
-                      {consultant.availableSlots.slice(0, 3).map((slot, i) => (
-                        <Badge key={i} variant="outline" className="text-xs">
-                          {slot}
-                        </Badge>
-                      ))}
-                      {consultant.availableSlots.length > 3 && (
-                        <Badge variant="outline" className="text-xs">
-                          +{consultant.availableSlots.length - 3} more
-                        </Badge>
-                      )}
-                    </div>
+                {(consultant.availabilityFrom || consultant.availabilityTo) && (
+                  <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                    <Clock className="h-3.5 w-3.5" />
+                    {consultant.availabilityFrom} – {consultant.availabilityTo}
                   </div>
                 )}
 

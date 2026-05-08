@@ -69,7 +69,8 @@ export default function ConsultationBookingPage() {
     name: `${emergencyTeam.department} Team`,
     specialization: emergencyTeam.department,
     yearsExperience: 0,
-    availableSlots: [],
+    availabilityFrom: null as string | null,
+    availabilityTo: null as string | null,
   } : null);
 
   const isEmergencyTeam = !consultant && !!emergencyTeam;
@@ -435,21 +436,20 @@ export default function ConsultationBookingPage() {
                       name="appointmentSlot"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Select Time Slot *</FormLabel>
-                          <Select value={field.value} onValueChange={field.onChange}>
-                            <FormControl>
-                              <SelectTrigger data-testid="select-slot">
-                                <SelectValue placeholder="Choose a slot" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {service.availableSlots?.map((slot, i) => (
-                                <SelectItem key={i} value={slot}>
-                                  {slot}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                          <FormLabel>Preferred Appointment Time</FormLabel>
+                          {(service.availabilityFrom || service.availabilityTo) && (
+                            <p className="text-xs text-muted-foreground flex items-center gap-1">
+                              <span>Available:</span>
+                              <span className="font-medium text-foreground">{service.availabilityFrom} – {service.availabilityTo}</span>
+                            </p>
+                          )}
+                          <FormControl>
+                            <Input
+                              placeholder={`e.g. ${service.availabilityFrom || "10:00 AM"}`}
+                              {...field}
+                              data-testid="input-appointment-slot"
+                            />
+                          </FormControl>
                           <FormMessage />
                         </FormItem>
                       )}

@@ -2761,8 +2761,8 @@ export async function registerRoutes(
         }
       }
       
-      const { slots } = req.body as { slots: string[] };
-      const consultant = await storage.updateConsultant(req.params.id, { availableSlots: slots });
+      const { availabilityFrom, availabilityTo } = req.body as { availabilityFrom: string; availabilityTo: string };
+      const consultant = await storage.updateConsultant(req.params.id, { availabilityFrom, availabilityTo });
       if (!consultant) {
         return res.status(404).json({ message: "Consultant not found" });
       }
