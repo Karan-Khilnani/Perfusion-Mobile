@@ -178,9 +178,9 @@ export default function LandingPage() {
 
               {/* Service cards */}
               <div className="flex flex-col sm:flex-row gap-3 w-full max-w-lg">
-                <Link href="/consultants" className="flex-1">
+                <Link href="/consultants" className="flex-1 rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2">
                   <div
-                    className="group flex items-center gap-4 px-5 py-4 rounded-2xl border border-gray-200/80 dark:border-white/10 bg-white/80 dark:bg-white/5 backdrop-blur-sm shadow-md hover:-translate-y-0.5 hover:border-red-400 dark:hover:border-red-500/40 hover:shadow-lg hover:shadow-red-100 dark:hover:shadow-red-900/20 transition-all duration-200 cursor-pointer"
+                    className="group flex items-center gap-4 px-5 py-4 rounded-2xl border border-gray-200/80 dark:border-white/10 border-l-2 border-l-red-400/50 dark:border-l-red-500/40 bg-white/80 dark:bg-white/5 backdrop-blur-sm shadow-md hover:-translate-y-0.5 hover:border-red-400 hover:border-l-red-500 dark:hover:border-red-500/40 dark:hover:border-l-red-400 hover:shadow-lg hover:shadow-red-100 dark:hover:shadow-red-900/20 transition-all duration-200 cursor-pointer"
                     data-testid="card-hero-consultation"
                   >
                     <div className="shrink-0 flex items-center justify-center w-11 h-11 rounded-xl bg-red-600/10 border border-red-500/20 group-hover:bg-red-600/20 transition-colors">
@@ -200,9 +200,9 @@ export default function LandingPage() {
                   </div>
                 </Link>
 
-                <Link href="/lab-tests" className="flex-1">
+                <Link href="/lab-tests" className="flex-1 rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2">
                   <div
-                    className="group flex items-center gap-4 px-5 py-4 rounded-2xl border border-gray-200/80 dark:border-white/10 bg-white/80 dark:bg-white/5 backdrop-blur-sm shadow-md hover:-translate-y-0.5 hover:border-red-400 dark:hover:border-red-500/40 hover:shadow-lg hover:shadow-red-100 dark:hover:shadow-red-900/20 transition-all duration-200 cursor-pointer"
+                    className="group flex items-center gap-4 px-5 py-4 rounded-2xl border border-gray-200/80 dark:border-white/10 border-l-2 border-l-red-400/50 dark:border-l-red-500/40 bg-white/80 dark:bg-white/5 backdrop-blur-sm shadow-md hover:-translate-y-0.5 hover:border-red-400 hover:border-l-red-500 dark:hover:border-red-500/40 dark:hover:border-l-red-400 hover:shadow-lg hover:shadow-red-100 dark:hover:shadow-red-900/20 transition-all duration-200 cursor-pointer"
                     data-testid="card-hero-lab-tests"
                   >
                     <div className="shrink-0 flex items-center justify-center w-11 h-11 rounded-xl bg-red-600/10 border border-red-500/20 group-hover:bg-red-600/20 transition-colors">
