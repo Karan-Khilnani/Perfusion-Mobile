@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { Search, Clock, FlaskConical, ArrowUpDown, LogIn } from "lucide-react";
+import { Search, Clock, FlaskConical, ArrowUpDown, LogIn, IndianRupee } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import type { LabTest } from "@shared/schema";
 import PublicLayout from "./layout";
@@ -165,10 +165,14 @@ export default function PublicLabTestsPage() {
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
-                    <span className="flex items-center gap-1">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="flex items-center gap-1 text-sm text-muted-foreground">
                       <Clock className="h-3.5 w-3.5" />
                       {test.turnaroundTime}
+                    </span>
+                    <span className="flex items-center gap-0.5 text-base font-semibold text-foreground" data-testid={`text-price-${test.id}`}>
+                      <IndianRupee className="h-4 w-4" />
+                      {parseFloat((test as any).computedCustomerPrice || test.cost).toLocaleString("en-IN")}
                     </span>
                   </div>
                   <Button variant="outline" className="w-full" onClick={handleBookNow} data-testid={`button-book-test-${test.id}`}>
