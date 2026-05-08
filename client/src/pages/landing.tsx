@@ -164,7 +164,7 @@ export default function LandingPage() {
               </blockquote>
             </div>
             
-            <div className="flex flex-wrap items-center gap-3 mt-6">
+            <div className="mt-6 space-y-4">
               <Link href="/home">
                 <Button
                   size="lg"
@@ -175,16 +175,53 @@ export default function LandingPage() {
                   <ArrowRight className="ml-2 h-5 w-5" />
                 </Button>
               </Link>
-              <Link href="/consultants">
-                <Button size="lg" variant="outline" className="border-gray-400 dark:border-gray-600 text-gray-700 dark:text-gray-300" data-testid="button-browse-doctors">
-                  Browse Doctors
-                </Button>
-              </Link>
-              <Link href="/lab-tests">
-                <Button size="lg" variant="outline" className="border-gray-400 dark:border-gray-600 text-gray-700 dark:text-gray-300" data-testid="button-browse-labs">
-                  Lab Tests
-                </Button>
-              </Link>
+
+              {/* Service cards */}
+              <div className="flex flex-col sm:flex-row gap-3 w-full max-w-lg">
+                <Link href="/consultants" className="flex-1">
+                  <div
+                    className="group flex items-center gap-4 px-5 py-4 rounded-2xl border border-gray-200/80 dark:border-white/10 bg-white/80 dark:bg-white/5 backdrop-blur-sm shadow-md hover:-translate-y-0.5 hover:border-red-400 dark:hover:border-red-500/40 hover:shadow-lg hover:shadow-red-100 dark:hover:shadow-red-900/20 transition-all duration-200 cursor-pointer"
+                    data-testid="card-hero-consultation"
+                  >
+                    <div className="shrink-0 flex items-center justify-center w-11 h-11 rounded-xl bg-red-600/10 border border-red-500/20 group-hover:bg-red-600/20 transition-colors">
+                      {/* Stethoscope */}
+                      <svg viewBox="0 0 24 24" fill="none" className="w-6 h-6" aria-hidden="true">
+                        <path d="M4.5 6.5a2 2 0 1 1 4 0v5a5.5 5.5 0 0 0 11 0v-1" stroke="#dc2626" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"/>
+                        <path d="M4.5 6.5V5a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 .5.5v1.5" stroke="#dc2626" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"/>
+                        <circle cx="19.5" cy="9.5" r="2.5" stroke="#dc2626" strokeWidth="1.75"/>
+                        <circle cx="19.5" cy="9.5" r="1" fill="#dc2626"/>
+                      </svg>
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-semibold text-sm text-gray-900 dark:text-white leading-tight">Consultation</p>
+                      <p className="text-xs text-gray-500 dark:text-white/50 mt-0.5">Specialist video consultations</p>
+                    </div>
+                    <ArrowRight className="h-4 w-4 text-gray-400 dark:text-white/30 group-hover:text-red-500 group-hover:translate-x-0.5 transition-all shrink-0" />
+                  </div>
+                </Link>
+
+                <Link href="/lab-tests" className="flex-1">
+                  <div
+                    className="group flex items-center gap-4 px-5 py-4 rounded-2xl border border-gray-200/80 dark:border-white/10 bg-white/80 dark:bg-white/5 backdrop-blur-sm shadow-md hover:-translate-y-0.5 hover:border-red-400 dark:hover:border-red-500/40 hover:shadow-lg hover:shadow-red-100 dark:hover:shadow-red-900/20 transition-all duration-200 cursor-pointer"
+                    data-testid="card-hero-lab-tests"
+                  >
+                    <div className="shrink-0 flex items-center justify-center w-11 h-11 rounded-xl bg-red-600/10 border border-red-500/20 group-hover:bg-red-600/20 transition-colors">
+                      {/* Test tube / Flask */}
+                      <svg viewBox="0 0 24 24" fill="none" className="w-6 h-6" aria-hidden="true">
+                        <path d="M9 3h6M10 3v7.5L6.5 17A3 3 0 0 0 9.24 21h5.52A3 3 0 0 0 17.5 17L14 10.5V3" stroke="#dc2626" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"/>
+                        <path d="M6.5 17h11" stroke="#dc2626" strokeWidth="1.75" strokeLinecap="round"/>
+                        <circle cx="10.5" cy="18.5" r="1" fill="#dc2626"/>
+                        <circle cx="13.5" cy="19.5" r="0.75" fill="#dc2626" opacity="0.7"/>
+                      </svg>
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-semibold text-sm text-gray-900 dark:text-white leading-tight">Lab Tests</p>
+                      <p className="text-xs text-gray-500 dark:text-white/50 mt-0.5">400+ diagnostic tests</p>
+                    </div>
+                    <ArrowRight className="h-4 w-4 text-gray-400 dark:text-white/30 group-hover:text-red-500 group-hover:translate-x-0.5 transition-all shrink-0" />
+                  </div>
+                </Link>
+              </div>
             </div>
           </div>
 
