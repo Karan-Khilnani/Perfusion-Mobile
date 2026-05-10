@@ -35,7 +35,7 @@ function getMenuItems(providerType: string | null | undefined) {
     { title: "Dashboard", url: "/provider", icon: LayoutDashboard },
     { title: "Bookings", url: "/provider/bookings", icon: ClipboardList },
   ];
-  if (!providerType || providerType === "lab" || providerType === "hospital") {
+  if (!["consultant", "teleradiology"].includes(providerType ?? "")) {
     items.push({ title: "Services", url: "/provider/services", icon: Settings });
   }
   items.push({ title: "Billing", url: "/provider/billing", icon: IndianRupee });
