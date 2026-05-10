@@ -563,6 +563,7 @@ export default function ProviderServicesPage() {
       { value: "lab", label: "Diagnostic Lab" },
       { value: "consultant", label: "Specialist / Consultant" },
       { value: "hospital", label: "Hospital / Critical Care" },
+      { value: "teleradiology", label: "Teleradiology Centre" },
       { value: "transport", label: "Transport / Ambulance" },
     ];
     return (

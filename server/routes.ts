@@ -1551,37 +1551,75 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Provider profile not found" });
       }
 
+      const providerType = provider.type;
       const allBookings = await storage.getBookingsByProviderId(provider.id);
+
+      const makeSum = (bookings: typeof allBookings) =>
+        (filter: (b: (typeof allBookings)[0]) => boolean) =>
+          bookings.filter(filter).reduce((acc, b) => acc + parseFloat(b.basePrice || "0"), 0);
+
+      const enrichConsultations = async (bookings: typeof allBookings) => {
+        const active = bookings.filter((b) => !["cancelled", "completed"].includes(b.status));
+        return Promise.all(
+          active.map(async (b) => {
+            const seeker = await storage.getUserById(b.userId);
+            return { ...b, seekerHospitalName: seeker?.hospitalName || seeker?.firstName || "Unknown Hospital" };
+          })
+        );
+      };
+
+      if (providerType === "lab") {
+        const labBookings = allBookings.filter((b) => b.bookingType === "lab");
+        const assignments = await storage.getProviderLabTestsByProvider(provider.id);
+        const activeLabTestCount = assignments.length;
+        const sum = makeSum(labBookings);
+        const revenue = {
+          total: sum(() => true),
+          paid: sum((b) => b.paymentStatus === "paid"),
+          pending: sum((b) => b.paymentStatus === "pending" || b.paymentStatus === "partial"),
+        };
+        return res.json({ providerType, activeLabTestCount, revenue });
+      }
+
+      if (providerType === "teleradiology") {
+        const teleBookings = allBookings.filter((b) => b.bookingType === "teleradiology");
+        const assignments = await storage.getProviderModalitiesByProvider(provider.id);
+        const activeModalityCount = assignments.length;
+        const sum = makeSum(teleBookings);
+        const revenue = {
+          total: sum(() => true),
+          paid: sum((b) => b.paymentStatus === "paid"),
+          pending: sum((b) => b.paymentStatus === "pending" || b.paymentStatus === "partial"),
+        };
+        return res.json({ providerType, activeModalityCount, revenue });
+      }
+
+      if (providerType === "hospital") {
+        const consultationBookings = allBookings.filter((b) => b.bookingType === "consultation");
+        const activeConsultations = await enrichConsultations(consultationBookings);
+        const assignments = await storage.getProviderLabTestsByProvider(provider.id);
+        const activeLabTestCount = assignments.length;
+        const sum = makeSum(allBookings);
+        const revenue = {
+          total: sum(() => true),
+          paid: sum((b) => b.paymentStatus === "paid"),
+          pending: sum((b) => b.paymentStatus === "pending" || b.paymentStatus === "partial"),
+        };
+        return res.json({ providerType, activeConsultations, activeLabTestCount, revenue });
+      }
+
+      // consultant (default)
       const consultationBookings = allBookings.filter((b) => b.bookingType === "consultation");
-
-      // Active consultations (not cancelled or completed), enriched with seeker hospital name
-      const activeRaw = consultationBookings.filter(
-        (b) => !["cancelled", "completed"].includes(b.status)
-      );
-      const activeConsultations = await Promise.all(
-        activeRaw.map(async (b) => {
-          const seeker = await storage.getUserById(b.userId);
-          return {
-            ...b,
-            seekerHospitalName:
-              seeker?.hospitalName || seeker?.firstName || "Unknown Hospital",
-          };
-        })
-      );
-
-      // Revenue from ALL consultation bookings for this provider (basePrice only)
-      const sum = (filter: (b: (typeof consultationBookings)[0]) => boolean) =>
-        consultationBookings
-          .filter(filter)
-          .reduce((acc, b) => acc + parseFloat(b.basePrice || "0"), 0);
-
+      const activeConsultations = await enrichConsultations(consultationBookings);
+      const providerConsultants = await storage.getConsultantsByProvider(provider.id);
+      const consultant = providerConsultants[0] || null;
+      const sum = makeSum(consultationBookings);
       const revenue = {
         total: sum(() => true),
         paid: sum((b) => b.paymentStatus === "paid"),
         pending: sum((b) => b.paymentStatus === "pending" || b.paymentStatus === "partial"),
       };
-
-      res.json({ activeConsultations, revenue });
+      res.json({ providerType, activeConsultations, consultant, revenue });
     } catch (error) {
       console.error("Error fetching provider dashboard:", error);
       res.status(500).json({ message: "Failed to fetch dashboard data" });

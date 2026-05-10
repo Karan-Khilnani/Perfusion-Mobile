@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -29,23 +30,44 @@ import {
 } from "lucide-react";
 import logoImage from "@assets/Perfusion_website_logo_1766464970393.png";
 
-const menuItems = [
-  { title: "Dashboard", url: "/provider", icon: LayoutDashboard },
-  { title: "Bookings", url: "/provider/bookings", icon: ClipboardList },
-  { title: "Services", url: "/provider/services", icon: Settings },
-  { title: "Billing", url: "/provider/billing", icon: IndianRupee },
-  { title: "My Profile", url: "/provider/profile", icon: User },
-];
+function getMenuItems(providerType: string | null | undefined) {
+  const items = [
+    { title: "Dashboard", url: "/provider", icon: LayoutDashboard },
+    { title: "Bookings", url: "/provider/bookings", icon: ClipboardList },
+  ];
+  if (!providerType || providerType === "lab" || providerType === "hospital") {
+    items.push({ title: "Services", url: "/provider/services", icon: Settings });
+  }
+  items.push({ title: "Billing", url: "/provider/billing", icon: IndianRupee });
+  items.push({ title: "My Profile", url: "/provider/profile", icon: User });
+  return items;
+}
 
 export default function ProviderLayout({ children }: { children: React.ReactNode }) {
   const { user, isLoading, isAuthenticated, logout } = useAuth();
-  const [location] = useLocation();
+  const [location, navigate] = useLocation();
+
+  const { data: provider } = useQuery<any>({
+    queryKey: ["/api/providers/me"],
+    enabled: isAuthenticated && !isLoading,
+    retry: false,
+  });
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
       window.location.href = "/login";
     }
   }, [isLoading, isAuthenticated]);
+
+  useEffect(() => {
+    if (
+      provider?.type &&
+      ["consultant", "teleradiology"].includes(provider.type) &&
+      location.startsWith("/provider/services")
+    ) {
+      navigate("/provider");
+    }
+  }, [provider?.type, location, navigate]);
 
   if (isLoading) {
     return (
@@ -71,6 +93,8 @@ export default function ProviderLayout({ children }: { children: React.ReactNode
     "--sidebar-width-icon": "3.5rem",
   };
 
+  const menuItems = getMenuItems(provider?.type);
+
   return (
     <SidebarProvider style={sidebarStyle as React.CSSProperties}>
       <div className="flex h-screen w-full">
@@ -95,7 +119,7 @@ export default function ProviderLayout({ children }: { children: React.ReactNode
                             : location.startsWith(item.url)
                         }
                       >
-                        <Link href={item.url} data-testid={`provider-nav-${item.title.toLowerCase()}`}>
+                        <Link href={item.url} data-testid={`provider-nav-${item.title.toLowerCase().replace(" ", "-")}`}>
                           <item.icon className="h-4 w-4" />
                           <span>{item.title}</span>
                         </Link>

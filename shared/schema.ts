@@ -7,7 +7,7 @@ import { z } from "zod";
 export * from "./models/auth";
 
 // Provider types
-export type ProviderType = "lab" | "consultant" | "hospital" | "transport";
+export type ProviderType = "lab" | "consultant" | "hospital" | "transport" | "teleradiology";
 
 // Import ProviderStatus from auth
 import { ProviderStatus } from "./models/auth";
