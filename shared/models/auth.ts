@@ -78,7 +78,7 @@ export const registerSchema = z.object({
   registrationDocumentUrl: z.string().optional(),
   // Provider-specific fields (required when role = provider)
   phone: z.string().optional(),
-  providerType: z.enum(["lab", "consultant", "hospital", "transport"]).optional(),
+  providerType: z.enum(["lab", "consultant", "hospital", "transport", "teleradiology"]).optional(),
   description: z.string().optional(),
   location: z.string().optional(),
 });

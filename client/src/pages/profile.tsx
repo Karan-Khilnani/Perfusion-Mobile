@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -83,16 +83,16 @@ export default function ProfilePage() {
   const [regDocFile, setRegDocFile] = useState<File | null>(null);
   const [regDocUploading, setRegDocUploading] = useState(false);
   const [signatureUploading, setSignatureUploading] = useState(false);
-  const [availabilityFrom, setAvailabilityFrom] = useState("");
-  const [availabilityTo, setAvailabilityTo] = useState("");
-  const [slotsInitialized, setSlotsInitialized] = useState(false);
+  const [availabilityFrom, setAvailabilityFrom] = useState("09:00 AM");
+  const [availabilityTo, setAvailabilityTo] = useState("05:00 PM");
   const photoInputRef = useRef<HTMLInputElement>(null);
 
-  if (consultant && !slotsInitialized) {
-    setAvailabilityFrom(consultant.availabilityFrom || "09:00 AM");
-    setAvailabilityTo(consultant.availabilityTo || "05:00 PM");
-    setSlotsInitialized(true);
-  }
+  useEffect(() => {
+    if (consultant) {
+      setAvailabilityFrom(consultant.availabilityFrom || "09:00 AM");
+      setAvailabilityTo(consultant.availabilityTo || "05:00 PM");
+    }
+  }, [consultant?.id]);
 
   const personalForm = useForm<PersonalFormData>({
     resolver: zodResolver(personalSchema),

@@ -24,7 +24,7 @@ const profileSchema = z.object({
   hospitalRegistrationNo: z.string().min(1, "Registration number is required"),
   hospitalRegisteredOrg: z.string().min(2, "Registered organization is required"),
   phone: z.string().optional(),
-  providerType: z.enum(["lab", "consultant", "hospital", "transport"]).optional(),
+  providerType: z.enum(["lab", "consultant", "hospital", "transport", "teleradiology"]).optional(),
   description: z.string().optional(),
   location: z.string().optional(),
 }).refine((data) => {
@@ -226,6 +226,7 @@ export default function CompleteProfilePage() {
                               <SelectItem value="lab">Diagnostic Lab</SelectItem>
                               <SelectItem value="consultant">Specialist / Consultant</SelectItem>
                               <SelectItem value="hospital">Hospital / Critical Care</SelectItem>
+                              <SelectItem value="teleradiology">Teleradiology Centre</SelectItem>
                               <SelectItem value="transport">Transport / Ambulance</SelectItem>
                             </SelectContent>
                           </Select>
