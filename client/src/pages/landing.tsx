@@ -298,7 +298,7 @@ export default function LandingPage() {
                 <Link
                   href="/consultants"
                   aria-label="Browse specialist consultants"
-                  className="group inline-block mb-6"
+                  className="group inline-block mb-6 cursor-pointer"
                   data-testid="link-section-consultants-title"
                 >
                   <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold group-hover:text-red-600 transition-colors duration-200">
@@ -383,7 +383,7 @@ export default function LandingPage() {
                 <Link
                   href="/lab-tests"
                   aria-label="Browse lab tests"
-                  className="group inline-block mb-6"
+                  className="group inline-block mb-6 cursor-pointer"
                   data-testid="link-section-lab-title"
                 >
                   <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold group-hover:text-red-600 transition-colors duration-200">
