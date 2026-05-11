@@ -295,9 +295,16 @@ export default function LandingPage() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center">
               {/* Text side */}
               <div>
-                <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-6">
-                  Superspeciality Support at Patient's <span className="text-red-600">Bedside</span>
-                </h2>
+                <Link
+                  href="/consultants"
+                  aria-label="Browse specialist consultants"
+                  className="group inline-block mb-6"
+                  data-testid="link-section-consultants-title"
+                >
+                  <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold group-hover:text-red-600 transition-colors duration-200">
+                    Superspeciality Support at Patient's <span className="text-red-600">Bedside</span>
+                  </h2>
+                </Link>
                 <p className="text-lg md:text-xl text-gray-600 dark:text-white/60 leading-relaxed">
                   When expert guidance matters most, we bring specialists directly to the patient. Real-time consultations for critically ill patients, right where care happens.
                 </p>
@@ -305,25 +312,32 @@ export default function LandingPage() {
               
               {/* Image side with live consultation badge overlay */}
               <div className="relative">
-                <div className="relative rounded-2xl overflow-hidden shadow-xl max-w-md mx-auto lg:max-w-none">
-                  <img 
-                    src={bedsideImage} 
-                    alt="Specialist providing remote consultation to a patient at bedside via video call"
-                    className="w-full h-[280px] md:h-[320px] lg:h-[380px] object-cover"
-                    data-testid="img-bedside-support"
-                  />
-                  
-                  {/* Live Consultation badge on image */}
-                  <div className="absolute bottom-4 left-4 z-20">
-                    <div className="flex flex-wrap items-center gap-2 bg-red-600/90 backdrop-blur-sm px-4 py-2 rounded-full shadow-lg">
-                      <div className="w-2 h-2 rounded-full bg-white animate-pulse motion-reduce:animate-none" />
-                      <span className="text-white text-sm font-medium">Live Consultation</span>
+                <Link
+                  href="/consultants"
+                  aria-label="Browse specialist consultants"
+                  className="block"
+                  data-testid="link-section-consultants-image"
+                >
+                  <div className="relative rounded-2xl overflow-hidden shadow-xl max-w-md mx-auto lg:max-w-none cursor-pointer">
+                    <img 
+                      src={bedsideImage} 
+                      alt="Specialist providing remote consultation to a patient at bedside via video call"
+                      className="w-full h-[280px] md:h-[320px] lg:h-[380px] object-cover transition-transform duration-300 hover:scale-105"
+                      data-testid="img-bedside-support"
+                    />
+                    
+                    {/* Live Consultation badge on image */}
+                    <div className="absolute bottom-4 left-4 z-20">
+                      <div className="flex flex-wrap items-center gap-2 bg-red-600/90 backdrop-blur-sm px-4 py-2 rounded-full shadow-lg">
+                        <div className="w-2 h-2 rounded-full bg-white animate-pulse motion-reduce:animate-none" />
+                        <span className="text-white text-sm font-medium">Live Consultation</span>
+                      </div>
                     </div>
                   </div>
-                </div>
+                </Link>
                 {/* Subtle corner accents */}
-                <div className="absolute -top-3 -left-3 w-12 h-12 border-t-2 border-l-2 border-red-600/30 rounded-tl-xl" />
-                <div className="absolute -bottom-3 -right-3 w-12 h-12 border-b-2 border-r-2 border-red-600/30 rounded-br-xl" />
+                <div className="absolute -top-3 -left-3 w-12 h-12 border-t-2 border-l-2 border-red-600/30 rounded-tl-xl pointer-events-none" />
+                <div className="absolute -bottom-3 -right-3 w-12 h-12 border-b-2 border-r-2 border-red-600/30 rounded-br-xl pointer-events-none" />
               </div>
             </div>
           </div>
@@ -337,31 +351,45 @@ export default function LandingPage() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center">
               {/* Video side - larger */}
               <div className="relative order-2 lg:order-1">
-                <div className="relative rounded-2xl overflow-hidden shadow-2xl">
-                  {/* Decorative frame */}
-                  <div className="absolute -inset-2 bg-gradient-to-r from-red-600 to-red-400 rounded-3xl opacity-20 blur-md" />
-                  <video 
-                    autoPlay
-                    loop
-                    muted
-                    playsInline
-                    className="relative w-full h-[350px] md:h-[450px] lg:h-[500px] object-cover rounded-2xl bg-gray-900"
-                    data-testid="video-lab-diagnostics"
-                  >
-                    <source src={labVideo} type="video/mp4" />
-                    Your browser does not support the video tag.
-                  </video>
-                </div>
+                <Link
+                  href="/lab-tests"
+                  aria-label="Browse lab tests"
+                  className="block"
+                  data-testid="link-section-lab-video"
+                >
+                  <div className="relative rounded-2xl overflow-hidden shadow-2xl cursor-pointer group">
+                    {/* Decorative frame */}
+                    <div className="absolute -inset-2 bg-gradient-to-r from-red-600 to-red-400 rounded-3xl opacity-20 blur-md" />
+                    <video 
+                      autoPlay
+                      loop
+                      muted
+                      playsInline
+                      className="relative w-full h-[350px] md:h-[450px] lg:h-[500px] object-cover rounded-2xl bg-gray-900 transition-opacity duration-300 group-hover:opacity-85"
+                      data-testid="video-lab-diagnostics"
+                    >
+                      <source src={labVideo} type="video/mp4" />
+                      Your browser does not support the video tag.
+                    </video>
+                  </div>
+                </Link>
                 {/* Corner accents */}
-                <div className="absolute -top-4 -left-4 w-20 h-20 border-t-4 border-l-4 border-red-600/50 rounded-tl-3xl" />
-                <div className="absolute -bottom-4 -right-4 w-20 h-20 border-b-4 border-r-4 border-red-600/50 rounded-br-3xl" />
+                <div className="absolute -top-4 -left-4 w-20 h-20 border-t-4 border-l-4 border-red-600/50 rounded-tl-3xl pointer-events-none" />
+                <div className="absolute -bottom-4 -right-4 w-20 h-20 border-b-4 border-r-4 border-red-600/50 rounded-br-3xl pointer-events-none" />
               </div>
               
               {/* Text side */}
               <div className="order-1 lg:order-2">
-                <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-6">
-                  Advanced Lab <span className="text-red-600">Diagnostics</span>
-                </h2>
+                <Link
+                  href="/lab-tests"
+                  aria-label="Browse lab tests"
+                  className="group inline-block mb-6"
+                  data-testid="link-section-lab-title"
+                >
+                  <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold group-hover:text-red-600 transition-colors duration-200">
+                    Advanced Lab <span className="text-red-600">Diagnostics</span>
+                  </h2>
+                </Link>
                 
                 <p className="text-xl md:text-2xl lg:text-3xl font-light text-gray-600 dark:text-white/70 italic mb-8">
                   "Prescribe what you need, Perfusion will move it"
