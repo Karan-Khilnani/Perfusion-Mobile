@@ -245,10 +245,11 @@ export default function ProfilePage() {
     setConsultantRegDocUploading(true);
     try {
       const url = await uploadImage(file, file.name);
-      await updateConsultantDetailsMutation.mutateAsync({
-        ...consultantDetailsForm.getValues(),
-        registrationDocumentUrl: url,
-      });
+      if (!consultant?.id) throw new Error("No consultant record");
+      const res = await apiRequest("PATCH", `/api/provider/consultants/${consultant.id}`, { registrationDocumentUrl: url });
+      await res.json();
+      queryClient.invalidateQueries({ queryKey: ["/api/provider/my-consultants"] });
+      toast({ title: "Registration document saved" });
     } catch {
       toast({ title: "Upload failed", description: "Could not upload document.", variant: "destructive" });
     } finally {
@@ -507,7 +508,7 @@ export default function ProfilePage() {
                     <FormField control={consultantDetailsForm.control} name="yearsExperience" render={({ field }) => (
                       <FormItem>
                         <FormLabel>Years of Experience</FormLabel>
-                        <FormControl><Input type="number" min={0} placeholder="e.g. 10" {...field} data-testid="input-consultant-experience" /></FormControl>
+                        <FormControl><Input type="number" min={1} placeholder="e.g. 10" {...field} data-testid="input-consultant-experience" /></FormControl>
                         <FormMessage />
                       </FormItem>
                     )} />
@@ -515,7 +516,7 @@ export default function ProfilePage() {
                   <FormField control={consultantDetailsForm.control} name="consultationFee" render={({ field }) => (
                     <FormItem>
                       <FormLabel>Consultation Fee (₹)</FormLabel>
-                      <FormControl><Input type="number" min={0} placeholder="e.g. 500" {...field} data-testid="input-consultant-fee" /></FormControl>
+                      <FormControl><Input type="number" min={1} step="0.01" placeholder="e.g. 500" {...field} data-testid="input-consultant-fee" /></FormControl>
                       <FormMessage />
                     </FormItem>
                   )} />
