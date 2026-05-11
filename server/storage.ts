@@ -4,6 +4,7 @@ import {
   labs,
   labTests,
   consultants,
+  consultantSlotOverrides,
   emergencyTeams,
   radiologyModalities,
   providerLabTests,
@@ -23,6 +24,8 @@ import {
   type Lab,
   type LabTest,
   type Consultant,
+  type ConsultantSlotOverride,
+  type InsertConsultantSlotOverride,
   type EmergencyTeam,
   type RadiologyModality,
   type ProviderLabTest,
@@ -82,6 +85,9 @@ export interface IStorage {
   updateConsultantStatus(id: string, status: ServiceStatus): Promise<Consultant | undefined>;
   deleteConsultant(id: string): Promise<boolean>;
   getConsultantsByProvider(providerId: string): Promise<Consultant[]>;
+  getSlotOverrides(consultantId: string): Promise<ConsultantSlotOverride[]>;
+  upsertSlotOverride(data: InsertConsultantSlotOverride): Promise<ConsultantSlotOverride>;
+  deleteSlotOverride(consultantId: string, date: string): Promise<boolean>;
 
   // Emergency Teams
   getActiveEmergencyTeams(): Promise<EmergencyTeam[]>;
@@ -296,6 +302,38 @@ export class DatabaseStorage implements IStorage {
 
   async getConsultantsByProvider(providerId: string): Promise<Consultant[]> {
     return await db.select().from(consultants).where(eq(consultants.providerId, providerId));
+  }
+
+  async getSlotOverrides(consultantId: string): Promise<ConsultantSlotOverride[]> {
+    return await db.select().from(consultantSlotOverrides)
+      .where(eq(consultantSlotOverrides.consultantId, consultantId))
+      .orderBy(consultantSlotOverrides.date);
+  }
+
+  async upsertSlotOverride(data: InsertConsultantSlotOverride): Promise<ConsultantSlotOverride> {
+    const [existing] = await db.select().from(consultantSlotOverrides)
+      .where(and(
+        eq(consultantSlotOverrides.consultantId, data.consultantId),
+        eq(consultantSlotOverrides.date, data.date),
+      ));
+    if (existing) {
+      const [updated] = await db.update(consultantSlotOverrides)
+        .set({ isPaused: data.isPaused, customFrom: data.customFrom ?? null, customTo: data.customTo ?? null })
+        .where(eq(consultantSlotOverrides.id, existing.id))
+        .returning();
+      return updated;
+    }
+    const [created] = await db.insert(consultantSlotOverrides).values([data]).returning();
+    return created;
+  }
+
+  async deleteSlotOverride(consultantId: string, date: string): Promise<boolean> {
+    await db.delete(consultantSlotOverrides)
+      .where(and(
+        eq(consultantSlotOverrides.consultantId, consultantId),
+        eq(consultantSlotOverrides.date, date),
+      ));
+    return true;
   }
 
   // Emergency Teams

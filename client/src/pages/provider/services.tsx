@@ -64,6 +64,12 @@ export default function ProviderServicesPage() {
   const [editingSlotsFor, setEditingSlotsFor] = useState<Consultant | null>(null);
   const [editFromTime, setEditFromTime] = useState("09:00 AM");
   const [editToTime, setEditToTime] = useState("05:00 PM");
+  const [editDays, setEditDays] = useState<string[]>(["Mon", "Tue", "Wed", "Thu", "Fri"]);
+  const [calendarMonth, setCalendarMonth] = useState(() => { const d = new Date(); d.setDate(1); return d; });
+  const [dayActionDate, setDayActionDate] = useState<string | null>(null);
+  const [dayActionCustomFrom, setDayActionCustomFrom] = useState("09:00 AM");
+  const [dayActionCustomTo, setDayActionCustomTo] = useState("05:00 PM");
+  const [longPressTimer, setLongPressTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
   const [isAddTestDialogOpen, setIsAddTestDialogOpen] = useState(false);
   const [isSuggestTestDialogOpen, setIsSuggestTestDialogOpen] = useState(false);
   const [isBulkImportDialogOpen, setIsBulkImportDialogOpen] = useState(false);
@@ -386,9 +392,18 @@ export default function ProviderServicesPage() {
     },
   });
 
+  const { data: slotOverrides = [] } = useQuery<any[]>({
+    queryKey: ["/api/consultants", editingSlotsFor?.id, "slot-overrides"],
+    enabled: !!editingSlotsFor?.id,
+    queryFn: async () => {
+      const res = await fetch(`/api/consultants/${editingSlotsFor!.id}/slot-overrides`, { credentials: "include" });
+      return res.json();
+    },
+  });
+
   const updateSlotsMutation = useMutation({
-    mutationFn: async ({ id, availabilityFrom, availabilityTo }: { id: string; availabilityFrom: string; availabilityTo: string }) => {
-      const response = await apiRequest("PATCH", `/api/consultants/${id}/slots`, { availabilityFrom, availabilityTo });
+    mutationFn: async ({ id, availabilityFrom, availabilityTo, availableDays }: { id: string; availabilityFrom: string; availabilityTo: string; availableDays: string[] }) => {
+      const response = await apiRequest("PATCH", `/api/consultants/${id}/slots`, { availabilityFrom, availabilityTo, availableDays });
       return response.json();
     },
     onSuccess: () => {
@@ -398,6 +413,26 @@ export default function ProviderServicesPage() {
     },
     onError: () => {
       toast({ title: "Failed", description: "Failed to update availability.", variant: "destructive" });
+    },
+  });
+
+  const upsertOverrideMutation = useMutation({
+    mutationFn: async ({ consultantId, date, isPaused, customFrom, customTo }: { consultantId: string; date: string; isPaused: boolean; customFrom?: string; customTo?: string }) => {
+      const res = await apiRequest("POST", `/api/consultants/${consultantId}/slot-overrides`, { date, isPaused, customFrom, customTo });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/consultants", editingSlotsFor?.id, "slot-overrides"] });
+    },
+  });
+
+  const deleteOverrideMutation = useMutation({
+    mutationFn: async ({ consultantId, date }: { consultantId: string; date: string }) => {
+      const res = await apiRequest("DELETE", `/api/consultants/${consultantId}/slot-overrides/${date}`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/consultants", editingSlotsFor?.id, "slot-overrides"] });
     },
   });
 
@@ -549,15 +584,99 @@ export default function ProviderServicesPage() {
     "10:00 PM",
   ];
 
+  const DAYS_OF_WEEK = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
   const handleOpenSlotsEditor = (consultant: Consultant) => {
     setEditingSlotsFor(consultant);
     setEditFromTime(consultant.availabilityFrom || "09:00 AM");
     setEditToTime(consultant.availabilityTo || "05:00 PM");
+    setEditDays((consultant as any).availableDays ?? ["Mon", "Tue", "Wed", "Thu", "Fri"]);
+    const today = new Date();
+    today.setDate(1);
+    setCalendarMonth(today);
+    setDayActionDate(null);
   };
 
-  const handleSaveSlots = () => {
+  const handleSaveDefaultSchedule = () => {
     if (!editingSlotsFor) return;
-    updateSlotsMutation.mutate({ id: editingSlotsFor.id, availabilityFrom: editFromTime, availabilityTo: editToTime });
+    updateSlotsMutation.mutate({ id: editingSlotsFor.id, availabilityFrom: editFromTime, availabilityTo: editToTime, availableDays: editDays });
+  };
+
+  const toggleDay = (day: string) => {
+    setEditDays(prev => prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day]);
+  };
+
+  // Calendar helpers
+  const calendarDaysArray = (): (number | null)[] => {
+    const year = calendarMonth.getFullYear();
+    const month = calendarMonth.getMonth();
+    const firstDow = new Date(year, month, 1).getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const cells: (number | null)[] = Array(firstDow).fill(null);
+    for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+    return cells;
+  };
+
+  const toDateStr = (day: number): string => {
+    const y = calendarMonth.getFullYear();
+    const m = String(calendarMonth.getMonth() + 1).padStart(2, "0");
+    return `${y}-${m}-${String(day).padStart(2, "0")}`;
+  };
+
+  const getOverrideForDate = (dateStr: string) => slotOverrides.find((o: any) => o.date === dateStr);
+
+  const handleDayPointerDown = (day: number) => {
+    const dateStr = toDateStr(day);
+    const timer = setTimeout(() => {
+      // Long press — toggle pause
+      if (!editingSlotsFor) return;
+      const existing = getOverrideForDate(dateStr);
+      if (existing?.isPaused) {
+        // Already paused → resume (delete override)
+        deleteOverrideMutation.mutate({ consultantId: editingSlotsFor.id, date: dateStr });
+        toast({ title: "Day Resumed", description: `${dateStr} will use default hours` });
+      } else {
+        upsertOverrideMutation.mutate({ consultantId: editingSlotsFor.id, date: dateStr, isPaused: true });
+        toast({ title: "Day Paused", description: `No consultations on ${dateStr}` });
+      }
+    }, 600);
+    setLongPressTimer(timer);
+  };
+
+  const handleDayPointerUp = (day: number) => {
+    if (longPressTimer) {
+      clearTimeout(longPressTimer);
+      setLongPressTimer(null);
+    }
+  };
+
+  const handleDayClick = (day: number) => {
+    // Only fires for short taps — open custom time dialog
+    const dateStr = toDateStr(day);
+    const existing = getOverrideForDate(dateStr);
+    setDayActionDate(dateStr);
+    setDayActionCustomFrom(existing?.customFrom || editFromTime);
+    setDayActionCustomTo(existing?.customTo || editToTime);
+  };
+
+  const handleSaveDayCustomTime = () => {
+    if (!editingSlotsFor || !dayActionDate) return;
+    upsertOverrideMutation.mutate({
+      consultantId: editingSlotsFor.id,
+      date: dayActionDate,
+      isPaused: false,
+      customFrom: dayActionCustomFrom,
+      customTo: dayActionCustomTo,
+    });
+    setDayActionDate(null);
+    toast({ title: "Custom Hours Saved", description: `${dayActionDate}: ${dayActionCustomFrom} – ${dayActionCustomTo}` });
+  };
+
+  const handleRemoveDayOverride = () => {
+    if (!editingSlotsFor || !dayActionDate) return;
+    deleteOverrideMutation.mutate({ consultantId: editingSlotsFor.id, date: dayActionDate });
+    setDayActionDate(null);
+    toast({ title: "Override Removed", description: `${dayActionDate} reverted to default hours` });
   };
 
   const isLoading = providerLoading || labsLoading;
@@ -1316,10 +1435,17 @@ export default function ProviderServicesPage() {
                         <span>{consultant.yearsExperience} years exp.</span>
                         <span>₹{consultant.consultationFee}</span>
                       </div>
-                      {(consultant.availabilityFrom || consultant.availabilityTo) && (
-                        <div className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
-                          <Clock className="h-3 w-3" />
-                          {consultant.availabilityFrom} – {consultant.availabilityTo}
+                      {((consultant as any).availableDays?.length > 0 || consultant.availabilityFrom || consultant.availabilityTo) && (
+                        <div className="mt-2 flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
+                          <Clock className="h-3 w-3 shrink-0" />
+                          {(consultant as any).availableDays?.length > 0 && (
+                            <span>{(consultant as any).availableDays.join(", ")}</span>
+                          )}
+                          {consultant.availabilityFrom && consultant.availabilityTo && (
+                            <span className={(consultant as any).availableDays?.length > 0 ? "ml-1" : ""}>
+                              {consultant.availabilityFrom} – {consultant.availabilityTo}
+                            </span>
+                          )}
                         </div>
                       )}
                       <div className="mt-3 flex items-center gap-2" data-testid={`sig-section-${consultant.id}`}>
@@ -1747,53 +1873,169 @@ export default function ProviderServicesPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!editingSlotsFor} onOpenChange={(open) => !open && setEditingSlotsFor(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Set Availability Hours</DialogTitle>
-            <DialogDescription>
-              Set the daily availability window for {editingSlotsFor?.name}
-            </DialogDescription>
+      {/* ── Slot Editor Dialog ── */}
+      <Dialog open={!!editingSlotsFor} onOpenChange={(open) => { if (!open) { setEditingSlotsFor(null); setDayActionDate(null); } }}>
+        <DialogContent className="max-w-lg max-h-[90vh] flex flex-col">
+          <DialogHeader className="shrink-0">
+            <DialogTitle>Manage Availability</DialogTitle>
+            <DialogDescription>{editingSlotsFor?.name}</DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium">From</label>
-                <Select value={editFromTime} onValueChange={setEditFromTime}>
-                  <SelectTrigger data-testid="select-availability-from">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {TIMES.map((t) => (
-                      <SelectItem key={t} value={t}>{t}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+
+          <Tabs defaultValue="schedule" className="flex-1 overflow-hidden flex flex-col">
+            <TabsList className="shrink-0 w-full">
+              <TabsTrigger value="schedule" className="flex-1" data-testid="tab-default-schedule">Default Schedule</TabsTrigger>
+              <TabsTrigger value="calendar" className="flex-1" data-testid="tab-calendar">Calendar</TabsTrigger>
+            </TabsList>
+
+            {/* ── Tab 1: Default Schedule ── */}
+            <TabsContent value="schedule" className="flex-1 overflow-auto space-y-5 pt-2">
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Available Days</p>
+                <div className="flex flex-wrap gap-2">
+                  {DAYS_OF_WEEK.map((day) => (
+                    <button
+                      key={day}
+                      type="button"
+                      onClick={() => toggleDay(day)}
+                      data-testid={`btn-day-${day}`}
+                      className={`h-9 w-12 rounded-md border text-sm font-medium transition-colors select-none
+                        ${editDays.includes(day)
+                          ? "bg-primary text-primary-foreground border-primary"
+                          : "bg-background text-muted-foreground border-border hover:bg-muted"
+                        }`}
+                    >
+                      {day}
+                    </button>
+                  ))}
+                </div>
               </div>
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium">To</label>
-                <Select value={editToTime} onValueChange={setEditToTime}>
-                  <SelectTrigger data-testid="select-availability-to">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {TIMES.map((t) => (
-                      <SelectItem key={t} value={t}>{t}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Time Window</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-xs text-muted-foreground">From</label>
+                    <Select value={editFromTime} onValueChange={setEditFromTime}>
+                      <SelectTrigger data-testid="select-availability-from"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {TIMES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs text-muted-foreground">To</label>
+                    <Select value={editToTime} onValueChange={setEditToTime}>
+                      <SelectTrigger data-testid="select-availability-to"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {TIMES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setEditingSlotsFor(null)}>
-              Cancel
-            </Button>
-            <Button onClick={handleSaveSlots} disabled={updateSlotsMutation.isPending} data-testid="button-save-slots">
-              {updateSlotsMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              Save
-            </Button>
-          </div>
+
+              <Button className="w-full" onClick={handleSaveDefaultSchedule} disabled={updateSlotsMutation.isPending} data-testid="button-save-schedule">
+                {updateSlotsMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                Save Default Schedule
+              </Button>
+            </TabsContent>
+
+            {/* ── Tab 2: Calendar ── */}
+            <TabsContent value="calendar" className="flex-1 overflow-auto space-y-3 pt-2">
+              <p className="text-xs text-muted-foreground">
+                <span className="font-medium">Tap</span> a date to set custom hours.{" "}
+                <span className="font-medium">Long-press</span> to pause / resume.
+              </p>
+
+              {/* Month nav */}
+              <div className="flex items-center justify-between">
+                <Button size="sm" variant="ghost" onClick={() => setCalendarMonth(prev => { const d = new Date(prev); d.setMonth(d.getMonth() - 1); return d; })} data-testid="btn-prev-month">‹</Button>
+                <span className="text-sm font-medium">
+                  {calendarMonth.toLocaleString("default", { month: "long", year: "numeric" })}
+                </span>
+                <Button size="sm" variant="ghost" onClick={() => setCalendarMonth(prev => { const d = new Date(prev); d.setMonth(d.getMonth() + 1); return d; })} data-testid="btn-next-month">›</Button>
+              </div>
+
+              {/* Day-of-week headers */}
+              <div className="grid grid-cols-7 gap-1 text-center">
+                {["Su","Mo","Tu","We","Th","Fr","Sa"].map(h => (
+                  <div key={h} className="text-xs font-medium text-muted-foreground py-1">{h}</div>
+                ))}
+                {calendarDaysArray().map((day, idx) => {
+                  if (!day) return <div key={`empty-${idx}`} />;
+                  const dateStr = toDateStr(day);
+                  const override = getOverrideForDate(dateStr);
+                  const isPaused = override?.isPaused === true;
+                  const hasCustom = override && !override.isPaused;
+                  const isToday = dateStr === new Date().toISOString().slice(0, 10);
+                  return (
+                    <button
+                      key={dateStr}
+                      type="button"
+                      data-testid={`cal-day-${dateStr}`}
+                      onPointerDown={() => handleDayPointerDown(day)}
+                      onPointerUp={() => handleDayPointerUp(day)}
+                      onPointerLeave={() => handleDayPointerUp(day)}
+                      onClick={() => handleDayClick(day)}
+                      className={`relative h-9 w-full rounded-md text-sm font-medium transition-colors select-none touch-none
+                        ${isPaused ? "bg-red-100 dark:bg-red-950 text-red-700 dark:text-red-300 border border-red-300 dark:border-red-700"
+                          : hasCustom ? "bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 border border-blue-300 dark:border-blue-700"
+                          : isToday ? "border-2 border-primary text-primary"
+                          : "hover:bg-muted border border-transparent"}`}
+                    >
+                      {day}
+                      {isPaused && <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 text-[8px] leading-none">off</span>}
+                      {hasCustom && <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 text-[8px] leading-none">custom</span>}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Legend */}
+              <div className="flex items-center gap-4 text-xs text-muted-foreground pt-1">
+                <span className="flex items-center gap-1"><span className="inline-block h-3 w-3 rounded bg-red-100 dark:bg-red-950 border border-red-300 dark:border-red-700" />Paused</span>
+                <span className="flex items-center gap-1"><span className="inline-block h-3 w-3 rounded bg-blue-100 dark:bg-blue-950 border border-blue-300 dark:border-blue-700" />Custom hours</span>
+                <span className="flex items-center gap-1"><span className="inline-block h-3 w-3 rounded border-2 border-primary" />Today</span>
+              </div>
+
+              {/* Day action sub-panel */}
+              {dayActionDate && (
+                <div className="rounded-lg border bg-muted/40 p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-medium">{dayActionDate}</p>
+                    <button type="button" onClick={() => setDayActionDate(null)} className="text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-xs text-muted-foreground">From</label>
+                      <Select value={dayActionCustomFrom} onValueChange={setDayActionCustomFrom}>
+                        <SelectTrigger data-testid="select-day-from"><SelectValue /></SelectTrigger>
+                        <SelectContent>{TIMES.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs text-muted-foreground">To</label>
+                      <Select value={dayActionCustomTo} onValueChange={setDayActionCustomTo}>
+                        <SelectTrigger data-testid="select-day-to"><SelectValue /></SelectTrigger>
+                        <SelectContent>{TIMES.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button size="sm" className="flex-1" onClick={handleSaveDayCustomTime} disabled={upsertOverrideMutation.isPending} data-testid="button-save-day-custom">
+                      {upsertOverrideMutation.isPending ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : null}
+                      Save Hours
+                    </Button>
+                    {getOverrideForDate(dayActionDate) && (
+                      <Button size="sm" variant="outline" className="flex-1 text-destructive border-destructive hover:bg-destructive/10" onClick={handleRemoveDayOverride} disabled={deleteOverrideMutation.isPending} data-testid="button-remove-day-override">
+                        Remove Override
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              )}
+            </TabsContent>
+          </Tabs>
         </DialogContent>
       </Dialog>
 

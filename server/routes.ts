@@ -2799,8 +2799,8 @@ export async function registerRoutes(
         }
       }
       
-      const { availabilityFrom, availabilityTo } = req.body as { availabilityFrom: string; availabilityTo: string };
-      const consultant = await storage.updateConsultant(req.params.id, { availabilityFrom, availabilityTo });
+      const { availabilityFrom, availabilityTo, availableDays } = req.body as { availabilityFrom?: string; availabilityTo?: string; availableDays?: string[] };
+      const consultant = await storage.updateConsultant(req.params.id, { availabilityFrom, availabilityTo, availableDays } as any);
       if (!consultant) {
         return res.status(404).json({ message: "Consultant not found" });
       }
@@ -2808,6 +2808,60 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error updating consultant slots:", error);
       res.status(500).json({ message: "Failed to update slots" });
+    }
+  });
+
+  // Slot override helpers — re-used auth check
+  async function verifyConsultantOwnership(req: any, res: any): Promise<boolean> {
+    const user = req.user;
+    if (user.role !== "admin" && user.role !== "provider") {
+      res.status(403).json({ message: "Access denied." });
+      return false;
+    }
+    if (user.role === "provider") {
+      const provider = await storage.getProviderByUserId(user.id);
+      if (!provider) { res.status(403).json({ message: "Provider profile not found" }); return false; }
+      const consultant = await storage.getConsultantById(req.params.id);
+      if (!consultant || consultant.providerId !== provider.id) {
+        res.status(403).json({ message: "Access denied. You can only manage your own consultants." });
+        return false;
+      }
+    }
+    return true;
+  }
+
+  app.get("/api/consultants/:id/slot-overrides", isAuthenticated, async (req: any, res) => {
+    try {
+      if (!await verifyConsultantOwnership(req, res)) return;
+      const overrides = await storage.getSlotOverrides(req.params.id);
+      res.json(overrides);
+    } catch (error) {
+      console.error("Error fetching slot overrides:", error);
+      res.status(500).json({ message: "Failed to fetch slot overrides" });
+    }
+  });
+
+  app.post("/api/consultants/:id/slot-overrides", isAuthenticated, async (req: any, res) => {
+    try {
+      if (!await verifyConsultantOwnership(req, res)) return;
+      const { date, isPaused, customFrom, customTo } = req.body as { date: string; isPaused: boolean; customFrom?: string; customTo?: string };
+      if (!date) return res.status(400).json({ message: "date is required" });
+      const override = await storage.upsertSlotOverride({ consultantId: req.params.id, date, isPaused: !!isPaused, customFrom: customFrom ?? null, customTo: customTo ?? null });
+      res.json(override);
+    } catch (error) {
+      console.error("Error upserting slot override:", error);
+      res.status(500).json({ message: "Failed to save slot override" });
+    }
+  });
+
+  app.delete("/api/consultants/:id/slot-overrides/:date", isAuthenticated, async (req: any, res) => {
+    try {
+      if (!await verifyConsultantOwnership(req, res)) return;
+      await storage.deleteSlotOverride(req.params.id, req.params.date);
+      res.json({ ok: true });
+    } catch (error) {
+      console.error("Error deleting slot override:", error);
+      res.status(500).json({ message: "Failed to delete slot override" });
     }
   });
 

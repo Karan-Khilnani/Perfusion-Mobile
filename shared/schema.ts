@@ -80,6 +80,7 @@ export const consultants = pgTable("consultants", {
   availableSlots: text("available_slots").array(),
   availabilityFrom: text("availability_from"),
   availabilityTo: text("availability_to"),
+  availableDays: text("available_days").array(),
   registrationNumber: varchar("registration_number", { length: 100 }),
   registeredOrganization: varchar("registered_organization", { length: 255 }),
   registrationDocumentUrl: varchar("registration_document_url", { length: 500 }),
@@ -420,6 +421,21 @@ export const pushSubscriptions = pgTable("push_subscriptions", {
 export const insertPushSubscriptionSchema = createInsertSchema(pushSubscriptions).omit({ id: true, createdAt: true });
 export type InsertPushSubscription = z.infer<typeof insertPushSubscriptionSchema>;
 export type PushSubscription = typeof pushSubscriptions.$inferSelect;
+
+// Consultant Slot Overrides — per-date pauses or custom time windows
+export const consultantSlotOverrides = pgTable("consultant_slot_overrides", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  consultantId: varchar("consultant_id").notNull(),
+  date: varchar("date", { length: 10 }).notNull(), // YYYY-MM-DD
+  isPaused: boolean("is_paused").default(false).notNull(),
+  customFrom: text("custom_from"),
+  customTo: text("custom_to"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertConsultantSlotOverrideSchema = createInsertSchema(consultantSlotOverrides).omit({ id: true, createdAt: true });
+export type InsertConsultantSlotOverride = z.infer<typeof insertConsultantSlotOverrideSchema>;
+export type ConsultantSlotOverride = typeof consultantSlotOverrides.$inferSelect;
 
 // Search/filter types
 export interface LabSearchParams {
