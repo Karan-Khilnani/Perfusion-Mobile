@@ -41,8 +41,8 @@ const consultantDetailsSchema = z.object({
   name: z.string().min(2, "Full name is required"),
   qualification: z.string().min(2, "Qualification is required"),
   specialization: z.string().min(2, "Specialization is required"),
-  yearsExperience: z.coerce.number().min(0, "Years of experience must be 0 or more"),
-  consultationFee: z.string().min(1, "Consultation fee is required"),
+  yearsExperience: z.coerce.number().min(1, "Years of experience must be at least 1"),
+  consultationFee: z.coerce.number().positive("Consultation fee must be greater than 0"),
   registrationNumber: z.string().optional(),
   registeredOrganization: z.string().optional(),
   affiliatedInstitution: z.string().optional(),
@@ -227,7 +227,8 @@ export default function ProfilePage() {
   const updateConsultantDetailsMutation = useMutation({
     mutationFn: async (data: ConsultantDetailsFormData & { registrationDocumentUrl?: string }) => {
       if (!consultant?.id) throw new Error("No consultant record");
-      const res = await apiRequest("PATCH", `/api/provider/consultants/${consultant.id}`, data);
+      const payload = { ...data, consultationFee: String(data.consultationFee) };
+      const res = await apiRequest("PATCH", `/api/provider/consultants/${consultant.id}`, payload);
       return res.json();
     },
     onSuccess: () => {
