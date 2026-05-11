@@ -351,6 +351,8 @@ export default function LandingPage() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center">
               {/* Video side - larger */}
               <div className="relative order-2 lg:order-1">
+                {/* Decorative frame — outside the link so it doesn't act as click target */}
+                <div className="absolute -inset-2 bg-gradient-to-r from-red-600 to-red-400 rounded-3xl opacity-20 blur-md pointer-events-none" />
                 <Link
                   href="/lab-tests"
                   aria-label="Browse lab tests"
@@ -358,14 +360,12 @@ export default function LandingPage() {
                   data-testid="link-section-lab-video"
                 >
                   <div className="relative rounded-2xl overflow-hidden shadow-2xl cursor-pointer group">
-                    {/* Decorative frame */}
-                    <div className="absolute -inset-2 bg-gradient-to-r from-red-600 to-red-400 rounded-3xl opacity-20 blur-md" />
                     <video 
                       autoPlay
                       loop
                       muted
                       playsInline
-                      className="relative w-full h-[350px] md:h-[450px] lg:h-[500px] object-cover rounded-2xl bg-gray-900 transition-opacity duration-300 group-hover:opacity-85"
+                      className="relative w-full h-[350px] md:h-[450px] lg:h-[500px] object-cover rounded-2xl bg-gray-900 transition-opacity duration-300 group-hover:opacity-90"
                       data-testid="video-lab-diagnostics"
                     >
                       <source src={labVideo} type="video/mp4" />
