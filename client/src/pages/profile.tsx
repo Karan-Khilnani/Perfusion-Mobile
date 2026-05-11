@@ -37,9 +37,22 @@ const providerSchema = z.object({
   phone: z.string().optional(),
 });
 
+const consultantDetailsSchema = z.object({
+  name: z.string().min(2, "Full name is required"),
+  qualification: z.string().min(2, "Qualification is required"),
+  specialization: z.string().min(2, "Specialization is required"),
+  yearsExperience: z.coerce.number().min(0, "Years of experience must be 0 or more"),
+  consultationFee: z.string().min(1, "Consultation fee is required"),
+  registrationNumber: z.string().optional(),
+  registeredOrganization: z.string().optional(),
+  affiliatedInstitution: z.string().optional(),
+  portfolio: z.string().optional(),
+});
+
 type PersonalFormData = z.infer<typeof personalSchema>;
 type FullAccountFormData = z.infer<typeof fullAccountSchema>;
 type ProviderFormData = z.infer<typeof providerSchema>;
+type ConsultantDetailsFormData = z.infer<typeof consultantDetailsSchema>;
 
 async function uploadImage(blob: Blob, filename: string): Promise<string> {
   const formData = new FormData();
@@ -83,6 +96,7 @@ export default function ProfilePage() {
   const [regDocFile, setRegDocFile] = useState<File | null>(null);
   const [regDocUploading, setRegDocUploading] = useState(false);
   const [signatureUploading, setSignatureUploading] = useState(false);
+  const [consultantRegDocUploading, setConsultantRegDocUploading] = useState(false);
   const [availabilityFrom, setAvailabilityFrom] = useState("09:00 AM");
   const [availabilityTo, setAvailabilityTo] = useState("05:00 PM");
   const photoInputRef = useRef<HTMLInputElement>(null);
@@ -192,6 +206,54 @@ export default function ProfilePage() {
       toast({ title: "Update failed", description: "Could not save signature.", variant: "destructive" });
     },
   });
+
+  const consultantDetailsForm = useForm<ConsultantDetailsFormData>({
+    resolver: zodResolver(consultantDetailsSchema),
+    values: consultant
+      ? {
+          name: consultant.name || "",
+          qualification: consultant.qualification || "",
+          specialization: consultant.specialization || "",
+          yearsExperience: consultant.yearsExperience || 0,
+          consultationFee: consultant.consultationFee || "",
+          registrationNumber: consultant.registrationNumber || "",
+          registeredOrganization: consultant.registeredOrganization || "",
+          affiliatedInstitution: consultant.affiliatedInstitution || "",
+          portfolio: consultant.portfolio || "",
+        }
+      : undefined,
+  });
+
+  const updateConsultantDetailsMutation = useMutation({
+    mutationFn: async (data: ConsultantDetailsFormData & { registrationDocumentUrl?: string }) => {
+      if (!consultant?.id) throw new Error("No consultant record");
+      const res = await apiRequest("PATCH", `/api/provider/consultants/${consultant.id}`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/provider/my-consultants"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/provider/dashboard"] });
+      toast({ title: "Professional details saved" });
+    },
+    onError: () => {
+      toast({ title: "Update failed", description: "Could not save professional details.", variant: "destructive" });
+    },
+  });
+
+  const handleConsultantRegDocUpload = async (file: File) => {
+    setConsultantRegDocUploading(true);
+    try {
+      const url = await uploadImage(file, file.name);
+      await updateConsultantDetailsMutation.mutateAsync({
+        ...consultantDetailsForm.getValues(),
+        registrationDocumentUrl: url,
+      });
+    } catch {
+      toast({ title: "Upload failed", description: "Could not upload document.", variant: "destructive" });
+    } finally {
+      setConsultantRegDocUploading(false);
+    }
+  };
 
   const handlePhotoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -394,6 +456,129 @@ export default function ProfilePage() {
                   />
                   <Button type="submit" disabled={updateProviderMutation.isPending} data-testid="button-save-provider">
                     {updateProviderMutation.isPending ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Saving...</> : <><Save className="h-4 w-4 mr-2" />Save Display Details</>}
+                  </Button>
+                </form>
+              </Form>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Professional Details — consultant record fields */}
+        {consultant && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <FileText className="h-4 w-4" />
+                Professional Details
+              </CardTitle>
+              <CardDescription>Your qualifications, experience, and fee — used for bookings and seeker listings.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Form {...consultantDetailsForm}>
+                <form
+                  onSubmit={consultantDetailsForm.handleSubmit((d) => updateConsultantDetailsMutation.mutate(d))}
+                  className="space-y-4"
+                >
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField control={consultantDetailsForm.control} name="name" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Full Name</FormLabel>
+                        <FormControl><Input placeholder="Dr. Full Name" {...field} data-testid="input-consultant-name" /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                    <FormField control={consultantDetailsForm.control} name="qualification" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Qualification</FormLabel>
+                        <FormControl><Input placeholder="e.g. MD, DM (Cardiology)" {...field} data-testid="input-consultant-qualification" /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField control={consultantDetailsForm.control} name="specialization" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Specialization</FormLabel>
+                        <FormControl><Input placeholder="e.g. Cardiology" {...field} data-testid="input-consultant-specialization" /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                    <FormField control={consultantDetailsForm.control} name="yearsExperience" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Years of Experience</FormLabel>
+                        <FormControl><Input type="number" min={0} placeholder="e.g. 10" {...field} data-testid="input-consultant-experience" /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                  </div>
+                  <FormField control={consultantDetailsForm.control} name="consultationFee" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Consultation Fee (₹)</FormLabel>
+                      <FormControl><Input type="number" min={0} placeholder="e.g. 500" {...field} data-testid="input-consultant-fee" /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                  <Separator />
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField control={consultantDetailsForm.control} name="registrationNumber" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Registration Number</FormLabel>
+                        <FormControl><Input placeholder="MCI/State reg. no." {...field} data-testid="input-consultant-reg-no" /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                    <FormField control={consultantDetailsForm.control} name="registeredOrganization" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Registered With</FormLabel>
+                        <FormControl><Input placeholder="e.g. MCI, NMC" {...field} data-testid="input-consultant-reg-org" /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                  </div>
+                  <FormField control={consultantDetailsForm.control} name="affiliatedInstitution" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Affiliated Institution</FormLabel>
+                      <FormControl><Input placeholder="e.g. AIIMS Raipur" {...field} data-testid="input-consultant-affiliation" /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                  <FormField control={consultantDetailsForm.control} name="portfolio" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Portfolio / Bio</FormLabel>
+                      <FormControl>
+                        <Textarea placeholder="Brief bio, areas of expertise, notable achievements..." {...field} data-testid="input-consultant-portfolio" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+
+                  {/* Registration document */}
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium">Registration Document</p>
+                    {consultant.registrationDocumentUrl ? (
+                      <div className="flex items-center gap-2 rounded-md border p-2">
+                        <FileText className="h-4 w-4 text-muted-foreground" />
+                        <a href={consultant.registrationDocumentUrl} target="_blank" rel="noopener noreferrer" className="flex-1 text-sm truncate text-primary underline">View Document</a>
+                        <label className="cursor-pointer">
+                          <Button type="button" variant="ghost" size="sm" asChild disabled={consultantRegDocUploading}>
+                            <span>{consultantRegDocUploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Replace"}</span>
+                          </Button>
+                          <input type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleConsultantRegDocUpload(f); if (e.target) e.target.value = ""; }} data-testid="input-replace-consultant-reg-doc" />
+                        </label>
+                      </div>
+                    ) : (
+                      <label className="flex items-center gap-2 rounded-md border border-dashed p-3 cursor-pointer hover:bg-muted/50 transition-colors" data-testid="label-upload-consultant-reg-doc">
+                        <Upload className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-sm text-muted-foreground">{consultantRegDocUploading ? "Uploading..." : "Upload registration certificate (PDF or image)"}</span>
+                        <input type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleConsultantRegDocUpload(f); if (e.target) e.target.value = ""; }} />
+                      </label>
+                    )}
+                  </div>
+
+                  <Button type="submit" disabled={updateConsultantDetailsMutation.isPending} data-testid="button-save-consultant-details">
+                    {updateConsultantDetailsMutation.isPending
+                      ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Saving...</>
+                      : <><Save className="h-4 w-4 mr-2" />Save Professional Details</>}
                   </Button>
                 </form>
               </Form>
