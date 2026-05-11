@@ -24,6 +24,22 @@ export default function LandingPage() {
 
   return (
     <div className="min-h-screen w-full bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-gray-950 dark:via-gray-900 dark:to-black text-gray-900 dark:text-white overflow-x-hidden transition-colors duration-500">
+      {/* SVG filter — corrects logo for light backgrounds.
+          invert (black↔white) + hueRotate(180°) restores hue;
+          gamma curves precisely restore lightness per channel. */}
+      <svg aria-hidden="true" style={{ position: 'absolute', width: 0, height: 0, overflow: 'hidden' }}>
+        <defs>
+          <filter id="logo-light-fix" colorInterpolationFilters="sRGB">
+            <feColorMatrix type="matrix" values="-1 0 0 0 1  0 -1 0 0 1  0 0 -1 0 1  0 0 0 1 0" result="inverted" />
+            <feColorMatrix in="inverted" type="hueRotate" values="180" result="hueFixed" />
+            <feComponentTransfer in="hueFixed">
+              <feFuncR type="gamma" amplitude="1" exponent="3.0" offset="0" />
+              <feFuncG type="gamma" amplitude="1" exponent="2.1" offset="0" />
+              <feFuncB type="gamma" amplitude="1" exponent="2.1" offset="0" />
+            </feComponentTransfer>
+          </filter>
+        </defs>
+      </svg>
       {/* Theme Toggle - Fixed position using global component */}
       <div className="fixed top-6 right-6 z-50" data-testid="container-theme-toggle">
         <ThemeToggle />
@@ -150,7 +166,7 @@ export default function LandingPage() {
             <img
               src={logoImage}
               alt="Perfusion"
-              className="h-auto w-[14rem] md:w-[18rem] lg:w-[22rem] drop-shadow-2xl invert hue-rotate-180 dark:invert-0 dark:hue-rotate-0"
+              className="h-auto w-[14rem] md:w-[18rem] lg:w-[22rem] drop-shadow-2xl logo-fix-light"
               data-testid="img-landing-logo"
             />
             
@@ -256,7 +272,7 @@ export default function LandingPage() {
                   <img 
                     src={logoImage} 
                     alt="Perfusion" 
-                    className="w-32 h-auto drop-shadow-lg"
+                    className="w-32 h-auto drop-shadow-lg logo-fix-light"
                   />
                   {/* Pulse rings - uses motion-reduce for accessibility */}
                   <div className="absolute inset-0 rounded-full border-2 border-red-500/50 animate-ping motion-reduce:animate-none" style={{ animationDuration: '2s' }} />
@@ -487,7 +503,7 @@ export default function LandingPage() {
               <img
                 src={logoImage}
                 alt="Perfusion"
-                className="h-auto w-48 mb-4"
+                className="h-auto w-48 mb-4 logo-fix-light"
               />
               <p className="text-gray-600 dark:text-white/70">
                 Connecting Remote Healthcare
