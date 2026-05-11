@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Phone, Mail, MapPin, ArrowRight } from "lucide-react";
 import { HeroCardFan } from "@/components/hero-card-fan";
 import { ThemeToggle } from "@/components/theme-toggle";
-import logoImage from "@assets/Pitchdeck_logo_1769590061051.png";
+import logoImage from "@assets/Perfusion_website_logo_1769522658153.png";
 import indiaMapImage from "@assets/ChatGPT_Image_Dec_18__2025__08_43_37_PM-removebg-preview_1769521462134.png";
 import bedsideImage from "@assets/ChatGPT_Image_Jan_29,_2026,_01_37_39_PM_1769674310991.png";
 import labVideo from "@assets/perfusion_video_h264.mp4";
