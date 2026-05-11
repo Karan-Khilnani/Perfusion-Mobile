@@ -74,11 +74,8 @@ export function ConsultantSlotEditor({
     onSuccess: () => {
       doInvalidate();
       toast({ title: "Schedule Saved", description: "Default schedule has been updated." });
-      if (onSaved) {
-        onSaved();
-      } else {
-        setOpen(false);
-      }
+      setOpen(false);
+      onSaved?.();
     },
     onError: () => {
       toast({ title: "Failed", description: "Could not save schedule.", variant: "destructive" });
