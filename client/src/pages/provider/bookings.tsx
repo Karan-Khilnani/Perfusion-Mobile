@@ -15,7 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { ClipboardList, RefreshCw, Video, Upload, Stethoscope, FlaskConical, ScanLine, FileText, Download, Paperclip, FileSignature, Loader2, File, ShieldCheck, Lock } from "lucide-react";
 import { Link } from "wouter";
-import type { Booking, BookingStatus } from "@shared/schema";
+import type { Booking, BookingStatus, BookingType, Provider } from "@shared/schema";
 import { format } from "date-fns";
 
 const statusOptions: { value: BookingStatus; label: string }[] = [
@@ -47,9 +47,30 @@ export default function ProviderBookingsPage() {
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const { data: provider } = useQuery<Provider>({
+    queryKey: ["/api/providers/me"],
+    retry: false,
+  });
+
+  const bookingTypesByProviderType: Record<string, BookingType[]> = {
+    lab: ["lab"],
+    consultant: ["consultation"],
+    hospital: ["lab", "consultation", "teleradiology"],
+    teleradiology: ["teleradiology"],
+    transport: [],
+  };
+
+  const allBookingTypes: BookingType[] = ["lab", "consultation", "teleradiology"];
+
+  const allowedBookingTypes: BookingType[] = provider
+    ? (bookingTypesByProviderType[provider.type] ?? allBookingTypes)
+    : allBookingTypes;
+
   const { data: bookings, isLoading, refetch } = useQuery<Booking[]>({
     queryKey: ["/api/provider/bookings"],
   });
+
+  const filteredBookings = bookings?.filter((b) => allowedBookingTypes.includes(b.bookingType)) ?? [];
 
   const updateStatusMutation = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: BookingStatus }) => {
@@ -275,9 +296,9 @@ export default function ProviderBookingsPage() {
     }
   };
 
-  const pendingBookings = bookings?.filter((b) => ["booked", "pending", "confirmed"].includes(b.status)) || [];
-  const activeBookings = bookings?.filter((b) => ["sample_collected", "processing"].includes(b.status)) || [];
-  const completedBookings = bookings?.filter((b) => ["report_ready", "completed", "cancelled"].includes(b.status)) || [];
+  const pendingBookings = filteredBookings.filter((b) => ["booked", "pending", "confirmed"].includes(b.status));
+  const activeBookings = filteredBookings.filter((b) => ["sample_collected", "processing"].includes(b.status));
+  const completedBookings = filteredBookings.filter((b) => ["report_ready", "completed", "cancelled"].includes(b.status));
 
   const BookingRow = ({ booking }: { booking: Booking }) => (
     <div
