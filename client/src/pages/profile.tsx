@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -15,6 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import { ImageCropDialog } from "@/components/ui/image-crop-dialog";
 import { apiRequest } from "@/lib/queryClient";
 import { Camera, Loader2, Save, Building, User, Upload, FileText, X, Clock, PenLine } from "lucide-react";
+import { ConsultantSlotEditor } from "@/components/consultant-slot-editor";
 
 const personalSchema = z.object({
   firstName: z.string().min(1, "First name is required"),
@@ -97,16 +98,7 @@ export default function ProfilePage() {
   const [regDocUploading, setRegDocUploading] = useState(false);
   const [signatureUploading, setSignatureUploading] = useState(false);
   const [consultantRegDocUploading, setConsultantRegDocUploading] = useState(false);
-  const [availabilityFrom, setAvailabilityFrom] = useState("09:00 AM");
-  const [availabilityTo, setAvailabilityTo] = useState("05:00 PM");
   const photoInputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (consultant) {
-      setAvailabilityFrom(consultant.availabilityFrom || "09:00 AM");
-      setAvailabilityTo(consultant.availabilityTo || "05:00 PM");
-    }
-  }, [consultant?.id]);
 
   const personalForm = useForm<PersonalFormData>({
     resolver: zodResolver(personalSchema),
@@ -173,22 +165,6 @@ export default function ProfilePage() {
     },
     onError: () => {
       toast({ title: "Update failed", description: "Could not save provider profile.", variant: "destructive" });
-    },
-  });
-
-  const updateSlotsMutation = useMutation({
-    mutationFn: async ({ from, to }: { from: string; to: string }) => {
-      if (!consultant?.id) throw new Error("No consultant record");
-      const res = await apiRequest("PATCH", `/api/consultants/${consultant.id}/slots`, { availabilityFrom: from, availabilityTo: to });
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/provider/my-consultants"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/provider/dashboard"] });
-      toast({ title: "Availability updated" });
-    },
-    onError: () => {
-      toast({ title: "Update failed", description: "Could not save availability.", variant: "destructive" });
     },
   });
 
@@ -604,40 +580,15 @@ export default function ProfilePage() {
                 <Clock className="h-4 w-4 text-muted-foreground" />
                 <p className="text-sm font-medium">Availability</p>
               </div>
-              <div className="flex items-center gap-3 flex-wrap">
-                <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">From</Label>
-                  <select
-                    value={availabilityFrom}
-                    onChange={(e) => setAvailabilityFrom(e.target.value)}
-                    className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring"
-                    data-testid="select-availability-from"
-                  >
-                    {timeOptions.map((t) => <option key={t} value={t}>{t}</option>)}
-                  </select>
-                </div>
-                <span className="text-muted-foreground mt-4">–</span>
-                <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">To</Label>
-                  <select
-                    value={availabilityTo}
-                    onChange={(e) => setAvailabilityTo(e.target.value)}
-                    className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring"
-                    data-testid="select-availability-to"
-                  >
-                    {timeOptions.map((t) => <option key={t} value={t}>{t}</option>)}
-                  </select>
-                </div>
-                <Button
-                  size="sm"
-                  className="mt-4"
-                  onClick={() => updateSlotsMutation.mutate({ from: availabilityFrom, to: availabilityTo })}
-                  disabled={updateSlotsMutation.isPending || !consultant}
-                  data-testid="button-save-availability"
-                >
-                  {updateSlotsMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save"}
-                </Button>
-              </div>
+              {consultant && (
+                <ConsultantSlotEditor
+                  consultantId={consultant.id}
+                  initialFrom={consultant.availabilityFrom}
+                  initialTo={consultant.availabilityTo}
+                  initialDays={(consultant as any).availableDays}
+                  invalidateKeys={[["/api/provider/my-consultants"], ["/api/provider/dashboard"]]}
+                />
+              )}
             </div>
 
             <Separator />

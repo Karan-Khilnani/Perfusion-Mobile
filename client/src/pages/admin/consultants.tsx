@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import { ConsultantSlotEditor } from "@/components/consultant-slot-editor";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -71,8 +72,6 @@ export default function AdminConsultantsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingSlotsFor, setEditingSlotsFor] = useState<Consultant | null>(null);
-  const [editFromTime, setEditFromTime] = useState("09:00 AM");
-  const [editToTime, setEditToTime] = useState("05:00 PM");
   const [isPricingDialogOpen, setIsPricingDialogOpen] = useState(false);
   const [pricingConsultant, setPricingConsultant] = useState<EnrichedConsultant | null>(null);
   const [pricingMode, setPricingMode] = useState<"price" | "margin">("price");
@@ -151,20 +150,6 @@ export default function AdminConsultantsPage() {
     },
     onError: () => {
       toast({ title: "Error", description: "Failed to delete consultant", variant: "destructive" });
-    },
-  });
-
-  const updateSlotsMutation = useMutation({
-    mutationFn: async ({ id, availabilityFrom, availabilityTo }: { id: string; availabilityFrom: string; availabilityTo: string }) => {
-      return apiRequest("PATCH", `/api/consultants/${id}/slots`, { availabilityFrom, availabilityTo });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/consultants"] });
-      setEditingSlotsFor(null);
-      toast({ title: "Success", description: "Availability hours updated" });
-    },
-    onError: () => {
-      toast({ title: "Error", description: "Failed to update availability", variant: "destructive" });
     },
   });
 
@@ -290,17 +275,6 @@ export default function AdminConsultantsPage() {
     "08:00 PM", "08:30 PM", "09:00 PM", "09:30 PM",
     "10:00 PM",
   ];
-
-  const handleOpenSlotsEditor = (consultant: Consultant) => {
-    setEditingSlotsFor(consultant);
-    setEditFromTime(consultant.availabilityFrom || "09:00 AM");
-    setEditToTime(consultant.availabilityTo || "05:00 PM");
-  };
-
-  const handleSaveSlots = () => {
-    if (!editingSlotsFor) return;
-    updateSlotsMutation.mutate({ id: editingSlotsFor.id, availabilityFrom: editFromTime, availabilityTo: editToTime });
-  };
 
   const onSubmit = (data: ConsultantFormData) => {
     createMutation.mutate(data);
@@ -588,7 +562,7 @@ export default function AdminConsultantsPage() {
                             </DropdownMenuItem>
                           )}
                           <DropdownMenuItem
-                            onClick={() => handleOpenSlotsEditor(consultant)}
+                            onClick={() => setEditingSlotsFor(consultant)}
                           >
                             <Calendar className="mr-2 h-4 w-4" />
                             Edit Slots
@@ -814,54 +788,23 @@ export default function AdminConsultantsPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!editingSlotsFor} onOpenChange={() => setEditingSlotsFor(null)}>
-        <DialogContent className="sm:max-w-[400px]">
+      <Dialog open={!!editingSlotsFor} onOpenChange={(open) => { if (!open) setEditingSlotsFor(null); }}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-auto">
           <DialogHeader>
-            <DialogTitle>Set Availability Hours</DialogTitle>
-            <DialogDescription>
-              Set the daily availability window for {editingSlotsFor?.name}
-            </DialogDescription>
+            <DialogTitle>Manage Availability</DialogTitle>
+            <DialogDescription>{editingSlotsFor?.name}</DialogDescription>
           </DialogHeader>
-          <div className="grid grid-cols-2 gap-4 py-2">
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">From</label>
-              <Select value={editFromTime} onValueChange={setEditFromTime}>
-                <SelectTrigger data-testid="select-availability-from">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {TIMES.map((t) => (
-                    <SelectItem key={t} value={t}>{t}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">To</label>
-              <Select value={editToTime} onValueChange={setEditToTime}>
-                <SelectTrigger data-testid="select-availability-to">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {TIMES.map((t) => (
-                    <SelectItem key={t} value={t}>{t}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <div className="flex justify-end gap-2 pt-4">
-            <Button variant="outline" onClick={() => setEditingSlotsFor(null)}>
-              Cancel
-            </Button>
-            <Button
-              onClick={handleSaveSlots}
-              disabled={updateSlotsMutation.isPending}
-              data-testid="button-save-slots"
-            >
-              {updateSlotsMutation.isPending ? "Saving..." : "Save"}
-            </Button>
-          </div>
+          {editingSlotsFor && (
+            <ConsultantSlotEditor
+              consultantId={editingSlotsFor.id}
+              consultantName={editingSlotsFor.name}
+              initialFrom={editingSlotsFor.availabilityFrom}
+              initialTo={editingSlotsFor.availabilityTo}
+              initialDays={(editingSlotsFor as any).availableDays}
+              invalidateKeys={[["/api/admin/consultants"]]}
+              onSaved={() => setEditingSlotsFor(null)}
+            />
+          )}
         </DialogContent>
       </Dialog>
 

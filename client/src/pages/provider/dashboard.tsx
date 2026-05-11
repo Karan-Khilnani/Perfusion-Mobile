@@ -39,6 +39,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Booking } from "@shared/schema";
+import { ConsultantSlotEditor } from "@/components/consultant-slot-editor";
 
 interface ActiveConsultation extends Booking {
   seekerHospitalName: string;
@@ -411,32 +412,7 @@ function ConsultationsSection({
 }
 
 function AvailabilityEditor({ consultant }: { consultant: DashboardData["consultant"] }) {
-  const { toast } = useToast();
-  const [fromTime, setFromTime] = useState(consultant?.availabilityFrom || "09:00 AM");
-  const [toTime, setToTime] = useState(consultant?.availabilityTo || "05:00 PM");
-
-  const updateSlotsMutation = useMutation({
-    mutationFn: async ({ availabilityFrom, availabilityTo }: { availabilityFrom: string; availabilityTo: string }) => {
-      if (!consultant?.id) throw new Error("No consultant record");
-      const res = await apiRequest("PATCH", `/api/consultants/${consultant.id}/slots`, { availabilityFrom, availabilityTo });
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/provider/dashboard"] });
-      toast({ title: "Availability updated", description: "Your availability window has been saved." });
-    },
-    onError: () => {
-      toast({ title: "Update failed", description: "Could not save availability.", variant: "destructive" });
-    },
-  });
-
   if (!consultant) return null;
-
-  const timeOptions = [
-    "12:00 AM","01:00 AM","02:00 AM","03:00 AM","04:00 AM","05:00 AM","06:00 AM","07:00 AM","08:00 AM","09:00 AM","10:00 AM","11:00 AM",
-    "12:00 PM","01:00 PM","02:00 PM","03:00 PM","04:00 PM","05:00 PM","06:00 PM","07:00 PM","08:00 PM","09:00 PM","10:00 PM","11:00 PM",
-  ];
-
   return (
     <Card data-testid="card-availability">
       <CardHeader className="pb-3">
@@ -445,46 +421,14 @@ function AvailabilityEditor({ consultant }: { consultant: DashboardData["consult
           Availability
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-4">
-        {consultant.availabilityFrom && consultant.availabilityTo && (
-          <p className="text-sm text-muted-foreground">
-            Currently: <span className="font-medium text-foreground">{consultant.availabilityFrom} – {consultant.availabilityTo}</span>
-          </p>
-        )}
-        <div className="flex items-center gap-3 flex-wrap">
-          <div className="space-y-1">
-            <Label className="text-xs">From</Label>
-            <select
-              value={fromTime}
-              onChange={(e) => setFromTime(e.target.value)}
-              className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring"
-              data-testid="select-availability-from"
-            >
-              {timeOptions.map((t) => <option key={t} value={t}>{t}</option>)}
-            </select>
-          </div>
-          <span className="text-muted-foreground mt-5">–</span>
-          <div className="space-y-1">
-            <Label className="text-xs">To</Label>
-            <select
-              value={toTime}
-              onChange={(e) => setToTime(e.target.value)}
-              className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring"
-              data-testid="select-availability-to"
-            >
-              {timeOptions.map((t) => <option key={t} value={t}>{t}</option>)}
-            </select>
-          </div>
-          <Button
-            size="sm"
-            className="mt-5"
-            onClick={() => updateSlotsMutation.mutate({ availabilityFrom: fromTime, availabilityTo: toTime })}
-            disabled={updateSlotsMutation.isPending}
-            data-testid="button-save-availability"
-          >
-            {updateSlotsMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save"}
-          </Button>
-        </div>
+      <CardContent>
+        <ConsultantSlotEditor
+          consultantId={consultant.id}
+          initialFrom={consultant.availabilityFrom}
+          initialTo={consultant.availabilityTo}
+          initialDays={(consultant as any).availableDays}
+          invalidateKeys={[["/api/provider/dashboard"], ["/api/provider/my-consultants"]]}
+        />
       </CardContent>
     </Card>
   );
