@@ -62,7 +62,10 @@ export function HeroCardFan({ className = "" }: { className?: string }) {
         onMouseEnter={expand}
         onMouseLeave={collapse}
         onFocus={expand}
-        onBlur={collapse}
+        onBlur={(e) => {
+          // Only collapse if focus leaves the whole group entirely
+          if (!e.currentTarget.contains(e.relatedTarget as Node | null)) collapse();
+        }}
         data-testid="hero-card-fan"
       >
         {/* Card 3 — Lab Tests (bottom of stack, fans right) */}
@@ -149,7 +152,7 @@ export function HeroCardFan({ className = "" }: { className?: string }) {
         className={`mt-2 text-xs text-gray-400 dark:text-white/30 transition-opacity duration-300 select-none ${fanned ? "opacity-0 pointer-events-none" : "opacity-100"}`}
         aria-hidden="true"
       >
-        hover to explore
+        tap or hover to explore
       </p>
     </div>
   );
