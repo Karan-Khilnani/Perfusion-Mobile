@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -111,6 +111,7 @@ export default function ProviderServicesPage() {
   const [editEmergencyRegNo, setEditEmergencyRegNo] = useState("");
   const [editEmergencyRegOrg, setEditEmergencyRegOrg] = useState("");
   const [editEmergencyDocFile, setEditEmergencyDocFile] = useState<File | null>(null);
+  const [activeServiceTab, setActiveServiceTab] = useState("labs");
 
   const fileToDataUrl = (file: File): Promise<string> =>
     new Promise((resolve, reject) => {
@@ -127,6 +128,22 @@ export default function ProviderServicesPage() {
 
   const { data: currentUser } = useQuery<any>({ queryKey: ["/api/auth/user"] });
   const [selectedProviderType, setSelectedProviderType] = useState<string>("lab");
+
+  const serviceTabsByType: Record<string, string[]> = {
+    lab: ["labs"],
+    consultant: ["consultants"],
+    hospital: ["labs", "consultants", "emergency", "teleradiology"],
+    teleradiology: ["teleradiology"],
+    transport: [],
+  };
+
+  useEffect(() => {
+    if (!provider) return;
+    const allowed = serviceTabsByType[provider.type] ?? [];
+    if (!allowed.includes(activeServiceTab)) {
+      setActiveServiceTab(allowed[0] ?? "labs");
+    }
+  }, [provider?.type]);
 
   const autoCreateMutation = useMutation({
     mutationFn: async (type: string) => {
@@ -641,24 +658,26 @@ export default function ProviderServicesPage() {
 
       {verificationBanner}
 
-      <Tabs defaultValue="labs" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="labs" data-testid="tab-labs">
-            <FlaskConical className="mr-2 h-4 w-4" />
-            Labs
-          </TabsTrigger>
-          <TabsTrigger value="consultants" data-testid="tab-consultants">
-            <Stethoscope className="mr-2 h-4 w-4" />
-            Consultants
-          </TabsTrigger>
-          <TabsTrigger value="emergency" data-testid="tab-emergency">
-            <AlertCircle className="mr-2 h-4 w-4" />
-            Emergency
-          </TabsTrigger>
-          <TabsTrigger value="teleradiology" data-testid="tab-teleradiology">
-            <ScanLine className="mr-2 h-4 w-4" />
-            Teleradiology
-          </TabsTrigger>
+      {(() => {
+        const allTabs = [
+          { value: "labs", label: "Labs", icon: <FlaskConical className="mr-2 h-4 w-4" /> },
+          { value: "consultants", label: "Consultants", icon: <Stethoscope className="mr-2 h-4 w-4" /> },
+          { value: "emergency", label: "Emergency", icon: <AlertCircle className="mr-2 h-4 w-4" /> },
+          { value: "teleradiology", label: "Teleradiology", icon: <ScanLine className="mr-2 h-4 w-4" /> },
+        ];
+        const allowedValues = serviceTabsByType[provider.type] ?? [];
+        const visibleTabs = allTabs.filter(t => allowedValues.includes(t.value));
+        const colsClass: Record<number, string> = { 1: "grid-cols-1", 2: "grid-cols-2", 3: "grid-cols-3", 4: "grid-cols-4" };
+        const safeActiveTab = allowedValues.includes(activeServiceTab) ? activeServiceTab : (allowedValues[0] ?? "labs");
+        return (
+      <Tabs value={safeActiveTab} onValueChange={(v) => allowedValues.includes(v) && setActiveServiceTab(v)} className="w-full">
+        <TabsList className={`grid w-full ${colsClass[visibleTabs.length] ?? "grid-cols-4"}`}>
+          {visibleTabs.map(tab => (
+            <TabsTrigger key={tab.value} value={tab.value} data-testid={`tab-${tab.value}`}>
+              {tab.icon}
+              {tab.label}
+            </TabsTrigger>
+          ))}
         </TabsList>
 
         <TabsContent value="labs" className="space-y-4">
@@ -1593,6 +1612,8 @@ export default function ProviderServicesPage() {
           </Card>
         </TabsContent>
       </Tabs>
+        );
+      })()}
 
       <Dialog open={!!editingConsultant} onOpenChange={(open) => !open && setEditingConsultant(null)}>
         <DialogContent className="max-h-[90vh] flex flex-col">
