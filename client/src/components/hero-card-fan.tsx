@@ -56,7 +56,7 @@ export function HeroCardFan({ className = "" }: { className?: string }) {
     <div className={`mt-6 ${className}`}>
       <div
         className="relative cursor-pointer"
-        style={{ height: CARD_H + 24, width: CARD_W }}
+        style={{ height: CARD_H + 24, width: fanned ? FAN_OFFSET * 2 + CARD_W : CARD_W, transition: "width 420ms cubic-bezier(0.34, 1.56, 0.64, 1)" }}
         onMouseEnter={expand}
         onMouseLeave={collapse}
         onFocus={expand}
