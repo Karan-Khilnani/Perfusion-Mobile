@@ -40,16 +40,14 @@ export function HeroCardFan({ className = "" }: { className?: string }) {
   const expand = useCallback(() => setFanned(true), []);
   const collapse = useCallback(() => setFanned(false), []);
 
-  const c1Transform = fanned
-    ? `translateX(${-FAN_OFFSET}px) translateY(0px) scale(1)`
-    : "translateX(0px) translateY(0px) scale(1)";
+  const c1Transform = "translateX(0px) translateY(0px) scale(1)";
 
   const c2Transform = fanned
-    ? "translateX(0px) translateY(0px) scale(1)"
+    ? `translateX(${FAN_OFFSET}px) translateY(0px) scale(1)`
     : "translateX(0px) translateY(10px) scale(0.965)";
 
   const c3Transform = fanned
-    ? `translateX(${FAN_OFFSET}px) translateY(0px) scale(1)`
+    ? `translateX(${FAN_OFFSET * 2}px) translateY(0px) scale(1)`
     : "translateX(0px) translateY(20px) scale(0.93)";
 
   const cardBase = "absolute top-0 rounded-2xl select-none flex items-center gap-3 px-4";
