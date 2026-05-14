@@ -81,6 +81,7 @@ export default function AdminConsultantsPage() {
   const [sigCropOpen, setSigCropOpen] = useState(false);
   const [sigCropRaw, setSigCropRaw] = useState<File | null>(null);
   const [cropTargetId, setCropTargetId] = useState<string | null>(null);
+  const [viewSigConsultant, setViewSigConsultant] = useState<EnrichedConsultant | null>(null);
   const [editingConsultant, setEditingConsultant] = useState<EnrichedConsultant | null>(null);
   const [editRegNo, setEditRegNo] = useState("");
   const [editRegOrg, setEditRegOrg] = useState("");
@@ -539,12 +540,9 @@ export default function AdminConsultantsPage() {
                             <Camera className="mr-2 h-4 w-4" />
                             Replace Photo
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => {
-                            pendingConsultantIdRef.current = String(consultant.id);
-                            setTimeout(() => sigInputRef.current?.click(), 0);
-                          }} data-testid={`label-admin-sig-${consultant.id}`}>
+                          <DropdownMenuItem onClick={() => setViewSigConsultant(consultant)} data-testid={`label-admin-sig-${consultant.id}`}>
                             <PenLine className="mr-2 h-4 w-4" />
-                            Replace Signature
+                            Edit Signature
                           </DropdownMenuItem>
                           {consultant.status === "active" ? (
                             <DropdownMenuItem
@@ -863,6 +861,45 @@ export default function AdminConsultantsPage() {
           }
         }}
       />
+
+      {/* Signature preview/edit dialog */}
+      <Dialog open={!!viewSigConsultant} onOpenChange={(open) => { if (!open) setViewSigConsultant(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Digital Signature — {viewSigConsultant?.name}</DialogTitle>
+            <DialogDescription>Current signature on file. You can replace it with a new image.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            {viewSigConsultant?.digitalSignatureUrl ? (
+              <div className="rounded-lg border bg-muted/30 p-4 flex items-center justify-center min-h-[120px]">
+                <img
+                  src={viewSigConsultant.digitalSignatureUrl}
+                  alt="Current digital signature"
+                  className="max-h-40 max-w-full object-contain"
+                  data-testid="img-current-signature"
+                />
+              </div>
+            ) : (
+              <div className="rounded-lg border border-dashed bg-muted/20 p-8 flex flex-col items-center justify-center gap-2 text-muted-foreground">
+                <PenLine className="h-8 w-8 opacity-40" />
+                <p className="text-sm">No signature uploaded yet</p>
+              </div>
+            )}
+            <Button
+              className="w-full"
+              onClick={() => {
+                pendingConsultantIdRef.current = String(viewSigConsultant?.id);
+                setViewSigConsultant(null);
+                setTimeout(() => sigInputRef.current?.click(), 100);
+              }}
+              data-testid="button-replace-signature"
+            >
+              <Upload className="mr-2 h-4 w-4" />
+              {viewSigConsultant?.digitalSignatureUrl ? "Replace Signature" : "Upload Signature"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Crop dialog for admin signature replacement */}
       <ImageCropDialog
