@@ -430,48 +430,30 @@ export default function ConsultationBookingPage() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {!isEmergencyTeam && (
+                  {!isEmergencyTeam && (service as any).availableSlots && (service as any).availableSlots.length > 0 && (
                     <FormField
                       control={form.control}
                       name="appointmentSlot"
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Appointment Slot</FormLabel>
-                          {(service as any).availableSlots && (service as any).availableSlots.length > 0 ? (
-                            <div className="flex flex-wrap gap-2 pt-1">
-                              {(service as any).availableSlots.map((slot: string, i: number) => (
-                                <button
-                                  key={i}
-                                  type="button"
-                                  onClick={() => field.onChange(slot)}
-                                  data-testid={`button-slot-${i}`}
-                                  className={`rounded-md border px-3 py-1.5 text-sm transition-colors ${
-                                    field.value === slot
-                                      ? "border-primary bg-primary text-primary-foreground"
-                                      : "border-border bg-background hover:border-primary/60 hover:bg-muted"
-                                  }`}
-                                >
-                                  {slot}
-                                </button>
-                              ))}
-                            </div>
-                          ) : (
-                            <>
-                              {(service.availabilityFrom || service.availabilityTo) && (
-                                <p className="text-xs text-muted-foreground flex items-center gap-1">
-                                  <span>Available:</span>
-                                  <span className="font-medium text-foreground">{service.availabilityFrom} – {service.availabilityTo}</span>
-                                </p>
-                              )}
-                              <FormControl>
-                                <Input
-                                  placeholder={`e.g. ${service.availabilityFrom || "10:00 AM"}`}
-                                  {...field}
-                                  data-testid="input-appointment-slot"
-                                />
-                              </FormControl>
-                            </>
-                          )}
+                          <div className="flex flex-wrap gap-2 pt-1">
+                            {(service as any).availableSlots.map((slot: string, i: number) => (
+                              <button
+                                key={i}
+                                type="button"
+                                onClick={() => field.onChange(slot)}
+                                data-testid={`button-slot-${i}`}
+                                className={`rounded-md border px-3 py-1.5 text-sm transition-colors ${
+                                  field.value === slot
+                                    ? "border-primary bg-primary text-primary-foreground"
+                                    : "border-border bg-background hover:border-primary/60 hover:bg-muted"
+                                }`}
+                              >
+                                {slot}
+                              </button>
+                            ))}
+                          </div>
                           <FormMessage />
                         </FormItem>
                       )}
