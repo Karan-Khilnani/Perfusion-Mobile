@@ -98,15 +98,23 @@ function ConsultantProfileSheet({
           </div>
         )}
 
-        {(consultant.availabilityFrom || consultant.availabilityTo) && (
+        {((consultant.availableSlots && consultant.availableSlots.length > 0) || consultant.availabilityFrom || consultant.availabilityTo) && (
           <div className="mb-6">
             <div className="flex items-center gap-1.5 text-sm font-medium mb-2">
               <Clock className="h-4 w-4 text-muted-foreground" />
-              Available Hours
+              Available Slots
             </div>
-            <p className="text-sm text-muted-foreground pl-5" data-testid="text-availability-range">
-              {consultant.availabilityFrom} – {consultant.availabilityTo}
-            </p>
+            {consultant.availableSlots && consultant.availableSlots.length > 0 ? (
+              <div className="pl-5 flex flex-wrap gap-1.5">
+                {consultant.availableSlots.map((slot, i) => (
+                  <Badge key={i} variant="outline" className="text-xs font-normal" data-testid={`badge-slot-${i}`}>{slot}</Badge>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground pl-5" data-testid="text-availability-range">
+                {consultant.availabilityFrom} – {consultant.availabilityTo}
+              </p>
+            )}
           </div>
         )}
 
@@ -407,12 +415,27 @@ export default function PublicConsultantsPage() {
                           {consultant.yearsExperience} years exp
                         </span>
                       </div>
-                      {(consultant.availabilityFrom || consultant.availabilityTo) && (
+                      {consultant.availableSlots && consultant.availableSlots.length > 0 ? (
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                            <Clock className="h-3 w-3" />
+                            Available slots
+                          </div>
+                          <div className="flex flex-wrap gap-1">
+                            {consultant.availableSlots.slice(0, 3).map((slot, i) => (
+                              <Badge key={i} variant="outline" className="text-[10px] font-normal py-0">{slot}</Badge>
+                            ))}
+                            {consultant.availableSlots.length > 3 && (
+                              <Badge variant="outline" className="text-[10px] font-normal py-0">+{consultant.availableSlots.length - 3} more</Badge>
+                            )}
+                          </div>
+                        </div>
+                      ) : (consultant.availabilityFrom || consultant.availabilityTo) ? (
                         <div className="flex items-center gap-1 text-sm text-muted-foreground">
                           <Clock className="h-3.5 w-3.5" />
                           {consultant.availabilityFrom} – {consultant.availabilityTo}
                         </div>
-                      )}
+                      ) : null}
                       <div className="flex gap-2">
                         <Button variant="outline" className="flex-1" onClick={() => setProfileConsultant(consultant)} data-testid={`button-view-profile-${consultant.id}`}>
                           View Profile
