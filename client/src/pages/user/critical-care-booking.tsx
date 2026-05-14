@@ -12,7 +12,6 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { StarRating } from "@/components/star-rating";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { ArrowLeft, Check, CreditCard, Briefcase, Clock, Users, MapPin } from "lucide-react";
 import type { Hospital, CriticalCareDoctor } from "@shared/schema";
@@ -249,7 +248,6 @@ export default function CriticalCareBookingPage() {
                   </div>
                 )}
               </div>
-              <StarRating rating={parseFloat(entity.rating || "4.0")} />
             </div>
             <div className="mt-4 flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
               {isDoctor ? (

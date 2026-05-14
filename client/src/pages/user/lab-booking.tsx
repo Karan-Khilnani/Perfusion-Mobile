@@ -13,7 +13,6 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { useRazorpay } from "@/hooks/use-razorpay";
-import { StarRating } from "@/components/star-rating";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { ArrowLeft, Check, CreditCard, MapPin, Clock, DollarSign } from "lucide-react";
 import type { Lab, LabTest } from "@shared/schema";
@@ -324,10 +323,6 @@ export default function LabBookingPage() {
                           <Clock className="h-4 w-4 text-muted-foreground" />
                           {selectedTest.turnaroundTime}
                         </span>
-                        <StarRating
-                          rating={4.5}
-                          size="sm"
-                        />
                       </div>
                     </div>
                   )}

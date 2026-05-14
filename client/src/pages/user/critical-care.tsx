@@ -9,7 +9,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { StarRating } from "@/components/star-rating";
 import { Search, MapPin, HeartPulse, ArrowUpDown, Briefcase, Clock, Users, Building2 } from "lucide-react";
 import type { Hospital, CriticalCareDoctor } from "@shared/schema";
 
@@ -25,14 +24,14 @@ const locations = [
   "Ahmedabad",
 ];
 
-type DoctorSortOption = "rating" | "responseTime" | "experience";
-type HospitalSortOption = "rating" | "responseTime" | "teamStrength";
+type DoctorSortOption = "responseTime" | "experience";
+type HospitalSortOption = "responseTime" | "teamStrength";
 
 export default function CriticalCarePage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedLocation, setSelectedLocation] = useState("All Locations");
-  const [doctorSortBy, setDoctorSortBy] = useState<DoctorSortOption>("rating");
-  const [hospitalSortBy, setHospitalSortBy] = useState<HospitalSortOption>("rating");
+  const [doctorSortBy, setDoctorSortBy] = useState<DoctorSortOption>("responseTime");
+  const [hospitalSortBy, setHospitalSortBy] = useState<HospitalSortOption>("responseTime");
 
   const { data: doctors, isLoading: doctorsLoading } = useQuery<CriticalCareDoctor[]>({
     queryKey: ["/api/critical-care/doctors"],
@@ -56,8 +55,6 @@ export default function CriticalCarePage() {
 
     filtered.sort((a, b) => {
       switch (doctorSortBy) {
-        case "rating":
-          return parseFloat(b.rating || "0") - parseFloat(a.rating || "0");
         case "responseTime":
           return parseInt(a.responseTime) - parseInt(b.responseTime);
         case "experience":
@@ -87,8 +84,6 @@ export default function CriticalCarePage() {
 
     filtered.sort((a, b) => {
       switch (hospitalSortBy) {
-        case "rating":
-          return parseFloat(b.rating || "0") - parseFloat(a.rating || "0");
         case "responseTime":
           return parseInt(a.emergencyResponseTime) - parseInt(b.emergencyResponseTime);
         case "teamStrength":
@@ -171,7 +166,6 @@ export default function CriticalCarePage() {
                 <SelectValue placeholder="Sort by" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="rating">Sort by Rating</SelectItem>
                 <SelectItem value="responseTime">Sort by Response Time</SelectItem>
                 <SelectItem value="experience">Sort by Experience</SelectItem>
               </SelectContent>
@@ -212,7 +206,6 @@ export default function CriticalCarePage() {
                         <CardTitle className="text-lg">{doctor.name}</CardTitle>
                         <p className="text-sm text-muted-foreground">{doctor.qualification}</p>
                       </div>
-                      <StarRating rating={parseFloat(doctor.rating || "4.0")} size="sm" />
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-4">
@@ -285,7 +278,6 @@ export default function CriticalCarePage() {
                   <CardHeader className="pb-3">
                     <div className="flex items-start justify-between gap-2">
                       <CardTitle className="text-lg">{hospital.name}</CardTitle>
-                      <StarRating rating={parseFloat(hospital.rating || "4.0")} size="sm" />
                     </div>
                     <div className="flex items-center gap-1 text-sm text-muted-foreground">
                       <MapPin className="h-3.5 w-3.5" />

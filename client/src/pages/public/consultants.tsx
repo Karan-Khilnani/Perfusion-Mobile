@@ -10,13 +10,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Separator } from "@/components/ui/separator";
-import { StarRating } from "@/components/star-rating";
 import { Search, Stethoscope, ArrowUpDown, Briefcase, AlertTriangle, Users, Building2, BookOpen, Clock, User, LogIn, Zap } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import type { Consultant } from "@shared/schema";
 import PublicLayout from "./layout";
 
-type SortOption = "rating" | "availability";
+type SortOption = "availability";
 type ConsultantWithPrice = Consultant & { computedCustomerPrice?: string };
 
 function ConsultantProfileSheet({
@@ -57,11 +56,6 @@ function ConsultantProfileSheet({
             <p className="text-sm text-muted-foreground mt-0.5" data-testid="text-profile-qualification">{consultant.qualification}</p>
             {consultant.specialization && (
               <Badge variant="secondary" className="mt-2" data-testid="badge-profile-specialization">{consultant.specialization}</Badge>
-            )}
-            {consultant.rating && (
-              <div className="mt-2">
-                <StarRating rating={parseFloat(consultant.rating)} size="sm" />
-              </div>
             )}
           </div>
         </div>
@@ -150,7 +144,7 @@ export default function PublicConsultantsPage() {
   const { user } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedSpecialization, setSelectedSpecialization] = useState("All Specializations");
-  const [sortBy, setSortBy] = useState<SortOption>("rating");
+  const [sortBy, setSortBy] = useState<SortOption>("availability");
   const [showEmergency, setShowEmergency] = useState(false);
   const [selectedDepartment, setSelectedDepartment] = useState("All Departments");
   const [profileConsultant, setProfileConsultant] = useState<ConsultantWithPrice | null>(null);
@@ -196,7 +190,6 @@ export default function PublicConsultantsPage() {
       return specMatch && searchMatch;
     });
     filtered.sort((a, b) => {
-      if (sortBy === "rating") return parseFloat(b.rating || "0") - parseFloat(a.rating || "0");
       return (b.availabilityFrom ? 1 : 0) - (a.availabilityFrom ? 1 : 0);
     });
     return filtered;
@@ -328,7 +321,6 @@ export default function PublicConsultantsPage() {
                         <SelectValue placeholder="Sort by" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="rating">Sort by Rating</SelectItem>
                         <SelectItem value="availability">Sort by Availability</SelectItem>
                       </SelectContent>
                     </Select>
@@ -373,7 +365,6 @@ export default function PublicConsultantsPage() {
                             <p className="text-sm text-muted-foreground">{consultant.qualification}</p>
                           </div>
                         </div>
-                        {consultant.rating && <StarRating rating={parseFloat(consultant.rating)} size="sm" />}
                       </div>
                     </CardHeader>
                     <CardContent className="space-y-4">

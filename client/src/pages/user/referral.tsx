@@ -14,7 +14,6 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { 
   Building2, 
   MapPin, 
-  Star, 
   Phone, 
   ArrowRight, 
   ArrowLeft, 
@@ -281,10 +280,6 @@ export default function ReferralPage() {
                         <Building2 className="h-5 w-5 text-primary" />
                         <h3 className="font-semibold">{hospital.name}</h3>
                       </div>
-                      <div className="flex items-center gap-1 text-sm">
-                        <Star className="h-4 w-4 fill-yellow-500 text-yellow-500" />
-                        {hospital.rating}
-                      </div>
                     </div>
 
                     <div className="mb-3 flex items-center gap-2 text-sm text-muted-foreground">
@@ -401,10 +396,6 @@ export default function ReferralPage() {
                           <h3 className="font-semibold">{service.name}</h3>
                           <div className="text-sm text-muted-foreground">{service.location}</div>
                         </div>
-                      </div>
-                      <div className="flex items-center gap-1 text-sm">
-                        <Star className="h-4 w-4 fill-yellow-500 text-yellow-500" />
-                        {service.rating}
                       </div>
                     </div>
 

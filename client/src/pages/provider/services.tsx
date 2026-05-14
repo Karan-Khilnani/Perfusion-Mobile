@@ -13,7 +13,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { StarRating } from "@/components/star-rating";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Plus, Edit2, FlaskConical, IndianRupee, Clock, Building2, Stethoscope, Loader2, AlertCircle, ScanLine, CheckCircle2, ArrowRight, Calendar, Upload, FileText, X, Camera, PenLine, FileSpreadsheet, Download, Trash2, Eye, EyeOff } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -1567,7 +1566,6 @@ export default function ProviderServicesPage() {
                         <Calendar className="mr-1 h-3.5 w-3.5" />
                         Slots
                       </Button>
-                      {consultant.rating && <StarRating rating={parseFloat(consultant.rating)} />}
                     </div>
                   </CardContent>
                 </Card>

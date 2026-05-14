@@ -10,11 +10,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Separator } from "@/components/ui/separator";
-import { StarRating } from "@/components/star-rating";
 import { Search, Stethoscope, ArrowUpDown, Briefcase, Calendar, AlertTriangle, Users, Building2, BookOpen, Clock, User } from "lucide-react";
 import type { Consultant } from "@shared/schema";
 
-type SortOption = "rating" | "cost" | "availability";
+type SortOption = "cost" | "availability";
 type ConsultantWithPrice = Consultant & { computedCustomerPrice?: string };
 
 function ConsultantProfileSheet({
@@ -63,11 +62,6 @@ function ConsultantProfileSheet({
               <Badge variant="secondary" className="mt-2" data-testid="badge-profile-specialization">
                 {consultant.specialization}
               </Badge>
-            )}
-            {consultant.rating && (
-              <div className="mt-2">
-                <StarRating rating={parseFloat(consultant.rating)} size="sm" />
-              </div>
             )}
           </div>
         </div>
@@ -159,7 +153,7 @@ function ConsultantProfileSheet({
 export default function ConsultationPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedSpecialization, setSelectedSpecialization] = useState("All Specializations");
-  const [sortBy, setSortBy] = useState<SortOption>("rating");
+  const [sortBy, setSortBy] = useState<SortOption>("cost");
   const [showEmergency, setShowEmergency] = useState(false);
   const [selectedDepartment, setSelectedDepartment] = useState("All Departments");
   const [profileConsultant, setProfileConsultant] = useState<ConsultantWithPrice | null>(null);
@@ -203,8 +197,6 @@ export default function ConsultationPage() {
 
     filtered.sort((a, b) => {
       switch (sortBy) {
-        case "rating":
-          return parseFloat(b.rating || "0") - parseFloat(a.rating || "0");
         case "cost":
           return parseFloat(a.computedCustomerPrice ?? a.consultationFee) - parseFloat(b.computedCustomerPrice ?? b.consultationFee);
         case "availability":
@@ -387,7 +379,6 @@ export default function ConsultationPage() {
                   <SelectValue placeholder="Sort by" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="rating">Sort by Rating</SelectItem>
                   <SelectItem value="cost">Sort by Cost</SelectItem>
                   <SelectItem value="availability">Sort by Availability</SelectItem>
                 </SelectContent>
@@ -442,7 +433,6 @@ export default function ConsultationPage() {
                       <p className="text-sm text-muted-foreground">{consultant.qualification}</p>
                     </div>
                   </div>
-                  {consultant.rating && <StarRating rating={parseFloat(consultant.rating)} size="sm" />}
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
