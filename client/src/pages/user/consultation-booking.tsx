@@ -17,7 +17,7 @@ import { useRazorpay } from "@/hooks/use-razorpay";
 import { StarRating } from "@/components/star-rating";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ArrowLeft, Check, CreditCard, Briefcase, Video, Upload, FileText, X } from "lucide-react";
+import { ArrowLeft, Check, CreditCard, Briefcase, Video, Upload, FileText, X, ChevronLeft, ChevronRight, CalendarDays, Clock } from "lucide-react";
 import type { Consultant } from "@shared/schema";
 
 const bookingSchema = z.object({
@@ -52,7 +52,11 @@ export default function ConsultationBookingPage() {
   const [chartUrls, setChartUrls] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<"pay_now" | "pay_later">("pay_later");
+  const [calendarMonth, setCalendarMonth] = useState(() => { const d = new Date(); d.setDate(1); return d; });
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const { openCheckout } = useRazorpay();
+
+  const DAYS_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
   const { data: consultant, isLoading } = useQuery<Consultant>({
     queryKey: ["/api/consultants", id],
@@ -62,6 +66,23 @@ export default function ConsultationBookingPage() {
   const { data: emergencyTeam } = useQuery<any>({
     queryKey: ["/api/emergency-teams", id],
     enabled: !!id && !consultant && !isLoading,
+  });
+
+  // Derived slot mode helpers
+  const consultantAvailableSlots: string[] = (consultant as any)?.availableSlots ?? [];
+  const consultantAvailableDays: string[] = (consultant as any)?.availableDays ?? [];
+  const consultantFrom: string = consultant?.availabilityFrom ?? "";
+  const consultantTo: string = consultant?.availabilityTo ?? "";
+  const isCalendarMode = !isLoading && !!consultant && consultantAvailableSlots.length === 0 && consultantAvailableDays.length > 0 && !!consultantFrom;
+
+  const { data: slotOverrides = [] } = useQuery<any[]>({
+    queryKey: ["/api/consultants", id, "public-slot-overrides"],
+    queryFn: async () => {
+      const res = await fetch(`/api/consultants/${id}/public-slot-overrides`, { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!id && isCalendarMode,
   });
 
   const service = consultant || (emergencyTeam ? {
@@ -430,46 +451,218 @@ export default function ConsultationBookingPage() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {!isEmergencyTeam && (() => {
-                    const availableSlots: string[] = (service as any).availableSlots || [];
-                    const availableDays: string[] = (service as any).availableDays || [];
-                    const from: string = (service as any).availabilityFrom || "";
-                    const to: string = (service as any).availabilityTo || "";
-                    const generatedSlots: string[] = availableDays.length > 0 && from
-                      ? availableDays.map(d => to ? `${d}, ${from} – ${to}` : `${d}, ${from}`)
-                      : [];
-                    const slots = availableSlots.length > 0 ? availableSlots : generatedSlots;
-                    if (slots.length === 0) return null;
-                    return (
-                      <FormField
-                        control={form.control}
-                        name="appointmentSlot"
-                        render={({ field }) => (
+                  {/* ── Slot selection (non-emergency only) ── */}
+                  {!isEmergencyTeam && (
+                    <FormField
+                      control={form.control}
+                      name="appointmentSlot"
+                      render={({ field }) => {
+                        // ── Legacy mode: pre-seeded slot strings ──
+                        if (consultantAvailableSlots.length > 0) {
+                          return (
+                            <FormItem>
+                              <FormLabel>Appointment Slot</FormLabel>
+                              <div className="flex flex-wrap gap-2 pt-1">
+                                {consultantAvailableSlots.map((slot, i) => (
+                                  <button
+                                    key={i}
+                                    type="button"
+                                    onClick={() => field.onChange(slot)}
+                                    data-testid={`button-slot-${i}`}
+                                    className={`rounded-md border px-3 py-1.5 text-sm transition-colors ${
+                                      field.value === slot
+                                        ? "border-primary bg-primary text-primary-foreground"
+                                        : "border-border bg-background hover:border-primary/60 hover:bg-muted"
+                                    }`}
+                                  >
+                                    {slot}
+                                  </button>
+                                ))}
+                              </div>
+                              <FormMessage />
+                            </FormItem>
+                          );
+                        }
+
+                        // ── Calendar mode: pick a date, then a time window ──
+                        if (!isCalendarMode) return <FormItem />;
+
+                        const calYear = calendarMonth.getFullYear();
+                        const calMonthNum = calendarMonth.getMonth();
+                        const firstDow = new Date(calYear, calMonthNum, 1).getDay();
+                        const daysInMonth = new Date(calYear, calMonthNum + 1, 0).getDate();
+                        const cells: (number | null)[] = Array(firstDow).fill(null);
+                        for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+
+                        const todayStart = new Date();
+                        todayStart.setHours(0, 0, 0, 0);
+
+                        const toDateStr = (day: number) => {
+                          const m = String(calMonthNum + 1).padStart(2, "0");
+                          return `${calYear}-${m}-${String(day).padStart(2, "0")}`;
+                        };
+
+                        const getOverride = (dateStr: string) =>
+                          (slotOverrides as any[]).find(o => o.date === dateStr);
+
+                        const isDaySelectable = (day: number) => {
+                          const d = new Date(calYear, calMonthNum, day);
+                          if (d < todayStart) return false;
+                          const dayName = DAYS_SHORT[d.getDay()];
+                          if (!consultantAvailableDays.includes(dayName)) return false;
+                          const override = getOverride(toDateStr(day));
+                          if (override?.isPaused) return false;
+                          return true;
+                        };
+
+                        const formatDateLabel = (dateStr: string) => {
+                          const d = new Date(dateStr + "T00:00:00");
+                          return d.toLocaleDateString("en-IN", {
+                            weekday: "short", day: "numeric", month: "short", year: "numeric",
+                          });
+                        };
+
+                        const getTimeForDate = (dateStr: string) => {
+                          const ov = getOverride(dateStr);
+                          if (ov && !ov.isPaused) {
+                            return { from: ov.customFrom || consultantFrom, to: ov.customTo || consultantTo };
+                          }
+                          return { from: consultantFrom, to: consultantTo };
+                        };
+
+                        return (
                           <FormItem>
-                            <FormLabel>Appointment Slot</FormLabel>
-                            <div className="flex flex-wrap gap-2 pt-1">
-                              {slots.map((slot, i) => (
+                            <FormLabel className="flex items-center gap-2">
+                              <CalendarDays className="h-4 w-4" />
+                              Select Appointment Date
+                            </FormLabel>
+
+                            <div className="rounded-lg border bg-background p-3 space-y-2 mt-1">
+                              {/* Month navigation */}
+                              <div className="flex items-center justify-between">
                                 <button
-                                  key={i}
                                   type="button"
-                                  onClick={() => field.onChange(slot)}
-                                  data-testid={`button-slot-${i}`}
-                                  className={`rounded-md border px-3 py-1.5 text-sm transition-colors ${
-                                    field.value === slot
-                                      ? "border-primary bg-primary text-primary-foreground"
-                                      : "border-border bg-background hover:border-primary/60 hover:bg-muted"
-                                  }`}
+                                  data-testid="btn-cal-prev-month"
+                                  onClick={() => setCalendarMonth(prev => {
+                                    const d = new Date(prev); d.setMonth(d.getMonth() - 1); return d;
+                                  })}
+                                  className="p-1 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
                                 >
-                                  {slot}
+                                  <ChevronLeft className="h-4 w-4" />
                                 </button>
-                              ))}
+                                <span className="text-sm font-medium">
+                                  {calendarMonth.toLocaleString("default", { month: "long", year: "numeric" })}
+                                </span>
+                                <button
+                                  type="button"
+                                  data-testid="btn-cal-next-month"
+                                  onClick={() => setCalendarMonth(prev => {
+                                    const d = new Date(prev); d.setMonth(d.getMonth() + 1); return d;
+                                  })}
+                                  className="p-1 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+                                >
+                                  <ChevronRight className="h-4 w-4" />
+                                </button>
+                              </div>
+
+                              {/* Day headers + grid */}
+                              <div className="grid grid-cols-7 gap-1 text-center">
+                                {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map(h => (
+                                  <div key={h} className="text-xs font-medium text-muted-foreground py-1">{h}</div>
+                                ))}
+                                {cells.map((day, idx) => {
+                                  if (!day) return <div key={`e-${idx}`} />;
+                                  const dateStr = toDateStr(day);
+                                  const selectable = isDaySelectable(day);
+                                  const isSelected = selectedDate === dateStr;
+                                  const isToday = new Date(calYear, calMonthNum, day).getTime() === todayStart.getTime();
+                                  return (
+                                    <button
+                                      key={dateStr}
+                                      type="button"
+                                      data-testid={`cal-date-${dateStr}`}
+                                      disabled={!selectable}
+                                      onClick={() => {
+                                        setSelectedDate(dateStr);
+                                        field.onChange("");
+                                      }}
+                                      className={[
+                                        "h-9 w-full rounded-md text-sm font-medium transition-colors select-none",
+                                        !selectable
+                                          ? "text-muted-foreground/40 cursor-not-allowed"
+                                          : isSelected
+                                          ? "bg-primary text-primary-foreground"
+                                          : "hover:bg-primary/10 hover:text-primary cursor-pointer",
+                                        isToday && !isSelected
+                                          ? "border-2 border-primary"
+                                          : "border border-transparent",
+                                      ].join(" ")}
+                                    >
+                                      {day}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+
+                              {/* Legend */}
+                              <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground pt-1 border-t">
+                                <span className="flex items-center gap-1">
+                                  <span className="inline-block h-3 w-3 rounded bg-primary" />
+                                  Selected
+                                </span>
+                                <span className="flex items-center gap-1">
+                                  <span className="inline-block h-3 w-3 rounded border-2 border-primary" />
+                                  Today
+                                </span>
+                                <span className="flex items-center gap-1">
+                                  <span className="inline-block h-3 w-3 rounded bg-muted" />
+                                  Unavailable
+                                </span>
+                              </div>
                             </div>
+
+                            {/* Time slot — shown after date is picked */}
+                            {selectedDate && (
+                              <div className="space-y-2 pt-1">
+                                <p className="text-sm text-muted-foreground flex items-center gap-1.5">
+                                  <Clock className="h-3.5 w-3.5" />
+                                  Available time on <span className="font-medium text-foreground">{formatDateLabel(selectedDate)}</span>
+                                </p>
+                                <div className="flex flex-wrap gap-2">
+                                  {(() => {
+                                    const { from, to } = getTimeForDate(selectedDate);
+                                    const slotLabel = `${formatDateLabel(selectedDate)}, ${from}${to ? ` – ${to}` : ""}`;
+                                    return (
+                                      <button
+                                        type="button"
+                                        data-testid="button-time-slot"
+                                        onClick={() => field.onChange(slotLabel)}
+                                        className={`rounded-md border px-4 py-2 text-sm font-medium transition-colors ${
+                                          field.value === slotLabel
+                                            ? "border-primary bg-primary text-primary-foreground"
+                                            : "border-border bg-background hover:border-primary/60 hover:bg-muted"
+                                        }`}
+                                      >
+                                        {from}{to ? ` – ${to}` : ""}
+                                      </button>
+                                    );
+                                  })()}
+                                </div>
+                                {field.value && (
+                                  <p className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
+                                    <Check className="h-3 w-3" />
+                                    Slot selected: {field.value}
+                                  </p>
+                                )}
+                              </div>
+                            )}
+
                             <FormMessage />
                           </FormItem>
-                        )}
-                      />
-                    );
-                  })()}
+                        );
+                      }}
+                    />
+                  )}
 
                   {isEmergencyTeam && (
                     <div className="rounded-lg border border-red-500/30 bg-red-50 dark:bg-red-950/20 p-3">

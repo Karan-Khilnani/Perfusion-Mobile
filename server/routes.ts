@@ -2881,6 +2881,17 @@ export async function registerRoutes(
     }
   });
 
+  // Read-only slot overrides for the booking form — any authenticated user may fetch
+  app.get("/api/consultants/:id/public-slot-overrides", isAuthenticated, async (req: any, res) => {
+    try {
+      const overrides = await storage.getSlotOverrides(req.params.id);
+      res.json(overrides);
+    } catch (error) {
+      console.error("Error fetching public slot overrides:", error);
+      res.status(500).json({ message: "Failed to fetch slot overrides" });
+    }
+  });
+
   app.patch("/api/consultants/:id/photo", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user?.id;
