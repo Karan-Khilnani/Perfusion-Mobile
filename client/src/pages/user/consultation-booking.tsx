@@ -18,7 +18,7 @@ import { StarRating } from "@/components/star-rating";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ArrowLeft, Check, CreditCard, Briefcase, Video, Upload, FileText, X, ChevronLeft, ChevronRight, CalendarDays, Clock } from "lucide-react";
-import type { Consultant } from "@shared/schema";
+import type { Consultant, ConsultantSlotOverride } from "@shared/schema";
 
 const bookingSchema = z.object({
   appointmentSlot: z.string().optional(),
@@ -68,14 +68,14 @@ export default function ConsultationBookingPage() {
     enabled: !!id && !consultant && !isLoading,
   });
 
-  // Derived slot mode helpers
-  const consultantAvailableSlots: string[] = (consultant as any)?.availableSlots ?? [];
-  const consultantAvailableDays: string[] = (consultant as any)?.availableDays ?? [];
+  // Derived slot mode helpers — all fields come directly from the Consultant type
+  const consultantAvailableSlots: string[] = consultant?.availableSlots ?? [];
+  const consultantAvailableDays: string[] = consultant?.availableDays ?? [];
   const consultantFrom: string = consultant?.availabilityFrom ?? "";
   const consultantTo: string = consultant?.availabilityTo ?? "";
   const isCalendarMode = !isLoading && !!consultant && consultantAvailableSlots.length === 0 && consultantAvailableDays.length > 0 && !!consultantFrom;
 
-  const { data: slotOverrides = [] } = useQuery<any[]>({
+  const { data: slotOverrides = [] } = useQuery<ConsultantSlotOverride[]>({
     queryKey: ["/api/consultants", id, "public-slot-overrides"],
     queryFn: async () => {
       const res = await fetch(`/api/consultants/${id}/public-slot-overrides`, { credentials: "include" });
@@ -502,8 +502,8 @@ export default function ConsultationBookingPage() {
                           return `${calYear}-${m}-${String(day).padStart(2, "0")}`;
                         };
 
-                        const getOverride = (dateStr: string) =>
-                          (slotOverrides as any[]).find(o => o.date === dateStr);
+                        const getOverride = (dateStr: string): ConsultantSlotOverride | undefined =>
+                          slotOverrides.find(o => o.date === dateStr);
 
                         const isDaySelectable = (day: number) => {
                           const d = new Date(calYear, calMonthNum, day);
