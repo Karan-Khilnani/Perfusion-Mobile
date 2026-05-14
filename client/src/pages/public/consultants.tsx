@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Separator } from "@/components/ui/separator";
 import { StarRating } from "@/components/star-rating";
-import { Search, Stethoscope, ArrowUpDown, Briefcase, Calendar, AlertTriangle, Users, Building2, BookOpen, Clock, User, LogIn } from "lucide-react";
+import { Search, Stethoscope, ArrowUpDown, Briefcase, AlertTriangle, Users, Building2, BookOpen, Clock, User, LogIn, Zap, Bell } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import type { Consultant } from "@shared/schema";
 import PublicLayout from "./layout";
@@ -245,83 +245,67 @@ export default function PublicConsultantsPage() {
         </div>
 
         {showEmergency ? (
-          <div className="space-y-4">
-            <Card className="border-red-500/30 bg-red-50 dark:bg-red-950/20">
-              <CardContent className="flex items-center gap-3 py-4">
-                <AlertTriangle className="h-5 w-5 text-red-600" />
-                <div>
-                  <p className="font-medium text-red-800 dark:text-red-200">Emergency Consultation Services</p>
-                  <p className="text-sm text-red-600 dark:text-red-400">Select a department to find available emergency teams</p>
-                </div>
-              </CardContent>
-            </Card>
+          <div className="space-y-6">
+            {/* Coming Soon hero */}
+            <div className="relative overflow-hidden rounded-2xl border border-red-200 dark:border-red-900/60 bg-gradient-to-br from-red-50 via-white to-orange-50 dark:from-red-950/40 dark:via-background dark:to-orange-950/20 px-8 py-14 text-center">
+              {/* decorative blobs */}
+              <div className="pointer-events-none absolute -top-16 -left-16 h-56 w-56 rounded-full bg-red-400/10 blur-3xl" />
+              <div className="pointer-events-none absolute -bottom-16 -right-16 h-56 w-56 rounded-full bg-orange-400/10 blur-3xl" />
 
-            <Card>
-              <CardContent className="pt-6">
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div>
-                    <Label htmlFor="department" className="sr-only">Department</Label>
-                    <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
-                      <SelectTrigger data-testid="select-department">
-                        <Users className="mr-2 h-4 w-4 text-muted-foreground" />
-                        <SelectValue placeholder="Select department" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {departments.map((dept) => (
-                          <SelectItem key={dept} value={dept}>{dept}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+              {/* pulsing icon */}
+              <div className="relative mx-auto mb-6 flex h-20 w-20 items-center justify-center">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-20" />
+                <div className="relative flex h-20 w-20 items-center justify-center rounded-full bg-red-600 shadow-lg shadow-red-600/30">
+                  <Zap className="h-9 w-9 text-white" />
+                </div>
+              </div>
+
+              <Badge className="mb-4 bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300 border-red-200 dark:border-red-800 px-3 py-1 text-xs font-semibold tracking-wide uppercase">
+                Coming Soon
+              </Badge>
+
+              <h2 className="mt-3 text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+                Emergency Consultation
+              </h2>
+              <p className="mx-auto mt-3 max-w-md text-base text-muted-foreground leading-relaxed">
+                Connect instantly with specialists across{" "}
+                <span className="font-semibold text-foreground">30+ specialities</span>{" "}
+                — expert emergency opinions delivered within{" "}
+                <span className="font-semibold text-red-600 dark:text-red-400">30 minutes</span>.
+              </p>
+
+              {/* feature pills */}
+              <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+                {[
+                  { icon: Zap, label: "Response in 30 min" },
+                  { icon: Stethoscope, label: "30+ specialities" },
+                  { icon: Users, label: "Dedicated care teams" },
+                  { icon: Clock, label: "24 × 7 availability" },
+                ].map(({ icon: Icon, label }) => (
+                  <div
+                    key={label}
+                    className="flex items-center gap-1.5 rounded-full border border-red-200 dark:border-red-900/60 bg-white dark:bg-red-950/20 px-4 py-1.5 text-sm text-red-700 dark:text-red-300 shadow-sm"
+                  >
+                    <Icon className="h-3.5 w-3.5" />
+                    {label}
                   </div>
-                </div>
-              </CardContent>
-            </Card>
+                ))}
+              </div>
 
-            {emergencyLoading ? (
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {[1, 2, 3].map((i) => (
-                  <Card key={i}><CardHeader><Skeleton className="h-6 w-3/4" /></CardHeader><CardContent className="space-y-3"><Skeleton className="h-4 w-full" /><Skeleton className="h-4 w-2/3" /><Skeleton className="h-10 w-full" /></CardContent></Card>
-                ))}
+              {/* notify CTA */}
+              <div className="mt-10 flex flex-col items-center gap-3">
+                <p className="text-sm text-muted-foreground">Be the first to know when this goes live</p>
+                <Button
+                  variant="outline"
+                  className="border-red-400 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 gap-2"
+                  onClick={() => {}}
+                  data-testid="button-notify-emergency"
+                >
+                  <Bell className="h-4 w-4" />
+                  Notify Me
+                </Button>
               </div>
-            ) : filteredEmergencyTeams.length === 0 ? (
-              <Card>
-                <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-                  <AlertTriangle className="mb-4 h-12 w-12 text-muted-foreground/50" />
-                  <h3 className="mb-2 text-lg font-medium">No emergency teams available</h3>
-                  <p className="text-sm text-muted-foreground">No emergency teams found for the selected department</p>
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {filteredEmergencyTeams.map((team: any) => (
-                  <Card key={team.id} className="overflow-visible" data-testid={`card-emergency-team-${team.id}`}>
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-lg">{team.department} Team</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="space-y-2 text-sm text-muted-foreground">
-                        <div className="flex items-center gap-2">
-                          <Users className="h-3.5 w-3.5" />
-                          <span>Team Lead: {team.teamLeadName}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Stethoscope className="h-3.5 w-3.5" />
-                          <span>{team.qualification}</span>
-                        </div>
-                      </div>
-                      <Button
-                        className="w-full bg-red-600 text-white border-red-600 no-default-hover-elevate no-default-active-elevate"
-                        onClick={() => handleEmergencyBook(team.id)}
-                        data-testid={`button-book-emergency-${team.id}`}
-                      >
-                        <AlertTriangle className="mr-2 h-4 w-4" />
-                        Book Emergency Consultation
-                      </Button>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
+            </div>
           </div>
         ) : (
           <>
