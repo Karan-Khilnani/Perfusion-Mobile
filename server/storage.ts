@@ -439,6 +439,10 @@ export class DatabaseStorage implements IStorage {
     return updated;
   }
 
+  async bulkSetProviderLabTestTatHidden(providerId: string, tatHidden: boolean): Promise<void> {
+    await db.update(providerLabTests).set({ tatHidden } as any).where(eq(providerLabTests.providerId, providerId));
+  }
+
   async deleteProviderLabTest(id: string): Promise<boolean> {
     await db.delete(providerLabTests).where(eq(providerLabTests.id, id));
     return true;

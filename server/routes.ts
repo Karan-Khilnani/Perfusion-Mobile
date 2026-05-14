@@ -563,6 +563,7 @@ export async function registerRoutes(
             providerBaseCost: baseCost.toFixed(2),
             computedCustomerPrice: pricing.customerPrice.toFixed(2),
             computedMarginPercent: pricing.marginPercent.toFixed(2),
+            tatHidden: providerTest?.tatHidden ?? false,
           };
         });
       res.json(enrichedTests);
@@ -1709,6 +1710,21 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error updating provider lab test:", error);
       res.status(500).json({ message: "Failed to update lab test" });
+    }
+  });
+
+  // Bulk set TAT visibility for all of a provider's lab tests
+  app.patch("/api/provider/lab-tests-tat-visibility", isAuthenticated, isProvider, async (req: any, res) => {
+    try {
+      const provider = await storage.getProviderByUserId(req.user.id);
+      if (!provider) return res.status(403).json({ message: "Not a provider" });
+      const { tatHidden } = req.body;
+      if (typeof tatHidden !== "boolean") return res.status(400).json({ message: "tatHidden must be boolean" });
+      await storage.bulkSetProviderLabTestTatHidden(provider.id, tatHidden);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error bulk updating TAT visibility:", error);
+      res.status(500).json({ message: "Failed to update TAT visibility" });
     }
   });
 

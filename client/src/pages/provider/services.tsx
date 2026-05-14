@@ -15,7 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { StarRating } from "@/components/star-rating";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Plus, Edit2, FlaskConical, IndianRupee, Clock, Building2, Stethoscope, Loader2, AlertCircle, ScanLine, CheckCircle2, ArrowRight, Calendar, Upload, FileText, X, Camera, PenLine, FileSpreadsheet, Download, Trash2 } from "lucide-react";
+import { Plus, Edit2, FlaskConical, IndianRupee, Clock, Building2, Stethoscope, Loader2, AlertCircle, ScanLine, CheckCircle2, ArrowRight, Calendar, Upload, FileText, X, Camera, PenLine, FileSpreadsheet, Download, Trash2, Eye, EyeOff } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import type { Lab, LabTest, Consultant, Provider, RadiologyModality, ProviderLabTest } from "@shared/schema";
@@ -525,6 +525,31 @@ export default function ProviderServicesPage() {
     },
     onError: () => {
       toast({ title: "Failed to update test", variant: "destructive" });
+    },
+  });
+
+  const toggleTestTatMutation = useMutation({
+    mutationFn: async ({ id, tatHidden }: { id: string; tatHidden: boolean }) => {
+      return apiRequest("PATCH", `/api/provider/lab-tests/${id}`, { tatHidden });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/provider/my-lab-tests"] });
+    },
+    onError: () => {
+      toast({ title: "Failed to update TAT visibility", variant: "destructive" });
+    },
+  });
+
+  const bulkTatMutation = useMutation({
+    mutationFn: async (tatHidden: boolean) => {
+      return apiRequest("PATCH", "/api/provider/lab-tests-tat-visibility", { tatHidden });
+    },
+    onSuccess: (_data, tatHidden) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/provider/my-lab-tests"] });
+      toast({ title: tatHidden ? "TAT hidden for all tests" : "TAT shown for all tests" });
+    },
+    onError: () => {
+      toast({ title: "Failed to update TAT visibility", variant: "destructive" });
     },
   });
 
@@ -1094,6 +1119,29 @@ export default function ProviderServicesPage() {
                         Delete Selected ({selectedTestIds.size})
                       </Button>
                     )}
+                    {myLabTests.every(t => (t as any).tatHidden) ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => bulkTatMutation.mutate(false)}
+                        disabled={bulkTatMutation.isPending}
+                        data-testid="button-show-all-tat"
+                      >
+                        {bulkTatMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Eye className="mr-2 h-4 w-4" />}
+                        Show TAT for All
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => bulkTatMutation.mutate(true)}
+                        disabled={bulkTatMutation.isPending}
+                        data-testid="button-hide-all-tat"
+                      >
+                        {bulkTatMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <EyeOff className="mr-2 h-4 w-4" />}
+                        Hide TAT for All
+                      </Button>
+                    )}
                     <div className="flex items-center gap-2">
                       <Checkbox
                         id="select-all-tests"
@@ -1133,12 +1181,25 @@ export default function ProviderServicesPage() {
                         <span className="flex items-center gap-1">
                           <IndianRupee className="h-3.5 w-3.5" />₹{pt.price}
                         </span>
-                        <span className="flex items-center gap-1">
+                        <span className={`flex items-center gap-1 ${(pt as any).tatHidden ? "line-through opacity-40" : ""}`}>
                           <Clock className="h-3.5 w-3.5" />{pt.turnaroundTime || pt.labTest?.turnaroundTime || "N/A"}
                         </span>
+                        {(pt as any).tatHidden && (
+                          <Badge variant="outline" className="text-[10px] text-muted-foreground border-dashed py-0">TAT hidden</Badge>
+                        )}
                       </div>
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => toggleTestTatMutation.mutate({ id: pt.id, tatHidden: !(pt as any).tatHidden })}
+                        disabled={toggleTestTatMutation.isPending}
+                        title={(pt as any).tatHidden ? "Show TAT to patients" : "Hide TAT from patients"}
+                        data-testid={`button-toggle-tat-${pt.id}`}
+                      >
+                        {(pt as any).tatHidden ? <EyeOff className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4 text-muted-foreground" />}
+                      </Button>
                       <Button
                         variant="ghost"
                         size="icon"

@@ -135,6 +135,7 @@ export const providerLabTests = pgTable("provider_lab_tests", {
   registrationDocumentUrl: varchar("registration_document_url", { length: 500 }),
   approvalStatus: varchar("approval_status", { length: 20 }).default("pending").$type<SuggestionStatus>(),
   isActive: boolean("is_active").default(true),
+  tatHidden: boolean("tat_hidden").default(false),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

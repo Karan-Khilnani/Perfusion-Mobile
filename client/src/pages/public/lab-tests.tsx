@@ -166,10 +166,12 @@ export default function PublicLabTestsPage() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <span className="flex items-center gap-1 text-sm text-muted-foreground">
-                      <Clock className="h-3.5 w-3.5" />
-                      {test.turnaroundTime}
-                    </span>
+                    {!(test as any).tatHidden && (
+                      <span className="flex items-center gap-1 text-sm text-muted-foreground">
+                        <Clock className="h-3.5 w-3.5" />
+                        {test.turnaroundTime}
+                      </span>
+                    )}
                     <span className="flex items-center gap-0.5 text-base font-semibold text-foreground" data-testid={`text-price-${test.id}`}>
                       <IndianRupee className="h-4 w-4" />
                       {parseFloat((test as any).computedCustomerPrice || test.cost).toLocaleString("en-IN")}
