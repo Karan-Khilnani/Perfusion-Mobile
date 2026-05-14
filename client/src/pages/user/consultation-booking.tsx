@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation, useParams, Link } from "wouter";
 import { useForm } from "react-hook-form";
@@ -75,7 +75,7 @@ export default function ConsultationBookingPage() {
   const consultantTo: string = consultant?.availabilityTo ?? "";
   const isCalendarMode = !isLoading && !!consultant && consultantAvailableSlots.length === 0 && consultantAvailableDays.length > 0 && !!consultantFrom;
 
-  const { data: slotOverrides = [] } = useQuery<ConsultantSlotOverride[]>({
+  const { data: slotOverrides = [], isLoading: slotOverridesLoading } = useQuery<ConsultantSlotOverride[]>({
     queryKey: ["/api/consultants", id, "public-slot-overrides"],
     queryFn: async () => {
       const res = await fetch(`/api/consultants/${id}/public-slot-overrides`, { credentials: "include" });
@@ -84,6 +84,16 @@ export default function ConsultationBookingPage() {
     },
     enabled: !!id && isCalendarMode,
   });
+
+  // If overrides finish loading and the already-selected date turns out to be paused, clear it
+  useEffect(() => {
+    if (slotOverridesLoading || !selectedDate) return;
+    const isPaused = slotOverrides.some(o => o.date === selectedDate && o.isPaused);
+    if (isPaused) {
+      setSelectedDate(null);
+      form.setValue("appointmentSlot", "");
+    }
+  }, [slotOverrides, slotOverridesLoading]);
 
   const service = consultant || (emergencyTeam ? {
     ...emergencyTeam,
@@ -506,6 +516,7 @@ export default function ConsultationBookingPage() {
                           slotOverrides.find(o => o.date === dateStr);
 
                         const isDaySelectable = (day: number) => {
+                          if (slotOverridesLoading) return false; // block all until overrides are confirmed
                           const d = new Date(calYear, calMonthNum, day);
                           if (d < todayStart) return false;
                           const dayName = DAYS_SHORT[d.getDay()];
@@ -621,8 +632,8 @@ export default function ConsultationBookingPage() {
                               </div>
                             </div>
 
-                            {/* Time slot — shown after date is picked */}
-                            {selectedDate && (
+                            {/* Time slot — shown after date is picked, only if not paused */}
+                            {selectedDate && !getOverride(selectedDate)?.isPaused && (
                               <div className="space-y-2 pt-1">
                                 <p className="text-sm text-muted-foreground flex items-center gap-1.5">
                                   <Clock className="h-3.5 w-3.5" />
