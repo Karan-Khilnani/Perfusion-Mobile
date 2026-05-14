@@ -585,7 +585,8 @@ export default function ProfilePage() {
                   consultantId={consultant.id}
                   initialFrom={consultant.availabilityFrom}
                   initialTo={consultant.availabilityTo}
-                  initialDays={(consultant as any).availableDays}
+                  initialDays={consultant.availableDays ?? undefined}
+                  initialSlotSeries={(consultant as any).slotSeries ?? undefined}
                   invalidateKeys={[["/api/provider/my-consultants"], ["/api/provider/dashboard"]]}
                 />
               )}

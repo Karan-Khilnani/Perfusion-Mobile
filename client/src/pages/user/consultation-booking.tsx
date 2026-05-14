@@ -17,7 +17,7 @@ import { useRazorpay } from "@/hooks/use-razorpay";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ArrowLeft, Check, CreditCard, Briefcase, Video, Upload, FileText, X, ChevronLeft, ChevronRight, CalendarDays, Clock } from "lucide-react";
-import type { Consultant, ConsultantSlotOverride } from "@shared/schema";
+import type { Consultant, ConsultantSlotOverride, SlotSeries } from "@shared/schema";
 
 const bookingSchema = z.object({
   appointmentSlot: z.string().optional(),
@@ -69,10 +69,13 @@ export default function ConsultationBookingPage() {
 
   // Derived slot mode helpers — all fields come directly from the Consultant type
   const consultantAvailableSlots: string[] = consultant?.availableSlots ?? [];
+  const consultantSlotSeries: SlotSeries[] = (consultant?.slotSeries as SlotSeries[] | null | undefined) ?? [];
   const consultantAvailableDays: string[] = consultant?.availableDays ?? [];
   const consultantFrom: string = consultant?.availabilityFrom ?? "";
   const consultantTo: string = consultant?.availabilityTo ?? "";
-  const isCalendarMode = !isLoading && !!consultant && consultantAvailableSlots.length === 0 && consultantAvailableDays.length > 0 && !!consultantFrom;
+  // Calendar mode: either new slotSeries array or legacy availableDays+from/to
+  const isCalendarMode = !isLoading && !!consultant && consultantAvailableSlots.length === 0 &&
+    (consultantSlotSeries.length > 0 || (consultantAvailableDays.length > 0 && !!consultantFrom));
 
   const { data: slotOverrides = [], isLoading: slotOverridesLoading } = useQuery<ConsultantSlotOverride[]>({
     queryKey: ["/api/consultants", id, "public-slot-overrides"],
@@ -518,7 +521,11 @@ export default function ConsultationBookingPage() {
                           const d = new Date(calYear, calMonthNum, day);
                           if (d < todayStart) return false;
                           const dayName = DAYS_SHORT[d.getDay()];
-                          if (!consultantAvailableDays.includes(dayName)) return false;
+                          // Check against slotSeries first, then legacy availableDays
+                          const coveredBySchedule = consultantSlotSeries.length > 0
+                            ? consultantSlotSeries.some(s => s.days.includes(dayName))
+                            : consultantAvailableDays.includes(dayName);
+                          if (!coveredBySchedule) return false;
                           const override = getOverride(toDateStr(day));
                           if (override?.isPaused) return false;
                           return true;
@@ -531,12 +538,23 @@ export default function ConsultationBookingPage() {
                           });
                         };
 
-                        const getTimeForDate = (dateStr: string) => {
+                        // Returns all available time windows for a given date
+                        const getTimeWindowsForDate = (dateStr: string): { from: string; to: string }[] => {
                           const ov = getOverride(dateStr);
+                          // A custom override for this specific date → one fixed window
                           if (ov && !ov.isPaused) {
-                            return { from: ov.customFrom || consultantFrom, to: ov.customTo || consultantTo };
+                            return [{ from: ov.customFrom || consultantFrom, to: ov.customTo || consultantTo }];
                           }
-                          return { from: consultantFrom, to: consultantTo };
+                          // slotSeries → return all series that cover this weekday
+                          if (consultantSlotSeries.length > 0) {
+                            const d = new Date(dateStr + "T00:00:00");
+                            const dayName = DAYS_SHORT[d.getDay()];
+                            return consultantSlotSeries
+                              .filter(s => s.days.includes(dayName))
+                              .map(s => ({ from: s.from, to: s.to }));
+                          }
+                          // Legacy fallback
+                          return [{ from: consultantFrom, to: consultantTo }];
                         };
 
                         return (
@@ -635,16 +653,16 @@ export default function ConsultationBookingPage() {
                               <div className="space-y-2 pt-1">
                                 <p className="text-sm text-muted-foreground flex items-center gap-1.5">
                                   <Clock className="h-3.5 w-3.5" />
-                                  Available time on <span className="font-medium text-foreground">{formatDateLabel(selectedDate)}</span>
+                                  Available windows on <span className="font-medium text-foreground">{formatDateLabel(selectedDate)}</span>
                                 </p>
                                 <div className="flex flex-wrap gap-2">
-                                  {(() => {
-                                    const { from, to } = getTimeForDate(selectedDate);
+                                  {getTimeWindowsForDate(selectedDate).map(({ from, to }, idx) => {
                                     const slotLabel = `${formatDateLabel(selectedDate)}, ${from}${to ? ` – ${to}` : ""}`;
                                     return (
                                       <button
+                                        key={idx}
                                         type="button"
-                                        data-testid="button-time-slot"
+                                        data-testid={`button-time-slot-${idx}`}
                                         onClick={() => field.onChange(slotLabel)}
                                         className={`rounded-md border px-4 py-2 text-sm font-medium transition-colors ${
                                           field.value === slotLabel
@@ -655,7 +673,7 @@ export default function ConsultationBookingPage() {
                                         {from}{to ? ` – ${to}` : ""}
                                       </button>
                                     );
-                                  })()}
+                                  })}
                                 </div>
                                 {field.value && (
                                   <p className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1">

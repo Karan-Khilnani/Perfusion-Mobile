@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, decimal, timestamp, boolean } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, decimal, timestamp, boolean, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -8,6 +8,9 @@ export * from "./models/auth";
 
 // Provider types
 export type ProviderType = "lab" | "consultant" | "hospital" | "transport" | "teleradiology";
+
+// Slot series — one time window for a set of weekdays
+export type SlotSeries = { days: string[]; from: string; to: string };
 
 // Import ProviderStatus from auth
 import { ProviderStatus } from "./models/auth";
@@ -81,6 +84,7 @@ export const consultants = pgTable("consultants", {
   availabilityFrom: text("availability_from"),
   availabilityTo: text("availability_to"),
   availableDays: text("available_days").array(),
+  slotSeries: jsonb("slot_series").$type<SlotSeries[]>(),
   registrationNumber: varchar("registration_number", { length: 100 }),
   registeredOrganization: varchar("registered_organization", { length: 255 }),
   registrationDocumentUrl: varchar("registration_document_url", { length: 500 }),

@@ -801,6 +801,7 @@ export default function AdminConsultantsPage() {
               initialFrom={editingSlotsFor.availabilityFrom}
               initialTo={editingSlotsFor.availabilityTo}
               initialDays={(editingSlotsFor as any).availableDays}
+              initialSlotSeries={(editingSlotsFor as any).slotSeries ?? undefined}
               invalidateKeys={[["/api/admin/consultants"]]}
               onSaved={() => setEditingSlotsFor(null)}
             />

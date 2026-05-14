@@ -427,6 +427,7 @@ function AvailabilityEditor({ consultant }: { consultant: DashboardData["consult
           initialFrom={consultant.availabilityFrom}
           initialTo={consultant.availabilityTo}
           initialDays={(consultant as any).availableDays}
+          initialSlotSeries={(consultant as any).slotSeries ?? undefined}
           invalidateKeys={[["/api/provider/dashboard"], ["/api/provider/my-consultants"]]}
         />
       </CardContent>
