@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Separator } from "@/components/ui/separator";
 import { StarRating } from "@/components/star-rating";
-import { Search, Stethoscope, ArrowUpDown, Briefcase, AlertTriangle, Users, Building2, BookOpen, Clock, User, LogIn, Zap, Bell } from "lucide-react";
+import { Search, Stethoscope, ArrowUpDown, Briefcase, AlertTriangle, Users, Building2, BookOpen, Clock, User, LogIn, Zap } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import type { Consultant } from "@shared/schema";
 import PublicLayout from "./layout";
@@ -270,7 +270,7 @@ export default function PublicConsultantsPage() {
               <p className="mx-auto mt-3 max-w-md text-base text-muted-foreground leading-relaxed">
                 Connect instantly with specialists across{" "}
                 <span className="font-semibold text-foreground">30+ specialities</span>{" "}
-                — expert emergency opinions delivered within{" "}
+                Expert emergency opinions delivered within{" "}
                 <span className="font-semibold text-red-600 dark:text-red-400">30 minutes</span>.
               </p>
 
@@ -292,19 +292,6 @@ export default function PublicConsultantsPage() {
                 ))}
               </div>
 
-              {/* notify CTA */}
-              <div className="mt-10 flex flex-col items-center gap-3">
-                <p className="text-sm text-muted-foreground">Be the first to know when this goes live</p>
-                <Button
-                  variant="outline"
-                  className="border-red-400 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 gap-2"
-                  onClick={() => {}}
-                  data-testid="button-notify-emergency"
-                >
-                  <Bell className="h-4 w-4" />
-                  Notify Me
-                </Button>
-              </div>
             </div>
           </div>
         ) : (
