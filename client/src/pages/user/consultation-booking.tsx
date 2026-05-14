@@ -430,35 +430,46 @@ export default function ConsultationBookingPage() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {!isEmergencyTeam && (service as any).availableSlots && (service as any).availableSlots.length > 0 && (
-                    <FormField
-                      control={form.control}
-                      name="appointmentSlot"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Appointment Slot</FormLabel>
-                          <div className="flex flex-wrap gap-2 pt-1">
-                            {(service as any).availableSlots.map((slot: string, i: number) => (
-                              <button
-                                key={i}
-                                type="button"
-                                onClick={() => field.onChange(slot)}
-                                data-testid={`button-slot-${i}`}
-                                className={`rounded-md border px-3 py-1.5 text-sm transition-colors ${
-                                  field.value === slot
-                                    ? "border-primary bg-primary text-primary-foreground"
-                                    : "border-border bg-background hover:border-primary/60 hover:bg-muted"
-                                }`}
-                              >
-                                {slot}
-                              </button>
-                            ))}
-                          </div>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  )}
+                  {!isEmergencyTeam && (() => {
+                    const availableSlots: string[] = (service as any).availableSlots || [];
+                    const availableDays: string[] = (service as any).availableDays || [];
+                    const from: string = (service as any).availabilityFrom || "";
+                    const to: string = (service as any).availabilityTo || "";
+                    const generatedSlots: string[] = availableDays.length > 0 && from
+                      ? availableDays.map(d => to ? `${d}, ${from} – ${to}` : `${d}, ${from}`)
+                      : [];
+                    const slots = availableSlots.length > 0 ? availableSlots : generatedSlots;
+                    if (slots.length === 0) return null;
+                    return (
+                      <FormField
+                        control={form.control}
+                        name="appointmentSlot"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Appointment Slot</FormLabel>
+                            <div className="flex flex-wrap gap-2 pt-1">
+                              {slots.map((slot, i) => (
+                                <button
+                                  key={i}
+                                  type="button"
+                                  onClick={() => field.onChange(slot)}
+                                  data-testid={`button-slot-${i}`}
+                                  className={`rounded-md border px-3 py-1.5 text-sm transition-colors ${
+                                    field.value === slot
+                                      ? "border-primary bg-primary text-primary-foreground"
+                                      : "border-border bg-background hover:border-primary/60 hover:bg-muted"
+                                  }`}
+                                >
+                                  {slot}
+                                </button>
+                              ))}
+                            </div>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    );
+                  })()}
 
                   {isEmergencyTeam && (
                     <div className="rounded-lg border border-red-500/30 bg-red-50 dark:bg-red-950/20 p-3">
