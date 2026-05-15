@@ -1,5 +1,5 @@
 import { db } from "../db";
-import { bookings, consultants } from "../../shared/schema";
+import { bookings, consultants, providers } from "../../shared/schema";
 import { eq, and, inArray } from "drizzle-orm";
 import { triggerVoiceCall } from "./msg91";
 
@@ -160,12 +160,27 @@ async function fireAppointmentReminders(): Promise<void> {
       // Call consultant
       if (booking.providerId) {
         const [consultant] = await db
-          .select({ contactPhone: consultants.contactPhone })
+          .select({
+            contactPhone: consultants.contactPhone,
+            providerId: consultants.providerId,
+          })
           .from(consultants)
           .where(eq(consultants.id, booking.providerId));
-        if (consultant?.contactPhone) {
-          console.log(`[Scheduler]   → Calling consultant: ${consultant.contactPhone}`);
-          triggerVoiceCall(consultant.contactPhone, consultantMsg).catch((e) =>
+
+        let consultantPhone = consultant?.contactPhone || null;
+
+        // Fall back to provider's own phone if consultant has no direct contact phone
+        if (!consultantPhone && consultant?.providerId) {
+          const [prov] = await db
+            .select({ phone: providers.phone })
+            .from(providers)
+            .where(eq(providers.id, consultant.providerId));
+          consultantPhone = prov?.phone || null;
+        }
+
+        if (consultantPhone) {
+          console.log(`[Scheduler]   → Calling consultant: ${consultantPhone}`);
+          triggerVoiceCall(consultantPhone, consultantMsg).catch((e) =>
             console.error("[Scheduler] Consultant call failed:", e?.message)
           );
         } else {

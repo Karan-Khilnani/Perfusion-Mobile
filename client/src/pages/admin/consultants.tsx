@@ -65,6 +65,7 @@ const consultantSchema = z.object({
   availabilityFrom: z.string().optional(),
   availabilityTo: z.string().optional(),
   portfolio: z.string().optional(),
+  contactPhone: z.string().optional(),
 });
 
 type ConsultantFormData = z.infer<typeof consultantSchema>;
@@ -108,6 +109,7 @@ export default function AdminConsultantsPage() {
       rating: "4.5",
       availabilityFrom: "09:00 AM",
       availabilityTo: "05:00 PM",
+      contactPhone: "",
     },
   });
 
@@ -172,7 +174,7 @@ export default function AdminConsultantsPage() {
 
   const editConsultantForm = useForm<ConsultantFormData>({
     resolver: zodResolver(consultantSchema),
-    defaultValues: { name: "", qualification: "", specialization: "", yearsExperience: 0, consultationFee: "", followUpFee: "", rating: "4.0", availabilityFrom: "09:00 AM", availabilityTo: "05:00 PM", portfolio: "" },
+    defaultValues: { name: "", qualification: "", specialization: "", yearsExperience: 0, consultationFee: "", followUpFee: "", rating: "4.0", availabilityFrom: "09:00 AM", availabilityTo: "05:00 PM", portfolio: "", contactPhone: "" },
   });
 
   const openEditDetails = (c: EnrichedConsultant) => {
@@ -188,6 +190,7 @@ export default function AdminConsultantsPage() {
       availabilityFrom: c.availabilityFrom || "09:00 AM",
       availabilityTo: c.availabilityTo || "05:00 PM",
       portfolio: c.portfolio || "",
+      contactPhone: (c as any).contactPhone || "",
     });
     setEditRegNo(c.registrationNumber || "");
     setEditRegOrg(c.registeredOrganization || "");
@@ -403,6 +406,19 @@ export default function AdminConsultantsPage() {
                       <FormLabel>Follow-Up Fee (₹) <span className="text-muted-foreground font-normal text-xs">— leave blank to use consultation fee</span></FormLabel>
                       <FormControl>
                         <Input placeholder="800.00" {...field} data-testid="input-followup-fee" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="contactPhone"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Contact Phone <span className="text-muted-foreground font-normal text-xs">— for appointment reminders</span></FormLabel>
+                      <FormControl>
+                        <Input placeholder="+919876543210" {...field} data-testid="input-consultant-phone" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -751,6 +767,13 @@ export default function AdminConsultantsPage() {
                   <FormItem>
                     <FormLabel>Follow-Up Fee (₹) <span className="text-muted-foreground font-normal text-xs">— leave blank to use fresh fee</span></FormLabel>
                     <FormControl><Input placeholder="800.00" {...field} data-testid="input-admin-edit-followup-fee" /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+                <FormField control={editConsultantForm.control} name="contactPhone" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Contact Phone <span className="text-muted-foreground font-normal text-xs">— for appointment reminders</span></FormLabel>
+                    <FormControl><Input placeholder="+919876543210" {...field} data-testid="input-admin-edit-consultant-phone" /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )} />

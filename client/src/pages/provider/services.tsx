@@ -44,6 +44,7 @@ const consultantSchema = z.object({
   yearsExperience: z.coerce.number().min(0, "Experience is required"),
   consultationFee: z.string().min(1, "Fee is required"),
   portfolio: z.string().optional(),
+  contactPhone: z.string().optional(),
 });
 
 const emergencyTeamSchema = z.object({
@@ -296,7 +297,7 @@ export default function ProviderServicesPage() {
 
   const editConsultantForm = useForm<ConsultantFormData>({
     resolver: zodResolver(consultantSchema),
-    defaultValues: { name: "", qualification: "", specialization: "", yearsExperience: 0, consultationFee: "", portfolio: "" },
+    defaultValues: { name: "", qualification: "", specialization: "", yearsExperience: 0, consultationFee: "", portfolio: "", contactPhone: "" },
   });
 
   const editEmergencyForm = useForm<EmergencyTeamFormData>({
@@ -313,6 +314,7 @@ export default function ProviderServicesPage() {
       yearsExperience: c.yearsExperience || 0,
       consultationFee: c.consultationFee || "",
       portfolio: c.portfolio || "",
+      contactPhone: c.contactPhone || "",
     });
     setEditConsultantRegNo(c.registrationNumber || "");
     setEditConsultantRegOrg(c.registeredOrganization || "");
@@ -1220,6 +1222,19 @@ export default function ProviderServicesPage() {
                     </div>
                     <FormField
                       control={consultantForm.control}
+                      name="contactPhone"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Contact Phone <span className="text-muted-foreground font-normal text-xs">— for appointment reminders</span></FormLabel>
+                          <FormControl>
+                            <Input placeholder="+919876543210" {...field} data-testid="input-consultant-phone" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={consultantForm.control}
                       name="portfolio"
                       render={({ field }) => (
                         <FormItem>
@@ -1680,6 +1695,13 @@ export default function ProviderServicesPage() {
                   <Label>Affiliated Institution</Label>
                   <Input value={editConsultantAffiliation} onChange={(e) => setEditConsultantAffiliation(e.target.value)} placeholder="e.g., AIIMS Delhi" data-testid="input-edit-consultant-affiliation" />
                 </div>
+                <FormField control={editConsultantForm.control} name="contactPhone" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Contact Phone <span className="text-muted-foreground font-normal text-xs">— for appointment reminders</span></FormLabel>
+                    <FormControl><Input placeholder="+919876543210" {...field} data-testid="input-edit-consultant-phone" /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
                 <FormField control={editConsultantForm.control} name="portfolio" render={({ field }) => (
                   <FormItem><FormLabel>Portfolio / Experience Details</FormLabel><FormControl><Textarea className="min-h-[80px] resize-none" data-testid="input-edit-consultant-portfolio" {...field} /></FormControl><FormMessage /></FormItem>
                 )} />
