@@ -10,7 +10,7 @@ import { eq } from "drizzle-orm";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
-import { notifyAdminLabBooking, notifyUserReportReady, cancelVoiceCall } from "./services/msg91";
+import { notifyAdminLabBooking, notifyUserReportReady, cancelVoiceCall, triggerVoiceCall } from "./services/msg91";
 import { generateBookingNumber } from "./services/booking-number";
 import { calculateCustomerPrice, deriveMarginFromPrice, derivePriceFromMargin } from "./services/pricing";
 import { processReport, type BookingReportData } from "./services/report-processor";
@@ -4084,6 +4084,28 @@ export async function registerRoutes(
       res.json({ status: session.status, videoRoomUrl: session.videoRoomUrl });
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch call status" });
+    }
+  });
+
+  // ── Admin: test Twilio voice call ─────────────────────────────────────────
+  // POST /api/admin/test-voice-call  { phone: "+919876543210" }
+  // Lets an admin verify that Twilio is configured and can place calls.
+  app.post("/api/admin/test-voice-call", isAdmin, async (req: any, res) => {
+    try {
+      const { phone } = req.body;
+      if (!phone) return res.status(400).json({ error: "phone is required" });
+      const message =
+        "Hello. This is a test call from Perfusion Healthcare. " +
+        "Twilio voice call integration is working correctly. " +
+        "You may now hang up.";
+      const sid = await triggerVoiceCall(phone, message);
+      if (sid) {
+        return res.json({ success: true, sid });
+      } else {
+        return res.status(500).json({ success: false, error: "Call failed — check server logs for details" });
+      }
+    } catch (error: any) {
+      return res.status(500).json({ error: error?.message || "Unknown error" });
     }
   });
 
