@@ -53,10 +53,10 @@ function ConsultantProfileSheet({
           )}
           <div className="min-w-0">
             <h2 className="text-xl font-semibold leading-tight" data-testid="text-profile-name">{consultant.name}</h2>
-            <p className="text-sm text-muted-foreground mt-0.5" data-testid="text-profile-qualification">{consultant.qualification}</p>
             {consultant.specialization && (
-              <Badge variant="secondary" className="mt-2" data-testid="badge-profile-specialization">{consultant.specialization}</Badge>
+              <p className="text-base font-semibold text-primary mt-0.5" data-testid="badge-profile-specialization">{consultant.specialization}</p>
             )}
+            <p className="text-sm text-muted-foreground mt-0.5" data-testid="text-profile-qualification">{consultant.qualification}</p>
           </div>
         </div>
 
@@ -362,15 +362,15 @@ export default function PublicConsultantsPage() {
                           )}
                           <div>
                             <CardTitle className="text-lg">{consultant.name}</CardTitle>
+                            {consultant.specialization && (
+                              <p className="text-base font-semibold text-primary mt-0.5">{consultant.specialization}</p>
+                            )}
                             <p className="text-sm text-muted-foreground">{consultant.qualification}</p>
                           </div>
                         </div>
                       </div>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                      {consultant.specialization && (
-                        <Badge variant="secondary">{consultant.specialization}</Badge>
-                      )}
                       <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
                         <span className="flex items-center gap-1">
                           <Briefcase className="h-3.5 w-3.5" />
