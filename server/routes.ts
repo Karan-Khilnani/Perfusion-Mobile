@@ -922,6 +922,15 @@ export async function registerRoutes(
         // Always link back to root booking (not a chain)
         bookingData.parentBookingId = parentBooking.parentBookingId || parentBooking.id;
         bookingData.isFollowUp = true;
+        // Copy patient details from parent — seeker should not have to re-enter them
+        bookingData.patientName = parentBooking.patientName;
+        bookingData.patientAge = parentBooking.patientAge;
+        bookingData.patientGender = parentBooking.patientGender;
+        bookingData.patientContact = parentBooking.patientContact;
+        bookingData.patientWeight = parentBooking.patientWeight || null;
+        bookingData.patientAllergies = parentBooking.patientAllergies || null;
+        bookingData.patientAllergyNotSpecified = parentBooking.patientAllergyNotSpecified ?? true;
+        bookingData.uhidIpNumber = parentBooking.uhidIpNumber || null;
       }
       
       // For consultation bookings, link to the provider who owns the consultant

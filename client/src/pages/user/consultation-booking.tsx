@@ -36,6 +36,23 @@ const bookingSchema = z.object({
   investigations: z.string().optional(),
 });
 
+const followUpBookingSchema = z.object({
+  appointmentSlot: z.string().optional(),
+  patientName: z.string().optional(),
+  patientAge: z.coerce.number().optional(),
+  patientGender: z.enum(["male", "female", "other"]).optional(),
+  contactNumber: z.string().optional(),
+  patientWeight: z.string().optional(),
+  allergyNotSpecified: z.boolean().default(true),
+  patientAllergies: z.string().optional(),
+  uhidIpNumber: z.string().optional(),
+  clinicalSummary: z.string().min(10, "Please describe the patient's current status"),
+  provisionalDiagnosis: z.string().optional(),
+  orderingPhysician: z.string().optional(),
+  examination: z.string().optional(),
+  investigations: z.string().optional(),
+});
+
 type BookingFormData = z.infer<typeof bookingSchema>;
 
 export default function ConsultationBookingPage() {
@@ -89,6 +106,14 @@ export default function ConsultationBookingPage() {
     enabled: !!id && isCalendarMode,
   });
 
+  const { data: allUserBookings = [] } = useQuery<any[]>({
+    queryKey: ["/api/bookings"],
+    enabled: isFollowUpMode,
+  });
+  const parentBooking = isFollowUpMode
+    ? allUserBookings.find((b: any) => String(b.id) === String(parentBookingId))
+    : null;
+
   // If overrides finish loading and the already-selected date turns out to be paused, clear it
   useEffect(() => {
     if (slotOverridesLoading || !selectedDate) return;
@@ -111,7 +136,7 @@ export default function ConsultationBookingPage() {
   const isEmergencyTeam = !consultant && !!emergencyTeam;
 
   const form = useForm<BookingFormData>({
-    resolver: zodResolver(bookingSchema),
+    resolver: zodResolver(isFollowUpMode ? followUpBookingSchema : bookingSchema),
     defaultValues: {
       appointmentSlot: "",
       patientName: "",
@@ -176,14 +201,17 @@ export default function ConsultationBookingPage() {
         serviceName: isEmergencyTeam ? `${emergencyTeam.department} Team` : service.name,
         providerName: isEmergencyTeam ? emergencyTeam.qualification : service.qualification,
         ...(isFollowUpMode && parentBookingId ? { isFollowUp: true, parentBookingId } : {}),
-        patientName: data.patientName,
-        patientAge: data.patientAge,
-        patientGender: data.patientGender,
-        patientContact: data.contactNumber,
-        patientWeight: data.patientWeight || null,
-        patientAllergies: data.allergyNotSpecified ? null : (data.patientAllergies || null),
-        patientAllergyNotSpecified: data.allergyNotSpecified,
-        uhidIpNumber: data.uhidIpNumber || null,
+        // Patient fields only sent for new (non-follow-up) bookings; server copies them from parent for follow-ups
+        ...(!isFollowUpMode ? {
+          patientName: data.patientName,
+          patientAge: data.patientAge,
+          patientGender: data.patientGender,
+          patientContact: data.contactNumber,
+          patientWeight: data.patientWeight || null,
+          patientAllergies: data.allergyNotSpecified ? null : (data.patientAllergies || null),
+          patientAllergyNotSpecified: data.allergyNotSpecified,
+          uhidIpNumber: data.uhidIpNumber || null,
+        } : {}),
         clinicalSummary: data.clinicalSummary,
         provisionalDiagnosis: data.provisionalDiagnosis || null,
         examination: data.examination || null,
@@ -390,6 +418,354 @@ export default function ConsultationBookingPage() {
       </div>
     );
   }
+
+  // ── Follow-Up Mode: single-page simplified form ──────────────────────────
+  if (isFollowUpMode) {
+    const hasSlots = !isEmergencyTeam && (consultantAvailableSlots.length > 0 || isCalendarMode);
+
+    const handleFollowUpSubmit = async () => {
+      const isValid = await form.trigger(["clinicalSummary", ...(hasSlots ? ["appointmentSlot" as const] : [])]);
+      if (!isValid) return;
+      bookingMutation.mutate(form.getValues());
+    };
+
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={() => navigate("/user/orders")}>
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">Book Follow-Up</h1>
+            <p className="text-muted-foreground">{service.name}</p>
+          </div>
+        </div>
+
+        {/* Consultant info */}
+        <div className="mx-auto max-w-2xl space-y-4">
+          <Card>
+            <CardContent className="pt-5">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h3 className="font-semibold">{service.name}</h3>
+                  <p className="text-sm text-muted-foreground">{service.qualification}</p>
+                  {service.specialization && (
+                    <Badge variant="secondary" className="mt-2">{service.specialization}</Badge>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Patient summary (read-only from parent booking) */}
+          {parentBooking && (
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">Patient</CardTitle>
+                <CardDescription>Details carried from original booking</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <dl className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
+                  <div>
+                    <dt className="text-muted-foreground">Name</dt>
+                    <dd className="font-medium">{parentBooking.patientName}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-muted-foreground">Age / Gender</dt>
+                    <dd className="font-medium">{parentBooking.patientAge}y / {parentBooking.patientGender}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-muted-foreground">Contact</dt>
+                    <dd className="font-medium">{parentBooking.patientContact}</dd>
+                  </div>
+                  {parentBooking.uhidIpNumber && (
+                    <div>
+                      <dt className="text-muted-foreground">UHID / IP</dt>
+                      <dd className="font-medium">{parentBooking.uhidIpNumber}</dd>
+                    </div>
+                  )}
+                </dl>
+              </CardContent>
+            </Card>
+          )}
+
+          <Form {...form}>
+            <form className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Follow-Up Details</CardTitle>
+                  <CardDescription>Provide the patient's current status and any updated documents</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-5">
+
+                  {/* Slot picker — reuse existing FormField logic */}
+                  {hasSlots && (
+                    <FormField
+                      control={form.control}
+                      name="appointmentSlot"
+                      render={({ field }) => {
+                        if (consultantAvailableSlots.length > 0) {
+                          return (
+                            <FormItem>
+                              <FormLabel>Appointment Slot</FormLabel>
+                              <div className="flex flex-wrap gap-2 pt-1">
+                                {consultantAvailableSlots.map((slot, i) => (
+                                  <button
+                                    key={i}
+                                    type="button"
+                                    onClick={() => field.onChange(slot)}
+                                    data-testid={`button-slot-${i}`}
+                                    className={`rounded-md border px-3 py-1.5 text-sm transition-colors ${
+                                      field.value === slot
+                                        ? "border-primary bg-primary text-primary-foreground"
+                                        : "border-border bg-background hover:border-primary/60 hover:bg-muted"
+                                    }`}
+                                  >
+                                    {slot}
+                                  </button>
+                                ))}
+                              </div>
+                              <FormMessage />
+                            </FormItem>
+                          );
+                        }
+                        if (!isCalendarMode) return <FormItem />;
+
+                        const calYear = calendarMonth.getFullYear();
+                        const calMonthNum = calendarMonth.getMonth();
+                        const firstDow = new Date(calYear, calMonthNum, 1).getDay();
+                        const daysInMonth = new Date(calYear, calMonthNum + 1, 0).getDate();
+                        const cells: (number | null)[] = Array(firstDow).fill(null);
+                        for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+                        const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+                        const toDateStr = (day: number) => {
+                          const m = String(calMonthNum + 1).padStart(2, "0");
+                          return `${calYear}-${m}-${String(day).padStart(2, "0")}`;
+                        };
+                        const getOverride = (dateStr: string): ConsultantSlotOverride | undefined =>
+                          slotOverrides.find(o => o.date === dateStr);
+                        const isDaySelectable = (day: number) => {
+                          if (slotOverridesLoading) return false;
+                          const d = new Date(calYear, calMonthNum, day);
+                          if (d < todayStart) return false;
+                          const dayName = DAYS_SHORT[d.getDay()];
+                          const coveredBySchedule = consultantSlotSeries.length > 0
+                            ? consultantSlotSeries.some(s => s.days.includes(dayName))
+                            : consultantAvailableDays.includes(dayName);
+                          if (!coveredBySchedule) return false;
+                          const override = getOverride(toDateStr(day));
+                          if (override?.isPaused) return false;
+                          return true;
+                        };
+                        const formatDateLabel = (dateStr: string) => {
+                          const d = new Date(dateStr + "T00:00:00");
+                          return d.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short", year: "numeric" });
+                        };
+                        const getTimeWindowsForDate = (dateStr: string): { from: string; to: string }[] => {
+                          const ov = getOverride(dateStr);
+                          if (ov && !ov.isPaused) return [{ from: ov.customFrom || consultantFrom, to: ov.customTo || consultantTo }];
+                          if (consultantSlotSeries.length > 0) {
+                            const d = new Date(dateStr + "T00:00:00");
+                            const dayName = DAYS_SHORT[d.getDay()];
+                            return consultantSlotSeries.filter(s => s.days.includes(dayName)).map(s => ({ from: s.from, to: s.to }));
+                          }
+                          return [{ from: consultantFrom, to: consultantTo }];
+                        };
+                        return (
+                          <FormItem>
+                            <FormLabel className="flex items-center gap-2">
+                              <CalendarDays className="h-4 w-4" />
+                              Select Appointment Date
+                            </FormLabel>
+                            <div className="rounded-lg border bg-background p-3 space-y-2 mt-1">
+                              <div className="flex items-center justify-between">
+                                <button type="button" data-testid="btn-cal-prev-month" onClick={() => setCalendarMonth(prev => { const d = new Date(prev); d.setMonth(d.getMonth() - 1); return d; })} className="p-1 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground">
+                                  <ChevronLeft className="h-4 w-4" />
+                                </button>
+                                <span className="text-sm font-medium">{calendarMonth.toLocaleString("default", { month: "long", year: "numeric" })}</span>
+                                <button type="button" data-testid="btn-cal-next-month" onClick={() => setCalendarMonth(prev => { const d = new Date(prev); d.setMonth(d.getMonth() + 1); return d; })} className="p-1 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground">
+                                  <ChevronRight className="h-4 w-4" />
+                                </button>
+                              </div>
+                              <div className="grid grid-cols-7 gap-1 text-center">
+                                {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map(h => (
+                                  <div key={h} className="text-xs font-medium text-muted-foreground py-1">{h}</div>
+                                ))}
+                                {cells.map((day, idx) => {
+                                  if (!day) return <div key={`e-${idx}`} />;
+                                  const dateStr = toDateStr(day);
+                                  const selectable = isDaySelectable(day);
+                                  const isSelected = selectedDate === dateStr;
+                                  const isToday = new Date(calYear, calMonthNum, day).getTime() === todayStart.getTime();
+                                  return (
+                                    <button key={dateStr} type="button" data-testid={`cal-date-${dateStr}`} disabled={!selectable}
+                                      onClick={() => { setSelectedDate(dateStr); field.onChange(""); }}
+                                      className={["h-9 w-full rounded-md text-sm font-medium transition-colors select-none",
+                                        !selectable ? "text-muted-foreground/40 cursor-not-allowed" : isSelected ? "bg-primary text-primary-foreground" : "hover:bg-primary/10 hover:text-primary cursor-pointer",
+                                        isToday && !isSelected ? "border-2 border-primary" : "border border-transparent",
+                                      ].join(" ")}
+                                    >{day}</button>
+                                  );
+                                })}
+                              </div>
+                              <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground pt-1 border-t">
+                                <span className="flex items-center gap-1"><span className="inline-block h-3 w-3 rounded bg-primary" />Selected</span>
+                                <span className="flex items-center gap-1"><span className="inline-block h-3 w-3 rounded border-2 border-primary" />Today</span>
+                                <span className="flex items-center gap-1"><span className="inline-block h-3 w-3 rounded bg-muted" />Unavailable</span>
+                              </div>
+                            </div>
+                            {selectedDate && !getOverride(selectedDate)?.isPaused && (
+                              <div className="space-y-2 pt-1">
+                                <p className="text-sm text-muted-foreground flex items-center gap-1.5">
+                                  <Clock className="h-3.5 w-3.5" />
+                                  Available windows on <span className="font-medium text-foreground">{formatDateLabel(selectedDate)}</span>
+                                </p>
+                                <div className="flex flex-wrap gap-2">
+                                  {getTimeWindowsForDate(selectedDate).map(({ from, to }, idx) => {
+                                    const slotLabel = `${formatDateLabel(selectedDate)}, ${from}${to ? ` – ${to}` : ""}`;
+                                    return (
+                                      <button key={idx} type="button" data-testid={`button-time-slot-${idx}`}
+                                        onClick={() => field.onChange(slotLabel)}
+                                        className={`rounded-md border px-4 py-2 text-sm font-medium transition-colors ${field.value === slotLabel ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background hover:border-primary/60 hover:bg-muted"}`}
+                                      >
+                                        {from}{to ? ` – ${to}` : ""}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                                {field.value && (
+                                  <p className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
+                                    <Check className="h-3 w-3" />
+                                    Slot selected: {field.value}
+                                  </p>
+                                )}
+                              </div>
+                            )}
+                            <FormMessage />
+                          </FormItem>
+                        );
+                      }}
+                    />
+                  )}
+
+                  {/* Current status — required */}
+                  <FormField
+                    control={form.control}
+                    name="clinicalSummary"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Current Status / Update *</FormLabel>
+                        <FormControl>
+                          <Textarea
+                            placeholder="Describe current symptoms, response to treatment, any new complaints or changes since last consultation..."
+                            className="min-h-[120px]"
+                            {...field}
+                            data-testid="input-clinical-summary"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  {/* Upload Reports */}
+                  <div className="space-y-2">
+                    <FormLabel>Upload Reports (Optional)</FormLabel>
+                    <p className="text-xs text-muted-foreground">Upload patient reports, lab results, images</p>
+                    <div className="rounded-lg border-2 border-dashed border-muted-foreground/25 p-4">
+                      <div className="flex flex-col items-center gap-2">
+                        <Upload className="h-6 w-6 text-muted-foreground" />
+                        <p className="text-sm text-muted-foreground">Select one or more files</p>
+                        <Input type="file" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" onChange={handleReportFiles} multiple className="max-w-xs" data-testid="input-report-upload" />
+                      </div>
+                      {reportFiles.length > 0 && (
+                        <div className="mt-3 space-y-1">
+                          {reportFiles.map((file, i) => (
+                            <div key={i} className="flex items-center justify-between rounded border p-2 text-sm">
+                              <div className="flex items-center gap-2">
+                                <FileText className="h-3 w-3" />
+                                <span className="truncate max-w-[200px]">{file.name}</span>
+                              </div>
+                              <Button type="button" variant="ghost" size="icon" onClick={() => removeReportFile(i)} data-testid={`button-remove-report-${i}`}>
+                                <X className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Upload Treatment Charts */}
+                  <div className="space-y-2">
+                    <FormLabel>Upload Treatment Charts (Optional)</FormLabel>
+                    <p className="text-xs text-muted-foreground">Upload treatment records, nursing charts, medication charts</p>
+                    <div className="rounded-lg border-2 border-dashed border-muted-foreground/25 p-4">
+                      <div className="flex flex-col items-center gap-2">
+                        <Upload className="h-6 w-6 text-muted-foreground" />
+                        <p className="text-sm text-muted-foreground">Select one or more files</p>
+                        <Input type="file" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" onChange={handleChartFiles} multiple className="max-w-xs" data-testid="input-chart-upload" />
+                      </div>
+                      {chartFiles.length > 0 && (
+                        <div className="mt-3 space-y-1">
+                          {chartFiles.map((file, i) => (
+                            <div key={i} className="flex items-center justify-between rounded border p-2 text-sm">
+                              <div className="flex items-center gap-2">
+                                <FileText className="h-3 w-3" />
+                                <span className="truncate max-w-[200px]">{file.name}</span>
+                              </div>
+                              <Button type="button" variant="ghost" size="icon" onClick={() => removeChartFile(i)} data-testid={`button-remove-chart-${i}`}>
+                                <X className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Payment option */}
+                  <div className="rounded-lg border p-4">
+                    <div className="mb-3 flex items-center gap-2">
+                      <CreditCard className="h-5 w-5 text-muted-foreground" />
+                      <span className="font-medium">Payment Option</span>
+                    </div>
+                    <div className="space-y-3">
+                      <label className="flex items-center gap-3 rounded-lg border p-3 cursor-pointer hover:bg-muted/50" data-testid="radio-pay-later">
+                        <input type="radio" name="paymentMethod" value="pay_later" checked={paymentMethod === "pay_later"} onChange={() => setPaymentMethod("pay_later")} className="h-4 w-4" />
+                        <div>
+                          <div className="font-medium">Pay Later</div>
+                          <div className="text-sm text-muted-foreground">Pay within 30 days. Invoice will be generated.</div>
+                        </div>
+                      </label>
+                      <label className="flex items-center gap-3 rounded-lg border p-3 cursor-pointer hover:bg-muted/50" data-testid="radio-pay-now">
+                        <input type="radio" name="paymentMethod" value="pay_now" checked={paymentMethod === "pay_now"} onChange={() => setPaymentMethod("pay_now")} className="h-4 w-4" />
+                        <div>
+                          <div className="font-medium">Pay Now</div>
+                          <div className="text-sm text-muted-foreground">Mark as paid immediately.</div>
+                        </div>
+                      </label>
+                    </div>
+                  </div>
+
+                  <Button
+                    type="button"
+                    className="w-full"
+                    disabled={bookingMutation.isPending || uploading}
+                    onClick={handleFollowUpSubmit}
+                    data-testid="button-confirm-followup"
+                  >
+                    {bookingMutation.isPending || uploading ? "Processing..." : paymentMethod === "pay_now" ? "Confirm & Pay" : "Confirm Follow-Up"}
+                  </Button>
+                </CardContent>
+              </Card>
+            </form>
+          </Form>
+        </div>
+      </div>
+    );
+  }
+  // ── End Follow-Up Mode ────────────────────────────────────────────────────
 
   const stepLabels = ["Patient Details", "Clinical Info", "Confirm"];
   const currentStepIndex = step === "details" ? 0 : step === "clinical" ? 1 : 2;
