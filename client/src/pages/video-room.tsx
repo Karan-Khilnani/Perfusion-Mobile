@@ -39,6 +39,8 @@ export default function VideoRoomPage() {
   const ringTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const ringingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const phaseRef = useRef<CallPhase>("precall");
+  // Stable ref to latest booking so unmount cleanup can access it
+  const bookingRef = useRef<Booking | null>(null);
 
   const urlParams = new URLSearchParams(window.location.search);
   const returnTo = urlParams.get("returnTo") || "/user/orders";
@@ -72,6 +74,11 @@ export default function VideoRoomPage() {
   useEffect(() => {
     phaseRef.current = phase;
   }, [phase]);
+
+  // Keep bookingRef in sync so unmount cleanup has the latest value
+  useEffect(() => {
+    if (booking) bookingRef.current = booking;
+  }, [booking]);
 
   // Callee who accepted an incoming call skips precall → goes straight to connected
   useEffect(() => {
@@ -180,10 +187,10 @@ export default function VideoRoomPage() {
 
   const handleRetry = () => {
     setRingingSeconds(0);
+    // Setting phase back to "precall" is enough:
+    // - Provider: the auto-ring useEffect fires when phase becomes "precall"
+    // - Seeker: pre-call form re-appears; they click the button manually
     setPhase("precall");
-    if (isProvider && booking) {
-      setTimeout(() => handleRing(), 0);
-    }
   };
 
   const hangUp = () => {
@@ -210,7 +217,15 @@ export default function VideoRoomPage() {
   }, []);
 
   useEffect(() => {
-    return () => { clearRingTimer(); };
+    return () => {
+      clearRingTimer();
+      // If the component unmounts while still ringing (e.g. user navigates away
+      // without clicking Cancel), tell the server to cancel the session so the
+      // recipient stops seeing the ghost incoming-call overlay.
+      if (phaseRef.current === "ringing" && bookingRef.current) {
+        apiRequest("POST", `/api/call/cancel/${bookingRef.current.id}`, {}).catch(() => {});
+      }
+    };
   }, []);
 
   if (!roomId || !dailyUrl) {

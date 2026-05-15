@@ -31,6 +31,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
   const [notificationsEnabled, setNotificationsEnabled] = useState<boolean | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioUnlocked = useRef(false);
+  const callAutoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Create the audio element once and unlock it on first user interaction.
   useEffect(() => {
@@ -85,14 +86,28 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
     }).catch(() => {});
   }, []);
 
+  const clearCallAutoTimer = useCallback(() => {
+    if (callAutoTimerRef.current) {
+      clearTimeout(callAutoTimerRef.current);
+      callAutoTimerRef.current = null;
+    }
+  }, []);
+
   const handleCallEvent = useCallback((event: CallEvent) => {
     if (event.type === "incoming_call") {
       setIncomingCall(event);
+      // Auto-dismiss after 70 seconds in case the server's timeout/cancel event
+      // is missed (e.g. tab was backgrounded or SSE reconnected after the event).
+      clearCallAutoTimer();
+      callAutoTimerRef.current = setTimeout(() => {
+        setIncomingCall(null);
+      }, 70000);
     } else if (event.type === "call_timeout" || event.type === "call_cancelled") {
       if (event.bookingId) dismissNotification(event.bookingId);
+      clearCallAutoTimer();
       setIncomingCall(null);
     }
-  }, [dismissNotification]);
+  }, [dismissNotification, clearCallAutoTimer]);
 
   useCallEvents(handleCallEvent);
 
@@ -217,7 +232,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
       {incomingCall && (
         <IncomingCallOverlay
           callEvent={incomingCall}
-          onDismiss={() => setIncomingCall(null)}
+          onDismiss={() => { clearCallAutoTimer(); setIncomingCall(null); }}
         />
       )}
 
