@@ -133,7 +133,12 @@ export default function OrdersPage() {
 
   const BookingCard = ({ booking }: { booking: Booking }) => {
     const Icon = typeIcons[booking.bookingType as BookingType];
-    
+    const [, cardNavigate] = useLocation();
+    const canFollowUp = booking.bookingType === "consultation" &&
+      booking.createdAt &&
+      differenceInDays(new Date(), new Date(booking.createdAt)) < 7 &&
+      !["cancelled"].includes(booking.status);
+
     return (
       <Card
         className={`cursor-pointer overflow-visible transition-all ${
@@ -170,6 +175,23 @@ export default function OrdersPage() {
                     </span>
                   )}
                 </div>
+                {canFollowUp && (
+                  <div className="mt-3">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 text-xs border-blue-300 text-blue-700 hover:bg-blue-50 dark:border-blue-700 dark:text-blue-300 dark:hover:bg-blue-900/30"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        cardNavigate(`/user/consultation/${booking.serviceId}/book?parentBookingId=${booking.id}`);
+                      }}
+                      data-testid={`button-follow-up-${booking.id}`}
+                    >
+                      <RefreshCw className="mr-1.5 h-3 w-3" />
+                      Book Follow-Up
+                    </Button>
+                  </div>
+                )}
               </div>
             </div>
             <div className="flex flex-col items-end gap-2">
@@ -466,7 +488,7 @@ export default function OrdersPage() {
               size="sm"
               variant="outline"
               className="border-blue-300 text-blue-700 hover:bg-blue-100 dark:border-blue-700 dark:text-blue-300 dark:hover:bg-blue-900/30"
-              onClick={() => navigate(`/book/consultation/${booking.serviceId}?parentBookingId=${booking.id}`)}
+              onClick={() => navigate(`/user/consultation/${booking.serviceId}/book?parentBookingId=${booking.id}`)}
               data-testid="button-book-follow-up"
             >
               <RefreshCw className="mr-2 h-3.5 w-3.5" />
