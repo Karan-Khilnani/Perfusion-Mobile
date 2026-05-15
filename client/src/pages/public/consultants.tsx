@@ -72,15 +72,6 @@ function ConsultantProfileSheet({
           </div>
         </div>
 
-        {consultant.affiliatedInstitution && (
-          <div className="mb-5">
-            <div className="flex items-center gap-1.5 text-sm font-medium mb-1.5">
-              <Building2 className="h-4 w-4 text-muted-foreground" />
-              Affiliated Institution
-            </div>
-            <p className="text-sm text-muted-foreground pl-5" data-testid="text-profile-affiliation">{consultant.affiliatedInstitution}</p>
-          </div>
-        )}
 
         {consultant.portfolio && (
           <div className="mb-5">
@@ -112,18 +103,6 @@ function ConsultantProfileSheet({
           </div>
         )}
 
-        {(consultant.registrationNumber || consultant.registeredOrganization) && (
-          <div className="mb-6">
-            <div className="flex items-center gap-1.5 text-sm font-medium mb-1.5">
-              <User className="h-4 w-4 text-muted-foreground" />
-              Registration
-            </div>
-            <div className="pl-5 space-y-0.5 text-sm text-muted-foreground">
-              {consultant.registrationNumber && <p data-testid="text-profile-reg-no">Reg. No: {consultant.registrationNumber}</p>}
-              {consultant.registeredOrganization && <p data-testid="text-profile-reg-org">{consultant.registeredOrganization}</p>}
-            </div>
-          </div>
-        )}
 
         <Separator className="mb-5" />
 
