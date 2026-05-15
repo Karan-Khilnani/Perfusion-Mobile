@@ -62,7 +62,7 @@ export default function ProviderOnboardingPage() {
   const createProviderMutation = useMutation({
     mutationFn: async (data: ProviderFormData) => {
       const payload = {
-        name: currentUser?.hospitalName || "",
+        name: currentUser?.hospitalName || `${currentUser?.firstName || ""} ${currentUser?.lastName || ""}`.trim() || "",
         type: data.type,
         description: data.description || "",
         location: data.location,
@@ -72,11 +72,33 @@ export default function ProviderOnboardingPage() {
         licenseNumber: currentUser?.hospitalRegistrationNo || "",
         registeredOrganization: currentUser?.hospitalRegisteredOrg || "",
       };
-      return apiRequest("POST", "/api/providers", payload);
+      const providerRes = await apiRequest("POST", "/api/providers", payload);
+      const provider = await providerRes.json();
+
+      if (data.type === "consultant") {
+        const consultantName = (
+          currentUser?.hospitalName ||
+          `${currentUser?.firstName || ""} ${currentUser?.lastName || ""}`.trim()
+        );
+        await apiRequest("POST", "/api/provider/consultants", {
+          name: consultantName,
+          qualification: "",
+          specialization: "",
+          yearsExperience: 0,
+          consultationFee: "0",
+          registrationNumber: currentUser?.hospitalRegistrationNo || "",
+          registeredOrganization: currentUser?.hospitalRegisteredOrg || "",
+          affiliatedInstitution: "",
+          status: "active",
+        });
+      }
+
+      return provider;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
       queryClient.invalidateQueries({ queryKey: ["/api/providers/me"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/provider/my-consultants"] });
       toast({
         title: "Registration Complete",
         description: "Your provider profile is ready. You can now add services.",

@@ -14,7 +14,8 @@ import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { ImageCropDialog } from "@/components/ui/image-crop-dialog";
 import { apiRequest } from "@/lib/queryClient";
-import { Camera, Loader2, Save, Building, User, Upload, FileText, X, Clock, PenLine } from "lucide-react";
+import { Camera, Loader2, Save, Building, User, Upload, FileText, X, Clock, PenLine, AlertCircle, CheckCircle2, Info } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ConsultantSlotEditor } from "@/components/consultant-slot-editor";
 
 const personalSchema = z.object({
@@ -197,23 +198,37 @@ export default function ProfilePage() {
           affiliatedInstitution: consultant.affiliatedInstitution || "",
           portfolio: consultant.portfolio || "",
         }
-      : undefined,
+      : {
+          name: user ? `${user.firstName || ""} ${user.lastName || ""}`.trim() : "",
+          qualification: "",
+          specialization: "",
+          yearsExperience: 0,
+          consultationFee: "",
+          registrationNumber: user?.hospitalRegistrationNo || "",
+          registeredOrganization: user?.hospitalRegisteredOrg || "",
+          affiliatedInstitution: "",
+          portfolio: "",
+        },
   });
 
-  const updateConsultantDetailsMutation = useMutation({
+  const saveConsultantDetailsMutation = useMutation({
     mutationFn: async (data: ConsultantDetailsFormData & { registrationDocumentUrl?: string }) => {
-      if (!consultant?.id) throw new Error("No consultant record");
       const payload = { ...data, consultationFee: String(data.consultationFee) };
-      const res = await apiRequest("PATCH", `/api/provider/consultants/${consultant.id}`, payload);
-      return res.json();
+      if (consultant?.id) {
+        const res = await apiRequest("PATCH", `/api/provider/consultants/${consultant.id}`, payload);
+        return res.json();
+      } else {
+        const res = await apiRequest("POST", "/api/provider/consultants", { ...payload, status: "active" });
+        return res.json();
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/provider/my-consultants"] });
       queryClient.invalidateQueries({ queryKey: ["/api/provider/dashboard"] });
-      toast({ title: "Professional details saved" });
+      toast({ title: consultant?.id ? "Professional details saved" : "Profile created — pending admin approval" });
     },
     onError: () => {
-      toast({ title: "Update failed", description: "Could not save professional details.", variant: "destructive" });
+      toast({ title: "Save failed", description: "Could not save professional details.", variant: "destructive" });
     },
   });
 
@@ -356,12 +371,52 @@ export default function ProfilePage() {
 
   // ── Consultant profile ─────────────────────────────────────────────────────
   if (providerType === "consultant") {
+    const approvalStatus = consultant?.approvalStatus;
+
     return (
       <div className="max-w-2xl mx-auto space-y-6">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">My Profile</h1>
           <p className="text-muted-foreground">Manage your personal and professional details</p>
         </div>
+
+        {/* Approval status banner */}
+        {!consultant && (
+          <Alert className="border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-900">
+            <Info className="h-4 w-4 text-amber-600" />
+            <AlertTitle className="text-amber-800 dark:text-amber-400">Complete your professional profile</AlertTitle>
+            <AlertDescription className="text-amber-700 dark:text-amber-500">
+              Your account is set up, but your professional details haven't been filled in yet. Please complete the Professional Details section below so seekers can find and book you.
+            </AlertDescription>
+          </Alert>
+        )}
+        {consultant && approvalStatus === "pending" && (
+          <Alert className="border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-900">
+            <AlertCircle className="h-4 w-4 text-amber-600" />
+            <AlertTitle className="text-amber-800 dark:text-amber-400">Pending admin approval</AlertTitle>
+            <AlertDescription className="text-amber-700 dark:text-amber-500">
+              Your profile has been submitted and is awaiting review. You won't appear in the seeker catalog until an admin approves your profile. No action needed — we'll notify you once it's done.
+            </AlertDescription>
+          </Alert>
+        )}
+        {consultant && approvalStatus === "rejected" && (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Profile not approved</AlertTitle>
+            <AlertDescription>
+              Your profile was not approved. Please update your details and contact support for assistance.
+            </AlertDescription>
+          </Alert>
+        )}
+        {consultant && approvalStatus === "approved" && (
+          <Alert className="border-green-200 bg-green-50 dark:bg-green-950/20 dark:border-green-900">
+            <CheckCircle2 className="h-4 w-4 text-green-600" />
+            <AlertTitle className="text-green-800 dark:text-green-400">Profile approved — visible to seekers</AlertTitle>
+            <AlertDescription className="text-green-700 dark:text-green-500">
+              Your profile is active and visible in the seeker catalog.
+            </AlertDescription>
+          </Alert>
+        )}
 
         {photoCard}
 
@@ -442,21 +497,20 @@ export default function ProfilePage() {
         )}
 
         {/* Professional Details — consultant record fields */}
-        {consultant && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2">
-                <FileText className="h-4 w-4" />
-                Professional Details
-              </CardTitle>
-              <CardDescription>Your qualifications, experience, and fee — used for bookings and seeker listings.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Form {...consultantDetailsForm}>
-                <form
-                  onSubmit={consultantDetailsForm.handleSubmit((d) => updateConsultantDetailsMutation.mutate(d))}
-                  className="space-y-4"
-                >
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <FileText className="h-4 w-4" />
+              Professional Details
+            </CardTitle>
+            <CardDescription>Your qualifications, experience, and fee — used for bookings and seeker listings.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Form {...consultantDetailsForm}>
+              <form
+                onSubmit={consultantDetailsForm.handleSubmit((d) => saveConsultantDetailsMutation.mutate(d))}
+                className="space-y-4"
+              >
                   <div className="grid grid-cols-2 gap-4">
                     <FormField control={consultantDetailsForm.control} name="name" render={({ field }) => (
                       <FormItem>
@@ -530,39 +584,42 @@ export default function ProfilePage() {
                     </FormItem>
                   )} />
 
-                  {/* Registration document */}
-                  <div className="space-y-2">
-                    <p className="text-sm font-medium">Registration Document</p>
-                    {consultant.registrationDocumentUrl ? (
-                      <div className="flex items-center gap-2 rounded-md border p-2">
-                        <FileText className="h-4 w-4 text-muted-foreground" />
-                        <a href={consultant.registrationDocumentUrl} target="_blank" rel="noopener noreferrer" className="flex-1 text-sm truncate text-primary underline">View Document</a>
-                        <label className="cursor-pointer">
-                          <Button type="button" variant="ghost" size="sm" asChild disabled={consultantRegDocUploading}>
-                            <span>{consultantRegDocUploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Replace"}</span>
-                          </Button>
-                          <input type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleConsultantRegDocUpload(f); if (e.target) e.target.value = ""; }} data-testid="input-replace-consultant-reg-doc" />
+                  {/* Registration document — only after record exists */}
+                  {consultant ? (
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium">Registration Document</p>
+                      {consultant.registrationDocumentUrl ? (
+                        <div className="flex items-center gap-2 rounded-md border p-2">
+                          <FileText className="h-4 w-4 text-muted-foreground" />
+                          <a href={consultant.registrationDocumentUrl} target="_blank" rel="noopener noreferrer" className="flex-1 text-sm truncate text-primary underline">View Document</a>
+                          <label className="cursor-pointer">
+                            <Button type="button" variant="ghost" size="sm" asChild disabled={consultantRegDocUploading}>
+                              <span>{consultantRegDocUploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Replace"}</span>
+                            </Button>
+                            <input type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleConsultantRegDocUpload(f); if (e.target) e.target.value = ""; }} data-testid="input-replace-consultant-reg-doc" />
+                          </label>
+                        </div>
+                      ) : (
+                        <label className="flex items-center gap-2 rounded-md border border-dashed p-3 cursor-pointer hover:bg-muted/50 transition-colors" data-testid="label-upload-consultant-reg-doc">
+                          <Upload className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-sm text-muted-foreground">{consultantRegDocUploading ? "Uploading..." : "Upload registration certificate (PDF or image)"}</span>
+                          <input type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleConsultantRegDocUpload(f); if (e.target) e.target.value = ""; }} />
                         </label>
-                      </div>
-                    ) : (
-                      <label className="flex items-center gap-2 rounded-md border border-dashed p-3 cursor-pointer hover:bg-muted/50 transition-colors" data-testid="label-upload-consultant-reg-doc">
-                        <Upload className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-sm text-muted-foreground">{consultantRegDocUploading ? "Uploading..." : "Upload registration certificate (PDF or image)"}</span>
-                        <input type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleConsultantRegDocUpload(f); if (e.target) e.target.value = ""; }} />
-                      </label>
-                    )}
-                  </div>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">You can upload your registration certificate after saving the profile above.</p>
+                  )}
 
-                  <Button type="submit" disabled={updateConsultantDetailsMutation.isPending} data-testid="button-save-consultant-details">
-                    {updateConsultantDetailsMutation.isPending
+                  <Button type="submit" disabled={saveConsultantDetailsMutation.isPending} data-testid="button-save-consultant-details">
+                    {saveConsultantDetailsMutation.isPending
                       ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Saving...</>
-                      : <><Save className="h-4 w-4 mr-2" />Save Professional Details</>}
+                      : <><Save className="h-4 w-4 mr-2" />{consultant ? "Save Professional Details" : "Create Profile"}</>}
                   </Button>
                 </form>
               </Form>
             </CardContent>
           </Card>
-        )}
 
         {/* Account Details — availability + signature */}
         <Card>
