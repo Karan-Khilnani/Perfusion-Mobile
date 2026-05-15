@@ -430,15 +430,15 @@ export default function ConsultationPage() {
                     )}
                     <div>
                       <CardTitle className="text-lg">{consultant.name}</CardTitle>
+                      {consultant.specialization && (
+                        <p className="text-base font-semibold text-primary mt-0.5">{consultant.specialization}</p>
+                      )}
                       <p className="text-sm text-muted-foreground">{consultant.qualification}</p>
                     </div>
                   </div>
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
-                {consultant.specialization && (
-                  <Badge variant="secondary">{consultant.specialization}</Badge>
-                )}
 
                 <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
                   <span className="flex items-center gap-1">
