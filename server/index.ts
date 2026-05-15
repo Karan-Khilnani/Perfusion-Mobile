@@ -3,6 +3,7 @@ import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 import { seedDatabase } from "./seed";
+import { startConsultationScheduler } from "./services/consultation-scheduler";
 import path from "path";
 import fs from "fs";
 
@@ -82,6 +83,7 @@ async function startServer() {
     await seedDatabase();
     
     await registerRoutes(httpServer, app);
+    startConsultationScheduler();
 
     app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
       const status = err.status || err.statusCode || 500;

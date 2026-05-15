@@ -7,7 +7,7 @@ import type { BookingStatus, UserRole, ProviderType, ProviderStatus, ServiceStat
 import multer from "multer";
 import path from "path";
 import fs from "fs";
-import { notifyAdminLabBooking, notifyUserReportReady, triggerVoiceCall, cancelVoiceCall } from "./services/msg91";
+import { notifyAdminLabBooking, notifyUserReportReady, cancelVoiceCall } from "./services/msg91";
 import { generateBookingNumber } from "./services/booking-number";
 import { calculateCustomerPrice, deriveMarginFromPrice, derivePriceFromMargin } from "./services/pricing";
 import { processReport, type BookingReportData } from "./services/report-processor";
@@ -3884,30 +3884,6 @@ export async function registerRoutes(
       }
 
       res.json({ success: true, session: { bookingId, status: "ringing" } });
-
-      // Twilio voice call fallback — rings the recipient's actual phone number
-      // even when the phone is locked or the browser is fully closed.
-      // Runs entirely after the response is sent so it never adds latency.
-      // The returned SID is stored on the session so we can cancel the call
-      // the moment the recipient accepts, declines, or the call times out.
-      storage.getUserById(recipientUserId).then(async (recipientUser) => {
-        if (!recipientUser?.phone) return;
-        const svcName = (booking.serviceName || "consultation").replace(/[<>&'"]/g, "");
-        const safeCallerName = callerName.replace(/[<>&'"]/g, "");
-        const voiceMsg =
-          `Hello. You have an incoming ${svcName} call on Perfusion from ${safeCallerName}. ` +
-          `Please open the Perfusion app to join the call. ` +
-          `This call is from ${safeCallerName} on Perfusion Healthcare.`;
-        const sid = await triggerVoiceCall(recipientUser.phone, voiceMsg).catch((err: any) => {
-          console.error("[Call] Twilio fallback voice call failed:", err?.message || err);
-          return null;
-        });
-        if (sid) {
-          // Attach SID to the session so it can be cancelled on accept/decline/timeout
-          const s = callSessions.get(bookingId);
-          if (s) s.twilioCallSid = sid;
-        }
-      }).catch(() => {});
     } catch (error) {
       console.error("[Call] Ring error:", error);
       res.status(500).json({ error: "Failed to initiate ring" });
