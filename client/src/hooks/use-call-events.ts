@@ -6,7 +6,8 @@ export type CallEventType =
   | "call_accepted"
   | "call_declined"
   | "call_timeout"
-  | "call_cancelled";
+  | "call_cancelled"
+  | "document_uploaded";
 
 export interface CallEvent {
   type: CallEventType;
@@ -16,6 +17,8 @@ export interface CallEvent {
   videoRoomUrl?: string;
   serviceName?: string;
   subtitle?: string;
+  url?: string;
+  fileName?: string;
 }
 
 type CallEventHandler = (event: CallEvent) => void;

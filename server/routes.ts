@@ -4,6 +4,9 @@ import { storage } from "./storage";
 import { setupAuth, isAuthenticated, isAdmin, isProvider, updateUserRole } from "./auth";
 import { registerAuthRoutes } from "./auth/routes";
 import type { BookingStatus, UserRole, ProviderType, ProviderStatus, ServiceStatus } from "@shared/schema";
+import { consultants } from "@shared/schema";
+import { db } from "./db";
+import { eq } from "drizzle-orm";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
@@ -3014,6 +3017,66 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error updating booking:", error);
       res.status(500).json({ message: "Failed to update booking" });
+    }
+  });
+
+  // In-call document upload — seeker or provider uploads a file during a video consultation.
+  // File is saved to disk, appended to documentUrls, and broadcast to both parties via SSE.
+  app.post("/api/bookings/:id/call-document", isAuthenticated, uploadReport.single("file"), async (req: any, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) return res.status(401).json({ message: "Not authenticated" });
+
+      const booking = await storage.getBookingById(req.params.id);
+      if (!booking) return res.status(404).json({ message: "Booking not found" });
+
+      // Allow the seeker (booking owner) or the assigned provider
+      let isAuthorised = booking.userId === userId;
+      if (!isAuthorised && booking.providerId) {
+        // Check if the current user is the provider for this consultant
+        const provider = await storage.getProviderByUserId(userId);
+        if (provider) {
+          const [consultant] = await db
+            .select()
+            .from(consultants)
+            .where(eq(consultants.providerId, provider.id))
+            .limit(1);
+          if (consultant && consultant.id === booking.providerId) {
+            isAuthorised = true;
+          }
+        }
+      }
+      if (!isAuthorised) return res.status(403).json({ message: "Access denied" });
+
+      if (!req.file) return res.status(400).json({ message: "No file uploaded" });
+
+      const fileUrl = `/uploads/reports/${req.file.filename}`;
+      const fileName = req.file.originalname || req.file.filename;
+
+      // Append to documentUrls
+      const existing = (booking.documentUrls || []).filter((u: any) => u && u !== "undefined");
+      await storage.updateBooking(booking.id, { documentUrls: [...existing, fileUrl] } as any);
+
+      // Broadcast SSE document_uploaded to both seeker and provider
+      const event = { type: "document_uploaded", bookingId: booking.id, url: fileUrl, fileName };
+      broadcastCallEvent(booking.userId, event);
+      if (booking.providerId) {
+        // Find the provider's userId to broadcast to them too
+        const [consultant] = await db
+          .select()
+          .from(consultants)
+          .where(eq(consultants.id, booking.providerId))
+          .limit(1);
+        if (consultant?.providerId) {
+          const provider = await storage.getProviderById(consultant.providerId);
+          if (provider?.userId) broadcastCallEvent(provider.userId, event);
+        }
+      }
+
+      res.json({ url: fileUrl, fileName });
+    } catch (error) {
+      console.error("[CallDoc] Upload error:", error);
+      res.status(500).json({ message: "Upload failed" });
     }
   });
 

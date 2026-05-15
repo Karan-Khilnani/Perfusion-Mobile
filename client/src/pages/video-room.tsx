@@ -6,9 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, Video, VideoOff, Phone, Maximize2, Minimize2, Stethoscope, ClipboardList, PhoneOff, RefreshCw } from "lucide-react";
+import { ArrowLeft, Video, VideoOff, Phone, Maximize2, Minimize2, Stethoscope, ClipboardList, PhoneOff, RefreshCw, PanelRightClose, PanelRightOpen } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useCallEvents, type CallEvent } from "@/hooks/use-call-events";
+import { ClinicalPanel } from "@/components/clinical-panel";
 import type { Booking } from "@shared/schema";
 
 type CallPhase =
@@ -27,6 +28,8 @@ export default function VideoRoomPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [onCallDoctorName, setOnCallDoctorName] = useState("");
   const [onCallDoctorDesignation, setOnCallDoctorDesignation] = useState("");
+  const [panelOpen, setPanelOpen] = useState(true);
+  const [inCallDocs, setInCallDocs] = useState<{ url: string; name: string }[]>([]);
   const [phase, setPhase] = useState<CallPhase>("precall");
   const [ringingSeconds, setRingingSeconds] = useState(0);
   // Tracks whether we've applied the initial accepted=true jump (avoid re-render loop)
@@ -104,6 +107,11 @@ export default function VideoRoomPage() {
     } else if (event.type === "call_timeout" && currentPhase === "ringing") {
       clearRingTimer();
       setPhase("timeout");
+    } else if (event.type === "document_uploaded" && event.url && event.fileName) {
+      setInCallDocs(prev => {
+        if (prev.some(d => d.url === event.url)) return prev;
+        return [...prev, { url: event.url!, name: event.fileName! }];
+      });
     }
   }, [booking]);
 
@@ -386,7 +394,7 @@ export default function VideoRoomPage() {
   // ─── Connected — Video Room ────────────────────────────────────────────────
   return (
     <div className="flex h-screen flex-col bg-background">
-      <header className="flex items-center justify-between border-b px-4 py-3">
+      <header className="flex items-center justify-between border-b px-4 py-3 shrink-0">
         <div className="flex items-center gap-4">
           <Link href={returnTo}>
             <Button variant="ghost" size="icon" data-testid="button-back">
@@ -405,42 +413,71 @@ export default function VideoRoomPage() {
             <Video className="h-3.5 w-3.5" />
             Live
           </Badge>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setPanelOpen(o => !o)}
+            title={panelOpen ? "Hide patient file" : "Show patient file"}
+            data-testid="button-toggle-panel"
+          >
+            {panelOpen
+              ? <PanelRightClose className="h-5 w-5" />
+              : <PanelRightOpen className="h-5 w-5" />
+            }
+          </Button>
         </div>
       </header>
 
-      <div
-        ref={containerRef}
-        className="relative flex-1 bg-black"
-        style={{ minHeight: "500px" }}
-      >
-        {isLoading && (
-          <div className="absolute inset-0 z-10 flex items-center justify-center bg-background">
-            <div className="text-center">
-              <div className="mb-4 h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto" />
-              <p className="text-muted-foreground">Connecting to video room...</p>
+      {/* Main area: video + clinical panel side by side */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Video */}
+        <div
+          ref={containerRef}
+          className="relative flex-1 bg-black"
+        >
+          {isLoading && (
+            <div className="absolute inset-0 z-10 flex items-center justify-center bg-background">
+              <div className="text-center">
+                <div className="mb-4 h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto" />
+                <p className="text-muted-foreground">Connecting to video room...</p>
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {dailyUrl && (
-          <iframe
-            ref={iframeRef}
-            src={dailyUrl}
-            allow="camera; microphone; fullscreen; display-capture; autoplay"
-            className="w-full h-full border-0"
-            style={{
-              position: "absolute",
-              top: 0,
-              left: 0,
-              width: "100%",
-              height: "100%",
-            }}
-            data-testid="video-container"
+          {dailyUrl && (
+            <iframe
+              ref={iframeRef}
+              src={dailyUrl}
+              allow="camera; microphone; fullscreen; display-capture; autoplay"
+              className="w-full h-full border-0"
+              style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                width: "100%",
+                height: "100%",
+              }}
+              data-testid="video-container"
+            />
+          )}
+        </div>
+
+        {/* Clinical panel */}
+        {panelOpen && booking && (
+          <ClinicalPanel
+            booking={booking}
+            isProvider={isProvider}
+            inCallDocs={inCallDocs}
+            onDocUploaded={(url, name) =>
+              setInCallDocs(prev =>
+                prev.some(d => d.url === url) ? prev : [...prev, { url, name }]
+              )
+            }
           />
         )}
       </div>
 
-      <footer className="flex items-center justify-center gap-4 border-t bg-muted/30 px-4 py-4">
+      <footer className="flex items-center justify-center gap-4 border-t bg-muted/30 px-4 py-4 shrink-0">
         <Button
           variant="destructive"
           size="icon"
