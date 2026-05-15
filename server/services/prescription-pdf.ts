@@ -83,7 +83,7 @@ function drawLabelValue(
   fontNorm: PDFFont, fontBold: PDFFont, labelW = 150
 ): number {
   page.drawText(label, { x: MARGIN + 10, y, size: 9, font: fontNorm, color: GREY });
-  const wrapped = wrapText(value || "—", fontNorm, 9, CONTENT_W - labelW - 10);
+  const wrapped = wrapText(value || "-", fontNorm, 9, CONTENT_W - labelW - 10);
   for (let i = 0; i < wrapped.length; i++) {
     page.drawText(wrapped[i], { x: MARGIN + labelW, y: y - i * 13, size: 9, font: fontBold, color: DARK });
   }
@@ -179,7 +179,7 @@ export async function generateAndStorePrescriptionPdf(data: PrescriptionPdfData,
   // ── Approval seal ─────────────────────────────────────────────────────────────
   page.drawRectangle({ x: MARGIN, y: y + 30, width: CONTENT_W - 90, height: 42, color: GREEN_BG });
   page.drawLine({ start: { x: MARGIN, y: y + 72 }, end: { x: MARGIN + CONTENT_W - 90, y: y + 72 }, thickness: 1.5, color: GREEN });
-  page.drawText("✓  CONFIRMED & SIGNED", { x: MARGIN + 10, y: y + 60, size: 11, font: fontBold, color: GREEN });
+  page.drawText("CONFIRMED & SIGNED", { x: MARGIN + 10, y: y + 60, size: 11, font: fontBold, color: GREEN });
   page.drawText(`Consultant confirmed this prescription on:`, { x: MARGIN + 10, y: y + 45, size: 8, font, color: GREY });
   page.drawText(approvalDateStr, { x: MARGIN + 10, y: y + 34, size: 9, font: fontBold, color: DARK });
 
@@ -215,7 +215,7 @@ export async function generateAndStorePrescriptionPdf(data: PrescriptionPdfData,
   if (data.patientAllergyNotSpecified) {
     y = drawLabelValue(page, "Allergies", "Not specified", y, font, fontBold);
   } else if (data.patientAllergies) {
-    y = drawLabelValue(page, "Allergies", `Yes — ${data.patientAllergies}`, y, font, fontBold);
+    y = drawLabelValue(page, "Allergies", `Yes - ${data.patientAllergies}`, y, font, fontBold);
   }
   y -= 8;
 
