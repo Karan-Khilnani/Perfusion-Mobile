@@ -5,6 +5,9 @@ import { triggerVoiceCall } from "./msg91";
 
 const ADMIN_PHONE = process.env.ADMIN_PHONE_NUMBER || "";
 
+// IST = UTC+5:30
+const IST_OFFSET_MS = (5 * 60 + 30) * 60 * 1000;
+
 // Tracks booking IDs that have already had appointment reminders fired
 // this server session, so we never double-call anyone.
 const remindedBookingIds = new Set<string>();
@@ -20,33 +23,42 @@ const DAY_MAP: Record<string, number> = {
 };
 
 /**
+ * Format a Date as IST time string for logging.
+ */
+function toISTString(d: Date): string {
+  return d.toLocaleString("en-IN", { timeZone: "Asia/Kolkata" });
+}
+
+/**
  * Parse an appointmentSlot string in any of these formats:
- *   "Mon, 15 May 2026, 10:00 AM – 11:00 AM"   (full date — calendar booking)
+ *   "Thu, 15 May 2026, 10:00 AM – 11:00 AM"   (full date — calendar booking)
  *   "Mon 10:00 AM"                              (legacy — day+time only)
  *   "Monday 10:00 AM"
  *   "Emergency - Immediate"                     → null (no time)
  *
- * For day+time-only slots the date is resolved to the current week's
- * occurrence of that weekday, so "Mon 10:00 AM" on a Monday at 10:00 AM
- * will match right now.
+ * ALL times in slot labels are IST (the browser generates them in local time).
+ * This function always returns a UTC Date that correctly represents the IST
+ * slot time so that comparing it with new Date() (also UTC) works correctly.
  */
 function parseSlotStart(slot: string): Date | null {
   if (!slot || slot.toLowerCase().includes("emergency") || slot.toLowerCase().includes("immediate")) {
     return null;
   }
 
-  const now = new Date();
+  const now = new Date(); // UTC
 
-  // ── Format 1: full date string ──────────────────────────────────────────
-  // "Mon, 15 May 2026, 10:00 AM – 11:00 AM"  or  "15 May 2026 10:00 AM"
-  // Strip the leading "Day, " prefix and anything after "–"
-  const beforeDash = slot.split(/[–—-]/)[0].trim();
-  const withoutDow = beforeDash.replace(/^[A-Za-z]+,\s*/, "").trim(); // remove "Mon, "
+  // ── Format 1: full date string with a year ──────────────────────────────
+  // "Thu, 15 May 2026, 10:00 AM – 11:00 AM"  →  strip day prefix & end range
+  const beforeDash = slot.split(/[–—]|(?<!\d)-(?!\d)/)[0].trim();
+  const withoutDow = beforeDash.replace(/^[A-Za-z]+,\s*/, "").trim(); // remove "Thu, "
   const normalized = withoutDow.replace(/,\s*/, " ").trim();          // "15 May 2026 10:00 AM"
   if (/\d{4}/.test(normalized)) {
-    // Contains a year — try direct parse
-    const parsed = new Date(normalized);
+    // Append IST offset so V8 treats the local time as IST, not UTC
+    const parsed = new Date(normalized + " +05:30");
     if (!isNaN(parsed.getTime())) return parsed;
+    // Fallback without offset (legacy data already stored as UTC)
+    const fallback = new Date(normalized);
+    if (!isNaN(fallback.getTime())) return fallback;
   }
 
   // ── Format 2: "Mon 10:00 AM" or "Monday 09:30 AM" ───────────────────────
@@ -55,36 +67,39 @@ function parseSlotStart(slot: string): Date | null {
   );
   if (shortMatch) {
     const dayKey = shortMatch[1].toLowerCase();
-    const targetDow = DAY_MAP[dayKey];
+    const targetDow = DAY_MAP[dayKey]; // intended day-of-week in IST
     if (targetDow === undefined) return null;
 
-    let hours = parseInt(shortMatch[2], 10);
-    const minutes = parseInt(shortMatch[3], 10);
+    let istH = parseInt(shortMatch[2], 10);
+    const istM = parseInt(shortMatch[3], 10);
     const ampm = shortMatch[4].toLowerCase();
-    if (ampm === "pm" && hours !== 12) hours += 12;
-    if (ampm === "am" && hours === 12) hours = 0;
+    if (ampm === "pm" && istH !== 12) istH += 12;
+    if (ampm === "am" && istH === 12) istH = 0;
 
-    // Find this week's occurrence of targetDow (relative to today)
-    const currentDow = now.getDay(); // 0=Sun … 6=Sat
-    const diff = targetDow - currentDow; // can be negative → earlier this week
-    const target = new Date(now);
-    target.setDate(now.getDate() + diff);
-    target.setHours(hours, minutes, 0, 0);
-    return target;
+    // Work in "IST virtual UTC" — shift now into IST, do calendar math, shift back
+    const nowISTms = now.getTime() + IST_OFFSET_MS;
+    const nowISTProxy = new Date(nowISTms); // UTC methods now give IST values
+
+    const currentDowIST = nowISTProxy.getUTCDay();
+    const diff = targetDow - currentDowIST; // may be negative (earlier this week)
+
+    const targetISTProxy = new Date(nowISTms);
+    targetISTProxy.setUTCDate(nowISTProxy.getUTCDate() + diff);
+    targetISTProxy.setUTCHours(istH, istM, 0, 0);
+
+    // Shift back to real UTC
+    return new Date(targetISTProxy.getTime() - IST_OFFSET_MS);
   }
 
   return null;
 }
 
-/** Returns true when two Dates are in the same calendar minute. */
+/**
+ * Returns true when two Dates fall in the same UTC minute (epoch-based).
+ * Timezone-agnostic — both dates are internally UTC so this is always correct.
+ */
 function sameMinute(a: Date, b: Date): boolean {
-  return (
-    a.getFullYear() === b.getFullYear() &&
-    a.getMonth() === b.getMonth() &&
-    a.getDate() === b.getDate() &&
-    a.getHours() === b.getHours() &&
-    a.getMinutes() === b.getMinutes()
-  );
+  return Math.floor(a.getTime() / 60000) === Math.floor(b.getTime() / 60000);
 }
 
 /**
@@ -104,7 +119,7 @@ async function fireAppointmentReminders(): Promise<void> {
       );
 
     const now = new Date();
-    console.log(`[Scheduler] Tick — ${now.toLocaleTimeString()} | ${activeBookings.length} active consultation booking(s) checked`);
+    console.log(`[Scheduler] Tick — ${toISTString(now)} IST | ${activeBookings.length} active consultation booking(s) checked`);
 
     for (const booking of activeBookings) {
       if (remindedBookingIds.has(booking.id)) continue;
@@ -118,7 +133,7 @@ async function fireAppointmentReminders(): Promise<void> {
       }
 
       const matches = sameMinute(slotStart, now);
-      console.log(`[Scheduler]   Booking ${booking.bookingNumber || booking.id}: slot "${booking.appointmentSlot}" → parsed ${slotStart.toLocaleTimeString()} | match=${matches}`);
+      console.log(`[Scheduler]   Booking ${booking.bookingNumber || booking.id}: slot "${booking.appointmentSlot}" → IST ${toISTString(slotStart)} | match=${matches}`);
 
       if (!matches) continue;
 
