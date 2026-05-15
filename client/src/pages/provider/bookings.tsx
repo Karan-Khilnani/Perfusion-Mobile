@@ -311,11 +311,16 @@ export default function ProviderBookingsPage() {
             {getBookingIcon(booking.bookingType)}
           </div>
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <p className="font-medium">{booking.serviceName}</p>
               <Badge variant="outline" className="text-xs capitalize">
                 {booking.bookingType}
               </Badge>
+              {(booking as any).isFollowUp && (
+                <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+                  Follow Up
+                </Badge>
+              )}
               <StatusBadge status={booking.status} />
             </div>
           </div>

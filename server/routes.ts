@@ -907,6 +907,22 @@ export async function registerRoutes(
         ...req.body,
         userId,
       };
+
+      // Validate and resolve follow-up parent booking
+      if (bookingData.parentBookingId) {
+        const parentBooking = await storage.getBookingById(bookingData.parentBookingId);
+        if (!parentBooking || parentBooking.bookingType !== "consultation") {
+          return res.status(400).json({ message: "Parent booking must be a valid consultation" });
+        }
+        const sevenDaysAgo = new Date();
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+        if (new Date(parentBooking.createdAt!) < sevenDaysAgo) {
+          return res.status(400).json({ message: "Follow-up consultations can only be booked within 7 days of the original consultation" });
+        }
+        // Always link back to root booking (not a chain)
+        bookingData.parentBookingId = parentBooking.parentBookingId || parentBooking.id;
+        bookingData.isFollowUp = true;
+      }
       
       // For consultation bookings, link to the provider who owns the consultant
       if (bookingData.bookingType === "consultation" && bookingData.serviceId) {
@@ -964,7 +980,11 @@ export async function registerRoutes(
       } else if (bookingData.bookingType === "consultation" && bookingData.serviceId) {
         const consultant = await storage.getConsultantById(bookingData.serviceId);
         if (consultant) {
-          providerBaseCost = parseFloat(consultant.consultationFee);
+          const isFollowUpBooking = bookingData.isFollowUp === true;
+          const effectiveFee = (isFollowUpBooking && consultant.followUpFee)
+            ? consultant.followUpFee
+            : consultant.consultationFee;
+          providerBaseCost = parseFloat(effectiveFee);
           serviceOverridePrice = consultant.customerPrice || null;
           serviceOverrideMargin = consultant.marginOverride || null;
         }

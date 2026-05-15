@@ -10,8 +10,10 @@ import {
   User,
   FileText,
   Plus,
+  RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { Booking } from "@shared/schema";
 
@@ -163,14 +165,22 @@ export default function UserDashboard() {
                         <Stethoscope className="h-4 w-4 text-primary" />
                       </div>
                       <div className="min-w-0">
-                        <p className="font-semibold text-sm leading-tight truncate">
-                          {booking.serviceName}
-                          {booking.consultantSpecialization && (
-                            <span className="font-normal text-muted-foreground">
-                              {" "}({booking.consultantSpecialization})
-                            </span>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="font-semibold text-sm leading-tight truncate">
+                            {booking.serviceName}
+                            {booking.consultantSpecialization && (
+                              <span className="font-normal text-muted-foreground">
+                                {" "}({booking.consultantSpecialization})
+                              </span>
+                            )}
+                          </p>
+                          {(booking as any).isFollowUp && (
+                            <Badge className="text-xs bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 border-0 shrink-0">
+                              <RefreshCw className="mr-1 h-2.5 w-2.5" />
+                              Follow Up
+                            </Badge>
                           )}
-                        </p>
+                        </div>
                         <p className="text-xs text-muted-foreground mt-0.5">{booking.providerName}</p>
                       </div>
                     </div>

@@ -9,13 +9,14 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { StatusBadge } from "@/components/status-badge";
 import { BookingTimeline } from "@/components/booking-timeline";
-import { ClipboardList, FlaskConical, Stethoscope, Calendar, IndianRupee, ChevronRight, Video, Scan, Download, FileText, Upload, Paperclip, X, Search, CheckCircle2, Clock } from "lucide-react";
+import { ClipboardList, FlaskConical, Stethoscope, Calendar, IndianRupee, ChevronRight, Video, Scan, Download, FileText, Upload, Paperclip, X, Search, CheckCircle2, Clock, RefreshCw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { Booking, BookingType } from "@shared/schema";
-import { format } from "date-fns";
+import { format, differenceInDays } from "date-fns";
+import { useLocation } from "wouter";
 
 const typeIcons: Record<BookingType, typeof FlaskConical> = {
   lab: FlaskConical,
@@ -148,7 +149,14 @@ export default function OrdersPage() {
                 <Icon className="h-5 w-5 text-primary" />
               </div>
               <div className="min-w-0 flex-1">
-                <h3 className="font-medium leading-tight">{booking.serviceName}</h3>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="font-medium leading-tight">{booking.serviceName}</h3>
+                  {(booking as any).isFollowUp && (
+                    <Badge className="text-xs bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 border-0">
+                      Follow Up
+                    </Badge>
+                  )}
+                </div>
                 <p className="text-sm text-muted-foreground">{booking.providerName}</p>
                 <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                   <span className="flex items-center gap-1">
@@ -174,11 +182,22 @@ export default function OrdersPage() {
     );
   };
 
-  const BookingDetails = ({ booking }: { booking: Booking }) => (
+  const BookingDetails = ({ booking }: { booking: Booking }) => {
+    const [, navigate] = useLocation();
+    const isWithinFollowUpWindow = booking.bookingType === "consultation" &&
+      booking.createdAt &&
+      differenceInDays(new Date(), new Date(booking.createdAt)) < 7;
+
+    return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2 flex-wrap">
           {typeLabels[booking.bookingType as BookingType]} Details
+          {(booking as any).isFollowUp && (
+            <Badge className="text-xs bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 border-0">
+              Follow Up
+            </Badge>
+          )}
           <StatusBadge status={booking.status} />
         </CardTitle>
       </CardHeader>
@@ -433,9 +452,32 @@ export default function OrdersPage() {
           <h4 className="mb-4 font-medium">Order Status</h4>
           <BookingTimeline status={booking.status} bookingType={booking.bookingType as BookingType} />
         </div>
+
+        {isWithinFollowUpWindow && !["cancelled"].includes(booking.status) && (
+          <div className="rounded-lg border border-blue-200 bg-blue-50/50 dark:border-blue-800 dark:bg-blue-900/10 p-4">
+            <div className="flex items-center gap-2 text-blue-700 dark:text-blue-400 mb-1">
+              <RefreshCw className="h-4 w-4" />
+              <span className="font-medium text-sm">Follow-Up Available</span>
+            </div>
+            <p className="text-xs text-muted-foreground mb-3">
+              Book a follow-up consultation for this patient with the same specialist within 7 days of the original booking.
+            </p>
+            <Button
+              size="sm"
+              variant="outline"
+              className="border-blue-300 text-blue-700 hover:bg-blue-100 dark:border-blue-700 dark:text-blue-300 dark:hover:bg-blue-900/30"
+              onClick={() => navigate(`/book/consultation/${booking.serviceId}?parentBookingId=${booking.id}`)}
+              data-testid="button-book-follow-up"
+            >
+              <RefreshCw className="mr-2 h-3.5 w-3.5" />
+              Book Follow Up
+            </Button>
+          </div>
+        )}
       </CardContent>
     </Card>
-  );
+    );
+  };
 
   const ListFilters = () => (
     <div className="space-y-3">

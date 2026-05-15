@@ -78,6 +78,7 @@ export const consultants = pgTable("consultants", {
   yearsExperience: integer("years_experience").notNull(),
   rating: decimal("rating", { precision: 2, scale: 1 }).default("4.0"),
   consultationFee: decimal("consultation_fee", { precision: 10, scale: 2 }).notNull(),
+  followUpFee: decimal("follow_up_fee", { precision: 10, scale: 2 }),
   customerPrice: decimal("customer_price", { precision: 10, scale: 2 }),
   marginOverride: decimal("margin_override", { precision: 5, scale: 2 }),
   availableSlots: text("available_slots").array(),
@@ -314,6 +315,9 @@ export const bookings = pgTable("bookings", {
   prescriptionPdfUrl: varchar("prescription_pdf_url", { length: 500 }),
   razorpayOrderId: varchar("razorpay_order_id", { length: 255 }),
   razorpayPaymentId: varchar("razorpay_payment_id", { length: 255 }),
+  // Follow-up consultation tracking
+  isFollowUp: boolean("is_follow_up").default(false),
+  parentBookingId: varchar("parent_booking_id", { length: 255 }),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

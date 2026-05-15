@@ -60,6 +60,7 @@ const consultantSchema = z.object({
   specialization: z.string().min(2, "Specialization is required"),
   yearsExperience: z.coerce.number().min(0, "Experience must be positive"),
   consultationFee: z.string().min(1, "Fee is required"),
+  followUpFee: z.string().optional(),
   rating: z.string().optional(),
   availabilityFrom: z.string().optional(),
   availabilityTo: z.string().optional(),
@@ -171,7 +172,7 @@ export default function AdminConsultantsPage() {
 
   const editConsultantForm = useForm<ConsultantFormData>({
     resolver: zodResolver(consultantSchema),
-    defaultValues: { name: "", qualification: "", specialization: "", yearsExperience: 0, consultationFee: "", rating: "4.0", availabilityFrom: "09:00 AM", availabilityTo: "05:00 PM", portfolio: "" },
+    defaultValues: { name: "", qualification: "", specialization: "", yearsExperience: 0, consultationFee: "", followUpFee: "", rating: "4.0", availabilityFrom: "09:00 AM", availabilityTo: "05:00 PM", portfolio: "" },
   });
 
   const openEditDetails = (c: EnrichedConsultant) => {
@@ -182,6 +183,7 @@ export default function AdminConsultantsPage() {
       specialization: c.specialization || "",
       yearsExperience: c.yearsExperience || 0,
       consultationFee: c.consultationFee || "",
+      followUpFee: c.followUpFee || "",
       rating: c.rating || "4.0",
       availabilityFrom: c.availabilityFrom || "09:00 AM",
       availabilityTo: c.availabilityTo || "05:00 PM",
@@ -217,6 +219,7 @@ export default function AdminConsultantsPage() {
         specialization: data.specialization,
         yearsExperience: data.yearsExperience,
         consultationFee: data.consultationFee,
+        followUpFee: data.followUpFee || null,
         availabilityFrom: data.availabilityFrom || undefined,
         availabilityTo: data.availabilityTo || undefined,
         registrationNumber: editRegNo || undefined,
@@ -392,6 +395,19 @@ export default function AdminConsultantsPage() {
                     )}
                   />
                 </div>
+                <FormField
+                  control={form.control}
+                  name="followUpFee"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Follow-Up Fee (₹) <span className="text-muted-foreground font-normal text-xs">— leave blank to use consultation fee</span></FormLabel>
+                      <FormControl>
+                        <Input placeholder="800.00" {...field} data-testid="input-followup-fee" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
                 <div className="grid grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
@@ -728,9 +744,16 @@ export default function AdminConsultantsPage() {
                     <FormItem><FormLabel>Years Experience</FormLabel><FormControl><Input type="number" {...field} data-testid="input-admin-edit-experience" /></FormControl><FormMessage /></FormItem>
                   )} />
                   <FormField control={editConsultantForm.control} name="consultationFee" render={({ field }) => (
-                    <FormItem><FormLabel>Fee (INR)</FormLabel><FormControl><Input {...field} data-testid="input-admin-edit-fee" /></FormControl><FormMessage /></FormItem>
+                    <FormItem><FormLabel>Fresh Consult Fee (₹)</FormLabel><FormControl><Input {...field} data-testid="input-admin-edit-fee" /></FormControl><FormMessage /></FormItem>
                   )} />
                 </div>
+                <FormField control={editConsultantForm.control} name="followUpFee" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Follow-Up Fee (₹) <span className="text-muted-foreground font-normal text-xs">— leave blank to use fresh fee</span></FormLabel>
+                    <FormControl><Input placeholder="800.00" {...field} data-testid="input-admin-edit-followup-fee" /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
                 <div className="space-y-2">
                   <Label>Registration No.</Label>
                   <Input value={editRegNo} onChange={(e) => setEditRegNo(e.target.value)} placeholder="Medical registration number" data-testid="input-admin-edit-reg-no" />

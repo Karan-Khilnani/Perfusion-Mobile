@@ -40,7 +40,9 @@ type BookingFormData = z.infer<typeof bookingSchema>;
 
 export default function ConsultationBookingPage() {
   const { id } = useParams<{ id: string }>();
-  const [, navigate] = useLocation();
+  const [location, navigate] = useLocation();
+  const parentBookingId = new URLSearchParams(window.location.search).get("parentBookingId");
+  const isFollowUpMode = !!parentBookingId;
   const { toast } = useToast();
   const [step, setStep] = useState<"details" | "clinical" | "payment" | "confirmation">("details");
   const [bookingId, setBookingId] = useState<string | null>(null);
@@ -173,6 +175,7 @@ export default function ConsultationBookingPage() {
         serviceId: service.id,
         serviceName: isEmergencyTeam ? `${emergencyTeam.department} Team` : service.name,
         providerName: isEmergencyTeam ? emergencyTeam.qualification : service.qualification,
+        ...(isFollowUpMode && parentBookingId ? { isFollowUp: true, parentBookingId } : {}),
         patientName: data.patientName,
         patientAge: data.patientAge,
         patientGender: data.patientGender,
@@ -868,9 +871,11 @@ export default function ConsultationBookingPage() {
             {step === "clinical" && (
               <Card>
                 <CardHeader>
-                  <CardTitle>Clinical Information</CardTitle>
+                  <CardTitle>{isFollowUpMode ? "Current Status" : "Clinical Information"}</CardTitle>
                   <CardDescription>
-                    Provide clinical details for the specialist to review
+                    {isFollowUpMode
+                      ? "Describe the patient's current condition and any updates since the original consultation"
+                      : "Provide clinical details for the specialist to review"}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -879,10 +884,12 @@ export default function ConsultationBookingPage() {
                     name="clinicalSummary"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Clinical Summary *</FormLabel>
+                        <FormLabel>{isFollowUpMode ? "Current Status / Update *" : "Clinical Summary *"}</FormLabel>
                         <FormControl>
                           <Textarea
-                            placeholder="Describe chief complaints, history of present illness, relevant past history, examination findings..."
+                            placeholder={isFollowUpMode
+                              ? "Describe current symptoms, response to treatment, any new complaints or changes since last consultation..."
+                              : "Describe chief complaints, history of present illness, relevant past history, examination findings..."}
                             className="min-h-[120px]"
                             {...field}
                             data-testid="input-clinical-summary"
