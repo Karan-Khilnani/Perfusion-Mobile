@@ -1201,9 +1201,12 @@ export async function registerRoutes(
         if (!provider) {
           return res.status(403).json({ message: "Provider profile not found" });
         }
-        // Check if this consultant belongs to this provider
+        // Check if this consultant belongs to this provider (only enforced when the consultant has a provider assigned)
         const consultant = await storage.getConsultantById(booking.serviceId);
-        if (!consultant || consultant.providerId !== provider.id) {
+        if (!consultant) {
+          return res.status(404).json({ message: "Consultant not found for this booking" });
+        }
+        if (consultant.providerId && consultant.providerId !== provider.id) {
           return res.status(403).json({ message: "You can only generate prescriptions for your own consultations" });
         }
       }
