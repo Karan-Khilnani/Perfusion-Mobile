@@ -180,7 +180,7 @@ export async function generateAndStorePrescriptionPdf(data: PrescriptionPdfData,
 
   // Title text block (right of logo, left of QR)
   const titleTextX = PAGE_W - MARGIN - QR_SIZE - 14; // right-align before QR
-  const titleText = "Digital Super Speciality Consultation Summary";
+  const titleText = "Digital Speciality Consultation Summary";
   const titleW = fontBold.widthOfTextAtSize(titleText, 9.5);
   page.drawText(titleText, { x: titleTextX - titleW, y: PAGE_H - 36, size: 9.5, font: fontBold, color: WHITE });
   const idText = `Summary ID: ${summaryId}`;
@@ -205,7 +205,7 @@ export async function generateAndStorePrescriptionPdf(data: PrescriptionPdfData,
     }
     if (data.onCallDoctorName) {
       y -= 14;
-      page.drawText("Call Facilitated By:", { x: rx, y, size: 8.5, font, color: GREY });
+      page.drawText("Referring Physician:", { x: rx, y, size: 8.5, font, color: GREY });
       const facilText = data.onCallDoctorDesignation
         ? `${data.onCallDoctorName} (${data.onCallDoctorDesignation})`
         : data.onCallDoctorName;
@@ -231,7 +231,7 @@ export async function generateAndStorePrescriptionPdf(data: PrescriptionPdfData,
 
   // ── Consultant details ────────────────────────────────────────────────────────
   [page, y] = needsNewPage(doc, pages, page, y, 80);
-  y = drawSectionTitle(page, "CONSULTING SUPER SPECIALIST", y, fontBold);
+  y = drawSectionTitle(page, "CONSULTING SPECIALIST", y, fontBold);
   y = drawLabelValue(page, "Doctor Name", consultantDisplayName, y, font, fontBold);
   if (data.consultantSpecialization) y = drawLabelValue(page, "Speciality", data.consultantSpecialization, y, font, fontBold);
   if (data.consultantQualification) y = drawLabelValue(page, "Qualification", data.consultantQualification, y, font, fontBold);
@@ -356,7 +356,7 @@ export async function generateAndStorePrescriptionPdf(data: PrescriptionPdfData,
   for (let i = 0; i < total; i++) {
     const p = pages[i];
     p.drawLine({ start: { x: MARGIN, y: 38 }, end: { x: PAGE_W - MARGIN, y: 38 }, thickness: 0.5, color: RED });
-    p.drawText("Perfusion Health Pvt Ltd | Digital Super Speciality Consultation Platform", { x: MARGIN, y: 26, size: 7, font, color: LIGHT_GREY });
+    p.drawText("Perfusion Health Pvt Ltd | Digital Speciality Consultation Platform", { x: MARGIN, y: 26, size: 7, font, color: LIGHT_GREY });
     const pageNumText = `Page ${i + 1} of ${total}`;
     const pw = font.widthOfTextAtSize(pageNumText, 7);
     p.drawText(pageNumText, { x: PAGE_W - MARGIN - pw, y: 26, size: 7, font, color: LIGHT_GREY });
