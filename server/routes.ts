@@ -6,7 +6,7 @@ import { registerAuthRoutes } from "./auth/routes";
 import type { BookingStatus, UserRole, ProviderType, ProviderStatus, ServiceStatus } from "@shared/schema";
 import { consultants, bookings } from "@shared/schema";
 import { db } from "./db";
-import { eq } from "drizzle-orm";
+import { eq, or } from "drizzle-orm";
 import { fireOneBooking } from "./services/consultation-scheduler";
 import multer from "multer";
 import path from "path";
@@ -2222,15 +2222,19 @@ export async function registerRoutes(
   });
 
   // ── Admin: Test Twilio reminder for a specific booking ───────────────────
-  // POST /api/admin/test-reminder/:bookingId  — refires consultation reminder calls
-  // POST /api/admin/test-twilio { phone }    — places a single test call
-  app.post("/api/admin/test-reminder/:bookingId", isAdmin, async (req, res) => {
+  // POST /api/admin/test-reminder  { ref }  — accepts booking number (PHC/...) OR UUID
+  // POST /api/admin/test-twilio    { phone } — places a single test call
+  app.post("/api/admin/test-reminder", isAdmin, async (req, res) => {
     try {
-      const { bookingId } = req.params;
-      const [booking] = await db.select().from(bookings).where(eq(bookings.id, bookingId));
-      if (!booking) return res.status(404).json({ message: "Booking not found" });
-      // Clear the fired flag so this booking can be refired
-      await db.update(bookings).set({ reminderFiredAt: null } as any).where(eq(bookings.id, bookingId));
+      const { ref } = req.body as { ref?: string };
+      if (!ref?.trim()) return res.status(400).json({ message: "ref (booking number or ID) is required" });
+      const val = ref.trim();
+      const [booking] = await db.select().from(bookings).where(
+        or(eq(bookings.id, val), eq(bookings.bookingNumber, val))
+      );
+      if (!booking) return res.status(404).json({ message: `No booking found for "${val}"` });
+      // Clear the fired flag so this booking can be re-fired
+      await db.update(bookings).set({ reminderFiredAt: null } as any).where(eq(bookings.id, booking.id));
       await fireOneBooking(booking);
       res.json({ ok: true, message: `Reminders fired for booking ${booking.bookingNumber || booking.id}. Check Twilio dashboard and server logs.` });
     } catch (e: any) {

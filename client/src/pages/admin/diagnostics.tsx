@@ -45,7 +45,7 @@ export default function DiagnosticsPage() {
 
   const testReminder = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest("POST", `/api/admin/test-reminder/${bookingId.trim()}`);
+      const res = await apiRequest("POST", "/api/admin/test-reminder", { ref: bookingId.trim() });
       return res.json() as Promise<TestResult>;
     },
     onSuccess: (data) => {
@@ -137,12 +137,12 @@ export default function DiagnosticsPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="booking-id">Booking ID (UUID)</Label>
+            <Label htmlFor="booking-id">Booking number or ID</Label>
             <div className="flex gap-2">
               <Input
                 id="booking-id"
                 data-testid="input-booking-id"
-                placeholder="7bc1db14-e804-48ae-80b7-5aec8282dd0c"
+                placeholder="PHC/2026-27/02/C00015 or UUID"
                 value={bookingId}
                 onChange={(e) => setBookingId(e.target.value)}
                 className="max-w-sm font-mono text-sm"
@@ -163,8 +163,8 @@ export default function DiagnosticsPage() {
             </div>
             <p className="text-xs text-muted-foreground flex items-start gap-1">
               <Info className="h-3 w-3 mt-0.5 shrink-0" />
-              Find the booking ID in the All Bookings page — hover the booking number to copy the ID,
-              or open the booking row and copy from the URL.
+              Accepts the booking number (e.g. PHC/2026-27/02/C00015) or the internal UUID.
+              Find both in the All Bookings page.
             </p>
           </div>
 
