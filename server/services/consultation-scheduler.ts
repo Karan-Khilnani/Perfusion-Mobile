@@ -139,82 +139,120 @@ async function fireAppointmentReminders(): Promise<void> {
 
       if (!shouldFire) continue;
 
-      // Mark as fired in DB immediately before making calls (prevents race conditions)
-      firedThisSession.add(booking.id);
-      await db.update(bookings)
-        .set({ reminderFiredAt: now } as any)
-        .where(eq(bookings.id, booking.id));
-
-      const patientName = booking.patientName || "Patient";
-      const bookingRef = booking.bookingNumber || booking.id;
-
-      console.log(`[Scheduler] ★ FIRING reminders for booking ${bookingRef} (${patientName})`);
-
-      const consultantMsg =
-        `Hello. This is a reminder from Perfusion Healthcare. ` +
-        `Your consultation with ${patientName} is scheduled to start now. ` +
-        `Please log in to the Perfusion portal to join the call.`;
-
-      const seekerMsg =
-        `Hello. This is a reminder from Perfusion Healthcare. ` +
-        `Your consultation is scheduled to start now. ` +
-        `Please log in to the Perfusion portal to join the call.`;
-
-      const adminMsg =
-        `Hello. This is a Perfusion Healthcare reminder. ` +
-        `Consultation booking ${bookingRef} for ${patientName} is starting now.`;
-
-      // Call consultant
-      if (booking.providerId) {
-        const [consultant] = await db
-          .select({
-            contactPhone: consultants.contactPhone,
-            providerId: consultants.providerId,
-          })
-          .from(consultants)
-          .where(eq(consultants.id, booking.providerId));
-
-        let consultantPhone = consultant?.contactPhone || null;
-
-        // Fall back to provider's phone if consultant has no direct contact phone
-        if (!consultantPhone && consultant?.providerId) {
-          const [prov] = await db
-            .select({ phone: providers.phone })
-            .from(providers)
-            .where(eq(providers.id, consultant.providerId));
-          consultantPhone = prov?.phone || null;
-        }
-
-        if (consultantPhone) {
-          console.log(`[Scheduler]   → Calling consultant: ${consultantPhone}`);
-          triggerVoiceCall(consultantPhone, consultantMsg).catch((e) =>
-            console.error("[Scheduler] Consultant call failed:", e?.message)
-          );
-        } else {
-          console.log(`[Scheduler]   → No consultant phone on record`);
-        }
-      }
-
-      // Call seeker
-      if (booking.patientContact) {
-        console.log(`[Scheduler]   → Calling seeker: ${booking.patientContact}`);
-        triggerVoiceCall(booking.patientContact, seekerMsg).catch((e) =>
-          console.error("[Scheduler] Seeker call failed:", e?.message)
-        );
-      } else {
-        console.log(`[Scheduler]   → No seeker contact on record`);
-      }
-
-      // Call admin
-      if (ADMIN_PHONE) {
-        console.log(`[Scheduler]   → Calling admin: ${ADMIN_PHONE}`);
-        triggerVoiceCall(ADMIN_PHONE, adminMsg).catch((e) =>
-          console.error("[Scheduler] Admin call failed:", e?.message)
-        );
-      }
+      await fireOneBooking(booking, now);
     }
   } catch (err: any) {
-    console.error("[Scheduler] Job error:", err?.message || err);
+    console.error("[Scheduler] Job error:", err?.message || err, err?.stack);
+  }
+}
+
+/**
+ * Fire reminders for ONE booking. Each step is independently try/caught so
+ * a failure in one outbound call never blocks the others or breaks the loop.
+ * Exported so it can be invoked manually for testing.
+ */
+export async function fireOneBooking(booking: any, now: Date = new Date()): Promise<void> {
+  const patientName = booking.patientName || "Patient";
+  const bookingRef = booking.bookingNumber || booking.id;
+
+  // Mark as fired in DB immediately to prevent re-firing
+  try {
+    firedThisSession.add(booking.id);
+    await db.update(bookings)
+      .set({ reminderFiredAt: now } as any)
+      .where(eq(bookings.id, booking.id));
+  } catch (e: any) {
+    console.error(`[Scheduler] Failed to mark booking ${bookingRef} as fired:`, e?.message, e?.stack);
+  }
+
+  console.log(`[Scheduler] ★ FIRING reminders for booking ${bookingRef} (${patientName})`);
+
+  const consultantMsg =
+    `Hello. This is a reminder from Perfusion Healthcare. ` +
+    `Your consultation with ${patientName} is scheduled to start now. ` +
+    `Please log in to the Perfusion portal to join the call.`;
+
+  const seekerMsg =
+    `Hello. This is a reminder from Perfusion Healthcare. ` +
+    `Your consultation is scheduled to start now. ` +
+    `Please log in to the Perfusion portal to join the call.`;
+
+  const adminMsg =
+    `Hello. This is a Perfusion Healthcare reminder. ` +
+    `Consultation booking ${bookingRef} for ${patientName} is starting now.`;
+
+  // ── Call consultant ────────────────────────────────────────────────────────
+  // booking.serviceId is the consultants.id; booking.providerId is providers.id.
+  // We prefer consultants.contactPhone, then fall back to providers.phone.
+  try {
+    let consultantPhone: string | null = null;
+
+    if (booking.serviceId) {
+      const [consultant] = await db
+        .select({
+          contactPhone: consultants.contactPhone,
+          providerId: consultants.providerId,
+        })
+        .from(consultants)
+        .where(eq(consultants.id, booking.serviceId));
+      consultantPhone = consultant?.contactPhone || null;
+
+      if (!consultantPhone && consultant?.providerId) {
+        const [prov] = await db
+          .select({ phone: providers.phone })
+          .from(providers)
+          .where(eq(providers.id, consultant.providerId));
+        consultantPhone = prov?.phone || null;
+      }
+    }
+
+    // Last-resort fallback: providers table directly via booking.providerId
+    if (!consultantPhone && booking.providerId) {
+      const [prov] = await db
+        .select({ phone: providers.phone })
+        .from(providers)
+        .where(eq(providers.id, booking.providerId));
+      consultantPhone = prov?.phone || null;
+    }
+
+    if (consultantPhone) {
+      console.log(`[Scheduler]   → Calling consultant: ${consultantPhone}`);
+      triggerVoiceCall(consultantPhone, consultantMsg).catch((e) =>
+        console.error("[Scheduler] Consultant call failed:", e?.message)
+      );
+    } else {
+      console.log(`[Scheduler]   → No consultant phone on record (serviceId=${booking.serviceId}, providerId=${booking.providerId})`);
+    }
+  } catch (e: any) {
+    console.error("[Scheduler] Consultant lookup error:", e?.message, e?.stack);
+  }
+
+  // ── Call seeker ────────────────────────────────────────────────────────────
+  try {
+    if (booking.patientContact) {
+      console.log(`[Scheduler]   → Calling seeker: ${booking.patientContact}`);
+      triggerVoiceCall(booking.patientContact, seekerMsg).catch((e) =>
+        console.error("[Scheduler] Seeker call failed:", e?.message)
+      );
+    } else {
+      console.log(`[Scheduler]   → No seeker contact on record`);
+    }
+  } catch (e: any) {
+    console.error("[Scheduler] Seeker step error:", e?.message, e?.stack);
+  }
+
+  // ── Call admin ─────────────────────────────────────────────────────────────
+  try {
+    if (ADMIN_PHONE) {
+      console.log(`[Scheduler]   → Calling admin: ${ADMIN_PHONE}`);
+      triggerVoiceCall(ADMIN_PHONE, adminMsg).catch((e) =>
+        console.error("[Scheduler] Admin call failed:", e?.message)
+      );
+    } else {
+      console.log(`[Scheduler]   → ADMIN_PHONE_NUMBER not set, skipping admin call`);
+    }
+  } catch (e: any) {
+    console.error("[Scheduler] Admin step error:", e?.message, e?.stack);
   }
 }
 

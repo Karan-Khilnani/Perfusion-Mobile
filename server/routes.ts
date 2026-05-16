@@ -4,9 +4,10 @@ import { storage } from "./storage";
 import { setupAuth, isAuthenticated, isAdmin, isProvider, updateUserRole } from "./auth";
 import { registerAuthRoutes } from "./auth/routes";
 import type { BookingStatus, UserRole, ProviderType, ProviderStatus, ServiceStatus } from "@shared/schema";
-import { consultants } from "@shared/schema";
+import { consultants, bookings } from "@shared/schema";
 import { db } from "./db";
 import { eq } from "drizzle-orm";
+import { fireOneBooking } from "./services/consultation-scheduler";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
@@ -2217,6 +2218,36 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error fetching transport service:", error);
       res.status(500).json({ message: "Failed to fetch transport service" });
+    }
+  });
+
+  // ── Admin: Test Twilio reminder for a specific booking ───────────────────
+  // POST /api/admin/test-reminder/:bookingId  — refires consultation reminder calls
+  // POST /api/admin/test-twilio { phone }    — places a single test call
+  app.post("/api/admin/test-reminder/:bookingId", isAdmin, async (req, res) => {
+    try {
+      const { bookingId } = req.params;
+      const [booking] = await db.select().from(bookings).where(eq(bookings.id, bookingId));
+      if (!booking) return res.status(404).json({ message: "Booking not found" });
+      // Clear the fired flag so this booking can be refired
+      await db.update(bookings).set({ reminderFiredAt: null } as any).where(eq(bookings.id, bookingId));
+      await fireOneBooking(booking);
+      res.json({ ok: true, message: `Reminders fired for booking ${booking.bookingNumber || booking.id}. Check Twilio dashboard and server logs.` });
+    } catch (e: any) {
+      console.error("Test reminder error:", e);
+      res.status(500).json({ message: e?.message || "Failed", stack: e?.stack });
+    }
+  });
+
+  app.post("/api/admin/test-twilio", isAdmin, async (req, res) => {
+    try {
+      const { phone } = req.body as { phone?: string };
+      if (!phone) return res.status(400).json({ message: "phone is required" });
+      await triggerVoiceCall(phone, "Hello. This is a test call from Perfusion Healthcare. If you hear this, Twilio is working correctly.");
+      res.json({ ok: true, message: `Test call placed to ${phone}` });
+    } catch (e: any) {
+      console.error("Test Twilio error:", e);
+      res.status(500).json({ message: e?.message || "Failed", stack: e?.stack });
     }
   });
 
