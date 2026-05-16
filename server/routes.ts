@@ -3195,20 +3195,15 @@ export async function registerRoutes(
       const existing = (booking.documentUrls || []).filter((u: any) => u && u !== "undefined");
       await storage.updateBooking(booking.id, { documentUrls: [...existing, fileUrl] } as any);
 
-      // Broadcast SSE document_uploaded to both seeker and provider
+      // Broadcast SSE document_uploaded to both seeker and provider.
+      // booking.providerId is providers.id — look it up directly to get the
+      // provider's userId. (Do NOT query consultants.id = booking.providerId;
+      // booking.serviceId is the consultants.id, booking.providerId is providers.id.)
       const event = { type: "document_uploaded", bookingId: booking.id, url: fileUrl, fileName };
       broadcastCallEvent(booking.userId, event);
       if (booking.providerId) {
-        // Find the provider's userId to broadcast to them too
-        const [consultant] = await db
-          .select()
-          .from(consultants)
-          .where(eq(consultants.id, booking.providerId))
-          .limit(1);
-        if (consultant?.providerId) {
-          const provider = await storage.getProviderById(consultant.providerId);
-          if (provider?.userId) broadcastCallEvent(provider.userId, event);
-        }
+        const providerRow = await storage.getProviderById(booking.providerId);
+        if (providerRow?.userId) broadcastCallEvent(providerRow.userId, event);
       }
 
       res.json({ url: fileUrl, fileName });
