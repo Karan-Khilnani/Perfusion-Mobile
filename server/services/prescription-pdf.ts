@@ -55,20 +55,40 @@ function cleanDrPrefix(name: string): string {
   return name.replace(/^dr\.\s*/i, "").trim();
 }
 
+function sanitize(text: string): string {
+  return (text || "")
+    .replace(/\r\n?/g, "\n")
+    .replace(/[\u0000-\u0008\u000B-\u001F\u007F]/g, "")
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/[\u201C\u201D]/g, '"')
+    .replace(/[\u2013\u2014]/g, "-")
+    .replace(/\u2026/g, "...")
+    .replace(/\u00A0/g, " ");
+}
+
+function sanitizeOneLine(text: string): string {
+  return sanitize(text).replace(/\n+/g, " ").replace(/\s+/g, " ").trim();
+}
+
 function wrapText(text: string, font: PDFFont, size: number, maxW: number): string[] {
-  const words = text.split(" ");
+  const clean = sanitize(text);
+  const paragraphs = clean.split("\n");
   const lines: string[] = [];
-  let cur = "";
-  for (const word of words) {
-    const test = cur ? `${cur} ${word}` : word;
-    if (font.widthOfTextAtSize(test, size) > maxW && cur) {
-      lines.push(cur);
-      cur = word;
-    } else {
-      cur = test;
+  for (const para of paragraphs) {
+    if (para.trim() === "") { lines.push(""); continue; }
+    const words = para.split(/\s+/).filter(Boolean);
+    let cur = "";
+    for (const word of words) {
+      const test = cur ? `${cur} ${word}` : word;
+      if (font.widthOfTextAtSize(test, size) > maxW && cur) {
+        lines.push(cur);
+        cur = word;
+      } else {
+        cur = test;
+      }
     }
+    if (cur) lines.push(cur);
   }
-  if (cur) lines.push(cur);
   return lines;
 }
 
@@ -183,7 +203,7 @@ export async function generateAndStorePrescriptionPdf(data: PrescriptionPdfData,
   const titleText = "Digital Speciality Consultation Summary";
   const titleW = fontBold.widthOfTextAtSize(titleText, 9.5);
   page.drawText(titleText, { x: titleTextX - titleW, y: PAGE_H - 36, size: 9.5, font: fontBold, color: WHITE });
-  const idText = `Summary ID: ${summaryId}`;
+  const idText = sanitizeOneLine(`Summary ID: ${summaryId}`);
   const idW = font.widthOfTextAtSize(idText, 8);
   page.drawText(idText, { x: titleTextX - idW, y: PAGE_H - 50, size: 8, font, color: rgb(1, 0.85, 0.85) });
   const modeText = "Mode: Teleconsultation";
@@ -201,7 +221,7 @@ export async function generateAndStorePrescriptionPdf(data: PrescriptionPdfData,
     const rx = MARGIN + 10;
     if (data.referringFacility) {
       page.drawText("Referring Facility:", { x: rx, y, size: 8.5, font, color: GREY });
-      page.drawText(data.referringFacility, { x: rx + 110, y, size: 8.5, font: fontBold, color: DARK });
+      page.drawText(sanitizeOneLine(data.referringFacility), { x: rx + 110, y, size: 8.5, font: fontBold, color: DARK });
     }
     if (data.onCallDoctorName) {
       y -= 14;
@@ -209,7 +229,7 @@ export async function generateAndStorePrescriptionPdf(data: PrescriptionPdfData,
       const facilText = data.onCallDoctorDesignation
         ? `${data.onCallDoctorName} (${data.onCallDoctorDesignation})`
         : data.onCallDoctorName;
-      page.drawText(facilText, { x: rx + 110, y, size: 8.5, font: fontBold, color: DARK });
+      page.drawText(sanitizeOneLine(facilText), { x: rx + 110, y, size: 8.5, font: fontBold, color: DARK });
     }
     y -= 22;
   }
@@ -286,8 +306,11 @@ export async function generateAndStorePrescriptionPdf(data: PrescriptionPdfData,
   if (data.followUp) {
     [page, y] = needsNewPage(doc, pages, page, y, 30);
     page.drawText("Follow-up: ", { x: MARGIN + 10, y, size: 9, font: fontBold, color: RED });
-    page.drawText(data.followUp, { x: MARGIN + 65, y, size: 9, font, color: DARK });
-    y -= 18;
+    const followLines = wrapText(data.followUp, font, 9, CONTENT_W - 75);
+    for (let i = 0; i < followLines.length; i++) {
+      page.drawText(followLines[i], { x: MARGIN + 65, y: y - i * 13, size: 9, font, color: DARK });
+    }
+    y -= Math.max(1, followLines.length) * 13 + 5;
   }
 
   // ── Legal disclaimer ──────────────────────────────────────────────────────────
@@ -338,15 +361,15 @@ export async function generateAndStorePrescriptionPdf(data: PrescriptionPdfData,
     }
   }
 
-  page.drawText(consultantDisplayName, { x: sigX, y, size: 10, font: fontBold, color: DARK });
+  page.drawText(sanitizeOneLine(consultantDisplayName), { x: sigX, y, size: 10, font: fontBold, color: DARK });
   y -= 14;
   if (data.consultantQualification || data.consultantSpecialization) {
     const cred = [data.consultantQualification, data.consultantSpecialization].filter(Boolean).join(" | ");
-    page.drawText(cred, { x: sigX, y, size: 8, font, color: GREY });
+    page.drawText(sanitizeOneLine(cred), { x: sigX, y, size: 8, font, color: GREY });
     y -= 12;
   }
   if (data.consultantRegistrationNo) {
-    page.drawText(`Reg. No.: ${data.consultantRegistrationNo}`, { x: sigX, y, size: 8, font, color: GREY });
+    page.drawText(sanitizeOneLine(`Reg. No.: ${data.consultantRegistrationNo}`), { x: sigX, y, size: 8, font, color: GREY });
     y -= 12;
   }
   page.drawText(`Confirmed: ${approvalDateStr}`, { x: sigX, y, size: 8, font, color: GREEN });
@@ -361,7 +384,7 @@ export async function generateAndStorePrescriptionPdf(data: PrescriptionPdfData,
     const pw = font.widthOfTextAtSize(pageNumText, 7);
     p.drawText(pageNumText, { x: PAGE_W - MARGIN - pw, y: 26, size: 7, font, color: LIGHT_GREY });
     p.drawText("This is a digitally confirmed consultation summary. Scan QR on page 1 to verify.", { x: MARGIN, y: 16, size: 7, font: fontItalic, color: LIGHT_GREY });
-    p.drawText(`Verification: ${verificationUrl}`, { x: MARGIN, y: 6, size: 6.5, font, color: LIGHT_GREY });
+    p.drawText(sanitizeOneLine(`Verification: ${verificationUrl}`), { x: MARGIN, y: 6, size: 6.5, font, color: LIGHT_GREY });
   }
 
   const pdfBytes = await doc.save();
