@@ -79,6 +79,21 @@ export default function VideoRoomPage() {
 
   const dailyUrl = getDailyUrl();
 
+  // Append ?userName to the Daily.co URL so the correct name shows inside the call
+  const buildDailyUrl = (url: string, name: string) => {
+    try {
+      const u = new URL(url);
+      if (name.trim()) u.searchParams.set("userName", name.trim());
+      return u.toString();
+    } catch {
+      return url;
+    }
+  };
+
+  const callDisplayName = isProvider
+    ? (booking?.serviceName || "")
+    : ((booking as any)?.onCallDoctorName || onCallDoctorName);
+
   // Mobile detection with resize listener
   useEffect(() => {
     const handler = () => setIsMobile(window.innerWidth < 768);
@@ -498,7 +513,7 @@ export default function VideoRoomPage() {
             {dailyUrl && (
               <iframe
                 ref={iframeRef}
-                src={dailyUrl}
+                src={buildDailyUrl(dailyUrl, callDisplayName)}
                 allow="camera; microphone; fullscreen; display-capture; autoplay"
                 style={{ width: "100%", height: "100%", border: "none", display: "block" }}
                 data-testid="video-container"
@@ -697,7 +712,7 @@ export default function VideoRoomPage() {
           {dailyUrl && (
             <iframe
               ref={iframeRef}
-              src={dailyUrl}
+              src={buildDailyUrl(dailyUrl, callDisplayName)}
               allow="camera; microphone; fullscreen; display-capture; autoplay"
               className="w-full h-full border-0"
               style={{
