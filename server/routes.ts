@@ -1346,11 +1346,15 @@ export async function registerRoutes(
       if (!booking) return res.status(404).json({ message: "Booking not found" });
       if (booking.bookingType !== "consultation") return res.status(400).json({ message: "Only consultation bookings can have prescriptions confirmed" });
 
-      // Strict ownership: verify the consultant belongs to this provider
+      // Ownership: verify the consultant belongs to this provider (only enforced when the consultant has a provider assigned)
       const provider = await storage.getProviderByUserId(user.id);
       if (!provider) return res.status(403).json({ message: "Provider profile not found" });
       const consultant = await storage.getConsultantById(booking.serviceId);
-      if (!consultant || consultant.providerId !== provider.id) {
+      if (!consultant) {
+        return res.status(404).json({ message: "Consultant not found for this booking" });
+      }
+      // If the consultant has a provider assigned, enforce ownership. If not (e.g. admin-seeded), allow any provider.
+      if (consultant.providerId && consultant.providerId !== provider.id) {
         return res.status(403).json({ message: "You can only sign prescriptions for your own consultants" });
       }
 
