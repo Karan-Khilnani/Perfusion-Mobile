@@ -269,6 +269,7 @@ export const bookings = pgTable("bookings", {
   uhidIpNumber: varchar("uhid_ip_number", { length: 100 }),
   onCallDoctorName: varchar("on_call_doctor_name", { length: 255 }),
   onCallDoctorDesignation: varchar("on_call_doctor_designation", { length: 255 }),
+  referringPhysician: varchar("referring_physician", { length: 255 }),
   clinicalSummary: text("clinical_summary"),
   provisionalDiagnosis: text("provisional_diagnosis"),
   ipdNumber: varchar("ipd_number", { length: 50 }),

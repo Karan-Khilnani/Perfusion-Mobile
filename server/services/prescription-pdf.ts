@@ -9,6 +9,7 @@ export interface PrescriptionPdfData {
   approvedAt: Date;
   approverIp: string;
   referringFacility: string | null;
+  referringPhysician: string | null;
   onCallDoctorName: string | null;
   onCallDoctorDesignation: string | null;
   patientName: string;
@@ -216,22 +217,30 @@ export async function generateAndStorePrescriptionPdf(data: PrescriptionPdfData,
   y -= 18;
 
   // ── Referring info ────────────────────────────────────────────────────────────
-  if (data.referringFacility || data.onCallDoctorName) {
-    page.drawRectangle({ x: MARGIN, y: y - 24, width: CONTENT_W, height: 30, color: SECTION_BG });
+  if (data.referringFacility || data.referringPhysician || data.onCallDoctorName) {
+    const lineCount = (data.referringFacility ? 1 : 0) + (data.referringPhysician ? 1 : 0) + (data.onCallDoctorName ? 1 : 0);
+    const blockH = lineCount * 14 + 8;
+    page.drawRectangle({ x: MARGIN, y: y - blockH + 10, width: CONTENT_W, height: blockH, color: SECTION_BG });
     const rx = MARGIN + 10;
     if (data.referringFacility) {
       page.drawText("Referring Facility:", { x: rx, y, size: 8.5, font, color: GREY });
       page.drawText(sanitizeOneLine(data.referringFacility), { x: rx + 110, y, size: 8.5, font: fontBold, color: DARK });
+      y -= 14;
+    }
+    if (data.referringPhysician) {
+      page.drawText("Referring Physician:", { x: rx, y, size: 8.5, font, color: GREY });
+      page.drawText(sanitizeOneLine(data.referringPhysician), { x: rx + 110, y, size: 8.5, font: fontBold, color: DARK });
+      y -= 14;
     }
     if (data.onCallDoctorName) {
-      y -= 14;
-      page.drawText("Referring Physician:", { x: rx, y, size: 8.5, font, color: GREY });
+      page.drawText("Call Facilitator:", { x: rx, y, size: 8.5, font, color: GREY });
       const facilText = data.onCallDoctorDesignation
         ? `${data.onCallDoctorName} (${data.onCallDoctorDesignation})`
         : data.onCallDoctorName;
       page.drawText(sanitizeOneLine(facilText), { x: rx + 110, y, size: 8.5, font: fontBold, color: DARK });
+      y -= 14;
     }
-    y -= 22;
+    y -= 8;
   }
 
   // ── Patient details ───────────────────────────────────────────────────────────

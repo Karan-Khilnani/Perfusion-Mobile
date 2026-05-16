@@ -214,6 +214,7 @@ export default function ConsultationBookingPage() {
         } : {}),
         clinicalSummary: data.clinicalSummary,
         provisionalDiagnosis: data.provisionalDiagnosis || null,
+        referringPhysician: data.orderingPhysician || null,
         examination: data.examination || null,
         investigations: data.investigations || null,
         documentUrls: uploadedReportUrls.length > 0 ? uploadedReportUrls : null,

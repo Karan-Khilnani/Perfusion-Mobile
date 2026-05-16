@@ -82,11 +82,14 @@ export default function VideoRoomPage() {
 
   const dailyUrl = getDailyUrl();
 
-  // Append ?userName to the Daily.co URL so the correct name shows inside the call
+  // Append ?userName to the Daily.co URL so the correct name shows inside the call.
+  // prejoinUI=false skips Daily's prejoin screen so the userName URL param wins over
+  // any cached name from previous sessions (Daily caches the last-entered name).
   const buildDailyUrl = (url: string, name: string) => {
     try {
       const u = new URL(url);
       if (name.trim()) u.searchParams.set("userName", name.trim());
+      u.searchParams.set("prejoinUI", "false");
       return u.toString();
     } catch {
       return url;
