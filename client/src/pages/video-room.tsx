@@ -6,10 +6,12 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, Video, VideoOff, Phone, Maximize2, Minimize2, Stethoscope, ClipboardList, PhoneOff, RefreshCw, PanelRightClose, PanelRightOpen } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ArrowLeft, Video, VideoOff, Phone, Maximize2, Minimize2, Stethoscope, ClipboardList, PhoneOff, RefreshCw, PanelRightClose, PanelRightOpen, FileText, ShieldCheck } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useCallEvents, type CallEvent } from "@/hooks/use-call-events";
 import { ClinicalPanel } from "@/components/clinical-panel";
+import { InCallSummaryForm } from "@/components/in-call-summary-form";
 import type { Booking } from "@shared/schema";
 
 type CallPhase =
@@ -18,6 +20,8 @@ type CallPhase =
   | "connected"
   | "declined"
   | "timeout";
+
+type MobilePanel = "video" | "docs" | "summary";
 
 export default function VideoRoomPage() {
   const { roomId } = useParams<{ roomId: string }>();
@@ -32,6 +36,11 @@ export default function VideoRoomPage() {
   const [inCallDocs, setInCallDocs] = useState<{ url: string; name: string }[]>([]);
   const [phase, setPhase] = useState<CallPhase>("precall");
   const [ringingSeconds, setRingingSeconds] = useState(0);
+  const [showSummaryDialog, setShowSummaryDialog] = useState(false);
+  const [mobilePanel, setMobilePanel] = useState<MobilePanel>("video");
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
+  const touchStartXRef = useRef<number>(0);
+
   // Tracks whether we've applied the initial accepted=true jump (avoid re-render loop)
   const joinedAsCalleeApplied = useRef(false);
 
@@ -69,6 +78,13 @@ export default function VideoRoomPage() {
   };
 
   const dailyUrl = getDailyUrl();
+
+  // Mobile detection with resize listener
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener("resize", handler);
+    return () => window.removeEventListener("resize", handler);
+  }, []);
 
   // Keep phaseRef in sync with phase state
   useEffect(() => {
@@ -187,9 +203,6 @@ export default function VideoRoomPage() {
 
   const handleRetry = () => {
     setRingingSeconds(0);
-    // Setting phase back to "precall" is enough:
-    // - Provider: the auto-ring useEffect fires when phase becomes "precall"
-    // - Seeker: pre-call form re-appears; they click the button manually
     setPhase("precall");
   };
 
@@ -219,14 +232,29 @@ export default function VideoRoomPage() {
   useEffect(() => {
     return () => {
       clearRingTimer();
-      // If the component unmounts while still ringing (e.g. user navigates away
-      // without clicking Cancel), tell the server to cancel the session so the
-      // recipient stops seeing the ghost incoming-call overlay.
       if (phaseRef.current === "ringing" && bookingRef.current) {
         apiRequest("POST", `/api/call/cancel/${bookingRef.current.id}`, {}).catch(() => {});
       }
     };
   }, []);
+
+  // ── Touch / swipe handlers for mobile carousel ────────────────────────────
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartXRef.current = e.touches[0].clientX;
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    const dx = e.changedTouches[0].clientX - touchStartXRef.current;
+    if (Math.abs(dx) < 50) return; // ignore tiny swipes
+
+    if (dx > 0) {
+      // Swiped right → show docs (or go back to video if on summary)
+      setMobilePanel(p => (p === "summary" ? "video" : "docs"));
+    } else {
+      // Swiped left → show summary (or go back to video if on docs)
+      setMobilePanel(p => (p === "docs" ? "video" : "summary"));
+    }
+  };
 
   if (!roomId || !dailyUrl) {
     return (
@@ -406,7 +434,197 @@ export default function VideoRoomPage() {
     );
   }
 
-  // ─── Connected — Video Room ────────────────────────────────────────────────
+  // ─── Connected — Mobile Layout (Swipe Carousel) ───────────────────────────
+  if (isMobile) {
+    const isSummaryConfirmed = !!(booking as any)?.prescriptionApprovedAt;
+
+    return (
+      <div className="flex h-screen flex-col bg-background overflow-hidden">
+        {/* Header */}
+        <header className="flex items-center justify-between border-b px-3 py-2 shrink-0 z-20 bg-background">
+          <div className="flex items-center gap-2">
+            <Link href={returnTo}>
+              <Button variant="ghost" size="icon" className="h-8 w-8" data-testid="button-back">
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+            </Link>
+            <div>
+              <h1 className="text-sm font-semibold leading-tight">Video Consultation</h1>
+              <p className="text-xs text-muted-foreground leading-tight truncate max-w-[160px]">
+                {booking?.serviceName || "Super Speciality Consultation"}
+              </p>
+            </div>
+          </div>
+          <Badge variant="outline" className="gap-1 text-green-600 border-green-600/30 bg-green-600/10 text-xs">
+            <Video className="h-3 w-3" />
+            Live
+          </Badge>
+        </header>
+
+        {/* Swipe area */}
+        <div
+          className="flex-1 relative overflow-hidden"
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
+        >
+          {/* ── Video (always rendered; transitions between full-screen and PiP) ── */}
+          <div
+            style={{
+              position: "absolute",
+              transition: "all 0.35s cubic-bezier(0.4,0,0.2,1)",
+              ...(mobilePanel === "video"
+                ? { inset: 0, zIndex: 10, borderRadius: 0 }
+                : {
+                    bottom: 72,
+                    right: 12,
+                    width: 128,
+                    height: 96,
+                    zIndex: 50,
+                    borderRadius: 10,
+                    overflow: "hidden",
+                    boxShadow: "0 4px 20px rgba(0,0,0,0.4)",
+                    border: "2px solid rgba(255,255,255,0.2)",
+                  }),
+            }}
+          >
+            {isLoading && mobilePanel === "video" && (
+              <div className="absolute inset-0 z-10 flex items-center justify-center bg-background">
+                <div className="text-center">
+                  <div className="mb-4 h-10 w-10 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto" />
+                  <p className="text-sm text-muted-foreground">Connecting…</p>
+                </div>
+              </div>
+            )}
+            {dailyUrl && (
+              <iframe
+                ref={iframeRef}
+                src={dailyUrl}
+                allow="camera; microphone; fullscreen; display-capture; autoplay"
+                style={{ width: "100%", height: "100%", border: "none", display: "block" }}
+                data-testid="video-container"
+              />
+            )}
+          </div>
+
+          {/* ── Reports panel (right → slides in from right) ─────────────────── */}
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              zIndex: 20,
+              transform: mobilePanel === "docs" ? "translateX(0)" : "translateX(100%)",
+              transition: "transform 0.35s cubic-bezier(0.4,0,0.2,1)",
+              background: "var(--background)",
+              overflowY: "auto",
+            }}
+          >
+            <div className="px-3 pt-3 pb-1 flex items-center gap-2 text-sm font-medium text-muted-foreground">
+              <FileText className="h-4 w-4" />
+              Patient Reports &amp; Documents
+            </div>
+            {booking && (
+              <ClinicalPanel
+                booking={booking}
+                isProvider={isProvider}
+                inCallDocs={inCallDocs}
+                onDocUploaded={(url, name) =>
+                  setInCallDocs(prev =>
+                    prev.some(d => d.url === url) ? prev : [...prev, { url, name }]
+                  )
+                }
+              />
+            )}
+          </div>
+
+          {/* ── Summary panel (left → slides in from left, provider only) ──────── */}
+          {isProvider && (
+            <div
+              style={{
+                position: "absolute",
+                inset: 0,
+                zIndex: 20,
+                transform: mobilePanel === "summary" ? "translateX(0)" : "translateX(-100%)",
+                transition: "transform 0.35s cubic-bezier(0.4,0,0.2,1)",
+                background: "var(--background)",
+                overflowY: "auto",
+              }}
+            >
+              <div className="px-3 pt-3 pb-1 flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                <ClipboardList className="h-4 w-4" />
+                Consultation Summary
+                {isSummaryConfirmed && (
+                  <span className="ml-auto flex items-center gap-1 text-xs text-green-600">
+                    <ShieldCheck className="h-3 w-3" /> Signed
+                  </span>
+                )}
+              </div>
+              {booking && <InCallSummaryForm booking={booking} />}
+            </div>
+          )}
+        </div>
+
+        {/* Footer — navigation dots + hangup */}
+        <footer className="shrink-0 border-t bg-muted/30 px-4 py-3 flex flex-col items-center gap-2 z-20">
+          {/* Dots */}
+          <div className="flex items-center gap-3">
+            {isProvider && (
+              <button
+                className="flex flex-col items-center gap-0.5"
+                onClick={() => setMobilePanel("summary")}
+                data-testid="button-mobile-panel-summary"
+              >
+                <div
+                  className={`h-2 w-2 rounded-full transition-colors ${
+                    mobilePanel === "summary" ? "bg-primary" : "bg-muted-foreground/30"
+                  }`}
+                />
+                <span className="text-[10px] text-muted-foreground">Summary</span>
+              </button>
+            )}
+            <button
+              className="flex flex-col items-center gap-0.5"
+              onClick={() => setMobilePanel("video")}
+              data-testid="button-mobile-panel-video"
+            >
+              <div
+                className={`h-2.5 w-2.5 rounded-full transition-colors ${
+                  mobilePanel === "video" ? "bg-primary scale-125" : "bg-muted-foreground/30"
+                }`}
+              />
+              <span className="text-[10px] text-muted-foreground">Video</span>
+            </button>
+            <button
+              className="flex flex-col items-center gap-0.5"
+              onClick={() => setMobilePanel("docs")}
+              data-testid="button-mobile-panel-docs"
+            >
+              <div
+                className={`h-2 w-2 rounded-full transition-colors ${
+                  mobilePanel === "docs" ? "bg-primary" : "bg-muted-foreground/30"
+                }`}
+              />
+              <span className="text-[10px] text-muted-foreground">Reports</span>
+            </button>
+          </div>
+
+          {/* Hangup */}
+          <Button
+            variant="destructive"
+            size="icon"
+            onClick={hangUp}
+            className="h-12 w-12 rounded-full"
+            data-testid="button-hangup"
+          >
+            <Phone className="h-5 w-5 rotate-[135deg]" />
+          </Button>
+        </footer>
+      </div>
+    );
+  }
+
+  // ─── Connected — Desktop Layout ────────────────────────────────────────────
+  const isSummaryConfirmed = !!(booking as any)?.prescriptionApprovedAt;
+
   return (
     <div className="flex h-screen flex-col bg-background">
       <header className="flex items-center justify-between border-b px-4 py-3 shrink-0">
@@ -428,6 +646,23 @@ export default function VideoRoomPage() {
             <Video className="h-3.5 w-3.5" />
             Live
           </Badge>
+
+          {/* Write Summary button — provider only */}
+          {isProvider && (
+            <Button
+              variant={isSummaryConfirmed ? "outline" : "secondary"}
+              size="sm"
+              onClick={() => setShowSummaryDialog(true)}
+              className={isSummaryConfirmed ? "gap-1.5 text-green-600 border-green-600/40 hover:bg-green-600/10" : "gap-1.5"}
+              data-testid="button-write-summary"
+            >
+              {isSummaryConfirmed
+                ? <><ShieldCheck className="h-4 w-4" /> Summary Signed</>
+                : <><ClipboardList className="h-4 w-4" /> Write Summary</>
+              }
+            </Button>
+          )}
+
           <Button
             variant="ghost"
             size="icon"
@@ -512,6 +747,28 @@ export default function VideoRoomPage() {
           {isFullscreen ? <Minimize2 className="h-5 w-5" /> : <Maximize2 className="h-5 w-5" />}
         </Button>
       </footer>
+
+      {/* Consultation Summary Dialog (desktop, provider only) */}
+      {isProvider && booking && (
+        <Dialog open={showSummaryDialog} onOpenChange={setShowSummaryDialog}>
+          <DialogContent className="max-w-xl max-h-[90vh] flex flex-col p-0">
+            <DialogHeader className="px-6 pt-6 pb-2 shrink-0">
+              <DialogTitle className="flex items-center gap-2">
+                {isSummaryConfirmed
+                  ? <><ShieldCheck className="h-5 w-5 text-green-600" /> Summary — Signed &amp; Locked</>
+                  : <><ClipboardList className="h-5 w-5" /> Consultation Summary</>
+                }
+              </DialogTitle>
+              <p className="text-sm text-muted-foreground">
+                {booking.patientName} • {booking.serviceName}
+              </p>
+            </DialogHeader>
+            <div className="flex-1 overflow-y-auto">
+              <InCallSummaryForm booking={booking} />
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }
