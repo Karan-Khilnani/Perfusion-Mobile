@@ -24,6 +24,7 @@ interface ActiveConsultation extends Booking {
 interface DashboardData {
   activeConsultations: ActiveConsultation[];
   readyReports: Booking[];
+  signedPrescriptions: Booking[];
 }
 
 function formatAppointmentSlot(slot: string | null | undefined): string {
@@ -60,6 +61,7 @@ export default function UserDashboard() {
 
   const activeConsultations = data?.activeConsultations ?? [];
   const readyReports = data?.readyReports ?? [];
+  const signedPrescriptions = data?.signedPrescriptions ?? [];
 
   return (
     <div className="min-h-full bg-background">
@@ -223,6 +225,80 @@ export default function UserDashboard() {
               </div>
             )}
           </div>
+
+          {(isLoading || signedPrescriptions.length > 0) && (
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold text-base">Signed Prescriptions</h3>
+              {signedPrescriptions.length > 0 && (
+                <span className="text-xs bg-blue-500/10 text-blue-600 dark:text-blue-400 font-medium px-2.5 py-1 rounded-full">
+                  {signedPrescriptions.length} available
+                </span>
+              )}
+            </div>
+            {isLoading ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <BookingCardSkeleton />
+                <BookingCardSkeleton />
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {signedPrescriptions.map((booking) => (
+                  <div
+                    key={booking.id}
+                    className="rounded-xl border bg-card p-5 space-y-4 hover:border-blue-500/30 transition-colors"
+                    data-testid={`card-prescription-${booking.id}`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-500/10 mt-0.5">
+                        <FileText className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-semibold text-sm leading-tight truncate">{booking.serviceName}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">{booking.providerName}</p>
+                      </div>
+                    </div>
+
+                    <div className="border-t" />
+
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 text-sm">
+                        <User className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                        <span className="text-muted-foreground">Patient:</span>
+                        <span className="font-medium truncate">{booking.patientName}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-sm">
+                        <Calendar className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                        <span className="text-muted-foreground">Signed on:</span>
+                        <span className="font-medium">
+                          {booking.prescriptionApprovedAt
+                            ? format(new Date(booking.prescriptionApprovedAt), "dd MMM yyyy")
+                            : "—"}
+                        </span>
+                      </div>
+                    </div>
+
+                    <a
+                      href={(booking as any).prescriptionPdfUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      download
+                    >
+                      <Button
+                        size="sm"
+                        className="w-full gap-2 bg-blue-600 hover:bg-blue-700 text-white"
+                        data-testid={`button-download-prescription-${booking.id}`}
+                      >
+                        <Download className="h-4 w-4" />
+                        Download Prescription
+                      </Button>
+                    </a>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          )}
 
           <div>
             <div className="flex items-center justify-between mb-4">

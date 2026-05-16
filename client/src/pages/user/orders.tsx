@@ -765,6 +765,7 @@ export default function OrdersPage() {
                                 <th className="px-3 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">Department</th>
                                 <th className="px-3 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">Booked Slot</th>
                                 <th className="px-3 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">Status</th>
+                                <th className="px-3 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">Prescription</th>
                               </tr>
                             </thead>
                             <tbody>
@@ -787,6 +788,22 @@ export default function OrdersPage() {
                                     <Badge variant={b.status === "completed" ? "default" : "outline"} className="text-xs">
                                       {b.status}
                                     </Badge>
+                                  </td>
+                                  <td className="px-3 py-2 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                                    {(b as any).prescriptionApprovedAt && (b as any).prescriptionPdfUrl ? (
+                                      <a
+                                        href={(b as any).prescriptionPdfUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        data-testid={`button-download-prescription-${b.id}`}
+                                      >
+                                        <Button size="sm" variant="default" className="h-7 text-xs gap-1">
+                                          <Download className="h-3 w-3" /> Prescription
+                                        </Button>
+                                      </a>
+                                    ) : (
+                                      <span className="text-xs text-muted-foreground">—</span>
+                                    )}
                                   </td>
                                 </tr>
                               ))}

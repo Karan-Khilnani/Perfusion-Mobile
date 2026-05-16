@@ -873,7 +873,13 @@ export async function registerRoutes(
           (b.status === "report_ready" || !!b.processedReportUrl)
       );
 
-      res.json({ activeConsultations, readyReports });
+      // Signed prescriptions: consultation bookings with an approved, signed prescription PDF
+      const signedPrescriptions = allBookings
+        .filter((b) => b.bookingType === "consultation" && !!b.prescriptionApprovedAt && !!b.prescriptionPdfUrl)
+        .sort((a, b) => new Date(b.prescriptionApprovedAt!).getTime() - new Date(a.prescriptionApprovedAt!).getTime())
+        .slice(0, 10);
+
+      res.json({ activeConsultations, readyReports, signedPrescriptions });
     } catch (error) {
       console.error("Error fetching dashboard data:", error);
       res.status(500).json({ message: "Failed to fetch dashboard data" });
