@@ -1,5 +1,6 @@
 import { db } from "../db";
 import { bookings, consultants, providers } from "../../shared/schema";
+import { users } from "../../shared/models/auth";
 import { eq, and, inArray, isNull } from "drizzle-orm";
 import { triggerVoiceCall } from "./msg91";
 
@@ -223,17 +224,30 @@ export async function fireOneBooking(booking: any, now: Date = new Date()): Prom
   }
 
   // ── Call seeker ────────────────────────────────────────────────────────────
+  // Seeker phone comes from the seeker user's My Profile (users.phone),
+  // looked up via booking.userId. We do NOT use booking.patientContact —
+  // that's the patient's own contact entered at booking time and may be a
+  // proxy/family number, not the registered seeker hospital's profile phone.
   try {
-    if (booking.patientContact) {
-      console.log(`[Scheduler]   → Calling seeker: ${booking.patientContact}`);
-      triggerVoiceCall(booking.patientContact, seekerMsg).catch((e) =>
+    let seekerPhone: string | null = null;
+    if (booking.userId) {
+      const [seekerUser] = await db
+        .select({ phone: users.phone })
+        .from(users)
+        .where(eq(users.id, booking.userId));
+      seekerPhone = seekerUser?.phone || null;
+    }
+
+    if (seekerPhone) {
+      console.log(`[Scheduler]   → Calling seeker: ${seekerPhone}`);
+      triggerVoiceCall(seekerPhone, seekerMsg).catch((e) =>
         console.error("[Scheduler] Seeker call failed:", e?.message)
       );
     } else {
-      console.log(`[Scheduler]   → No seeker contact on record`);
+      console.log(`[Scheduler]   → No seeker phone on profile (userId=${booking.userId})`);
     }
   } catch (e: any) {
-    console.error("[Scheduler] Seeker step error:", e?.message, e?.stack);
+    console.error("[Scheduler] Seeker lookup error:", e?.message, e?.stack);
   }
 
   // ── Call admin ─────────────────────────────────────────────────────────────
