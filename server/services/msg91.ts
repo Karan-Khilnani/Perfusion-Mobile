@@ -14,16 +14,32 @@ function getClient() {
   return twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
 }
 
+/**
+ * Normalize an Indian phone number to E.164 (+91XXXXXXXXXX).
+ * - Already E.164 (+...) → returned as-is.
+ * - "91XXXXXXXXXX" (12 digits) → "+91XXXXXXXXXX".
+ * - "0XXXXXXXXXX" or "XXXXXXXXXX" or any other length where the LAST 10
+ *   digits look like an Indian mobile (starts 6-9) → "+91" + last10.
+ * - Anything else → returned with leading "+" so Twilio rejects it cleanly
+ *   instead of silently misrouting (e.g. "45..." being read as Denmark).
+ */
 function formatPhoneNumber(phone: string): string {
-  let cleaned = phone.replace(/\s+/g, "").replace(/-/g, "");
-  if (!cleaned.startsWith("+")) {
-    if (cleaned.startsWith("91") && cleaned.length === 12) {
-      cleaned = "+" + cleaned;
-    } else if (cleaned.length === 10) {
-      cleaned = "+91" + cleaned;
+  if (!phone) return phone;
+  const trimmed = phone.trim();
+  if (trimmed.startsWith("+")) {
+    return "+" + trimmed.slice(1).replace(/\D/g, "");
+  }
+  const digits = trimmed.replace(/\D/g, "");
+  if (digits.length === 12 && digits.startsWith("91")) {
+    return "+" + digits;
+  }
+  if (digits.length >= 10) {
+    const last10 = digits.slice(-10);
+    if (/^[6-9]/.test(last10)) {
+      return "+91" + last10;
     }
   }
-  return cleaned;
+  return "+" + digits;
 }
 
 export async function triggerVoiceCall(

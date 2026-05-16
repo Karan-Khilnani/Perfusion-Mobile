@@ -182,36 +182,31 @@ export async function fireOneBooking(booking: any, now: Date = new Date()): Prom
     `Consultation booking ${bookingRef} for ${patientName} is starting now.`;
 
   // ── Call consultant ────────────────────────────────────────────────────────
-  // booking.serviceId is the consultants.id; booking.providerId is providers.id.
-  // We prefer consultants.contactPhone, then fall back to providers.phone.
+  // The consultants table has no direct phone column; the consultant's contact
+  // number lives on the linked providers row. booking.serviceId → consultants.id
+  // → consultants.providerId → providers.phone. booking.providerId is the
+  // last-resort fallback in case the join row is missing.
   try {
     let consultantPhone: string | null = null;
+    let resolvedProviderId: string | null = null;
 
     if (booking.serviceId) {
       const [consultant] = await db
-        .select({
-          contactPhone: consultants.contactPhone,
-          providerId: consultants.providerId,
-        })
+        .select({ providerId: consultants.providerId })
         .from(consultants)
         .where(eq(consultants.id, booking.serviceId));
-      consultantPhone = consultant?.contactPhone || null;
-
-      if (!consultantPhone && consultant?.providerId) {
-        const [prov] = await db
-          .select({ phone: providers.phone })
-          .from(providers)
-          .where(eq(providers.id, consultant.providerId));
-        consultantPhone = prov?.phone || null;
-      }
+      resolvedProviderId = consultant?.providerId || null;
     }
 
-    // Last-resort fallback: providers table directly via booking.providerId
-    if (!consultantPhone && booking.providerId) {
+    if (!resolvedProviderId && booking.providerId) {
+      resolvedProviderId = booking.providerId;
+    }
+
+    if (resolvedProviderId) {
       const [prov] = await db
         .select({ phone: providers.phone })
         .from(providers)
-        .where(eq(providers.id, booking.providerId));
+        .where(eq(providers.id, resolvedProviderId));
       consultantPhone = prov?.phone || null;
     }
 
