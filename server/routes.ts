@@ -1468,6 +1468,103 @@ export async function registerRoutes(
     }
   });
 
+  // Download a signed prescription PDF — streams the file directly (regenerates if missing on disk)
+  app.get("/api/bookings/:id/prescription/download", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.id;
+      const booking = await storage.getBookingById(req.params.id);
+      if (!booking || booking.bookingType !== "consultation") {
+        return res.status(404).json({ message: "Booking not found" });
+      }
+
+      // Auth: owner, provider assigned to this booking, or admin
+      const isOwner = booking.userId === userId;
+      const isAdminUser = req.user.role === "admin";
+      let isProviderUser = false;
+      if (req.user.role === "provider") {
+        const provider = await storage.getProviderByUserId(userId);
+        if (provider && booking.providerId === provider.id) isProviderUser = true;
+      }
+      if (!isOwner && !isAdminUser && !isProviderUser) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      if (!(booking as any).prescriptionApprovedAt) {
+        return res.status(404).json({ message: "Prescription has not been confirmed yet" });
+      }
+
+      // Try to serve the existing stored file first
+      const storedRelPath = (booking as any).prescriptionPdfUrl as string | null;
+      if (storedRelPath) {
+        const absPath = path.join(process.cwd(), storedRelPath);
+        if (fs.existsSync(absPath)) {
+          const safeName = `prescription-${(booking as any).bookingNumber || booking.id}.pdf`;
+          res.setHeader("Content-Type", "application/pdf");
+          res.setHeader("Content-Disposition", `attachment; filename="${safeName}"`);
+          return fs.createReadStream(absPath).pipe(res);
+        }
+      }
+
+      // File missing (e.g. different deployment instance) — regenerate on the fly
+      const bookingUser = await storage.getUserById(booking.userId);
+      const consultant = booking.serviceId ? await storage.getConsultantById(booking.serviceId) : null;
+      if (!consultant) {
+        return res.status(404).json({ message: "Consultant not found; cannot regenerate PDF" });
+      }
+
+      const protocol = req.headers["x-forwarded-proto"] || "https";
+      const host = req.headers.host || "localhost:5000";
+      const baseUrl = process.env.REPLIT_DEV_DOMAIN
+        ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+        : `${protocol}://${host}`;
+
+      const pdfData: PrescriptionPdfData = {
+        bookingId: booking.id,
+        bookingNumber: (booking as any).bookingNumber || `PFN-${booking.id.substring(0, 8).toUpperCase()}`,
+        approvedAt: new Date((booking as any).prescriptionApprovedAt),
+        approverIp: (booking as any).prescriptionApproverIp || "unknown",
+        referringFacility: bookingUser?.hospitalName || null,
+        onCallDoctorName: (booking as any).onCallDoctorName || null,
+        onCallDoctorDesignation: (booking as any).onCallDoctorDesignation || null,
+        patientName: booking.patientName,
+        patientAge: booking.patientAge,
+        patientGender: booking.patientGender,
+        uhidIpNumber: (booking as any).uhidIpNumber || null,
+        patientContact: booking.patientContact,
+        patientWeight: (booking as any).patientWeight || null,
+        patientAllergies: (booking as any).patientAllergyNotSpecified ? null : (booking as any).patientAllergies,
+        patientAllergyNotSpecified: (booking as any).patientAllergyNotSpecified ?? true,
+        consultantName: consultant.name,
+        consultantSpecialization: consultant.specialization || null,
+        consultantQualification: consultant.qualification || null,
+        consultantRegistrationNo: consultant.registrationNumber || null,
+        consultantYearsExperience: consultant.yearsExperience || null,
+        consultantAffiliation: consultant.affiliatedInstitution || null,
+        consultantSignatureUrl: consultant.digitalSignatureUrl || null,
+        clinicalHistory: booking.clinicalSummary || null,
+        examination: booking.examination || null,
+        investigations: booking.investigations || null,
+        diagnosis: booking.prescriptionDiagnosis || null,
+        physicianNotes: (booking as any).prescriptionPhysicianNotes || null,
+        treatmentPlan: booking.prescriptionMedications || null,
+        followUp: booking.prescriptionFollowUp || null,
+      };
+
+      const newPdfUrl = await generateAndStorePrescriptionPdf(pdfData, baseUrl);
+      // Persist the newly regenerated URL so future downloads are fast
+      await storage.updateBooking(booking.id, { prescriptionPdfUrl: newPdfUrl } as any);
+
+      const newAbsPath = path.join(process.cwd(), newPdfUrl);
+      const safeName = `prescription-${(booking as any).bookingNumber || booking.id}.pdf`;
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `attachment; filename="${safeName}"`);
+      fs.createReadStream(newAbsPath).pipe(res);
+    } catch (error) {
+      console.error("Error downloading prescription PDF:", error);
+      res.status(500).json({ message: "Failed to download prescription PDF" });
+    }
+  });
+
   // Public verification endpoint (no auth required)
   app.get("/api/verify/prescription/:bookingId", async (req: any, res) => {
     try {

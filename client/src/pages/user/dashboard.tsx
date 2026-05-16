@@ -279,10 +279,9 @@ export default function UserDashboard() {
                     </div>
 
                     <a
-                      href={(booking as any).prescriptionPdfUrl}
+                      href={`/api/bookings/${booking.id}/prescription/download`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      download
                     >
                       <Button
                         size="sm"

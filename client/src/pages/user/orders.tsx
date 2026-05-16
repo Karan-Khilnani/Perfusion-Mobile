@@ -175,6 +175,26 @@ export default function OrdersPage() {
                     </span>
                   )}
                 </div>
+                {(booking as any).prescriptionApprovedAt && (
+                  <div className="mt-3">
+                    <a
+                      href={`/api/bookings/${booking.id}/prescription/download`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      data-testid={`button-download-prescription-card-${booking.id}`}
+                    >
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-xs border-blue-300 text-blue-700 hover:bg-blue-50 dark:border-blue-700 dark:text-blue-300 dark:hover:bg-blue-900/30 gap-1"
+                      >
+                        <Download className="h-3 w-3" />
+                        Download Prescription
+                      </Button>
+                    </a>
+                  </div>
+                )}
                 {canFollowUp && (
                   <div className="mt-3">
                     <Button
@@ -406,9 +426,9 @@ export default function OrdersPage() {
                 </div>
               )}
             </div>
-            {(booking as any).prescriptionApprovedAt && (booking as any).prescriptionPdfUrl ? (
+            {(booking as any).prescriptionApprovedAt ? (
               <a
-                href={(booking as any).prescriptionPdfUrl}
+                href={`/api/bookings/${booking.id}/prescription/download`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-block mt-3"
@@ -790,9 +810,9 @@ export default function OrdersPage() {
                                     </Badge>
                                   </td>
                                   <td className="px-3 py-2 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
-                                    {(b as any).prescriptionApprovedAt && (b as any).prescriptionPdfUrl ? (
+                                    {(b as any).prescriptionApprovedAt ? (
                                       <a
-                                        href={(b as any).prescriptionPdfUrl}
+                                        href={`/api/bookings/${b.id}/prescription/download`}
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         data-testid={`button-download-prescription-${b.id}`}
