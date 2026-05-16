@@ -428,8 +428,9 @@ export async function registerRoutes(
       }
       
       const consultant = await storage.getConsultantById(req.params.id);
-      if (!consultant || consultant.providerId !== provider.id) {
-        return res.status(404).json({ message: "Consultant not found or access denied" });
+      if (!consultant) return res.status(404).json({ message: "Consultant not found" });
+      if (consultant.providerId && consultant.providerId !== provider.id) {
+        return res.status(403).json({ message: "Consultant not found or access denied" });
       }
       
       const updated = await storage.updateConsultant(req.params.id, req.body);
@@ -449,8 +450,9 @@ export async function registerRoutes(
       }
       
       const consultant = await storage.getConsultantById(req.params.id);
-      if (!consultant || consultant.providerId !== provider.id) {
-        return res.status(404).json({ message: "Consultant not found or access denied" });
+      if (!consultant) return res.status(404).json({ message: "Consultant not found" });
+      if (consultant.providerId && consultant.providerId !== provider.id) {
+        return res.status(403).json({ message: "Consultant not found or access denied" });
       }
       
       await storage.deleteConsultant(req.params.id);
@@ -2987,7 +2989,8 @@ export async function registerRoutes(
           return res.status(403).json({ message: "Provider profile not found" });
         }
         const consultant = await storage.getConsultantById(req.params.id);
-        if (!consultant || consultant.providerId !== provider.id) {
+        if (!consultant) return res.status(404).json({ message: "Consultant not found" });
+        if (consultant.providerId && consultant.providerId !== provider.id) {
           return res.status(403).json({ message: "Access denied. You can only manage your own consultants." });
         }
       }
@@ -3015,7 +3018,8 @@ export async function registerRoutes(
       const provider = await storage.getProviderByUserId(user.id);
       if (!provider) { res.status(403).json({ message: "Provider profile not found" }); return false; }
       const consultant = await storage.getConsultantById(req.params.id);
-      if (!consultant || consultant.providerId !== provider.id) {
+      if (!consultant) { res.status(404).json({ message: "Consultant not found" }); return false; }
+      if (consultant.providerId && consultant.providerId !== provider.id) {
         res.status(403).json({ message: "Access denied. You can only manage your own consultants." });
         return false;
       }
@@ -3076,7 +3080,8 @@ export async function registerRoutes(
         const provider = await storage.getProviderByUserId(userId);
         if (!provider) return res.status(403).json({ message: "Provider not found" });
         const consultant = await storage.getConsultantById(req.params.id);
-        if (!consultant || consultant.providerId !== provider.id) {
+        if (!consultant) return res.status(404).json({ message: "Consultant not found" });
+        if (consultant.providerId && consultant.providerId !== provider.id) {
           return res.status(403).json({ message: "Access denied" });
         }
       } else if (req.user.role !== "admin") {
@@ -3100,7 +3105,8 @@ export async function registerRoutes(
         const provider = await storage.getProviderByUserId(userId);
         if (!provider) return res.status(403).json({ message: "Provider not found" });
         const consultant = await storage.getConsultantById(req.params.id);
-        if (!consultant || consultant.providerId !== provider.id) {
+        if (!consultant) return res.status(404).json({ message: "Consultant not found" });
+        if (consultant.providerId && consultant.providerId !== provider.id) {
           return res.status(403).json({ message: "Access denied" });
         }
       } else if (req.user.role !== "admin") {
@@ -3125,7 +3131,8 @@ export async function registerRoutes(
         const provider = await storage.getProviderByUserId(userId);
         if (!provider) return res.status(403).json({ message: "Provider not found" });
         const consultant = await storage.getConsultantById(req.params.id);
-        if (!consultant || consultant.providerId !== provider.id) {
+        if (!consultant) return res.status(404).json({ message: "Consultant not found" });
+        if (consultant.providerId && consultant.providerId !== provider.id) {
           return res.status(403).json({ message: "Access denied" });
         }
       } else if (req.user.role !== "admin") {
