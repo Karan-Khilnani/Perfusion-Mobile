@@ -39,7 +39,10 @@ export default function VideoRoomPage() {
   const [showSummaryDialog, setShowSummaryDialog] = useState(false);
   const [mobilePanel, setMobilePanel] = useState<MobilePanel>("video");
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
+  const [pipPos, setPipPos] = useState({ bottom: 80, right: 12 });
   const touchStartXRef = useRef<number>(0);
+  const touchStartYRef = useRef<number>(0);
+  const pipDragRef = useRef<{ startX: number; startY: number; startBottom: number; startRight: number } | null>(null);
 
   // Tracks whether we've applied the initial accepted=true jump (avoid re-render loop)
   const joinedAsCalleeApplied = useRef(false);
@@ -256,19 +259,56 @@ export default function VideoRoomPage() {
   // ── Touch / swipe handlers for mobile carousel ────────────────────────────
   const handleTouchStart = (e: React.TouchEvent) => {
     touchStartXRef.current = e.touches[0].clientX;
+    touchStartYRef.current = e.touches[0].clientY;
   };
 
   const handleTouchEnd = (e: React.TouchEvent) => {
     const dx = e.changedTouches[0].clientX - touchStartXRef.current;
-    if (Math.abs(dx) < 50) return; // ignore tiny swipes
+    const dy = e.changedTouches[0].clientY - touchStartYRef.current;
+    // Ignore if too small or if mostly vertical (user is scrolling)
+    if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy) * 1.2) return;
 
     if (dx > 0) {
       // Swiped right → show docs (or go back to video if on summary)
-      setMobilePanel(p => (p === "summary" ? "video" : "docs"));
+      switchPanel(mobilePanel === "summary" ? "video" : "docs");
     } else {
       // Swiped left → show summary (or go back to video if on docs)
-      setMobilePanel(p => (p === "docs" ? "video" : "summary"));
+      switchPanel(mobilePanel === "docs" ? "video" : "summary");
     }
+  };
+
+  // Switch panel and reset PiP position when returning to video
+  const switchPanel = (panel: MobilePanel) => {
+    if (panel === "video") setPipPos({ bottom: 80, right: 12 });
+    setMobilePanel(panel);
+  };
+
+  // PiP drag handlers (pointer events for cross-platform touch+mouse support)
+  const handlePipPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (mobilePanel === "video") return;
+    e.preventDefault();
+    e.stopPropagation();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    pipDragRef.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      startBottom: pipPos.bottom,
+      startRight: pipPos.right,
+    };
+  };
+
+  const handlePipPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!pipDragRef.current) return;
+    const dx = e.clientX - pipDragRef.current.startX;
+    const dy = e.clientY - pipDragRef.current.startY;
+    // right decreases when dragging right, bottom decreases when dragging down
+    const newRight = Math.max(8, Math.min(window.innerWidth - 136, pipDragRef.current.startRight - dx));
+    const newBottom = Math.max(90, Math.min(window.innerHeight - 112, pipDragRef.current.startBottom - dy));
+    setPipPos({ bottom: newBottom, right: newRight });
+  };
+
+  const handlePipPointerUp = () => {
+    pipDragRef.current = null;
   };
 
   if (!roomId || !dailyUrl) {
@@ -476,22 +516,23 @@ export default function VideoRoomPage() {
           </Badge>
         </header>
 
-        {/* Swipe area */}
-        <div
-          className="flex-1 relative overflow-hidden"
-          onTouchStart={handleTouchStart}
-          onTouchEnd={handleTouchEnd}
-        >
+        {/* Swipe area — NO touch handlers here; iframe swallows them. Edge strips handle it. */}
+        <div className="flex-1 relative overflow-hidden">
+
           {/* ── Video (always rendered; transitions between full-screen and PiP) ── */}
           <div
+            onPointerDown={handlePipPointerDown}
+            onPointerMove={handlePipPointerMove}
+            onPointerUp={handlePipPointerUp}
             style={{
               position: "absolute",
               transition: "all 0.35s cubic-bezier(0.4,0,0.2,1)",
+              touchAction: "none",
               ...(mobilePanel === "video"
-                ? { inset: 0, zIndex: 10, borderRadius: 0 }
+                ? { inset: 0, zIndex: 10, borderRadius: 0, cursor: "default" }
                 : {
-                    bottom: 72,
-                    right: 12,
+                    bottom: pipPos.bottom,
+                    right: pipPos.right,
                     width: 128,
                     height: 96,
                     zIndex: 50,
@@ -499,6 +540,7 @@ export default function VideoRoomPage() {
                     overflow: "hidden",
                     boxShadow: "0 4px 20px rgba(0,0,0,0.4)",
                     border: "2px solid rgba(255,255,255,0.2)",
+                    cursor: "grab",
                   }),
             }}
           >
@@ -521,8 +563,10 @@ export default function VideoRoomPage() {
             )}
           </div>
 
-          {/* ── Reports panel (right → slides in from right) ─────────────────── */}
+          {/* ── Reports panel (slides in from right) — swipeable on full surface ─ */}
           <div
+            onTouchStart={handleTouchStart}
+            onTouchEnd={handleTouchEnd}
             style={{
               position: "absolute",
               inset: 0,
@@ -551,9 +595,11 @@ export default function VideoRoomPage() {
             )}
           </div>
 
-          {/* ── Summary panel (left → slides in from left, provider only) ──────── */}
+          {/* ── Summary panel (slides in from left, provider only) — swipeable ── */}
           {isProvider && (
             <div
+              onTouchStart={handleTouchStart}
+              onTouchEnd={handleTouchEnd}
               style={{
                 position: "absolute",
                 inset: 0,
@@ -576,49 +622,127 @@ export default function VideoRoomPage() {
               {booking && <InCallSummaryForm booking={booking} />}
             </div>
           )}
+
+          {/* ── Edge swipe zones — sit above the iframe (z-30) to capture touches ── */}
+          {/* Left edge: swipe right to navigate */}
+          <div
+            onTouchStart={handleTouchStart}
+            onTouchEnd={handleTouchEnd}
+            style={{
+              position: "absolute",
+              left: 0,
+              top: 0,
+              bottom: 0,
+              width: 36,
+              zIndex: 30,
+              touchAction: "none",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "flex-start",
+              paddingLeft: 6,
+            }}
+          >
+            <div style={{ width: 4, height: 36, borderRadius: 4, background: "rgba(255,255,255,0.18)" }} />
+          </div>
+          {/* Right edge: swipe left to navigate */}
+          <div
+            onTouchStart={handleTouchStart}
+            onTouchEnd={handleTouchEnd}
+            style={{
+              position: "absolute",
+              right: 0,
+              top: 0,
+              bottom: 0,
+              width: 36,
+              zIndex: 30,
+              touchAction: "none",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "flex-end",
+              paddingRight: 6,
+            }}
+          >
+            <div style={{ width: 4, height: 36, borderRadius: 4, background: "rgba(255,255,255,0.18)" }} />
+          </div>
         </div>
 
-        {/* Footer — navigation dots + hangup */}
-        <footer className="shrink-0 border-t bg-muted/30 px-4 py-3 flex flex-col items-center gap-2 z-20">
-          {/* Dots */}
-          <div className="flex items-center gap-3">
+        {/* Footer — enlarged pill nav buttons + hangup */}
+        <footer className="shrink-0 border-t bg-muted/30 px-3 py-2.5 flex flex-col items-center gap-2 z-20">
+          {/* Navigation pills */}
+          <div className="flex items-center gap-2">
             {isProvider && (
               <button
-                className="flex flex-col items-center gap-0.5"
-                onClick={() => setMobilePanel("summary")}
+                onClick={() => switchPanel("summary")}
                 data-testid="button-mobile-panel-summary"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  paddingLeft: 14,
+                  paddingRight: 14,
+                  paddingTop: 8,
+                  paddingBottom: 8,
+                  borderRadius: 999,
+                  fontSize: 13,
+                  fontWeight: 500,
+                  transition: "all 0.2s",
+                  background: mobilePanel === "summary" ? "hsl(var(--primary))" : "hsl(var(--muted))",
+                  color: mobilePanel === "summary" ? "hsl(var(--primary-foreground))" : "hsl(var(--muted-foreground))",
+                  border: "none",
+                  cursor: "pointer",
+                }}
               >
-                <div
-                  className={`h-2 w-2 rounded-full transition-colors ${
-                    mobilePanel === "summary" ? "bg-primary" : "bg-muted-foreground/30"
-                  }`}
-                />
-                <span className="text-[10px] text-muted-foreground">Summary</span>
+                <ClipboardList style={{ width: 14, height: 14 }} />
+                Summary
               </button>
             )}
             <button
-              className="flex flex-col items-center gap-0.5"
-              onClick={() => setMobilePanel("video")}
+              onClick={() => switchPanel("video")}
               data-testid="button-mobile-panel-video"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                paddingLeft: 14,
+                paddingRight: 14,
+                paddingTop: 8,
+                paddingBottom: 8,
+                borderRadius: 999,
+                fontSize: 13,
+                fontWeight: 500,
+                transition: "all 0.2s",
+                background: mobilePanel === "video" ? "hsl(var(--primary))" : "hsl(var(--muted))",
+                color: mobilePanel === "video" ? "hsl(var(--primary-foreground))" : "hsl(var(--muted-foreground))",
+                border: "none",
+                cursor: "pointer",
+              }}
             >
-              <div
-                className={`h-2.5 w-2.5 rounded-full transition-colors ${
-                  mobilePanel === "video" ? "bg-primary scale-125" : "bg-muted-foreground/30"
-                }`}
-              />
-              <span className="text-[10px] text-muted-foreground">Video</span>
+              <Video style={{ width: 14, height: 14 }} />
+              Video
             </button>
             <button
-              className="flex flex-col items-center gap-0.5"
-              onClick={() => setMobilePanel("docs")}
+              onClick={() => switchPanel("docs")}
               data-testid="button-mobile-panel-docs"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                paddingLeft: 14,
+                paddingRight: 14,
+                paddingTop: 8,
+                paddingBottom: 8,
+                borderRadius: 999,
+                fontSize: 13,
+                fontWeight: 500,
+                transition: "all 0.2s",
+                background: mobilePanel === "docs" ? "hsl(var(--primary))" : "hsl(var(--muted))",
+                color: mobilePanel === "docs" ? "hsl(var(--primary-foreground))" : "hsl(var(--muted-foreground))",
+                border: "none",
+                cursor: "pointer",
+              }}
             >
-              <div
-                className={`h-2 w-2 rounded-full transition-colors ${
-                  mobilePanel === "docs" ? "bg-primary" : "bg-muted-foreground/30"
-                }`}
-              />
-              <span className="text-[10px] text-muted-foreground">Reports</span>
+              <FileText style={{ width: 14, height: 14 }} />
+              Reports
             </button>
           </div>
 
