@@ -227,6 +227,7 @@ export interface IStorage {
   savePushSubscription(userId: string, endpoint: string, p256dh: string, auth: string): Promise<void>;
   getPushSubscriptionsByUserId(userId: string): Promise<Array<{ endpoint: string; p256dh: string; auth: string }>>;
   deletePushSubscription(userId: string, endpoint: string): Promise<void>;
+  deleteAllPushSubscriptionsForUser(userId: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -929,6 +930,10 @@ export class DatabaseStorage implements IStorage {
     await db.delete(pushSubscriptions).where(
       and(eq(pushSubscriptions.userId, userId), eq(pushSubscriptions.endpoint, endpoint))
     );
+  }
+
+  async deleteAllPushSubscriptionsForUser(userId: string): Promise<void> {
+    await db.delete(pushSubscriptions).where(eq(pushSubscriptions.userId, userId));
   }
 }
 

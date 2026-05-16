@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { SafeUser } from "@shared/models/auth";
+import { unsubscribeFromPush } from "@/lib/push-subscription";
 
 async function fetchUser(): Promise<SafeUser | null> {
   const response = await fetch("/api/auth/user", {
@@ -18,11 +19,15 @@ async function fetchUser(): Promise<SafeUser | null> {
 }
 
 async function logoutUser(): Promise<void> {
+  // Unsubscribe push notifications BEFORE destroying the session —
+  // the unsubscribe endpoint requires auth, so it must run first.
+  await unsubscribeFromPush().catch(() => {});
+
   const response = await fetch("/api/auth/logout", {
     method: "POST",
     credentials: "include",
   });
-  
+
   if (!response.ok) {
     throw new Error("Logout failed");
   }

@@ -317,7 +317,15 @@ export function registerAuthRoutes(app: Express): void {
     }
   });
 
-  app.post("/api/auth/logout", (req, res) => {
+  app.post("/api/auth/logout", async (req: any, res) => {
+    const userId = req.session?.userId as string | undefined;
+    if (userId) {
+      try {
+        await storage.deleteAllPushSubscriptionsForUser(userId);
+      } catch (e) {
+        console.error("[Logout] Failed to delete push subscriptions:", e);
+      }
+    }
     req.session.destroy((err) => {
       if (err) {
         console.error("Logout error:", err);
