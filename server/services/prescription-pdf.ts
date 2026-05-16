@@ -50,6 +50,11 @@ const PAGE_H = 842;
 const MARGIN = 50;
 const CONTENT_W = PAGE_W - 2 * MARGIN;
 
+/** Strip any leading "Dr." prefix so we never output "Dr. Dr. Name" */
+function cleanDrPrefix(name: string): string {
+  return name.replace(/^dr\.\s*/i, "").trim();
+}
+
 function wrapText(text: string, font: PDFFont, size: number, maxW: number): string[] {
   const words = text.split(" ");
   const lines: string[] = [];
@@ -127,81 +132,86 @@ export async function generateAndStorePrescriptionPdf(data: PrescriptionPdfData,
 
   const verificationUrl = `${verificationBaseUrl}/verify/prescription/${data.bookingId}`;
   const approvalDateStr = data.approvedAt.toLocaleString("en-IN", { dateStyle: "long", timeStyle: "medium", timeZone: "Asia/Kolkata" });
-  const prescriptionId = data.bookingNumber || `PFN-${data.bookingId.substring(0, 8).toUpperCase()}`;
+  const summaryId = data.bookingNumber || `PFN-${data.bookingId.substring(0, 8).toUpperCase()}`;
+
+  // Consultant name without duplicate "Dr." prefix
+  const consultantDisplayName = `Dr. ${cleanDrPrefix(data.consultantName)}`;
 
   const pages: PDFPage[] = [];
   let page = doc.addPage([PAGE_W, PAGE_H]);
   pages.push(page);
 
-  let y = PAGE_H - 20;
-
   // ── Header band ──────────────────────────────────────────────────────────────
-  page.drawRectangle({ x: 0, y: PAGE_H - 80, width: PAGE_W, height: 80, color: RED });
+  // 80px tall red band. QR code sits inside the band on the far right.
+  const HEADER_H = 80;
+  page.drawRectangle({ x: 0, y: PAGE_H - HEADER_H, width: PAGE_W, height: HEADER_H, color: RED });
 
+  // QR code inside header (right side), 56×56
+  const QR_SIZE = 56;
+  const QR_X = PAGE_W - MARGIN - QR_SIZE;
+  const QR_Y = PAGE_H - HEADER_H + (HEADER_H - QR_SIZE) / 2; // vertically centred in header
+
+  try {
+    const qrBytes = await generateQRCodeBytes(verificationUrl);
+    const qrImg = await doc.embedPng(qrBytes);
+    page.drawImage(qrImg, { x: QR_X, y: QR_Y, width: QR_SIZE, height: QR_SIZE });
+    const qrLabel = "Scan to verify";
+    const qrLW = font.widthOfTextAtSize(qrLabel, 6.5);
+    page.drawText(qrLabel, { x: QR_X + (QR_SIZE - qrLW) / 2, y: PAGE_H - HEADER_H + 3, size: 6.5, font, color: rgb(1, 0.85, 0.85) });
+  } catch (err) {
+    console.error("[ConsultationSummaryPDF] Failed to generate QR code:", err);
+  }
+
+  // Logo (left side of header)
   const logoBytes = await loadLogoBytes();
   if (logoBytes) {
     try {
       const logo = await doc.embedPng(logoBytes);
       const lh = 40;
       const lw = lh * (logo.width / logo.height);
-      page.drawImage(logo, { x: MARGIN, y: PAGE_H - 58, width: lw, height: lh });
+      page.drawImage(logo, { x: MARGIN, y: PAGE_H - HEADER_H + (HEADER_H - lh) / 2, width: lw, height: lh });
     } catch (err) {
-      console.error("[PrescriptionPDF] Failed to embed logo:", err);
-      page.drawText("Perfusion Health Pvt Ltd", { x: MARGIN, y: PAGE_H - 45, size: 16, font: fontBold, color: WHITE });
+      console.error("[ConsultationSummaryPDF] Failed to embed logo:", err);
+      page.drawText("Perfusion Health Pvt Ltd", { x: MARGIN, y: PAGE_H - 45, size: 14, font: fontBold, color: WHITE });
     }
   } else {
-    page.drawText("Perfusion Health Pvt Ltd", { x: MARGIN, y: PAGE_H - 45, size: 16, font: fontBold, color: WHITE });
+    page.drawText("Perfusion Health Pvt Ltd", { x: MARGIN, y: PAGE_H - 45, size: 14, font: fontBold, color: WHITE });
   }
 
-  const titleText = "Digital Super Speciality E-Prescription";
-  const titleW = fontBold.widthOfTextAtSize(titleText, 10);
-  page.drawText(titleText, { x: PAGE_W - MARGIN - titleW, y: PAGE_H - 38, size: 10, font: fontBold, color: WHITE });
-  const idText = `E-Prescription ID: ${prescriptionId}`;
-  page.drawText(idText, { x: PAGE_W - MARGIN - fontBold.widthOfTextAtSize(idText, 8), y: PAGE_H - 53, size: 8, font, color: rgb(1, 0.85, 0.85) });
+  // Title text block (right of logo, left of QR)
+  const titleTextX = PAGE_W - MARGIN - QR_SIZE - 14; // right-align before QR
+  const titleText = "Digital Super Speciality Consultation Summary";
+  const titleW = fontBold.widthOfTextAtSize(titleText, 9.5);
+  page.drawText(titleText, { x: titleTextX - titleW, y: PAGE_H - 36, size: 9.5, font: fontBold, color: WHITE });
+  const idText = `Summary ID: ${summaryId}`;
+  const idW = font.widthOfTextAtSize(idText, 8);
+  page.drawText(idText, { x: titleTextX - idW, y: PAGE_H - 50, size: 8, font, color: rgb(1, 0.85, 0.85) });
   const modeText = "Mode: Teleconsultation";
-  page.drawText(modeText, { x: PAGE_W - MARGIN - font.widthOfTextAtSize(modeText, 8), y: PAGE_H - 65, size: 8, font, color: rgb(1, 0.85, 0.85) });
+  const modeW = font.widthOfTextAtSize(modeText, 8);
+  page.drawText(modeText, { x: titleTextX - modeW, y: PAGE_H - 63, size: 8, font, color: rgb(1, 0.85, 0.85) });
 
-  y = PAGE_H - 100;
+  let y = PAGE_H - HEADER_H - 16;
 
-  // ── QR code ──────────────────────────────────────────────────────────────────
-  try {
-    const qrBytes = await generateQRCodeBytes(verificationUrl);
-    const qrImg = await doc.embedPng(qrBytes);
-    const qrSize = 72;
-    page.drawImage(qrImg, { x: PAGE_W - MARGIN - qrSize, y, width: qrSize, height: qrSize });
-    const qrLabel = "Scan to verify";
-    const qrLW = font.widthOfTextAtSize(qrLabel, 7);
-    page.drawText(qrLabel, { x: PAGE_W - MARGIN - qrSize + (qrSize - qrLW) / 2, y: y - 12, size: 7, font, color: GREY });
-  } catch (err) {
-    console.error("[PrescriptionPDF] Failed to generate QR code:", err);
-  }
-
-  // ── Approval seal ─────────────────────────────────────────────────────────────
-  page.drawRectangle({ x: MARGIN, y: y + 30, width: CONTENT_W - 90, height: 42, color: GREEN_BG });
-  page.drawLine({ start: { x: MARGIN, y: y + 72 }, end: { x: MARGIN + CONTENT_W - 90, y: y + 72 }, thickness: 1.5, color: GREEN });
-  page.drawText("CONFIRMED & SIGNED", { x: MARGIN + 10, y: y + 60, size: 11, font: fontBold, color: GREEN });
-  page.drawText(`Consultant confirmed this prescription on:`, { x: MARGIN + 10, y: y + 45, size: 8, font, color: GREY });
-  page.drawText(approvalDateStr, { x: MARGIN + 10, y: y + 34, size: 9, font: fontBold, color: DARK });
-
-  y -= 14;
   drawHLine(page, y);
-  y -= 20;
+  y -= 18;
 
   // ── Referring info ────────────────────────────────────────────────────────────
   if (data.referringFacility || data.onCallDoctorName) {
     page.drawRectangle({ x: MARGIN, y: y - 24, width: CONTENT_W, height: 30, color: SECTION_BG });
-    let rx = MARGIN + 10;
+    const rx = MARGIN + 10;
     if (data.referringFacility) {
       page.drawText("Referring Facility:", { x: rx, y, size: 8.5, font, color: GREY });
-      page.drawText(data.referringFacility, { x: rx + 100, y, size: 8.5, font: fontBold, color: DARK });
+      page.drawText(data.referringFacility, { x: rx + 110, y, size: 8.5, font: fontBold, color: DARK });
     }
     if (data.onCallDoctorName) {
       y -= 14;
-      page.drawText("On-Call Doctor:", { x: rx, y, size: 8.5, font, color: GREY });
-      const onCallText = data.onCallDoctorDesignation ? `${data.onCallDoctorName} (${data.onCallDoctorDesignation})` : data.onCallDoctorName;
-      page.drawText(onCallText, { x: rx + 100, y, size: 8.5, font: fontBold, color: DARK });
+      page.drawText("Call Facilitated By:", { x: rx, y, size: 8.5, font, color: GREY });
+      const facilText = data.onCallDoctorDesignation
+        ? `${data.onCallDoctorName} (${data.onCallDoctorDesignation})`
+        : data.onCallDoctorName;
+      page.drawText(facilText, { x: rx + 110, y, size: 8.5, font: fontBold, color: DARK });
     }
-    y -= 20;
+    y -= 22;
   }
 
   // ── Patient details ───────────────────────────────────────────────────────────
@@ -222,7 +232,7 @@ export async function generateAndStorePrescriptionPdf(data: PrescriptionPdfData,
   // ── Consultant details ────────────────────────────────────────────────────────
   [page, y] = needsNewPage(doc, pages, page, y, 80);
   y = drawSectionTitle(page, "CONSULTING SUPER SPECIALIST", y, fontBold);
-  y = drawLabelValue(page, "Doctor Name", `Dr. ${data.consultantName}`, y, font, fontBold);
+  y = drawLabelValue(page, "Doctor Name", consultantDisplayName, y, font, fontBold);
   if (data.consultantSpecialization) y = drawLabelValue(page, "Speciality", data.consultantSpecialization, y, font, fontBold);
   if (data.consultantQualification) y = drawLabelValue(page, "Qualification", data.consultantQualification, y, font, fontBold);
   if (data.consultantRegistrationNo) y = drawLabelValue(page, "Medical Council Reg. No.", data.consultantRegistrationNo, y, font, fontBold);
@@ -281,7 +291,7 @@ export async function generateAndStorePrescriptionPdf(data: PrescriptionPdfData,
   }
 
   // ── Legal disclaimer ──────────────────────────────────────────────────────────
-  [page, y] = needsNewPage(doc, pages, page, y, 50);
+  [page, y] = needsNewPage(doc, pages, page, y, 60);
   y -= 6;
   const legalText = "This consultation is based on information provided digitally and available records. Treatment advice is given in good faith and does not replace emergency care where indicated. Patient/referring team advised to seek immediate medical attention if condition worsens.";
   const legalLines = wrapText(legalText, fontItalic, 7.5, CONTENT_W - 20);
@@ -293,7 +303,17 @@ export async function generateAndStorePrescriptionPdf(data: PrescriptionPdfData,
     page.drawText(line, { x: MARGIN + 10, y: ly, size: 7.5, font: fontItalic, color: GREY });
     ly -= 11;
   }
-  y -= legalH + 16;
+  y -= legalH + 20;
+
+  // ── CONFIRMED & SIGNED seal (at end, above signature) ─────────────────────────
+  [page, y] = needsNewPage(doc, pages, page, y, 70);
+  const SEAL_H = 50;
+  page.drawRectangle({ x: MARGIN, y: y - SEAL_H, width: CONTENT_W, height: SEAL_H, color: GREEN_BG });
+  page.drawLine({ start: { x: MARGIN, y }, end: { x: MARGIN + CONTENT_W, y }, thickness: 1.5, color: GREEN });
+  page.drawText("CONFIRMED & SIGNED", { x: MARGIN + 12, y: y - 14, size: 11, font: fontBold, color: GREEN });
+  page.drawText("Consultant confirmed this consultation summary on:", { x: MARGIN + 12, y: y - 28, size: 8, font, color: GREY });
+  page.drawText(approvalDateStr, { x: MARGIN + 12, y: y - 40, size: 9, font: fontBold, color: DARK });
+  y -= SEAL_H + 18;
 
   // ── Signature block ───────────────────────────────────────────────────────────
   [page, y] = needsNewPage(doc, pages, page, y, 80);
@@ -314,11 +334,11 @@ export async function generateAndStorePrescriptionPdf(data: PrescriptionPdfData,
         y -= 40;
       }
     } catch (err) {
-      console.error("[PrescriptionPDF] Failed to embed consultant signature:", err);
+      console.error("[ConsultationSummaryPDF] Failed to embed consultant signature:", err);
     }
   }
 
-  page.drawText(`Dr. ${data.consultantName}`, { x: sigX, y, size: 10, font: fontBold, color: DARK });
+  page.drawText(consultantDisplayName, { x: sigX, y, size: 10, font: fontBold, color: DARK });
   y -= 14;
   if (data.consultantQualification || data.consultantSpecialization) {
     const cred = [data.consultantQualification, data.consultantSpecialization].filter(Boolean).join(" | ");
@@ -340,7 +360,7 @@ export async function generateAndStorePrescriptionPdf(data: PrescriptionPdfData,
     const pageNumText = `Page ${i + 1} of ${total}`;
     const pw = font.widthOfTextAtSize(pageNumText, 7);
     p.drawText(pageNumText, { x: PAGE_W - MARGIN - pw, y: 26, size: 7, font, color: LIGHT_GREY });
-    p.drawText("This is a digitally confirmed e-prescription. Scan QR on page 1 to verify.", { x: MARGIN, y: 16, size: 7, font: fontItalic, color: LIGHT_GREY });
+    p.drawText("This is a digitally confirmed consultation summary. Scan QR on page 1 to verify.", { x: MARGIN, y: 16, size: 7, font: fontItalic, color: LIGHT_GREY });
     p.drawText(`Verification: ${verificationUrl}`, { x: MARGIN, y: 6, size: 6.5, font, color: LIGHT_GREY });
   }
 
@@ -349,10 +369,10 @@ export async function generateAndStorePrescriptionPdf(data: PrescriptionPdfData,
   const outputDir = path.join(process.cwd(), "uploads", "prescriptions");
   if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
 
-  const fileName = `prescription-${data.bookingId}-${Date.now()}.pdf`;
+  const fileName = `consultation-summary-${data.bookingId}-${Date.now()}.pdf`;
   const outputPath = path.join(outputDir, fileName);
   fs.writeFileSync(outputPath, pdfBytes);
 
-  console.log(`[PrescriptionPDF] Generated: ${outputPath}`);
+  console.log(`[ConsultationSummaryPDF] Generated: ${outputPath}`);
   return `/uploads/prescriptions/${fileName}`;
 }
