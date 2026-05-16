@@ -313,6 +313,7 @@ export const bookings = pgTable("bookings", {
   prescriptionApproverIp: varchar("prescription_approver_ip", { length: 100 }),
   prescriptionOtpVerified: boolean("prescription_otp_verified").default(false),
   prescriptionPdfUrl: varchar("prescription_pdf_url", { length: 500 }),
+  reminderFiredAt: timestamp("reminder_fired_at"),
   razorpayOrderId: varchar("razorpay_order_id", { length: 255 }),
   razorpayPaymentId: varchar("razorpay_payment_id", { length: 255 }),
   // Follow-up consultation tracking

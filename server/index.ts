@@ -81,7 +81,13 @@ async function startServer() {
   try {
     // Run database seed to ensure admin account exists
     await seedDatabase();
-    
+
+    // Incremental schema migrations (idempotent — safe to run every startup)
+    const { getPool } = await import("./db");
+    const pool = getPool();
+    await pool.query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS reminder_fired_at timestamptz`);
+    await pool.query(`ALTER TABLE consultants ADD COLUMN IF NOT EXISTS contact_phone varchar(20)`);
+
     await registerRoutes(httpServer, app);
     startConsultationScheduler();
 
