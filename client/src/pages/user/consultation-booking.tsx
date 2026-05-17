@@ -55,6 +55,57 @@ const followUpBookingSchema = z.object({
 
 type BookingFormData = z.infer<typeof bookingSchema>;
 
+// ── Slot helpers ──────────────────────────────────────────────────────────────
+const SLOT_DAY_ORDER: Record<string, number> = {
+  Mon: 0, Tue: 1, Wed: 2, Thu: 3, Fri: 4, Sat: 5, Sun: 6,
+};
+
+function parseTimeToMinutes(timeStr: string): number {
+  const m = timeStr.match(/(\d+):(\d+)\s*(AM|PM)/i);
+  if (!m) return 0;
+  let h = parseInt(m[1]);
+  const min = parseInt(m[2]);
+  const ampm = m[3].toUpperCase();
+  if (ampm === "PM" && h !== 12) h += 12;
+  if (ampm === "AM" && h === 12) h = 0;
+  return h * 60 + min;
+}
+
+/** Sort "Mon 9:00 AM", "Tue 2:00 PM" … by weekday order then time. */
+function sortLegacySlots(slots: string[]): string[] {
+  return [...slots].sort((a, b) => {
+    const [dayA, ...tA] = a.split(" ");
+    const [dayB, ...tB] = b.split(" ");
+    const dd = (SLOT_DAY_ORDER[dayA] ?? 99) - (SLOT_DAY_ORDER[dayB] ?? 99);
+    if (dd !== 0) return dd;
+    return parseTimeToMinutes(tA.join(" ")) - parseTimeToMinutes(tB.join(" "));
+  });
+}
+
+/** Remove slots whose weekday matches today AND whose time has already passed. */
+function filterPastLegacySlots(slots: string[]): string[] {
+  const now = new Date();
+  const todayName = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][now.getDay()];
+  const nowMin = now.getHours() * 60 + now.getMinutes();
+  return slots.filter((slot) => {
+    const [dayName, ...timeParts] = slot.split(" ");
+    if (dayName !== todayName) return true;
+    return parseTimeToMinutes(timeParts.join(" ")) > nowMin;
+  });
+}
+
+/** When today is selected, remove time windows whose `from` time has passed. */
+function filterPastTimeWindows(
+  windows: { from: string; to: string }[],
+  dateStr: string,
+): { from: string; to: string }[] {
+  const now = new Date();
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  if (dateStr !== todayStr) return windows;
+  const nowMin = now.getHours() * 60 + now.getMinutes();
+  return windows.filter((w) => parseTimeToMinutes(w.from) > nowMin);
+}
+
 export default function ConsultationBookingPage() {
   const { id } = useParams<{ id: string }>();
   const [location, navigate] = useLocation();
@@ -506,26 +557,24 @@ export default function ConsultationBookingPage() {
                       name="appointmentSlot"
                       render={({ field }) => {
                         if (consultantAvailableSlots.length > 0) {
+                          const visibleSlots = filterPastLegacySlots(sortLegacySlots(consultantAvailableSlots));
                           return (
                             <FormItem>
                               <FormLabel>Appointment Slot</FormLabel>
-                              <div className="flex flex-wrap gap-2 pt-1">
-                                {consultantAvailableSlots.map((slot, i) => (
-                                  <button
-                                    key={i}
-                                    type="button"
-                                    onClick={() => field.onChange(slot)}
-                                    data-testid={`button-slot-${i}`}
-                                    className={`rounded-md border px-3 py-1.5 text-sm transition-colors ${
-                                      field.value === slot
-                                        ? "border-primary bg-primary text-primary-foreground"
-                                        : "border-border bg-background hover:border-primary/60 hover:bg-muted"
-                                    }`}
-                                  >
-                                    {slot}
-                                  </button>
-                                ))}
-                              </div>
+                              <Select value={field.value || ""} onValueChange={field.onChange}>
+                                <FormControl>
+                                  <SelectTrigger data-testid="select-appointment-slot">
+                                    <SelectValue placeholder={visibleSlots.length === 0 ? "No slots available" : "Select a slot"} />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  {visibleSlots.map((slot, i) => (
+                                    <SelectItem key={i} value={slot} data-testid={`option-slot-${i}`}>
+                                      {slot}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
                               <FormMessage />
                             </FormItem>
                           );
@@ -619,21 +668,34 @@ export default function ConsultationBookingPage() {
                               <div className="space-y-2 pt-1">
                                 <p className="text-sm text-muted-foreground flex items-center gap-1.5">
                                   <Clock className="h-3.5 w-3.5" />
-                                  Available windows on <span className="font-medium text-foreground">{formatDateLabel(selectedDate)}</span>
+                                  Available slots on <span className="font-medium text-foreground">{formatDateLabel(selectedDate)}</span>
                                 </p>
-                                <div className="flex flex-wrap gap-2">
-                                  {getTimeWindowsForDate(selectedDate).map(({ from, to }, idx) => {
-                                    const slotLabel = `${formatDateLabel(selectedDate)}, ${from}${to ? ` – ${to}` : ""}`;
-                                    return (
-                                      <button key={idx} type="button" data-testid={`button-time-slot-${idx}`}
-                                        onClick={() => field.onChange(slotLabel)}
-                                        className={`rounded-md border px-4 py-2 text-sm font-medium transition-colors ${field.value === slotLabel ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background hover:border-primary/60 hover:bg-muted"}`}
-                                      >
-                                        {from}{to ? ` – ${to}` : ""}
-                                      </button>
-                                    );
-                                  })}
-                                </div>
+                                {(() => {
+                                  const windows = filterPastTimeWindows(getTimeWindowsForDate(selectedDate), selectedDate);
+                                  if (windows.length === 0) {
+                                    return <p className="text-sm text-muted-foreground">No slots available for today — all windows have passed.</p>;
+                                  }
+                                  return (
+                                    <Select
+                                      value={field.value || ""}
+                                      onValueChange={field.onChange}
+                                    >
+                                      <SelectTrigger data-testid="select-time-slot">
+                                        <SelectValue placeholder="Select a time slot" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {windows.map(({ from, to }, idx) => {
+                                          const slotLabel = `${formatDateLabel(selectedDate)}, ${from}${to ? ` – ${to}` : ""}`;
+                                          return (
+                                            <SelectItem key={idx} value={slotLabel} data-testid={`option-time-slot-${idx}`}>
+                                              {from}{to ? ` – ${to}` : ""}
+                                            </SelectItem>
+                                          );
+                                        })}
+                                      </SelectContent>
+                                    </Select>
+                                  );
+                                })()}
                                 {field.value && (
                                   <p className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
                                     <Check className="h-3 w-3" />
@@ -850,26 +912,24 @@ export default function ConsultationBookingPage() {
                       render={({ field }) => {
                         // ── Legacy mode: pre-seeded slot strings ──
                         if (consultantAvailableSlots.length > 0) {
+                          const visibleSlots = filterPastLegacySlots(sortLegacySlots(consultantAvailableSlots));
                           return (
                             <FormItem>
                               <FormLabel>Appointment Slot</FormLabel>
-                              <div className="flex flex-wrap gap-2 pt-1">
-                                {consultantAvailableSlots.map((slot, i) => (
-                                  <button
-                                    key={i}
-                                    type="button"
-                                    onClick={() => field.onChange(slot)}
-                                    data-testid={`button-slot-${i}`}
-                                    className={`rounded-md border px-3 py-1.5 text-sm transition-colors ${
-                                      field.value === slot
-                                        ? "border-primary bg-primary text-primary-foreground"
-                                        : "border-border bg-background hover:border-primary/60 hover:bg-muted"
-                                    }`}
-                                  >
-                                    {slot}
-                                  </button>
-                                ))}
-                              </div>
+                              <Select value={field.value || ""} onValueChange={field.onChange}>
+                                <FormControl>
+                                  <SelectTrigger data-testid="select-appointment-slot">
+                                    <SelectValue placeholder={visibleSlots.length === 0 ? "No slots available" : "Select a slot"} />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  {visibleSlots.map((slot, i) => (
+                                    <SelectItem key={i} value={slot} data-testid={`option-slot-${i}`}>
+                                      {slot}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
                               <FormMessage />
                             </FormItem>
                           );
@@ -1033,28 +1093,34 @@ export default function ConsultationBookingPage() {
                               <div className="space-y-2 pt-1">
                                 <p className="text-sm text-muted-foreground flex items-center gap-1.5">
                                   <Clock className="h-3.5 w-3.5" />
-                                  Available windows on <span className="font-medium text-foreground">{formatDateLabel(selectedDate)}</span>
+                                  Available slots on <span className="font-medium text-foreground">{formatDateLabel(selectedDate)}</span>
                                 </p>
-                                <div className="flex flex-wrap gap-2">
-                                  {getTimeWindowsForDate(selectedDate).map(({ from, to }, idx) => {
-                                    const slotLabel = `${formatDateLabel(selectedDate)}, ${from}${to ? ` – ${to}` : ""}`;
-                                    return (
-                                      <button
-                                        key={idx}
-                                        type="button"
-                                        data-testid={`button-time-slot-${idx}`}
-                                        onClick={() => field.onChange(slotLabel)}
-                                        className={`rounded-md border px-4 py-2 text-sm font-medium transition-colors ${
-                                          field.value === slotLabel
-                                            ? "border-primary bg-primary text-primary-foreground"
-                                            : "border-border bg-background hover:border-primary/60 hover:bg-muted"
-                                        }`}
-                                      >
-                                        {from}{to ? ` – ${to}` : ""}
-                                      </button>
-                                    );
-                                  })}
-                                </div>
+                                {(() => {
+                                  const windows = filterPastTimeWindows(getTimeWindowsForDate(selectedDate), selectedDate);
+                                  if (windows.length === 0) {
+                                    return <p className="text-sm text-muted-foreground">No slots available for today — all windows have passed.</p>;
+                                  }
+                                  return (
+                                    <Select
+                                      value={field.value || ""}
+                                      onValueChange={field.onChange}
+                                    >
+                                      <SelectTrigger data-testid="select-time-slot">
+                                        <SelectValue placeholder="Select a time slot" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {windows.map(({ from, to }, idx) => {
+                                          const slotLabel = `${formatDateLabel(selectedDate)}, ${from}${to ? ` – ${to}` : ""}`;
+                                          return (
+                                            <SelectItem key={idx} value={slotLabel} data-testid={`option-time-slot-${idx}`}>
+                                              {from}{to ? ` – ${to}` : ""}
+                                            </SelectItem>
+                                          );
+                                        })}
+                                      </SelectContent>
+                                    </Select>
+                                  );
+                                })()}
                                 {field.value && (
                                   <p className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
                                     <Check className="h-3 w-3" />
