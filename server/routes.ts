@@ -854,11 +854,13 @@ export async function registerRoutes(
 
       const allBookings = await storage.getBookingsByUserId(userId);
 
-      // Active consultations: consultation bookings where prescription NOT yet signed
-      const consultationBookings = allBookings.filter(
+      // Filter out items the user has dismissed from dashboard
+      const visibleBookings = allBookings.filter((b) => !(b as any).dashboardHiddenAt);
+
+      // Consultations: all consultation bookings (active + those with signed prescriptions)
+      const consultationBookings = visibleBookings.filter(
         (b) => b.bookingType === "consultation" &&
-          !["cancelled", "completed"].includes(b.status) &&
-          !b.prescriptionApprovedAt
+          !["cancelled"].includes(b.status)
       );
       const activeConsultations = await Promise.all(
         consultationBookings.map(async (b) => {
@@ -871,21 +873,38 @@ export async function registerRoutes(
       );
 
       // Ready lab reports: lab bookings where status=report_ready or processedReportUrl set
-      const readyReports = allBookings.filter(
+      const readyReports = visibleBookings.filter(
         (b) => b.bookingType === "lab" &&
           (b.status === "report_ready" || !!b.processedReportUrl)
       );
 
-      // Signed prescriptions: consultation bookings with an approved, signed prescription PDF
-      const signedPrescriptions = allBookings
-        .filter((b) => b.bookingType === "consultation" && !!b.prescriptionApprovedAt && !!b.prescriptionPdfUrl)
-        .sort((a, b) => new Date(b.prescriptionApprovedAt!).getTime() - new Date(a.prescriptionApprovedAt!).getTime())
-        .slice(0, 10);
-
-      res.json({ activeConsultations, readyReports, signedPrescriptions });
+      res.json({ activeConsultations, readyReports, signedPrescriptions: [] });
     } catch (error) {
       console.error("Error fetching dashboard data:", error);
       res.status(500).json({ message: "Failed to fetch dashboard data" });
+    }
+  });
+
+  // Hide one or more bookings from the user's dashboard (soft-hide, data preserved)
+  app.post("/api/user/dashboard/hide", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) return res.status(401).json({ message: "Unauthorized" });
+      const { ids } = req.body as { ids: string[] };
+      if (!Array.isArray(ids) || ids.length === 0) {
+        return res.status(400).json({ message: "ids array required" });
+      }
+      const now = new Date();
+      for (const id of ids) {
+        const booking = await storage.getBookingById(id);
+        if (booking && booking.userId === userId) {
+          await storage.updateBooking(id, { dashboardHiddenAt: now } as any);
+        }
+      }
+      res.json({ ok: true });
+    } catch (error) {
+      console.error("Error hiding dashboard items:", error);
+      res.status(500).json({ message: "Failed to hide items" });
     }
   });
 
