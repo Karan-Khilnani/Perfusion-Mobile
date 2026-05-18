@@ -897,6 +897,51 @@ export async function registerRoutes(
     }
   });
 
+  // Generate a Daily.co meeting token with the caller's real name locked in server-side.
+  // This is the only reliable way to set participant names — URL params are ignored
+  // by Daily when prejoinUI is disabled, and the browser caches names from previous sessions.
+  app.get("/api/bookings/room/:roomUrl/daily-token", isAuthenticated, async (req: any, res) => {
+    try {
+      const apiKey = process.env.DAILY_API_KEY;
+      if (!apiKey) return res.status(503).json({ message: "Daily not configured" });
+
+      const roomUrl = decodeURIComponent(req.params.roomUrl);
+      // Extract just the room name from the full URL (last path segment)
+      const roomName = roomUrl.split("/").pop();
+      if (!roomName) return res.status(400).json({ message: "Invalid room URL" });
+
+      const user = req.user as any;
+      const userName = `${user.firstName || ""} ${user.lastName || ""}`.trim() || user.email || "Participant";
+
+      const response = await fetch("https://api.daily.co/v1/meeting-tokens", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          properties: {
+            room_name: roomName,
+            user_name: userName,
+            exp: Math.floor(Date.now() / 1000) + 4 * 3600, // valid 4 hours
+          },
+        }),
+      });
+
+      if (!response.ok) {
+        const err = await response.text();
+        console.error("[Daily] Token generation failed:", err);
+        return res.status(500).json({ message: "Failed to generate token" });
+      }
+
+      const { token } = await response.json();
+      res.json({ token, userName });
+    } catch (error) {
+      console.error("[Daily] Token error:", error);
+      res.status(500).json({ message: "Failed to generate token" });
+    }
+  });
+
   app.post("/api/bookings", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user?.id;

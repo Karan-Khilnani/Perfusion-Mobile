@@ -92,14 +92,16 @@ export default function VideoRoomPage() {
 
   const dailyUrl = getDailyUrl();
 
-  // Append ?userName to the Daily.co URL so the correct name shows inside the call.
-  // prejoinUI=false skips Daily's prejoin screen so the userName URL param wins over
-  // any cached name from previous sessions (Daily caches the last-entered name).
-  const buildDailyUrl = (url: string, name: string) => {
+  // Daily.co meeting token — generated server-side with the user's real name baked in.
+  // This is the only reliable way: URL params are ignored when prejoinUI=false and
+  // Daily caches the last-entered name in browser localStorage across sessions.
+  const [dailyToken, setDailyToken] = useState<string | null>(null);
+
+  const buildDailyUrl = (url: string) => {
     try {
       const u = new URL(url);
-      if (name.trim()) u.searchParams.set("userName", name.trim());
       u.searchParams.set("prejoinUI", "false");
+      if (dailyToken) u.searchParams.set("t", dailyToken);
       return u.toString();
     } catch {
       return url;
@@ -181,6 +183,17 @@ export default function VideoRoomPage() {
   }, [booking]);
 
   useCallEvents(handleCallEvent);
+
+  // Fetch a server-side Daily token when entering the call — this locks in the user's
+  // real name and cannot be overridden by browser cache.
+  useEffect(() => {
+    if (phase === "connected" && dailyUrl) {
+      fetch(`/api/bookings/room/${encodeURIComponent(dailyUrl)}/daily-token`, { credentials: "include" })
+        .then(r => r.ok ? r.json() : null)
+        .then(data => { if (data?.token) setDailyToken(data.token); })
+        .catch(() => {}); // fall back gracefully — call still works without token
+    }
+  }, [phase, dailyUrl]);
 
   useEffect(() => {
     if (phase === "connected") {
@@ -636,7 +649,7 @@ export default function VideoRoomPage() {
             {dailyUrl && (
               <iframe
                 ref={iframeRef}
-                src={buildDailyUrl(dailyUrl, callDisplayName)}
+                src={buildDailyUrl(dailyUrl)}
                 allow="camera; microphone; fullscreen; display-capture; autoplay"
                 style={{ width: "100%", height: "100%", border: "none", display: "block" }}
                 data-testid="video-container"
@@ -919,7 +932,7 @@ export default function VideoRoomPage() {
           {dailyUrl && (
             <iframe
               ref={iframeRef}
-              src={buildDailyUrl(dailyUrl, callDisplayName)}
+              src={buildDailyUrl(dailyUrl)}
               allow="camera; microphone; fullscreen; display-capture; autoplay"
               className="w-full h-full border-0"
               style={{
