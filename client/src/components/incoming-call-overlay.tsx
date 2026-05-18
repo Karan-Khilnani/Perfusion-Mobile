@@ -3,6 +3,7 @@ import { Phone, PhoneOff, Stethoscope } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { apiRequest } from "@/lib/queryClient";
 import { useLocation } from "wouter";
+import { useToast } from "@/hooks/use-toast";
 import type { CallEvent } from "@/hooks/use-call-events";
 
 interface Props {
@@ -13,6 +14,7 @@ interface Props {
 export function IncomingCallOverlay({ callEvent, onDismiss }: Props) {
   const [, navigate] = useLocation();
   const [accepting, setAccepting] = useState(false);
+  const { toast } = useToast();
   // Audio is managed by CallProvider (unlocked on first user interaction)
 
   if (!callEvent) return null;
@@ -30,15 +32,33 @@ export function IncomingCallOverlay({ callEvent, onDismiss }: Props) {
   const handleAccept = async () => {
     setAccepting(true);
     try {
-      await apiRequest("POST", `/api/call/accept/${callEvent.bookingId}`, {});
+      const result = await apiRequest("POST", `/api/call/accept/${callEvent.bookingId}`, {});
+      const data = await result.json().catch(() => ({}));
       dismissNotification(callEvent.bookingId);
       onDismiss();
       // callerRole tells us who called; recipient is the opposite role
       const returnTo = callEvent.callerRole === "provider" ? "/user/orders" : "/provider/bookings";
+      // Use videoRoomUrl from accept response if available (more up-to-date), fall back to event
+      const roomUrl = data?.videoRoomUrl || callEvent.videoRoomUrl || "";
       // accepted=true tells video-room to skip precall and go straight to connected
-      navigate(`/video/${encodeURIComponent(callEvent.videoRoomUrl || "")}?returnTo=${returnTo}&accepted=true`);
-    } catch {
+      navigate(`/video/${encodeURIComponent(roomUrl)}?returnTo=${returnTo}&accepted=true`);
+    } catch (err: any) {
       setAccepting(false);
+      const msg = err?.message || "";
+      if (msg.includes("404") || msg.includes("No active call")) {
+        toast({
+          title: "Call already ended",
+          description: "The caller cancelled or the call timed out before you could answer.",
+          variant: "destructive",
+        });
+        onDismiss();
+      } else {
+        toast({
+          title: "Could not accept call",
+          description: "Please check your connection and try again.",
+          variant: "destructive",
+        });
+      }
     }
   };
 

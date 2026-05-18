@@ -159,10 +159,14 @@ export default function VideoRoomPage() {
     }
   }
 
-  // Listen for call events (accepted/declined/timeout from the other side)
+  // Listen for call events (accepted/declined/timeout from the other side).
+  // Use bookingRef.current as fallback — on mobile the booking query may not have
+  // resolved yet when the SSE event arrives, and checking `booking` (stale closure)
+  // would silently drop the event.
   const handleCallEvent = useCallback((event: CallEvent) => {
-    if (!booking) return;
-    if (event.bookingId !== booking.id) return;
+    const b = booking ?? bookingRef.current;
+    if (!b) return;
+    if (event.bookingId !== b.id) return;
     const currentPhase = phaseRef.current;
 
     if (event.type === "call_accepted" && currentPhase === "ringing") {
@@ -183,6 +187,32 @@ export default function VideoRoomPage() {
   }, [booking]);
 
   useCallEvents(handleCallEvent);
+
+  // Polling fallback while ringing — SSE events can be silently dropped on mobile
+  // (screen dim, brief network blip, app backgrounded). Every 5 s we ask the server
+  // directly for the call status so we never stay stuck on the ringing screen.
+  useEffect(() => {
+    const b = booking ?? bookingRef.current;
+    if (phase !== "ringing" || !b) return;
+
+    const poll = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/call/status/${b.id}`, { credentials: "include" });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (phaseRef.current !== "ringing") return; // already transitioned via SSE
+        if (data.status === "accepted") {
+          clearRingTimer();
+          setPhase("connected");
+        } else if (data.status === "declined") {
+          clearRingTimer();
+          setPhase("declined");
+        }
+      } catch {}
+    }, 5000);
+
+    return () => clearInterval(poll);
+  }, [phase, booking]);
 
   // Fetch a server-side Daily token when entering the call — this locks in the user's
   // real name and cannot be overridden by browser cache.
