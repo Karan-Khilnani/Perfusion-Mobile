@@ -1092,9 +1092,9 @@ export async function registerRoutes(
       }
 
       res.status(201).json(booking);
-    } catch (error) {
-      console.error("Error creating booking:", error);
-      res.status(500).json({ message: "Failed to create booking" });
+    } catch (error: any) {
+      console.error("Error creating booking:", error?.message || error, error?.stack);
+      res.status(500).json({ message: error?.message || "Failed to create booking" });
     }
   });
 

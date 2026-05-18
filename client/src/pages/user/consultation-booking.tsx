@@ -314,10 +314,11 @@ export default function ConsultationBookingPage() {
         toast({ title: "Appointment Confirmed", description: "Your consultation has been booked successfully." });
       }
     },
-    onError: () => {
+    onError: (error: any) => {
+      const message = error?.message || "Something went wrong. Please try again.";
       toast({
         title: "Booking Failed",
-        description: "Something went wrong. Please try again.",
+        description: message,
         variant: "destructive",
       });
     },

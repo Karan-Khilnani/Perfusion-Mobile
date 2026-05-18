@@ -14,7 +14,22 @@ async function throwIfResNotOk(res: Response) {
           window.location.href = "/verify-email";
           return;
         }
-      } catch {}
+        if (data.registrationRejected) {
+          window.location.href = "/pending-approval";
+          return;
+        }
+        if (data.message) {
+          throw new Error(data.message);
+        }
+      } catch (e) {
+        if (e instanceof Error) throw e;
+      }
+    }
+    try {
+      const data = JSON.parse(text);
+      if (data.message) throw new Error(data.message);
+    } catch (e) {
+      if (e instanceof Error) throw e;
     }
     throw new Error(`${res.status}: ${text}`);
   }
@@ -62,7 +77,14 @@ export const getQueryFn: <T>(options: {
           window.location.href = "/verify-email";
           return null;
         }
-      } catch {}
+        if (data.registrationRejected) {
+          window.location.href = "/pending-approval";
+          return null;
+        }
+        if (data.message) throw new Error(data.message);
+      } catch (e) {
+        if (e instanceof Error) throw e;
+      }
       throw new Error(`403: ${text}`);
     }
 
