@@ -58,6 +58,10 @@ function parseFullDateSlot(slot: string): { start: Date; end: Date } | null {
   const startISTProxy = new Date(startDate.getTime() + IST_OFFSET_MS);
   const endISTProxy = new Date(startISTProxy);
   endISTProxy.setUTCHours(eh, em, 0, 0);
+  // If end falls at or before start (e.g. 11:30 PM – 12:00 AM crosses midnight), advance by one day
+  if (endISTProxy <= startISTProxy) {
+    endISTProxy.setUTCDate(endISTProxy.getUTCDate() + 1);
+  }
   const endDate = new Date(endISTProxy.getTime() - IST_OFFSET_MS);
 
   return { start: startDate, end: endDate };
