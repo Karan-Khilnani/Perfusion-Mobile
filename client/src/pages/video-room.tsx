@@ -659,8 +659,8 @@ export default function VideoRoomPage() {
               touchAction: "pan-y",
             }}
           >
-            <div className="px-3 pt-3 pb-1 flex items-center gap-2 text-sm font-medium text-muted-foreground">
-              <FileText className="h-4 w-4" />
+            <div className="px-3 py-2.5 flex items-center gap-2 text-sm font-semibold border-b bg-muted/40">
+              <FileText className="h-4 w-4 text-muted-foreground" />
               Patient Reports &amp; Documents
             </div>
             {booking && (
@@ -693,11 +693,11 @@ export default function VideoRoomPage() {
                 touchAction: "pan-y",
               }}
             >
-              <div className="px-3 pt-3 pb-1 flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                <ClipboardList className="h-4 w-4" />
+              <div className="px-3 py-2.5 flex items-center gap-2 text-sm font-semibold border-b bg-muted/40">
+                <ClipboardList className="h-4 w-4 text-muted-foreground" />
                 Consultation Summary
                 {isSummaryConfirmed && (
-                  <span className="ml-auto flex items-center gap-1 text-xs text-green-600">
+                  <span className="ml-auto flex items-center gap-1 text-xs font-medium text-green-600">
                     <ShieldCheck className="h-3 w-3" /> Signed
                   </span>
                 )}
@@ -769,8 +769,8 @@ export default function VideoRoomPage() {
                   fontSize: 13,
                   fontWeight: 500,
                   transition: "all 0.2s",
-                  background: mobilePanel === "summary" ? "hsl(var(--primary))" : "hsl(var(--muted))",
-                  color: mobilePanel === "summary" ? "hsl(var(--primary-foreground))" : "hsl(var(--muted-foreground))",
+                  background: mobilePanel === "summary" ? "hsl(var(--foreground))" : "hsl(var(--muted))",
+                  color: mobilePanel === "summary" ? "hsl(var(--background))" : "hsl(var(--muted-foreground))",
                   border: "none",
                   cursor: "pointer",
                 }}
@@ -794,8 +794,8 @@ export default function VideoRoomPage() {
                 fontSize: 13,
                 fontWeight: 500,
                 transition: "all 0.2s",
-                background: mobilePanel === "video" ? "hsl(var(--primary))" : "hsl(var(--muted))",
-                color: mobilePanel === "video" ? "hsl(var(--primary-foreground))" : "hsl(var(--muted-foreground))",
+                background: mobilePanel === "video" ? "hsl(var(--foreground))" : "hsl(var(--muted))",
+                color: mobilePanel === "video" ? "hsl(var(--background))" : "hsl(var(--muted-foreground))",
                 border: "none",
                 cursor: "pointer",
               }}
@@ -818,8 +818,8 @@ export default function VideoRoomPage() {
                 fontSize: 13,
                 fontWeight: 500,
                 transition: "all 0.2s",
-                background: mobilePanel === "docs" ? "hsl(var(--primary))" : "hsl(var(--muted))",
-                color: mobilePanel === "docs" ? "hsl(var(--primary-foreground))" : "hsl(var(--muted-foreground))",
+                background: mobilePanel === "docs" ? "hsl(var(--foreground))" : "hsl(var(--muted))",
+                color: mobilePanel === "docs" ? "hsl(var(--background))" : "hsl(var(--muted-foreground))",
                 border: "none",
                 cursor: "pointer",
               }}
