@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import path from "path";
+import ws from "ws";
 
 const BUCKET = "perfusion-uploads";
 
@@ -9,7 +10,11 @@ function getClient() {
   if (!supabaseUrl || !supabaseKey) {
     throw new Error("SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY environment variables are not set");
   }
-  return createClient(supabaseUrl, supabaseKey);
+  return createClient(supabaseUrl, supabaseKey, {
+    realtime: {
+      transport: ws as any,
+    },
+  });
 }
 
 export async function uploadFile(
