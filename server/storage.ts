@@ -64,6 +64,9 @@ import {
   type AuditLog,
   type InsertAuditLog,
   type PaymentStatus,
+  callSessionsTable,
+  type DbCallSession,
+  type InsertDbCallSession,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -228,6 +231,13 @@ export interface IStorage {
   getPushSubscriptionsByUserId(userId: string): Promise<Array<{ endpoint: string; p256dh: string; auth: string }>>;
   deletePushSubscription(userId: string, endpoint: string): Promise<void>;
   deleteAllPushSubscriptionsForUser(userId: string): Promise<void>;
+
+  // Call Sessions
+  createCallSession(data: InsertDbCallSession): Promise<DbCallSession>;
+  getCallSession(bookingId: string): Promise<DbCallSession | undefined>;
+  updateCallSession(bookingId: string, data: Partial<InsertDbCallSession>): Promise<DbCallSession | undefined>;
+  deleteCallSession(bookingId: string): Promise<void>;
+  getActiveCallSessionsForRecipient(recipientUserId: string): Promise<DbCallSession[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -934,6 +944,38 @@ export class DatabaseStorage implements IStorage {
 
   async deleteAllPushSubscriptionsForUser(userId: string): Promise<void> {
     await db.delete(pushSubscriptions).where(eq(pushSubscriptions.userId, userId));
+  }
+
+  // Call Sessions
+  async createCallSession(data: InsertDbCallSession): Promise<DbCallSession> {
+    await db.delete(callSessionsTable).where(eq(callSessionsTable.bookingId, data.bookingId));
+    const [row] = await db.insert(callSessionsTable).values(data).returning();
+    return row;
+  }
+
+  async getCallSession(bookingId: string): Promise<DbCallSession | undefined> {
+    const [row] = await db.select().from(callSessionsTable)
+      .where(and(eq(callSessionsTable.bookingId, bookingId), gte(callSessionsTable.expiresAt, new Date())));
+    return row;
+  }
+
+  async updateCallSession(bookingId: string, data: Partial<InsertDbCallSession>): Promise<DbCallSession | undefined> {
+    const [row] = await db.update(callSessionsTable).set(data).where(eq(callSessionsTable.bookingId, bookingId)).returning();
+    return row;
+  }
+
+  async deleteCallSession(bookingId: string): Promise<void> {
+    await db.delete(callSessionsTable).where(eq(callSessionsTable.bookingId, bookingId));
+  }
+
+  async getActiveCallSessionsForRecipient(recipientUserId: string): Promise<DbCallSession[]> {
+    return await db.select().from(callSessionsTable).where(
+      and(
+        eq(callSessionsTable.recipientUserId, recipientUserId),
+        eq(callSessionsTable.status, "ringing"),
+        gte(callSessionsTable.expiresAt, new Date()),
+      )
+    );
   }
 }
 

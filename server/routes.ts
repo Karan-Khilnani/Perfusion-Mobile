@@ -3952,23 +3952,7 @@ export async function registerRoutes(
     }
   });
 
-  // ─── Call Session State (in-memory) ──────────────────────────────────
-  type CallStatus = "ringing" | "accepted" | "declined" | "timeout";
-  interface CallSession {
-    bookingId: string;
-    callerId: string;
-    callerName: string;
-    callerRole: "seeker" | "provider";
-    recipientUserId: string;
-    videoRoomUrl: string;
-    serviceName: string;
-    subtitle: string;
-    status: CallStatus;
-    createdAt: number;
-    twilioCallSid?: string;
-  }
-
-  const callSessions = new Map<string, CallSession>(); // key = bookingId
+  // ─── Call Session State (DB-backed — shared across all autoscale instances) ──
   const sseClients = new Map<string, Set<any>>(); // key = userId → set of res objects
 
   function broadcastCallEvent(userId: string, event: object) {
@@ -4002,8 +3986,9 @@ export async function registerRoutes(
     // Replay any active ringing session for this user so they see the
     // incoming call overlay when opening the app directly (e.g. after
     // hearing a Twilio voice alert) rather than via push notification.
-    for (const s of callSessions.values()) {
-      if (s.status === "ringing" && s.recipientUserId === userId) {
+    storage.getActiveCallSessionsForRecipient(userId).then(activeSessions => {
+      const s = activeSessions[0];
+      if (s) {
         try {
           res.write(`data: ${JSON.stringify({
             type: "incoming_call",
@@ -4015,9 +4000,8 @@ export async function registerRoutes(
             subtitle: s.subtitle,
           })}\n\n`);
         } catch {}
-        break; // at most one active ringing session per user
       }
-    }
+    }).catch(() => {});
 
     req.on("close", () => {
       clearInterval(heartbeat);
@@ -4094,8 +4078,9 @@ export async function registerRoutes(
       const recipientUserId = isSeeker ? provider?.userId : booking.userId;
       if (!recipientUserId) return res.status(400).json({ error: "Cannot find recipient" });
 
-      // Store/update call session
-      const session: CallSession = {
+      // Persist call session to DB — shared across all autoscale instances
+      const SESSION_TTL_MS = 300_000; // 5 minutes
+      await storage.createCallSession({
         bookingId,
         callerId,
         callerName,
@@ -4105,22 +4090,22 @@ export async function registerRoutes(
         serviceName: booking.serviceName || "",
         subtitle,
         status: "ringing",
-        createdAt: Date.now(),
-      };
-      callSessions.set(bookingId, session);
+        expiresAt: new Date(Date.now() + SESSION_TTL_MS),
+      });
 
-      // Auto-timeout after 5 minutes
-      setTimeout(() => {
-        const s = callSessions.get(bookingId);
-        if (s && s.status === "ringing") {
-          s.status = "timeout";
-          // Cancel the Twilio voice call if it somehow never ended
-          if (s.twilioCallSid) cancelVoiceCall(s.twilioCallSid).catch(() => {});
-          broadcastCallEvent(callerId, { type: "call_timeout", bookingId });
-          broadcastCallEvent(recipientUserId, { type: "call_timeout", bookingId });
-          setTimeout(() => callSessions.delete(bookingId), 5000);
-        }
-      }, 300000);
+      // Auto-timeout after 5 minutes (best-effort cleanup on this instance)
+      setTimeout(async () => {
+        try {
+          const s = await storage.getCallSession(bookingId);
+          if (s && s.status === "ringing") {
+            await storage.updateCallSession(bookingId, { status: "timeout" });
+            if (s.twilioCallSid) cancelVoiceCall(s.twilioCallSid).catch(() => {});
+            broadcastCallEvent(callerId, { type: "call_timeout", bookingId });
+            broadcastCallEvent(recipientUserId, { type: "call_timeout", bookingId });
+            setTimeout(() => storage.deleteCallSession(bookingId), 5000);
+          }
+        } catch {}
+      }, SESSION_TTL_MS);
 
       // Notify recipient via SSE if they're online
       broadcastCallEvent(recipientUserId, {
@@ -4174,7 +4159,7 @@ export async function registerRoutes(
       if (!userId) return res.status(401).json({ error: "Not authenticated" });
 
       const { bookingId } = req.params;
-      const session = callSessions.get(bookingId);
+      const session = await storage.getCallSession(bookingId);
       if (!session) return res.status(404).json({ error: "No active call session" });
 
       // Verify the acceptor is NOT the caller and IS a participant in the booking
@@ -4188,7 +4173,7 @@ export async function registerRoutes(
 
       if (session.status !== "ringing") return res.json({ success: true, status: session.status });
 
-      session.status = "accepted";
+      await storage.updateCallSession(bookingId, { status: "accepted" });
 
       // Cancel the Twilio voice call if it's still ringing
       if (session.twilioCallSid) {
@@ -4203,7 +4188,7 @@ export async function registerRoutes(
       });
 
       // Clean up after 10s
-      setTimeout(() => callSessions.delete(bookingId), 10000);
+      setTimeout(() => storage.deleteCallSession(bookingId), 10000);
 
       res.json({ success: true, videoRoomUrl: session.videoRoomUrl });
     } catch (error) {
@@ -4218,7 +4203,7 @@ export async function registerRoutes(
       if (!userId) return res.status(401).json({ error: "Not authenticated" });
 
       const { bookingId } = req.params;
-      const session = callSessions.get(bookingId);
+      const session = await storage.getCallSession(bookingId);
       if (!session) return res.status(404).json({ error: "No active call session" });
 
       // Verify the decliner is NOT the caller and IS a participant in the booking
@@ -4230,7 +4215,7 @@ export async function registerRoutes(
       if (!isSeeker && !isProviderUser) return res.status(403).json({ error: "Not part of this booking" });
       if (session.callerId === userId) return res.status(403).json({ error: "Caller should use cancel endpoint" });
 
-      session.status = "declined";
+      await storage.updateCallSession(bookingId, { status: "declined" });
 
       // Cancel the Twilio voice call if it's still ringing
       if (session.twilioCallSid) {
@@ -4242,7 +4227,7 @@ export async function registerRoutes(
         bookingId,
       });
 
-      setTimeout(() => callSessions.delete(bookingId), 5000);
+      setTimeout(() => storage.deleteCallSession(bookingId), 5000);
 
       res.json({ success: true });
     } catch (error) {
@@ -4255,9 +4240,9 @@ export async function registerRoutes(
     try {
       const userId = req.user?.id;
       const { bookingId } = req.params;
-      const session = callSessions.get(bookingId);
+      const session = await storage.getCallSession(bookingId);
       if (session && session.callerId === userId) {
-        session.status = "declined";
+        await storage.updateCallSession(bookingId, { status: "declined" });
         // Cancel the Twilio voice call if it's still ringing
         if (session.twilioCallSid) cancelVoiceCall(session.twilioCallSid).catch(() => {});
         // Find recipient to notify
@@ -4269,7 +4254,7 @@ export async function registerRoutes(
             broadcastCallEvent(recipientUserId, { type: "call_cancelled", bookingId });
           }
         }
-        setTimeout(() => callSessions.delete(bookingId), 5000);
+        setTimeout(() => storage.deleteCallSession(bookingId), 5000);
       }
       res.json({ success: true });
     } catch (error) {
@@ -4293,7 +4278,7 @@ export async function registerRoutes(
       const isProviderUser = provider?.userId === userId;
       if (!isSeeker && !isProviderUser) return res.status(403).json({ error: "Not part of this booking" });
 
-      const session = callSessions.get(bookingId);
+      const session = await storage.getCallSession(bookingId);
       if (!session) return res.json({ status: "none" });
       res.json({ status: session.status, videoRoomUrl: session.videoRoomUrl });
     } catch (error) {

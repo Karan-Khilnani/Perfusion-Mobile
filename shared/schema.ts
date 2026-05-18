@@ -450,6 +450,25 @@ export const insertConsultantSlotOverrideSchema = createInsertSchema(consultantS
 export type InsertConsultantSlotOverride = z.infer<typeof insertConsultantSlotOverrideSchema>;
 export type ConsultantSlotOverride = typeof consultantSlotOverrides.$inferSelect;
 
+// Call Sessions — persisted in DB so all autoscale instances share state
+export const callSessionsTable = pgTable("call_sessions", {
+  bookingId: varchar("booking_id").primaryKey(),
+  callerId: varchar("caller_id").notNull(),
+  callerName: varchar("caller_name", { length: 255 }).notNull(),
+  callerRole: varchar("caller_role", { length: 20 }).notNull(),
+  recipientUserId: varchar("recipient_user_id").notNull(),
+  videoRoomUrl: text("video_room_url").notNull(),
+  serviceName: varchar("service_name", { length: 255 }).notNull().default(""),
+  subtitle: varchar("subtitle", { length: 255 }).notNull().default(""),
+  status: varchar("status", { length: 20 }).notNull().default("ringing"),
+  twilioCallSid: varchar("twilio_call_sid", { length: 100 }),
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export type DbCallSession = typeof callSessionsTable.$inferSelect;
+export type InsertDbCallSession = typeof callSessionsTable.$inferInsert;
+
 // Search/filter types
 export interface LabSearchParams {
   location?: string;
