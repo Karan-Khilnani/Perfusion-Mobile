@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ClipboardList, ExternalLink, Upload, Loader2, FileText, Image, AlertTriangle, CheckCircle2 } from "lucide-react";
@@ -41,6 +41,34 @@ function getFileName(url: string): string {
 function InlineDocument({ url, label }: { url: string; label: string }) {
   const image = isImageFile(url);
   const isMobile = useIsMobile();
+  const [imgError, setImgError] = useState(false);
+  // null = checking, true = reachable, false = 404/error
+  const [fileOk, setFileOk] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    if (image) return; // images use onError instead
+    setFileOk(null);
+    fetch(url, { method: "HEAD", credentials: "include" })
+      .then(r => setFileOk(r.ok))
+      .catch(() => setFileOk(false));
+  }, [url, image]);
+
+  const FallbackCard = ({ reason }: { reason: string }) => (
+    <a
+      href={url}
+      target="_blank"
+      rel="noreferrer"
+      className="flex items-center gap-3 w-full rounded border bg-muted/40 px-4 py-3 hover:bg-muted/70 transition-colors"
+      data-testid={`link-doc-fallback-${label}`}
+    >
+      <FileText className="h-8 w-8 text-muted-foreground shrink-0" />
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-medium truncate">{label}</p>
+        <p className="text-xs text-muted-foreground">{reason}</p>
+      </div>
+      <ExternalLink className="h-4 w-4 text-muted-foreground shrink-0" />
+    </a>
+  );
 
   return (
     <div className="mb-4 last:mb-0">
@@ -64,14 +92,24 @@ function InlineDocument({ url, label }: { url: string; label: string }) {
         </a>
       </div>
 
-      {/* Content — images display as <img>, everything else (PDF, etc.) as an inline iframe */}
+      {/* Content */}
       {image ? (
-        <img
-          src={url}
-          alt={label}
-          className="w-full rounded border object-contain max-h-[600px] bg-muted"
-          data-testid={`img-clinical-doc-${label}`}
-        />
+        imgError ? (
+          <FallbackCard reason="Image not available on this server — tap to open directly" />
+        ) : (
+          <img
+            src={url}
+            alt={label}
+            className="w-full rounded border object-contain max-h-[600px] bg-muted"
+            onError={() => setImgError(true)}
+            data-testid={`img-clinical-doc-${label}`}
+          />
+        )
+      ) : fileOk === false ? (
+        <FallbackCard reason="File not available on this server — tap to open directly" />
+      ) : fileOk === null ? (
+        /* Checking availability — show a subtle skeleton placeholder */
+        <div className="w-full rounded border bg-muted/30 animate-pulse" style={{ height: isMobile ? 380 : 500 }} />
       ) : (
         <iframe
           src={url}
