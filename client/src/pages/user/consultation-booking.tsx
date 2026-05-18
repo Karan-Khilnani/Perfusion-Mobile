@@ -94,16 +94,19 @@ function filterPastLegacySlots(slots: string[]): string[] {
   });
 }
 
-/** When today is selected, remove time windows whose `from` time has passed. */
+/** When today is selected, remove time windows whose `from` time has passed.
+ *  Always returns windows sorted earliest-first by `from` time. */
 function filterPastTimeWindows(
   windows: { from: string; to: string }[],
   dateStr: string,
 ): { from: string; to: string }[] {
   const now = new Date();
   const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
-  if (dateStr !== todayStr) return windows;
   const nowMin = now.getHours() * 60 + now.getMinutes();
-  return windows.filter((w) => parseTimeToMinutes(w.from) > nowMin);
+  const filtered = dateStr === todayStr
+    ? windows.filter((w) => parseTimeToMinutes(w.from) > nowMin)
+    : windows;
+  return [...filtered].sort((a, b) => parseTimeToMinutes(a.from) - parseTimeToMinutes(b.from));
 }
 
 export default function ConsultationBookingPage() {
