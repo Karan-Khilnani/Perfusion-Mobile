@@ -98,6 +98,25 @@ export default function AdminBookingsPage() {
     },
   });
 
+  const bulkCompletestaleMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", "/api/admin/bookings/bulk-complete-stale");
+      return response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/bookings"] });
+      toast({
+        title: "Done",
+        description: data.updated > 0
+          ? `${data.updated} past booking${data.updated === 1 ? "" : "s"} marked as completed.`
+          : "No stale bookings found — everything is already up to date.",
+      });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to mark stale bookings.", variant: "destructive" });
+    },
+  });
+
   const createBookingMutation = useMutation({
     mutationFn: async (data: any) => {
       const response = await apiRequest("POST", "/api/admin/bookings", data);
@@ -462,6 +481,21 @@ export default function AdminBookingsPage() {
                   <SelectItem value="teleradiology">Teleradiology</SelectItem>
                 </SelectContent>
               </Select>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => bulkCompletestaleMutation.mutate()}
+                disabled={bulkCompletestaleMutation.isPending}
+                data-testid="button-bulk-complete-stale"
+                title="Mark all past bookings (reminder already sent) as Completed"
+              >
+                {bulkCompletestaleMutation.isPending ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <TimerReset className="mr-2 h-4 w-4" />
+                )}
+                Clear Past Bookings
+              </Button>
             </div>
           </div>
         </CardHeader>

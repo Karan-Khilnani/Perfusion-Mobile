@@ -6,7 +6,7 @@ import { registerAuthRoutes } from "./auth/routes";
 import type { BookingStatus, UserRole, ProviderType, ProviderStatus, ServiceStatus } from "@shared/schema";
 import { consultants, bookings } from "@shared/schema";
 import { db } from "./db";
-import { eq, or } from "drizzle-orm";
+import { eq, or, and, isNotNull, notInArray } from "drizzle-orm";
 import { fireOneBooking } from "./services/consultation-scheduler";
 import multer from "multer";
 import path from "path";
@@ -2250,6 +2250,26 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error fetching transport service:", error);
       res.status(500).json({ message: "Failed to fetch transport service" });
+    }
+  });
+
+  // ── Admin: Bulk-complete stale bookings (reminder already fired, still open) ─
+  app.post("/api/admin/bookings/bulk-complete-stale", isAdmin, async (req, res) => {
+    try {
+      const result = await db
+        .update(bookings)
+        .set({ status: "completed" } as any)
+        .where(
+          and(
+            isNotNull(bookings.reminderFiredAt),
+            notInArray(bookings.status, ["completed", "cancelled"])
+          )
+        )
+        .returning({ id: bookings.id, bookingNumber: bookings.bookingNumber });
+      res.json({ ok: true, updated: result.length, bookings: result });
+    } catch (e: any) {
+      console.error("Bulk complete stale error:", e);
+      res.status(500).json({ message: e?.message || "Failed" });
     }
   });
 
