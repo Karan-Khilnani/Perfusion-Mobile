@@ -12,8 +12,70 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Separator } from "@/components/ui/separator";
 import { Search, Stethoscope, ArrowUpDown, Briefcase, AlertTriangle, Users, Building2, BookOpen, Clock, User, LogIn, Zap } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
-import type { Consultant } from "@shared/schema";
+import type { Consultant, SlotSeries } from "@shared/schema";
 import PublicLayout from "./layout";
+
+// ── Availability smart-label helpers ─────────────────────────────────────────
+function parseTimeMinutes(t: string): number {
+  const m = t.match(/(\d+):(\d+)\s*(AM|PM)/i);
+  if (!m) return -1;
+  let h = parseInt(m[1]), min = parseInt(m[2]);
+  const ap = m[3].toUpperCase();
+  if (ap === "PM" && h !== 12) h += 12;
+  if (ap === "AM" && h === 12) h = 0;
+  return h * 60 + min;
+}
+
+function getNextAvailability(consultant: Consultant & { computedCustomerPrice?: string }): string | null {
+  const SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const FULL  = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+  const dayEarliest: Record<string, number> = {};
+
+  const slotSeries  = (consultant as any).slotSeries  as SlotSeries[] | null | undefined;
+  const fixedSlots  = consultant.availableSlots        ?? [];
+  const legacyDays  = (consultant as any).availableDays as string[] | null ?? [];
+  const legacyFrom  = consultant.availabilityFrom      ?? "";
+
+  if (slotSeries && slotSeries.length > 0) {
+    for (const s of slotSeries) {
+      const mins = parseTimeMinutes(s.from);
+      for (const d of s.days) {
+        if (!(d in dayEarliest) || (mins >= 0 && mins < dayEarliest[d]))
+          dayEarliest[d] = mins >= 0 ? mins : 0;
+      }
+    }
+  } else if (fixedSlots.length > 0) {
+    for (const slot of fixedSlots) {
+      const m = slot.match(/^(Sun|Mon|Tue|Wed|Thu|Fri|Sat)[,\s]+(.+?)(?:\s*[–\-].+)?$/i);
+      if (m) {
+        const day = m[1], mins = parseTimeMinutes(m[2].trim());
+        if (!(day in dayEarliest) || (mins >= 0 && mins < dayEarliest[day]))
+          dayEarliest[day] = mins >= 0 ? mins : 0;
+      }
+    }
+  } else if (legacyDays.length > 0 && legacyFrom) {
+    const mins = parseTimeMinutes(legacyFrom);
+    for (const d of legacyDays) dayEarliest[d] = mins >= 0 ? mins : 0;
+  }
+
+  if (Object.keys(dayEarliest).length === 0) return null;
+
+  const istNow   = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+  const todayIdx = istNow.getDay();
+  const nowMins  = istNow.getHours() * 60 + istNow.getMinutes();
+
+  for (let offset = 0; offset < 14; offset++) {
+    const idx = (todayIdx + offset) % 7;
+    const day = SHORT[idx];
+    if (!(day in dayEarliest)) continue;
+    if (offset === 0 && dayEarliest[day] >= 0 && dayEarliest[day] <= nowMins) continue;
+    if (offset === 0) return "Available Today";
+    if (offset === 1) return "Available Tomorrow";
+    return `Available next ${FULL[idx]}`;
+  }
+  return null;
+}
 
 type SortOption = "availability";
 type ConsultantWithPrice = Consultant & { computedCustomerPrice?: string };
@@ -357,37 +419,22 @@ export default function PublicConsultantsPage() {
                         </span>
                       </div>
                       {(() => {
-                        const fixed = consultant.availableSlots || [];
-                        const days = (consultant as any).availableDays || [];
-                        const from = consultant.availabilityFrom || "";
-                        const to = consultant.availabilityTo || "";
-                        const generated = days.length > 0 && from
-                          ? days.map((d: string) => to ? `${d}, ${from} – ${to}` : `${d}, ${from}`)
-                          : [];
-                        const slots: string[] = fixed.length > 0 ? fixed : generated;
-                        if (slots.length > 0) return (
-                          <div className="space-y-1">
-                            <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                              <Clock className="h-3 w-3" />
-                              Available slots
-                            </div>
-                            <div className="flex flex-wrap gap-1">
-                              {slots.slice(0, 3).map((slot, i) => (
-                                <Badge key={i} variant="outline" className="text-[10px] font-normal py-0">{slot}</Badge>
-                              ))}
-                              {slots.length > 3 && (
-                                <Badge variant="outline" className="text-[10px] font-normal py-0">+{slots.length - 3} more</Badge>
-                              )}
-                            </div>
-                          </div>
+                        const label = getNextAvailability(consultant);
+                        if (!label) return null;
+                        const isToday    = label === "Available Today";
+                        const isTomorrow = label === "Available Tomorrow";
+                        return (
+                          <span className={`inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full w-fit ${
+                            isToday
+                              ? "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400"
+                              : isTomorrow
+                              ? "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400"
+                              : "bg-muted text-muted-foreground"
+                          }`} data-testid={`badge-availability-${consultant.id}`}>
+                            <Clock className="h-3 w-3" />
+                            {label}
+                          </span>
                         );
-                        if (from || to) return (
-                          <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                            <Clock className="h-3.5 w-3.5" />
-                            {from} – {to}
-                          </div>
-                        );
-                        return null;
                       })()}
                       <div className="flex gap-2">
                         <Button variant="outline" className="flex-1" onClick={() => setProfileConsultant(consultant)} data-testid={`button-view-profile-${consultant.id}`}>
