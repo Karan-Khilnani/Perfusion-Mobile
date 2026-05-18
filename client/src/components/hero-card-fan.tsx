@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { Link } from "wouter";
 import { ArrowRight } from "lucide-react";
 
@@ -6,6 +6,7 @@ const CARD_W = 158;
 const CARD_H = 84;
 const GAP = 12;
 const FAN_OFFSET = CARD_W + GAP;
+const FAN_OFFSET_V = CARD_H + GAP; // vertical offset for mobile
 
 const TRANSITION: React.CSSProperties = {
   transitionProperty: "transform, opacity, box-shadow",
@@ -37,18 +38,39 @@ function FlaskIcon() {
 
 export function HeroCardFan({ className = "" }: { className?: string }) {
   const [fanned, setFanned] = useState(false);
-  const expand = useCallback(() => setFanned(true), []);
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window !== "undefined" && window.innerWidth < 640
+  );
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 640);
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
+
+  const expand   = useCallback(() => setFanned(true),  []);
   const collapse = useCallback(() => setFanned(false), []);
 
   const c1Transform = "translateX(0px) translateY(0px) scale(1)";
 
+  // On mobile: fan downward. On desktop: fan rightward.
   const c2Transform = fanned
-    ? `translateX(${FAN_OFFSET}px) translateY(0px) scale(1)`
+    ? isMobile
+      ? `translateX(0px) translateY(${FAN_OFFSET_V}px) scale(1)`
+      : `translateX(${FAN_OFFSET}px) translateY(0px) scale(1)`
     : "translateX(0px) translateY(10px) scale(0.965)";
 
   const c3Transform = fanned
-    ? `translateX(${FAN_OFFSET * 2}px) translateY(0px) scale(1)`
+    ? isMobile
+      ? `translateX(0px) translateY(${FAN_OFFSET_V * 2}px) scale(1)`
+      : `translateX(${FAN_OFFSET * 2}px) translateY(0px) scale(1)`
     : "translateX(0px) translateY(20px) scale(0.93)";
+
+  // Container grows in height on mobile, in width on desktop
+  const containerW = isMobile ? CARD_W : fanned ? FAN_OFFSET * 2 + CARD_W : CARD_W;
+  const containerH = isMobile && fanned
+    ? FAN_OFFSET_V * 2 + CARD_H
+    : CARD_H + 24;
 
   const cardBase = "absolute top-0 rounded-2xl select-none flex items-center gap-3 px-4";
 
@@ -56,17 +78,20 @@ export function HeroCardFan({ className = "" }: { className?: string }) {
     <div className={`mt-6 ${className}`}>
       <div
         className="relative cursor-pointer"
-        style={{ height: CARD_H + 24, width: fanned ? FAN_OFFSET * 2 + CARD_W : CARD_W, transition: "width 420ms cubic-bezier(0.34, 1.56, 0.64, 1)" }}
+        style={{
+          height: containerH,
+          width: containerW,
+          transition: "width 420ms cubic-bezier(0.34, 1.56, 0.64, 1), height 420ms cubic-bezier(0.34, 1.56, 0.64, 1)",
+        }}
         onMouseEnter={expand}
         onMouseLeave={collapse}
         onFocus={expand}
         onBlur={(e) => {
-          // Only collapse if focus leaves the whole group entirely
           if (!e.currentTarget.contains(e.relatedTarget as Node | null)) collapse();
         }}
         data-testid="hero-card-fan"
       >
-        {/* Card 3 — Lab Tests (bottom of stack, fans right) */}
+        {/* Card 3 — Lab Tests (bottom of stack, fans right on desktop / down on mobile) */}
         <Link
           href="/lab-tests"
           tabIndex={fanned ? 0 : -1}
@@ -90,7 +115,7 @@ export function HeroCardFan({ className = "" }: { className?: string }) {
           </div>
         </Link>
 
-        {/* Card 2 — Consultation (middle of stack, stays center in fan) */}
+        {/* Card 2 — Consultation (middle of stack) */}
         <Link
           href="/consultants"
           tabIndex={fanned ? 0 : -1}
@@ -114,7 +139,7 @@ export function HeroCardFan({ className = "" }: { className?: string }) {
           </div>
         </Link>
 
-        {/* Card 1 — Enter Perfusion (top of stack, fans left) */}
+        {/* Card 1 — Enter Perfusion (top of stack) */}
         <Link
           href="/home"
           tabIndex={0}
