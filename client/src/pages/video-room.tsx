@@ -655,6 +655,24 @@ export default function VideoRoomPage() {
                 data-testid="video-container"
               />
             )}
+            {/* Transparent drag-capture overlay — sits above the iframe in PiP mode so
+                touch/pointer events reach React handlers instead of being swallowed by the iframe */}
+            {mobilePanel !== "video" && (
+              <div
+                onPointerDown={handlePipPointerDown}
+                onPointerMove={handlePipPointerMove}
+                onPointerUp={handlePipPointerUp}
+                onPointerCancel={handlePipPointerUp}
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  zIndex: 52,
+                  touchAction: "none",
+                  background: "transparent",
+                  cursor: isDraggingPip.current ? "grabbing" : "grab",
+                }}
+              />
+            )}
           </div>
 
           {/* ── Reports panel (slides in from right) — swipeable on full surface ─ */}
