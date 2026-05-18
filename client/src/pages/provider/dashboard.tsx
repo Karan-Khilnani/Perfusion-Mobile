@@ -22,6 +22,8 @@ import {
   Image,
   ExternalLink,
 } from "lucide-react";
+import { getCallWindow, callWindowLabel, toISTTimeString } from "@/lib/call-window";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
@@ -373,16 +375,45 @@ function ConsultationsSection({
                 </div>
 
                 <div className="grid grid-cols-2 gap-2.5">
-                  {booking.videoRoomId ? (
-                    <Button
-                      className="w-full h-10 gap-2 rounded-xl text-sm overflow-hidden"
-                      onClick={() => navigate(`/video/${encodeURIComponent(booking.videoRoomId!)}?returnTo=/provider`)}
-                      data-testid={`button-join-call-${booking.id}`}
-                    >
-                      <Video className="h-4 w-4 shrink-0" />
-                      <span className="truncate">Join Call</span>
-                    </Button>
-                  ) : (
+                  {booking.videoRoomId ? (() => {
+                    const win = getCallWindow(booking as any);
+                    if (win.open) {
+                      return (
+                        <Button
+                          className="w-full h-10 gap-2 rounded-xl text-sm overflow-hidden"
+                          onClick={() => navigate(`/video/${encodeURIComponent(booking.videoRoomId!)}?returnTo=/provider`)}
+                          data-testid={`button-join-call-${booking.id}`}
+                        >
+                          <Video className="h-4 w-4 shrink-0" />
+                          <span className="truncate">Join Call</span>
+                        </Button>
+                      );
+                    }
+                    return (
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              className="w-full h-10 gap-2 rounded-xl text-sm overflow-hidden"
+                              disabled
+                              variant="outline"
+                              data-testid={`button-join-call-${booking.id}`}
+                            >
+                              <Clock className="h-4 w-4 shrink-0" />
+                              <span className="truncate">{callWindowLabel(win)}</span>
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            {win.reason === "before_window" && win.windowStart
+                              ? `Call opens at ${toISTTimeString(win.windowStart)} IST`
+                              : win.reason === "expired" && win.windowEnd
+                              ? `Slot ended at ${toISTTimeString(win.windowEnd)} IST`
+                              : "Call window is not active"}
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    );
+                  })() : (
                     <Button className="w-full h-10 rounded-xl text-sm overflow-hidden" disabled variant="outline">
                       <Video className="h-4 w-4 shrink-0 mr-1.5" />
                       <span className="truncate">No Room Yet</span>

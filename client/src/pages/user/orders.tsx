@@ -13,6 +13,8 @@ import { ClipboardList, FlaskConical, Stethoscope, Calendar, IndianRupee, Chevro
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { getCallWindow, callWindowLabel, toISTTimeString } from "@/lib/call-window";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
 import type { Booking, BookingType } from "@shared/schema";
 import { format, differenceInDays } from "date-fns";
@@ -287,23 +289,46 @@ export default function OrdersPage() {
           </div>
         </dl>
 
-        {booking.bookingType === "consultation" && booking.videoRoomId && !["completed", "cancelled"].includes(booking.status) && (
-          <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
-            <div className="flex items-center gap-2 text-primary">
-              <Video className="h-5 w-5" />
-              <span className="font-medium">Video Consultation</span>
+        {booking.bookingType === "consultation" && booking.videoRoomId && !["completed", "cancelled"].includes(booking.status) && (() => {
+          const win = getCallWindow(booking as any);
+          return (
+            <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
+              <div className="flex items-center gap-2 text-primary">
+                <Video className="h-5 w-5" />
+                <span className="font-medium">Video Consultation</span>
+              </div>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Join the video call at your scheduled appointment time
+              </p>
+              {win.open ? (
+                <Link href={`/video/${encodeURIComponent(booking.videoRoomId)}?returnTo=/user/orders`}>
+                  <Button className="mt-3" data-testid="button-join-video-call">
+                    <Video className="mr-2 h-4 w-4" />
+                    Join Video Call
+                  </Button>
+                </Link>
+              ) : (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button className="mt-3" disabled variant="outline" data-testid="button-join-video-call">
+                        <Clock className="mr-2 h-4 w-4" />
+                        {callWindowLabel(win)}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      {win.reason === "before_window" && win.windowStart
+                        ? `Call opens at ${toISTTimeString(win.windowStart)} IST`
+                        : win.reason === "expired" && win.windowEnd
+                        ? `Slot ended at ${toISTTimeString(win.windowEnd)} IST`
+                        : "Call window is not active"}
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
             </div>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Join the video call at your scheduled appointment time
-            </p>
-            <Link href={`/video/${encodeURIComponent(booking.videoRoomId)}?returnTo=/user/orders`}>
-              <Button className="mt-3" data-testid="button-join-video-call">
-                <Video className="mr-2 h-4 w-4" />
-                Join Video Call
-              </Button>
-            </Link>
-          </div>
-        )}
+          );
+        })()}
 
         {validUrls(booking.documentUrls).length > 0 && (
           <div className="rounded-lg border p-4">
