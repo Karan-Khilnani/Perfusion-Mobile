@@ -3125,7 +3125,7 @@ export async function registerRoutes(
         return res.status(403).json({ message: "Access denied" });
       }
       if (!req.file) return res.status(400).json({ message: "No file uploaded" });
-      const photoUrl = `data:${req.file.mimetype};base64,${req.file.buffer.toString("base64")}`;
+      const photoUrl = await supabaseUpload(req.file.buffer, req.file.originalname, "consultant-photos", req.file.mimetype);
       const updated = await storage.updateConsultant(req.params.id, { photoUrl } as any);
       if (!updated) return res.status(404).json({ message: "Consultant not found" });
       res.json({ photoUrl, consultant: updated });
@@ -3151,7 +3151,7 @@ export async function registerRoutes(
         return res.status(403).json({ message: "Access denied" });
       }
       if (!req.file) return res.status(400).json({ message: "No file uploaded" });
-      const digitalSignatureUrl = `data:${req.file.mimetype};base64,${req.file.buffer.toString("base64")}`;
+      const digitalSignatureUrl = await supabaseUpload(req.file.buffer, req.file.originalname, "consultant-signatures", req.file.mimetype);
       const updated = await storage.updateConsultant(req.params.id, { digitalSignatureUrl } as any);
       if (!updated) return res.status(404).json({ message: "Consultant not found" });
       res.json({ digitalSignatureUrl, consultant: updated });

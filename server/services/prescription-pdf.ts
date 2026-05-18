@@ -357,12 +357,33 @@ export async function generateAndStorePrescriptionPdf(data: PrescriptionPdfData,
 
   if (data.consultantSignatureUrl) {
     try {
-      const sigPath = data.consultantSignatureUrl.startsWith("/")
-        ? path.join(process.cwd(), data.consultantSignatureUrl)
-        : null;
-      if (sigPath && fs.existsSync(sigPath)) {
-        const sigBytes = fs.readFileSync(sigPath);
-        const sigImg = await doc.embedPng(sigBytes);
+      let sigBytes: Uint8Array | null = null;
+      let sigMime = "image/png";
+
+      if (data.consultantSignatureUrl.startsWith("data:")) {
+        // Legacy base64 data URL stored in DB
+        const match = data.consultantSignatureUrl.match(/^data:([^;]+);base64,(.+)$/);
+        if (match) {
+          sigMime = match[1];
+          sigBytes = Uint8Array.from(Buffer.from(match[2], "base64"));
+        }
+      } else if (data.consultantSignatureUrl.startsWith("https://")) {
+        // Supabase or other cloud URL
+        const resp = await fetch(data.consultantSignatureUrl);
+        if (resp.ok) {
+          sigBytes = new Uint8Array(await resp.arrayBuffer());
+          sigMime = resp.headers.get("content-type") || "image/png";
+        }
+      } else if (data.consultantSignatureUrl.startsWith("/")) {
+        // Legacy local file path
+        const sigPath = path.join(process.cwd(), data.consultantSignatureUrl);
+        if (fs.existsSync(sigPath)) sigBytes = fs.readFileSync(sigPath);
+      }
+
+      if (sigBytes) {
+        const sigImg = sigMime.includes("jpeg") || sigMime.includes("jpg")
+          ? await doc.embedJpg(sigBytes)
+          : await doc.embedPng(sigBytes);
         page.drawImage(sigImg, { x: sigX, y: y - 36, width: 120, height: 36 });
         y -= 40;
       }
