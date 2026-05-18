@@ -47,6 +47,7 @@ export default function VideoRoomPage() {
   const touchStartXRef = useRef<number>(0);
   const touchStartYRef = useRef<number>(0);
   const pipDragRef = useRef<{ startX: number; startY: number; startBottom: number; startRight: number } | null>(null);
+  const isDraggingPip = useRef(false);
 
   // Tracks whether we've applied the initial accepted=true jump (avoid re-render loop)
   const joinedAsCalleeApplied = useRef(false);
@@ -314,6 +315,7 @@ export default function VideoRoomPage() {
     e.preventDefault();
     e.stopPropagation();
     e.currentTarget.setPointerCapture(e.pointerId);
+    isDraggingPip.current = true;
     pipDragRef.current = {
       startX: e.clientX,
       startY: e.clientY,
@@ -326,13 +328,15 @@ export default function VideoRoomPage() {
     if (!pipDragRef.current) return;
     const dx = e.clientX - pipDragRef.current.startX;
     const dy = e.clientY - pipDragRef.current.startY;
-    // right decreases when dragging right, bottom decreases when dragging down
-    const newRight = Math.max(8, Math.min(window.innerWidth - 136, pipDragRef.current.startRight - dx));
-    const newBottom = Math.max(90, Math.min(window.innerHeight - 112, pipDragRef.current.startBottom - dy));
+    // PiP size: 128×96 — keep it fully inside the viewport with 4px clearance
+    const pipW = 132, pipH = 100;
+    const newRight  = Math.max(4, Math.min(window.innerWidth  - pipW, pipDragRef.current.startRight  - dx));
+    const newBottom = Math.max(4, Math.min(window.innerHeight - pipH - 90, pipDragRef.current.startBottom - dy));
     setPipPos({ bottom: newBottom, right: newRight });
   };
 
   const handlePipPointerUp = () => {
+    isDraggingPip.current = false;
     pipDragRef.current = null;
   };
 
@@ -582,9 +586,11 @@ export default function VideoRoomPage() {
             onPointerDown={handlePipPointerDown}
             onPointerMove={handlePipPointerMove}
             onPointerUp={handlePipPointerUp}
+            onPointerCancel={handlePipPointerUp}
             style={{
               position: "absolute",
-              transition: "all 0.35s cubic-bezier(0.4,0,0.2,1)",
+              // No transition while dragging — avoids the 350ms lag on every move update
+              transition: isDraggingPip.current ? "none" : "all 0.35s cubic-bezier(0.4,0,0.2,1)",
               touchAction: "none",
               ...(mobilePanel === "video"
                 ? { inset: 0, zIndex: 10, borderRadius: 0, cursor: "default" }
@@ -597,11 +603,28 @@ export default function VideoRoomPage() {
                     borderRadius: 10,
                     overflow: "hidden",
                     boxShadow: "0 4px 20px rgba(0,0,0,0.4)",
-                    border: "2px solid rgba(255,255,255,0.2)",
-                    cursor: "grab",
+                    border: "2px solid rgba(255,255,255,0.25)",
+                    cursor: isDraggingPip.current ? "grabbing" : "grab",
                   }),
             }}
           >
+            {/* Drag-handle hint — only visible in PiP mode */}
+            {mobilePanel !== "video" && (
+              <div style={{
+                position: "absolute",
+                top: 4,
+                left: "50%",
+                transform: "translateX(-50%)",
+                display: "flex",
+                gap: 3,
+                zIndex: 51,
+                pointerEvents: "none",
+              }}>
+                {[0,1,2].map(i => (
+                  <div key={i} style={{ width: 4, height: 4, borderRadius: "50%", background: "rgba(255,255,255,0.7)" }} />
+                ))}
+              </div>
+            )}
             {isLoading && mobilePanel === "video" && (
               <div className="absolute inset-0 z-10 flex items-center justify-center bg-background">
                 <div className="text-center">
