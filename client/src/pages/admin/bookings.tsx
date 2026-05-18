@@ -13,7 +13,7 @@ import { StatusBadge } from "@/components/status-badge";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { format } from "date-fns";
-import { Search, Plus, Edit, Eye, Filter, Stethoscope, FlaskConical, ScanLine, Download, Upload, File, Loader2, ShieldCheck, FileSignature } from "lucide-react";
+import { Search, Plus, Edit, Eye, Filter, Stethoscope, FlaskConical, ScanLine, Download, Upload, File, Loader2, ShieldCheck, FileSignature, Clock, TimerReset } from "lucide-react";
 import type { Booking, Consultant, LabTest, RadiologyModality, BookingStatus } from "@shared/schema";
 
 type BookingFilter = "all" | "consultation" | "lab" | "teleradiology";
@@ -26,6 +26,12 @@ export default function AdminBookingsPage() {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [createType, setCreateType] = useState<"consultation" | "lab" | "teleradiology">("consultation");
   
+  // Extend call window state
+  const [extendWindowBooking, setExtendWindowBooking] = useState<Booking | null>(null);
+  const [extendDurationMinutes, setExtendDurationMinutes] = useState<number>(60);
+  const [extendCustomMinutes, setExtendCustomMinutes] = useState("");
+  const [extendUseCustom, setExtendUseCustom] = useState(false);
+
   // Report upload state
   const [showReportDialog, setShowReportDialog] = useState(false);
   const [reportBooking, setReportBooking] = useState<Booking | null>(null);
@@ -68,6 +74,27 @@ export default function AdminBookingsPage() {
     },
     onError: () => {
       toast({ title: "Error", description: "Failed to update booking.", variant: "destructive" });
+    },
+  });
+
+  const extendCallWindowMutation = useMutation({
+    mutationFn: async ({ id, durationMinutes }: { id: string; durationMinutes: number }) => {
+      const response = await apiRequest("PATCH", `/api/bookings/${id}/call-window/extend`, { durationMinutes });
+      return response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/bookings"] });
+      const until = data.extendedUntil
+        ? new Date(data.extendedUntil).toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata", hour: "numeric", minute: "2-digit", hour12: true })
+        : "";
+      toast({ title: "Call Window Extended", description: `Window is now open until ${until} IST.` });
+      setExtendWindowBooking(null);
+      setExtendCustomMinutes("");
+      setExtendUseCustom(false);
+      setExtendDurationMinutes(60);
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to extend call window.", variant: "destructive" });
     },
   });
 
@@ -501,6 +528,22 @@ export default function AdminBookingsPage() {
                   </div>
                   <div className="flex items-center gap-3">
                     <StatusBadge status={booking.status} />
+                    {booking.bookingType === "consultation" && booking.videoRoomId && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setExtendWindowBooking(booking);
+                          setExtendDurationMinutes(60);
+                          setExtendCustomMinutes("");
+                          setExtendUseCustom(false);
+                        }}
+                        data-testid={`button-extend-window-${booking.id}`}
+                      >
+                        <TimerReset className="mr-1 h-3.5 w-3.5" />
+                        Extend Window
+                      </Button>
+                    )}
                     {booking.bookingType === "consultation" && (booking as any).prescriptionApprovedAt && (booking as any).prescriptionPdfUrl && (
                       <a href={(booking as any).prescriptionPdfUrl} target="_blank" rel="noopener noreferrer">
                         <Button size="sm" variant="outline" className="text-green-700 dark:text-green-400" data-testid={`button-view-signed-rx-${booking.id}`}>
@@ -552,6 +595,95 @@ export default function AdminBookingsPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Extend Call Window Dialog */}
+      <Dialog open={!!extendWindowBooking} onOpenChange={(open) => { if (!open) { setExtendWindowBooking(null); setExtendCustomMinutes(""); setExtendUseCustom(false); setExtendDurationMinutes(60); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <TimerReset className="h-5 w-5 text-amber-600" />
+              Extend Call Window
+            </DialogTitle>
+            <DialogDescription>
+              Opens or re-opens the video call window for {extendWindowBooking?.patientName}'s {extendWindowBooking?.serviceName} booking.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">How long should the window stay open?</Label>
+              <div className="grid grid-cols-4 gap-2">
+                {[30, 60, 120, 240].map((mins) => (
+                  <Button
+                    key={mins}
+                    size="sm"
+                    variant={!extendUseCustom && extendDurationMinutes === mins ? "default" : "outline"}
+                    onClick={() => { setExtendDurationMinutes(mins); setExtendUseCustom(false); }}
+                    data-testid={`button-extend-preset-${mins}`}
+                  >
+                    {mins < 60 ? `${mins}m` : `${mins / 60}h`}
+                  </Button>
+                ))}
+              </div>
+              <div className="flex items-center gap-2 pt-1">
+                <Button
+                  size="sm"
+                  variant={extendUseCustom ? "default" : "outline"}
+                  onClick={() => setExtendUseCustom(true)}
+                  data-testid="button-extend-custom"
+                >
+                  Custom
+                </Button>
+                {extendUseCustom && (
+                  <div className="flex items-center gap-1">
+                    <Input
+                      type="number"
+                      min="1"
+                      max="480"
+                      placeholder="minutes"
+                      value={extendCustomMinutes}
+                      onChange={(e) => setExtendCustomMinutes(e.target.value)}
+                      className="w-28 h-8"
+                      data-testid="input-extend-custom-minutes"
+                    />
+                    <span className="text-sm text-muted-foreground">min</span>
+                  </div>
+                )}
+              </div>
+            </div>
+            {(() => {
+              const dur = extendUseCustom ? parseInt(extendCustomMinutes || "0", 10) : extendDurationMinutes;
+              if (dur > 0) {
+                const until = new Date(Date.now() + dur * 60 * 1000).toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata", hour: "numeric", minute: "2-digit", hour12: true });
+                return (
+                  <p className="flex items-center gap-1.5 text-sm text-amber-700 dark:text-amber-400 rounded-md bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/40 px-3 py-2">
+                    <Clock className="h-4 w-4 shrink-0" />
+                    Window will be open until <strong>{until} IST</strong>
+                  </p>
+                );
+              }
+              return null;
+            })()}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setExtendWindowBooking(null)} data-testid="button-extend-cancel">
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (!extendWindowBooking) return;
+                const dur = extendUseCustom ? parseInt(extendCustomMinutes || "0", 10) : extendDurationMinutes;
+                if (!dur || dur <= 0) return;
+                extendCallWindowMutation.mutate({ id: extendWindowBooking.id, durationMinutes: dur });
+              }}
+              disabled={extendCallWindowMutation.isPending || (extendUseCustom && (!parseInt(extendCustomMinutes || "0", 10) || parseInt(extendCustomMinutes || "0", 10) <= 0))}
+              data-testid="button-extend-confirm"
+            >
+              {extendCallWindowMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <TimerReset className="mr-2 h-4 w-4" />}
+              Extend Window
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={showReportDialog} onOpenChange={(open) => !open && resetReportDialog()}>
         <DialogContent>

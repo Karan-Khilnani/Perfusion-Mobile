@@ -316,6 +316,7 @@ export const bookings = pgTable("bookings", {
   prescriptionPdfUrl: varchar("prescription_pdf_url", { length: 500 }),
   dashboardHiddenAt: timestamp("dashboard_hidden_at"),
   reminderFiredAt: timestamp("reminder_fired_at"),
+  callWindowExtendedUntil: timestamp("call_window_extended_until"),
   razorpayOrderId: varchar("razorpay_order_id", { length: 255 }),
   razorpayPaymentId: varchar("razorpay_payment_id", { length: 255 }),
   // Follow-up consultation tracking

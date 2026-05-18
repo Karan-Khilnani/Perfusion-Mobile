@@ -21,6 +21,9 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { getCallWindow, callWindowLabel, toISTTimeString } from "@/lib/call-window";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Clock } from "lucide-react";
 import type { Booking } from "@shared/schema";
 
 interface ActiveConsultation extends Booking {
@@ -332,18 +335,55 @@ export default function UserDashboard() {
                       {/* Action buttons — hidden in clean mode so clicks don't conflict */}
                       {!cleanMode && (
                         <div className="space-y-2">
-                          {booking.videoRoomId ? (
-                            <Link href={`/video/${encodeURIComponent(booking.videoRoomId)}?returnTo=/user`}>
-                              <Button
-                                size="sm"
-                                className="w-full gap-2"
-                                data-testid={`button-join-call-${booking.id}`}
-                              >
-                                <Video className="h-4 w-4" />
-                                Join Call
-                              </Button>
-                            </Link>
-                          ) : (
+                          {booking.videoRoomId ? (() => {
+                            const win = getCallWindow(booking as any);
+                            if (win.open) {
+                              return (
+                                <div className="space-y-1">
+                                  <Link href={`/video/${encodeURIComponent(booking.videoRoomId!)}?returnTo=/user`}>
+                                    <Button
+                                      size="sm"
+                                      className="w-full gap-2"
+                                      data-testid={`button-join-call-${booking.id}`}
+                                    >
+                                      <Video className="h-4 w-4" />
+                                      Join Call
+                                    </Button>
+                                  </Link>
+                                  {win.reason === "extended" && win.extendedUntil && (
+                                    <p className="text-xs text-center text-amber-600 dark:text-amber-400">
+                                      Extended until {toISTTimeString(win.extendedUntil)}
+                                    </p>
+                                  )}
+                                </div>
+                              );
+                            }
+                            return (
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      size="sm"
+                                      className="w-full gap-2"
+                                      variant="outline"
+                                      disabled
+                                      data-testid={`button-join-call-${booking.id}`}
+                                    >
+                                      <Clock className="h-4 w-4" />
+                                      {callWindowLabel(win)}
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    {win.reason === "before_window" && win.windowStart
+                                      ? `Call opens at ${toISTTimeString(win.windowStart)} IST`
+                                      : win.reason === "expired" && win.windowEnd
+                                      ? `Slot ended at ${toISTTimeString(win.windowEnd)} IST. Contact admin to extend.`
+                                      : "Call window is not active"}
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            );
+                          })() : (
                             <Button size="sm" className="w-full" disabled variant="outline">
                               No room assigned yet
                             </Button>

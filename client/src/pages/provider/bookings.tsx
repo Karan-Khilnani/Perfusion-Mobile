@@ -13,7 +13,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { StatusBadge } from "@/components/status-badge";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { ClipboardList, RefreshCw, Video, Upload, Stethoscope, FlaskConical, ScanLine, FileText, Download, Paperclip, FileSignature, Loader2, File, ShieldCheck, Lock } from "lucide-react";
+import { ClipboardList, RefreshCw, Video, Upload, Stethoscope, FlaskConical, ScanLine, FileText, Download, Paperclip, FileSignature, Loader2, File, ShieldCheck, Lock, Clock } from "lucide-react";
+import { getCallWindow, callWindowLabel, toISTTimeString } from "@/lib/call-window";
 import { Link } from "wouter";
 import type { Booking, BookingStatus, BookingType, Provider } from "@shared/schema";
 import { format } from "date-fns";
@@ -356,14 +357,32 @@ export default function ProviderBookingsPage() {
         {(booking.bookingType === "lab" || booking.bookingType === "teleradiology") && (booking as any).providerPrice && (
           <span className="text-xs text-muted-foreground">Your rate</span>
         )}
-        {booking.bookingType === "consultation" && booking.videoRoomId && (
-          <Link href={`/video/${encodeURIComponent(booking.videoRoomId)}?returnTo=/provider/bookings`}>
-            <Button size="sm" variant="outline" data-testid={`button-join-video-${booking.id}`}>
-              <Video className="mr-2 h-3.5 w-3.5" />
-              Join Call
+        {booking.bookingType === "consultation" && booking.videoRoomId && (() => {
+          const win = getCallWindow(booking as any);
+          if (win.open) {
+            return (
+              <div className="flex flex-col items-end gap-0.5">
+                <Link href={`/video/${encodeURIComponent(booking.videoRoomId!)}?returnTo=/provider/bookings`}>
+                  <Button size="sm" variant="outline" data-testid={`button-join-video-${booking.id}`}>
+                    <Video className="mr-2 h-3.5 w-3.5" />
+                    Join Call
+                  </Button>
+                </Link>
+                {win.reason === "extended" && win.extendedUntil && (
+                  <span className="text-xs text-amber-600 dark:text-amber-400">
+                    Extended until {toISTTimeString(win.extendedUntil)}
+                  </span>
+                )}
+              </div>
+            );
+          }
+          return (
+            <Button size="sm" variant="outline" disabled data-testid={`button-join-video-${booking.id}`}>
+              <Clock className="mr-2 h-3.5 w-3.5" />
+              {callWindowLabel(win)}
             </Button>
-          </Link>
-        )}
+          );
+        })()}
         {booking.bookingType === "consultation" && (
           <>
             {(booking as any).prescriptionApprovedAt ? (

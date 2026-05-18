@@ -7,19 +7,22 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { ArrowLeft, Video, VideoOff, Phone, Maximize2, Minimize2, Stethoscope, ClipboardList, PhoneOff, RefreshCw, PanelRightClose, PanelRightOpen, FileText, ShieldCheck } from "lucide-react";
+import { ArrowLeft, Video, VideoOff, Phone, Maximize2, Minimize2, Stethoscope, ClipboardList, PhoneOff, RefreshCw, PanelRightClose, PanelRightOpen, FileText, ShieldCheck, Clock } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useCallEvents, type CallEvent } from "@/hooks/use-call-events";
 import { ClinicalPanel } from "@/components/clinical-panel";
 import { InCallSummaryForm } from "@/components/in-call-summary-form";
 import type { Booking } from "@shared/schema";
 
+import { getCallWindow, toISTTimeString } from "@/lib/call-window";
+
 type CallPhase =
   | "precall"
   | "ringing"
   | "connected"
   | "declined"
-  | "timeout";
+  | "timeout"
+  | "window_closed";
 
 type MobilePanel = "video" | "docs" | "summary";
 
@@ -124,6 +127,14 @@ export default function VideoRoomPage() {
       setPhase("connected");
     }
   }, [joinedAsCallee, phase]);
+
+  // Call window check — block precall if outside the scheduled slot
+  useEffect(() => {
+    if (booking && phase === "precall" && !joinedAsCallee) {
+      const win = getCallWindow(booking as any);
+      if (!win.open) setPhase("window_closed");
+    }
+  }, [booking, phase, joinedAsCallee]);
 
   function clearRingTimer() {
     if (ringTimeoutRef.current) {
@@ -331,6 +342,39 @@ export default function VideoRoomPage() {
             </Link>
           </CardContent>
         </Card>
+      </div>
+    );
+  }
+
+  // ─── Window Closed Screen ────────────────────────────────────────────────
+  if (phase === "window_closed") {
+    const win = booking ? getCallWindow(booking as any) : null;
+    const isBeforeWindow = win?.reason === "before_window";
+    return (
+      <div className="flex h-screen flex-col items-center justify-center bg-background gap-6 px-4">
+        <div className="flex h-24 w-24 items-center justify-center rounded-full bg-muted">
+          <Clock className="h-10 w-10 text-muted-foreground" />
+        </div>
+        <div className="text-center space-y-2 max-w-sm">
+          <h2 className="text-xl font-bold">
+            {isBeforeWindow ? "Call hasn't opened yet" : "Call window has ended"}
+          </h2>
+          <p className="text-muted-foreground text-sm">
+            {isBeforeWindow && win?.windowStart
+              ? `This consultation is scheduled to open at ${toISTTimeString(win.windowStart)} IST.`
+              : win?.windowEnd
+              ? `The scheduled call window ended at ${toISTTimeString(win.windowEnd)} IST.`
+              : "This call is outside its scheduled time window."}
+          </p>
+          {!isBeforeWindow && (
+            <p className="text-xs text-muted-foreground">
+              If you need to continue, ask your administrator to extend the call window.
+            </p>
+          )}
+        </div>
+        <Button onClick={() => navigate(returnTo)} data-testid="button-go-back">
+          Go Back
+        </Button>
       </div>
     );
   }

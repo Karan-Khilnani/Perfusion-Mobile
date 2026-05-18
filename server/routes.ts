@@ -17,6 +17,7 @@ import { calculateCustomerPrice, deriveMarginFromPrice, derivePriceFromMargin } 
 import { processReport, type BookingReportData } from "./services/report-processor";
 import { generateAndStorePrescriptionPdf, type PrescriptionPdfData } from "./services/prescription-pdf";
 import { sendPushNotification, getVapidPublicKey, type PushPayload } from "./services/push-notifications";
+import { getCallWindow } from "./services/call-window";
 
 // Daily.co API helper
 async function createDailyRoom(roomName: string): Promise<{ url: string; name: string } | null> {
@@ -4009,6 +4010,17 @@ export async function registerRoutes(
 
       const callerRole: "seeker" | "provider" = isSeeker ? "seeker" : "provider";
 
+      // Enforce call window — block ring if outside the scheduled slot
+      const window = getCallWindow(booking);
+      if (!window.open) {
+        return res.status(403).json({
+          error: "Call window is not active",
+          reason: window.reason,
+          windowStart: window.windowStart,
+          windowEnd: window.windowEnd,
+        });
+      }
+
       // Get caller display name
       const callerUser = await storage.getUserById(callerId);
       const callerName = callerUser?.name || callerUser?.email || "Unknown";
@@ -4253,6 +4265,58 @@ export async function registerRoutes(
       res.json({ status: session.status, videoRoomUrl: session.videoRoomUrl });
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch call status" });
+    }
+  });
+
+  // ── Call Window: status + admin extend ────────────────────────────────────
+
+  // GET /api/bookings/:id/call-window — returns the current window status
+  app.get("/api/bookings/:id/call-window", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.id;
+      const { id } = req.params;
+      const booking = await storage.getBookingById(id);
+      if (!booking) return res.status(404).json({ error: "Booking not found" });
+
+      const isAdminUser = req.user.role === "admin";
+      const provider = booking.providerId ? await storage.getProviderById(booking.providerId) : null;
+      const isSeeker = booking.userId === userId;
+      const isProviderUser = provider?.userId === userId;
+      if (!isSeeker && !isProviderUser && !isAdminUser) {
+        return res.status(403).json({ error: "Not authorised" });
+      }
+
+      const status = getCallWindow(booking);
+      res.json({
+        open: status.open,
+        reason: status.reason,
+        windowStart: status.windowStart,
+        windowEnd: status.windowEnd,
+        extendedUntil: status.extendedUntil,
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get call window status" });
+    }
+  });
+
+  // PATCH /api/bookings/:id/call-window/extend — admin sets new expiry
+  app.patch("/api/bookings/:id/call-window/extend", isAdmin, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const { durationMinutes } = req.body;
+      if (!durationMinutes || typeof durationMinutes !== "number" || durationMinutes <= 0) {
+        return res.status(400).json({ error: "durationMinutes must be a positive number" });
+      }
+
+      const booking = await storage.getBookingById(id);
+      if (!booking) return res.status(404).json({ error: "Booking not found" });
+
+      const extendedUntil = new Date(Date.now() + durationMinutes * 60 * 1000);
+      await storage.updateBooking(id, { callWindowExtendedUntil: extendedUntil } as any);
+
+      res.json({ success: true, extendedUntil });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to extend call window" });
     }
   });
 
