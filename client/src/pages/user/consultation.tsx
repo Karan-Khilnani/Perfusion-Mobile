@@ -28,7 +28,9 @@ function getNextAvailability(consultant: Consultant & { computedCustomerPrice?: 
   const SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   const FULL  = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
-  const dayEarliest: Record<string, number> = {};
+  // Track the LATEST slot time per day — a day is only "past" when its last slot has passed.
+  // Using earliest caused: if 10 AM slot passed but 8 PM slot remained, the whole day was skipped.
+  const dayLatest: Record<string, number> = {};
 
   const slotSeries   = (consultant as any).slotSeries  as SlotSeries[] | null | undefined;
   const fixedSlots   = consultant.availableSlots        ?? [];
@@ -39,8 +41,8 @@ function getNextAvailability(consultant: Consultant & { computedCustomerPrice?: 
     for (const s of slotSeries) {
       const mins = parseTimeMinutes(s.from);
       for (const d of s.days) {
-        if (!(d in dayEarliest) || (mins >= 0 && mins < dayEarliest[d]))
-          dayEarliest[d] = mins >= 0 ? mins : 0;
+        if (!(d in dayLatest) || (mins >= 0 && mins > dayLatest[d]))
+          dayLatest[d] = mins >= 0 ? mins : 0;
       }
     }
   } else if (fixedSlots.length > 0) {
@@ -48,16 +50,16 @@ function getNextAvailability(consultant: Consultant & { computedCustomerPrice?: 
       const m = slot.match(/^(Sun|Mon|Tue|Wed|Thu|Fri|Sat)[,\s]+(.+?)(?:\s*[–\-].+)?$/i);
       if (m) {
         const day = m[1], mins = parseTimeMinutes(m[2].trim());
-        if (!(day in dayEarliest) || (mins >= 0 && mins < dayEarliest[day]))
-          dayEarliest[day] = mins >= 0 ? mins : 0;
+        if (!(day in dayLatest) || (mins >= 0 && mins > dayLatest[day]))
+          dayLatest[day] = mins >= 0 ? mins : 0;
       }
     }
   } else if (legacyDays.length > 0 && legacyFrom) {
     const mins = parseTimeMinutes(legacyFrom);
-    for (const d of legacyDays) dayEarliest[d] = mins >= 0 ? mins : 0;
+    for (const d of legacyDays) dayLatest[d] = mins >= 0 ? mins : 0;
   }
 
-  if (Object.keys(dayEarliest).length === 0) return null;
+  if (Object.keys(dayLatest).length === 0) return null;
 
   const istNow     = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
   const todayIdx   = istNow.getDay();
@@ -66,8 +68,8 @@ function getNextAvailability(consultant: Consultant & { computedCustomerPrice?: 
   for (let offset = 0; offset < 14; offset++) {
     const idx  = (todayIdx + offset) % 7;
     const day  = SHORT[idx];
-    if (!(day in dayEarliest)) continue;
-    if (offset === 0 && dayEarliest[day] >= 0 && dayEarliest[day] <= nowMins) continue;
+    if (!(day in dayLatest)) continue;
+    if (offset === 0 && dayLatest[day] >= 0 && dayLatest[day] <= nowMins) continue;
     if (offset === 0) return "Available Today";
     if (offset === 1) return "Available Tomorrow";
     return `Available next ${FULL[idx]}`;
