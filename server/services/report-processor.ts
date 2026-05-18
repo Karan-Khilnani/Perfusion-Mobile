@@ -2,6 +2,7 @@ import { PDFDocument, rgb, StandardFonts, PDFPage, PDFFont, PDFImage } from "pdf
 import fs from "fs";
 import path from "path";
 import QRCode from "qrcode";
+import { uploadFile as supabaseUpload, isSupabaseUrl } from "./supabase-storage";
 
 export interface BookingReportData {
   bookingNumber: string;
@@ -531,28 +532,41 @@ async function addFooterToPages(doc: PDFDocument, data: BookingReportData, logoI
 }
 
 export async function processReport(originalFilePath: string, data: BookingReportData): Promise<string> {
-  const uploadsDir = path.join(process.cwd(), "uploads", "reports");
-  let absolutePath: string;
+  let fileBuffer: Buffer;
+  let ext: string;
 
-  if (originalFilePath.startsWith("/uploads/reports/")) {
-    absolutePath = path.join(process.cwd(), originalFilePath.slice(1));
-  } else if (path.isAbsolute(originalFilePath)) {
-    absolutePath = originalFilePath;
+  if (isSupabaseUrl(originalFilePath)) {
+    // New uploads are stored in Supabase — fetch the file bytes via HTTP
+    const response = await fetch(originalFilePath);
+    if (!response.ok) throw new Error(`Failed to fetch report from Supabase: ${response.statusText}`);
+    const arrayBuf = await response.arrayBuffer();
+    fileBuffer = Buffer.from(arrayBuf);
+    ext = path.extname(new URL(originalFilePath).pathname).toLowerCase();
   } else {
-    absolutePath = path.join(process.cwd(), originalFilePath);
-  }
+    // Legacy: file stored on local disk
+    const uploadsDir = path.join(process.cwd(), "uploads", "reports");
+    let absolutePath: string;
 
-  const resolvedPath = path.resolve(absolutePath);
-  if (!resolvedPath.startsWith(uploadsDir)) {
-    throw new Error(`Report file path outside allowed directory: ${resolvedPath}`);
-  }
+    if (originalFilePath.startsWith("/uploads/reports/")) {
+      absolutePath = path.join(process.cwd(), originalFilePath.slice(1));
+    } else if (path.isAbsolute(originalFilePath)) {
+      absolutePath = originalFilePath;
+    } else {
+      absolutePath = path.join(process.cwd(), originalFilePath);
+    }
 
-  if (!fs.existsSync(resolvedPath)) {
-    throw new Error(`Report file not found: ${resolvedPath}`);
-  }
+    const resolvedPath = path.resolve(absolutePath);
+    if (!resolvedPath.startsWith(uploadsDir)) {
+      throw new Error(`Report file path outside allowed directory: ${resolvedPath}`);
+    }
 
-  const fileBuffer = fs.readFileSync(resolvedPath);
-  const ext = path.extname(resolvedPath).toLowerCase();
+    if (!fs.existsSync(resolvedPath)) {
+      throw new Error(`Report file not found: ${resolvedPath}`);
+    }
+
+    fileBuffer = fs.readFileSync(resolvedPath);
+    ext = path.extname(resolvedPath).toLowerCase();
+  }
 
   let originalDoc: PDFDocument;
 
@@ -614,18 +628,11 @@ export async function processReport(originalFilePath: string, data: BookingRepor
     finalDoc.addPage(p);
   }
 
-  const outputDir = path.join(process.cwd(), "uploads", "reports");
-  if (!fs.existsSync(outputDir)) {
-    fs.mkdirSync(outputDir, { recursive: true });
-  }
-
-  const baseName = path.basename(resolvedPath, ext);
-  const outputFileName = `${baseName}-processed.pdf`;
-  const outputPath = path.join(outputDir, outputFileName);
-
   const finalBytes = await finalDoc.save();
-  fs.writeFileSync(outputPath, finalBytes);
+  const outputFileName = `processed-${Date.now()}-${Math.round(Math.random() * 1e9)}.pdf`;
+  const buffer = Buffer.from(finalBytes);
 
-  console.log(`[ReportProcessor] Processed report saved: ${outputPath}`);
-  return `/uploads/reports/${outputFileName}`;
+  const publicUrl = await supabaseUpload(buffer, outputFileName, "processed-reports", "application/pdf");
+  console.log(`[ReportProcessor] Processed report uploaded to Supabase: ${publicUrl}`);
+  return publicUrl;
 }

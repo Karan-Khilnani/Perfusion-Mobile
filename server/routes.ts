@@ -11,6 +11,7 @@ import { fireOneBooking } from "./services/consultation-scheduler";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
+import { uploadFile as supabaseUpload } from "./services/supabase-storage";
 import { notifyAdminLabBooking, notifyUserReportReady, cancelVoiceCall, triggerVoiceCall } from "./services/msg91";
 import { generateBookingNumber } from "./services/booking-number";
 import { calculateCustomerPrice, deriveMarginFromPrice, derivePriceFromMargin } from "./services/pricing";
@@ -91,25 +92,9 @@ async function isDailyRoomValid(roomUrl: string): Promise<boolean> {
   }
 }
 
-// Configure multer for file uploads
-const uploadDir = path.join(process.cwd(), "uploads", "reports");
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
-}
-
-const reportStorage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, uploadDir);
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-    const ext = path.extname(file.originalname);
-    cb(null, `report-${uniqueSuffix}${ext}`);
-  },
-});
-
+// Configure multer for file uploads (memory storage — files go to Supabase)
 const uploadReport = multer({
-  storage: reportStorage,
+  storage: multer.memoryStorage(),
   limits: { fileSize: 50 * 1024 * 1024 }, // 50MB limit
   fileFilter: (req, file, cb) => {
     const allowedTypes = [
@@ -128,25 +113,9 @@ const uploadReport = multer({
   },
 });
 
-// Configure multer for registration document uploads
-const docUploadDir = path.join(process.cwd(), "uploads", "documents");
-if (!fs.existsSync(docUploadDir)) {
-  fs.mkdirSync(docUploadDir, { recursive: true });
-}
-
-const documentStorage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, docUploadDir);
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-    const ext = path.extname(file.originalname);
-    cb(null, `doc-${uniqueSuffix}${ext}`);
-  },
-});
-
+// Configure multer for registration document uploads (memory storage — files go to Supabase)
 const uploadDocument = multer({
-  storage: documentStorage,
+  storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     const allowedTypes = [
@@ -3245,8 +3214,8 @@ export async function registerRoutes(
 
       if (!req.file) return res.status(400).json({ message: "No file uploaded" });
 
-      const fileUrl = `/uploads/reports/${req.file.filename}`;
-      const fileName = req.file.originalname || req.file.filename;
+      const fileUrl = await supabaseUpload(req.file.buffer, req.file.originalname, "call-documents", req.file.mimetype);
+      const fileName = req.file.originalname;
 
       // Append to documentUrls
       const existing = (booking.documentUrls || []).filter((u: any) => u && u !== "undefined");
@@ -3340,9 +3309,8 @@ export async function registerRoutes(
         return res.status(400).json({ message: "No file uploaded" });
       }
 
-      // Generate the URL for the uploaded file
-      const fileUrl = `/uploads/reports/${req.file.filename}`;
-      
+      const fileUrl = await supabaseUpload(req.file.buffer, req.file.originalname, "reports", req.file.mimetype);
+
       res.json({ 
         success: true, 
         url: fileUrl,
@@ -3362,8 +3330,8 @@ export async function registerRoutes(
         return res.status(400).json({ message: "No file uploaded" });
       }
 
-      const fileUrl = `/uploads/documents/${req.file.filename}`;
-      
+      const fileUrl = await supabaseUpload(req.file.buffer, req.file.originalname, "documents", req.file.mimetype);
+
       res.json({ 
         success: true, 
         url: fileUrl,

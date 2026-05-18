@@ -2,6 +2,7 @@ import { PDFDocument, rgb, StandardFonts, PDFPage, PDFFont } from "pdf-lib";
 import fs from "fs";
 import path from "path";
 import QRCode from "qrcode";
+import { uploadFile as supabaseUpload } from "./supabase-storage";
 
 export interface PrescriptionPdfData {
   bookingId: string;
@@ -397,14 +398,10 @@ export async function generateAndStorePrescriptionPdf(data: PrescriptionPdfData,
   }
 
   const pdfBytes = await doc.save();
-
-  const outputDir = path.join(process.cwd(), "uploads", "prescriptions");
-  if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
-
   const fileName = `consultation-summary-${data.bookingId}-${Date.now()}.pdf`;
-  const outputPath = path.join(outputDir, fileName);
-  fs.writeFileSync(outputPath, pdfBytes);
+  const buffer = Buffer.from(pdfBytes);
 
-  console.log(`[ConsultationSummaryPDF] Generated: ${outputPath}`);
-  return `/uploads/prescriptions/${fileName}`;
+  const publicUrl = await supabaseUpload(buffer, fileName, "prescriptions", "application/pdf");
+  console.log(`[ConsultationSummaryPDF] Uploaded to Supabase: ${publicUrl}`);
+  return publicUrl;
 }
