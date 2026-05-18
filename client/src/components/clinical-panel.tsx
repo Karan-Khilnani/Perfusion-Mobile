@@ -41,7 +41,6 @@ function getFileName(url: string): string {
 function InlineDocument({ url, label }: { url: string; label: string }) {
   const image = isImageFile(url);
   const isMobile = useIsMobile();
-  const isPdf = getFileExt(url) === "pdf";
 
   return (
     <div className="mb-4 last:mb-0">
@@ -65,7 +64,7 @@ function InlineDocument({ url, label }: { url: string; label: string }) {
         </a>
       </div>
 
-      {/* Content */}
+      {/* Content — images display as <img>, everything else (PDF, etc.) as an inline iframe */}
       {image ? (
         <img
           src={url}
@@ -73,30 +72,12 @@ function InlineDocument({ url, label }: { url: string; label: string }) {
           className="w-full rounded border object-contain max-h-[600px] bg-muted"
           data-testid={`img-clinical-doc-${label}`}
         />
-      ) : isPdf && isMobile ? (
-        /* Mobile PDF: iframe embeds don't render in mobile browsers.
-           Show a tappable card instead so the user can open it natively. */
-        <a
-          href={url}
-          target="_blank"
-          rel="noreferrer"
-          className="flex items-center gap-3 w-full rounded border bg-muted/40 px-4 py-3 hover:bg-muted/70 transition-colors"
-          data-testid={`link-pdf-mobile-${label}`}
-        >
-          <FileText className="h-8 w-8 text-red-500 shrink-0" />
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-medium truncate">{label}</p>
-            <p className="text-xs text-muted-foreground">Tap to open PDF</p>
-          </div>
-          <ExternalLink className="h-4 w-4 text-muted-foreground shrink-0" />
-        </a>
       ) : (
-        /* Desktop / non-PDF: embed inline */
         <iframe
           src={url}
           title={label}
           className="w-full rounded border bg-white"
-          style={{ height: "500px" }}
+          style={{ height: isMobile ? 380 : 500 }}
           data-testid={`iframe-clinical-doc-${label}`}
         />
       )}
