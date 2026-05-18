@@ -13,11 +13,83 @@ import { Textarea } from "@/components/ui/textarea";
 import { StatusBadge } from "@/components/status-badge";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { ClipboardList, RefreshCw, Video, Upload, Stethoscope, FlaskConical, ScanLine, FileText, Download, Paperclip, FileSignature, Loader2, File, ShieldCheck, Lock, Clock } from "lucide-react";
+import { ClipboardList, RefreshCw, Video, Upload, Stethoscope, FlaskConical, ScanLine, FileText, Download, Paperclip, FileSignature, Loader2, File, ShieldCheck, Lock, Clock, Image, ExternalLink } from "lucide-react";
 import { getCallWindow, callWindowLabel, toISTTimeString } from "@/lib/call-window";
 import { Link } from "wouter";
 import type { Booking, BookingStatus, BookingType, Provider } from "@shared/schema";
 import { format } from "date-fns";
+
+function docFileExt(url: string): string {
+  return (url.split(".").pop() ?? "").toLowerCase().split("?")[0];
+}
+function docIsImage(url: string): boolean {
+  return ["jpg", "jpeg", "png", "webp", "gif", "bmp"].includes(docFileExt(url));
+}
+function docFileName(url: string): string {
+  try {
+    const parts = url.split("/");
+    return decodeURIComponent(parts[parts.length - 1] ?? url).split("?")[0];
+  } catch {
+    return url;
+  }
+}
+
+function DocInlineViewer({ url, index, prefix }: { url: string; index: number; prefix: string }) {
+  const image = docIsImage(url);
+  const isPdf = docFileExt(url) === "pdf";
+  const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
+  const label = docFileName(url);
+
+  return (
+    <div className="mb-4 last:mb-0" data-testid={`doc-viewer-${prefix}-${index}`}>
+      <div className="flex items-center justify-between mb-1.5 gap-2">
+        <div className="flex items-center gap-1.5 min-w-0">
+          {image
+            ? <Image className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+            : <FileText className="h-3.5 w-3.5 text-muted-foreground shrink-0" />}
+          <span className="text-xs text-muted-foreground truncate">{label}</span>
+        </div>
+        <a
+          href={url}
+          target="_blank"
+          rel="noreferrer"
+          className="shrink-0 text-muted-foreground hover:text-primary transition-colors"
+          title="Open in new tab"
+        >
+          <ExternalLink className="h-3.5 w-3.5" />
+        </a>
+      </div>
+      {image ? (
+        <img
+          src={url}
+          alt={label}
+          className="w-full rounded border object-contain max-h-[500px] bg-muted"
+        />
+      ) : isPdf && isMobile ? (
+        <a
+          href={url}
+          target="_blank"
+          rel="noreferrer"
+          className="flex items-center gap-3 w-full rounded border bg-muted/40 px-4 py-3 hover:bg-muted/70 transition-colors"
+        >
+          <FileText className="h-8 w-8 text-red-500 shrink-0" />
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-medium truncate">{label}</p>
+            <p className="text-xs text-muted-foreground">Tap to open PDF</p>
+          </div>
+          <ExternalLink className="h-4 w-4 text-muted-foreground shrink-0" />
+        </a>
+      ) : (
+        <iframe
+          src={url}
+          title={label}
+          className="w-full rounded border bg-white"
+          style={{ height: "480px" }}
+        />
+      )}
+    </div>
+  );
+}
 
 const statusOptions: { value: BookingStatus; label: string }[] = [
   { value: "booked", label: "Booked" },
@@ -721,64 +793,40 @@ export default function ProviderBookingsPage() {
       </Dialog>
 
       <Dialog open={showDocsDialog} onOpenChange={setShowDocsDialog}>
-        <DialogContent>
-          <DialogHeader>
+        <DialogContent className="max-w-2xl max-h-[88vh] flex flex-col">
+          <DialogHeader className="shrink-0">
             <DialogTitle>Patient Documents</DialogTitle>
             <DialogDescription>
               Documents uploaded by {docsBooking?.patientName} for this booking
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 max-h-[60vh] overflow-y-auto">
+          <div className="overflow-y-auto flex-1 space-y-5 pr-1 pt-2">
             {docsBooking?.documentUrls && docsBooking.documentUrls.length > 0 && (
-              <div className="space-y-2">
-                <p className="text-sm font-medium">Reports</p>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">
+                  Reports ({docsBooking.documentUrls.length})
+                </p>
                 {docsBooking.documentUrls.map((url, i) => (
-                  <a 
-                    key={i}
-                    href={url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-2 rounded-lg border p-3 hover:bg-muted"
-                    data-testid={`link-provider-doc-${i}`}
-                  >
-                    <FileText className="h-5 w-5 text-primary" />
-                    <div className="flex-1">
-                      <p className="font-medium">Report {i + 1}</p>
-                      <p className="text-xs text-muted-foreground truncate">{url}</p>
-                    </div>
-                    <Download className="h-4 w-4 text-muted-foreground" />
-                  </a>
+                  <DocInlineViewer key={url + i} url={url} index={i} prefix="report" />
                 ))}
               </div>
             )}
             {(docsBooking as any)?.treatmentChartUrls && ((docsBooking as any).treatmentChartUrls as string[]).length > 0 && (
-              <div className="space-y-2">
-                <p className="text-sm font-medium">Treatment Charts</p>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">
+                  Treatment Charts ({((docsBooking as any).treatmentChartUrls as string[]).length})
+                </p>
                 {((docsBooking as any).treatmentChartUrls as string[]).map((url, i) => (
-                  <a 
-                    key={i}
-                    href={url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-2 rounded-lg border p-3 hover:bg-muted"
-                    data-testid={`link-provider-chart-${i}`}
-                  >
-                    <Paperclip className="h-5 w-5 text-primary" />
-                    <div className="flex-1">
-                      <p className="font-medium">Treatment Chart {i + 1}</p>
-                      <p className="text-xs text-muted-foreground truncate">{url}</p>
-                    </div>
-                    <Download className="h-4 w-4 text-muted-foreground" />
-                  </a>
+                  <DocInlineViewer key={url + i} url={url} index={i} prefix="chart" />
                 ))}
               </div>
             )}
-            {(!docsBooking?.documentUrls || docsBooking.documentUrls.length === 0) && 
+            {(!docsBooking?.documentUrls || docsBooking.documentUrls.length === 0) &&
              (!(docsBooking as any)?.treatmentChartUrls || ((docsBooking as any)?.treatmentChartUrls as string[])?.length === 0) && (
-              <p className="text-center text-muted-foreground py-4">No documents uploaded</p>
+              <p className="text-center text-muted-foreground py-8">No documents uploaded for this booking.</p>
             )}
           </div>
-          <DialogFooter>
+          <DialogFooter className="shrink-0">
             <Button onClick={() => setShowDocsDialog(false)}>Close</Button>
           </DialogFooter>
         </DialogContent>

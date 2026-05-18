@@ -19,6 +19,8 @@ import {
   ScanLine,
   Clock,
   TrendingUp,
+  Image,
+  ExternalLink,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -134,6 +136,79 @@ function PatientDetailsDialog({
   );
 }
 
+function getFileExt(url: string): string {
+  return (url.split(".").pop() ?? "").toLowerCase().split("?")[0];
+}
+function isImageFile(url: string): boolean {
+  return ["jpg", "jpeg", "png", "webp", "gif", "bmp"].includes(getFileExt(url));
+}
+function getFileName(url: string): string {
+  try {
+    const parts = url.split("/");
+    return decodeURIComponent(parts[parts.length - 1] ?? url).split("?")[0];
+  } catch {
+    return url;
+  }
+}
+
+function InlineFileViewer({ url, label }: { url: string; label: string }) {
+  const image = isImageFile(url);
+  const isPdf = getFileExt(url) === "pdf";
+  const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
+
+  return (
+    <div className="mb-4 last:mb-0">
+      <div className="flex items-center justify-between mb-1.5 gap-2">
+        <div className="flex items-center gap-1.5 min-w-0">
+          {image
+            ? <Image className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+            : <FileText className="h-3.5 w-3.5 text-muted-foreground shrink-0" />}
+          <span className="text-xs text-muted-foreground truncate">{label}</span>
+        </div>
+        <a
+          href={url}
+          target="_blank"
+          rel="noreferrer"
+          className="shrink-0 text-muted-foreground hover:text-primary transition-colors"
+          title="Open in new tab"
+        >
+          <ExternalLink className="h-3.5 w-3.5" />
+        </a>
+      </div>
+      {image ? (
+        <img
+          src={url}
+          alt={label}
+          className="w-full rounded border object-contain max-h-[500px] bg-muted"
+          data-testid={`img-file-viewer-${label}`}
+        />
+      ) : isPdf && isMobile ? (
+        <a
+          href={url}
+          target="_blank"
+          rel="noreferrer"
+          className="flex items-center gap-3 w-full rounded border bg-muted/40 px-4 py-3 hover:bg-muted/70 transition-colors"
+        >
+          <FileText className="h-8 w-8 text-red-500 shrink-0" />
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-medium truncate">{label}</p>
+            <p className="text-xs text-muted-foreground">Tap to open PDF</p>
+          </div>
+          <ExternalLink className="h-4 w-4 text-muted-foreground shrink-0" />
+        </a>
+      ) : (
+        <iframe
+          src={url}
+          title={label}
+          className="w-full rounded border bg-white"
+          style={{ height: "480px" }}
+          data-testid={`iframe-file-viewer-${label}`}
+        />
+      )}
+    </div>
+  );
+}
+
 function FileListDialog({
   title,
   urls,
@@ -146,25 +221,13 @@ function FileListDialog({
   return (
     <Dialog>
       <DialogTrigger asChild>{trigger}</DialogTrigger>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
+      <DialogContent className="max-w-2xl max-h-[88vh] flex flex-col">
+        <DialogHeader className="shrink-0">
           <DialogTitle>{title}</DialogTitle>
         </DialogHeader>
-        <div className="space-y-2 pt-2">
+        <div className="overflow-y-auto flex-1 pt-2 pr-1">
           {urls.map((url, i) => (
-            <a
-              key={i}
-              href={url}
-              target="_blank"
-              rel="noopener noreferrer"
-              download
-              className="flex items-center gap-2 rounded-lg border p-3 text-sm hover:bg-muted/50 transition-colors"
-            >
-              <Download className="h-4 w-4 shrink-0 text-muted-foreground" />
-              <span className="truncate text-primary underline-offset-2 hover:underline">
-                File {i + 1}
-              </span>
-            </a>
+            <InlineFileViewer key={url + i} url={url} label={getFileName(url)} />
           ))}
         </div>
       </DialogContent>
