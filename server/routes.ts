@@ -1542,6 +1542,10 @@ export async function registerRoutes(
       // Try to serve the existing stored file first
       const storedRelPath = (booking as any).prescriptionPdfUrl as string | null;
       if (storedRelPath) {
+        // Remote URL (Supabase Storage) — redirect the browser to it
+        if (/^https?:\/\//i.test(storedRelPath)) {
+          return res.redirect(storedRelPath);
+        }
         const absPath = path.join(process.cwd(), storedRelPath);
         if (fs.existsSync(absPath)) {
           const safeName = `prescription-${(booking as any).bookingNumber || booking.id}.pdf`;
@@ -1600,6 +1604,11 @@ export async function registerRoutes(
       const newPdfUrl = await generateAndStorePrescriptionPdf(pdfData, baseUrl);
       // Persist the newly regenerated URL so future downloads are fast
       await storage.updateBooking(booking.id, { prescriptionPdfUrl: newPdfUrl } as any);
+
+      // Remote URL (Supabase Storage) — redirect
+      if (/^https?:\/\//i.test(newPdfUrl)) {
+        return res.redirect(newPdfUrl);
+      }
 
       const newAbsPath = path.join(process.cwd(), newPdfUrl);
       const safeName = `prescription-${(booking as any).bookingNumber || booking.id}.pdf`;
