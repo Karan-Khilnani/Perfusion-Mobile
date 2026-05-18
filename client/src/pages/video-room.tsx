@@ -41,6 +41,7 @@ export default function VideoRoomPage() {
   const [ringingSeconds, setRingingSeconds] = useState(0);
   const [showSummaryDialog, setShowSummaryDialog] = useState(false);
   const [mobilePanel, setMobilePanel] = useState<MobilePanel>("video");
+  const mobilePanelRef = useRef<MobilePanel>("video");
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
   const [pipPos, setPipPos] = useState({ bottom: 80, right: 12 });
   const touchStartXRef = useRef<number>(0);
@@ -287,20 +288,22 @@ export default function VideoRoomPage() {
   const handleTouchEnd = (e: React.TouchEvent) => {
     const dx = e.changedTouches[0].clientX - touchStartXRef.current;
     const dy = e.changedTouches[0].clientY - touchStartYRef.current;
-    // Ignore if too small or if mostly vertical (user is scrolling)
-    if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy) * 1.2) return;
+    // Ignore if too small or mostly vertical — use ref to avoid stale closure
+    if (Math.abs(dx) < 35 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
 
-    if (dx > 0) {
-      // Swiped right → show docs (or go back to video if on summary)
-      switchPanel(mobilePanel === "summary" ? "video" : "docs");
+    const current = mobilePanelRef.current;
+    if (dx < 0) {
+      // Swiped LEFT → reports/docs panel (matches right-side button)
+      switchPanel(current === "summary" ? "video" : "docs");
     } else {
-      // Swiped left → show summary (or go back to video if on docs)
-      switchPanel(mobilePanel === "docs" ? "video" : "summary");
+      // Swiped RIGHT → summary panel (matches left-side button)
+      switchPanel(current === "docs" ? "video" : "summary");
     }
   };
 
-  // Switch panel and reset PiP position when returning to video
+  // Switch panel, keep ref in sync, and reset PiP position when returning to video
   const switchPanel = (panel: MobilePanel) => {
+    mobilePanelRef.current = panel;
     if (panel === "video") setPipPos({ bottom: 80, right: 12 });
     setMobilePanel(panel);
   };
@@ -630,6 +633,7 @@ export default function VideoRoomPage() {
               transition: "transform 0.35s cubic-bezier(0.4,0,0.2,1)",
               background: "var(--background)",
               overflowY: "auto",
+              touchAction: "pan-y",
             }}
           >
             <div className="px-3 pt-3 pb-1 flex items-center gap-2 text-sm font-medium text-muted-foreground">
@@ -663,6 +667,7 @@ export default function VideoRoomPage() {
                 transition: "transform 0.35s cubic-bezier(0.4,0,0.2,1)",
                 background: "var(--background)",
                 overflowY: "auto",
+                touchAction: "pan-y",
               }}
             >
               <div className="px-3 pt-3 pb-1 flex items-center gap-2 text-sm font-medium text-muted-foreground">
