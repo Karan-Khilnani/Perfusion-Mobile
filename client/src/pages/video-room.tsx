@@ -74,6 +74,11 @@ export default function VideoRoomPage() {
     enabled: !!roomId,
   });
 
+  // Fetch the currently logged-in user so we can show their real name in the call
+  const { data: authUser } = useQuery<{ firstName?: string; lastName?: string; email?: string }>({
+    queryKey: ["/api/auth/user"],
+  });
+
   const getDailyUrl = () => {
     if (!roomId) return null;
     const decoded = decodeURIComponent(roomId);
@@ -99,9 +104,12 @@ export default function VideoRoomPage() {
     }
   };
 
-  const callDisplayName = isProvider
-    ? (booking?.serviceName || "")
-    : ((booking as any)?.onCallDoctorName || onCallDoctorName);
+  // Always use the logged-in user's own name so each participant sees their
+  // real identity in the Daily.co call, regardless of what is stored on the booking.
+  const callDisplayName =
+    `${authUser?.firstName || ""} ${authUser?.lastName || ""}`.trim() ||
+    authUser?.email ||
+    "";
 
   // Mobile detection with resize listener
   useEffect(() => {
