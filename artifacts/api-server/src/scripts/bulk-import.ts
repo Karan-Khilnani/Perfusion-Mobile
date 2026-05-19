@@ -1,11 +1,14 @@
 import fs from "fs";
 import path from "path";
+import { fileURLToPath } from "url";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const PROVIDER_ID = "8bcae973-ea30-49d9-a062-8f3e4c88e162";
 const API_URL = process.env.API_URL || "http://localhost:5000";
 
 async function main() {
-  const testDataPath = path.join(process.cwd(), "server/data/ganga-lab-tests.json");
+  const testDataPath = path.join(__dirname, "../data/ganga-lab-tests.json");
   const importTests: { name: string; price: number }[] = JSON.parse(fs.readFileSync(testDataPath, "utf-8"));
   console.log(`Loaded ${importTests.length} tests from JSON file`);
 

@@ -148,7 +148,6 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
-  // Auth is set up in app.ts — only register auth routes here
   registerAuthRoutes(app);
 
   // User Role Management
