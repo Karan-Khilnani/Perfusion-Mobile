@@ -41,6 +41,7 @@ function getFileName(url: string): string {
 
 function InlineDocument({ url, label }: { url: string; label: string }) {
   const image = isImageFile(url);
+  const isPdf = getFileExt(url) === "pdf";
   const isMobile = useIsMobile();
   const [imgError, setImgError] = useState(false);
   const [fileOk, setFileOk] = useState<boolean | null>(null);
@@ -71,6 +72,25 @@ function InlineDocument({ url, label }: { url: string; label: string }) {
     </a>
   );
 
+  const MobilePdfPreview = () => (
+    <a
+      href={url}
+      target="_blank"
+      rel="noreferrer"
+      className="flex items-center gap-3 w-full rounded border bg-card px-4 py-4 hover:bg-muted/40 transition-colors"
+      data-testid={`link-mobile-pdf-${label}`}
+    >
+      <div className="h-12 w-10 rounded bg-primary/10 flex items-center justify-center shrink-0">
+        <FileText className="h-6 w-6 text-primary" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-medium truncate">{label}</p>
+        <p className="text-xs text-muted-foreground">Tap to open PDF</p>
+      </div>
+      <ExternalLink className="h-4 w-4 text-muted-foreground shrink-0" />
+    </a>
+  );
+
   return (
     <>
       <div className="mb-4 last:mb-0">
@@ -84,14 +104,16 @@ function InlineDocument({ url, label }: { url: string; label: string }) {
             <span className="text-xs text-muted-foreground truncate">{label}</span>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <button
-              onClick={() => setMaximized(true)}
-              className="text-muted-foreground hover:text-primary transition-colors"
-              title="Open fullscreen"
-              data-testid={`button-maximize-${label}`}
-            >
-              <Maximize2 className="h-3.5 w-3.5" />
-            </button>
+            {!(isMobile && isPdf) && (
+              <button
+                onClick={() => setMaximized(true)}
+                className="text-muted-foreground hover:text-primary transition-colors"
+                title="Open fullscreen"
+                data-testid={`button-maximize-${label}`}
+              >
+                <Maximize2 className="h-3.5 w-3.5" />
+              </button>
+            )}
             <a
               href={url}
               target="_blank"
@@ -121,13 +143,15 @@ function InlineDocument({ url, label }: { url: string; label: string }) {
         ) : fileOk === false ? (
           <FallbackCard reason="File not available on this server — tap to open directly" />
         ) : fileOk === null ? (
-          <div className="w-full rounded border bg-muted/30 animate-pulse" style={{ height: isMobile ? 380 : 500 }} />
+          <div className="w-full rounded border bg-muted/30 animate-pulse" style={{ height: isMobile && isPdf ? 140 : 500 }} />
+        ) : isMobile && isPdf ? (
+          <MobilePdfPreview />
         ) : (
           <iframe
             src={url}
             title={label}
             className="w-full rounded border bg-white"
-            style={{ height: isMobile ? 380 : 500 }}
+            style={{ height: 500 }}
             data-testid={`iframe-clinical-doc-${label}`}
           />
         )}
