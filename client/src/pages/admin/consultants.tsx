@@ -229,6 +229,7 @@ export default function AdminConsultantsPage() {
         registeredOrganization: editRegOrg || undefined,
         affiliatedInstitution: editAffiliation || undefined,
         portfolio: data.portfolio ?? "",
+        contactPhone: data.contactPhone || null,
         ...(registrationDocumentUrl ? { registrationDocumentUrl } : {}),
       });
     },
