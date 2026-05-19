@@ -1,0 +1,8 @@
+uploads = []
+outputs = []
+
+[[generated]]
+id = "VZDLgiWFUOpe8U-TpHPZI"
+uri = "file://artifacts/perfusion-mobile/assets/images/icon.png"
+type = "image"
+title = "perfusion app icon"

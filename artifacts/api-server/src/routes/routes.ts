@@ -19,6 +19,7 @@ import { processReport, type BookingReportData } from "../services/report-proces
 import { generateAndStorePrescriptionPdf, type PrescriptionPdfData } from "../services/prescription-pdf";
 import { sendPushNotification, getVapidPublicKey, type PushPayload } from "../services/push-notifications";
 import { getCallWindow } from "../services/call-window";
+import { Expo, type ExpoPushMessage } from "expo-server-sdk";
 
 // Daily.co API helper
 async function createDailyRoom(roomName: string): Promise<{ url: string; name: string } | null> {
@@ -3959,6 +3960,64 @@ export async function registerRoutes(
     }
   });
 
+  // ─── Mobile Push Token Registration ──────────────────────────────────────
+  app.post("/api/push/mobile-token", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) return res.status(401).json({ error: "Not authenticated" });
+      const { token, platform } = req.body;
+      if (!token || !platform) return res.status(400).json({ error: "Missing token or platform" });
+      const { getPool } = await import("./db");
+      const pool = getPool();
+      await pool.query(
+        `INSERT INTO mobile_push_tokens (user_id, token, platform, updated_at)
+         VALUES ($1, $2, $3, now())
+         ON CONFLICT (token) DO UPDATE SET user_id = $1, platform = $3, updated_at = now()`,
+        [userId, token, platform]
+      );
+      res.json({ success: true });
+    } catch (error) {
+      console.error("[MobilePush] Register error:", error);
+      res.status(500).json({ error: "Failed to register token" });
+    }
+  });
+
+  app.delete("/api/push/mobile-token", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) return res.status(401).json({ error: "Not authenticated" });
+      const { token } = req.body;
+      if (!token) return res.status(400).json({ error: "Missing token" });
+      const { getPool } = await import("./db");
+      const pool = getPool();
+      await pool.query(`DELETE FROM mobile_push_tokens WHERE token = $1 AND user_id = $2`, [token, userId]);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to remove token" });
+    }
+  });
+
+  // ─── Incoming call poll endpoint for mobile app ───────────────────────────
+  app.get("/api/call/incoming", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) return res.status(401).json({ error: "Not authenticated" });
+      const sessions = await storage.getActiveCallSessionsForRecipient(userId);
+      const session = sessions.find(s => s.status === "ringing");
+      if (!session) return res.json(null);
+      res.json({
+        bookingId: session.bookingId,
+        callerName: session.callerName,
+        callerRole: session.callerRole,
+        videoRoomUrl: session.videoRoomUrl,
+        serviceName: session.serviceName,
+        subtitle: session.subtitle,
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch incoming call" });
+    }
+  });
+
   // ─── Call Session State (DB-backed — shared across all autoscale instances) ──
   const sseClients = new Map<string, Set<any>>(); // key = userId → set of res objects
 
@@ -4150,6 +4209,52 @@ export async function registerRoutes(
             storage.deletePushSubscription(recipientUserId, sub.endpoint).catch(() => {});
           }
         }).catch(() => {});
+      }
+
+      // Send Expo push notification to mobile devices
+      try {
+        const { getPool } = await import("./db");
+        const pool = getPool();
+        const tokenRows = await pool.query(
+          `SELECT token FROM mobile_push_tokens WHERE user_id = $1`,
+          [recipientUserId]
+        );
+        if (tokenRows.rows.length > 0) {
+          const expo = new Expo();
+          const messages: ExpoPushMessage[] = tokenRows.rows
+            .filter((r: any) => Expo.isExpoPushToken(r.token))
+            .map((r: any) => ({
+              to: r.token,
+              sound: "default" as const,
+              title: "Incoming Consultation",
+              body: subtitle,
+              data: {
+                type: "incoming_call",
+                bookingId,
+                callerName,
+                callerRole,
+                videoRoomUrl,
+                subtitle,
+              },
+              priority: "high" as const,
+            }));
+          const chunks = expo.chunkPushNotifications(messages);
+          for (const chunk of chunks) {
+            expo.sendPushNotificationsAsync(chunk).then((receipts) => {
+              receipts.forEach((receipt, i) => {
+                if (receipt.status === "error") {
+                  console.error(`[MobilePush] Error sending to ${messages[i]?.to}:`, receipt.message);
+                  if (receipt.details?.error === "DeviceNotRegistered") {
+                    pool.query(`DELETE FROM mobile_push_tokens WHERE token = $1`, [messages[i]?.to]).catch(() => {});
+                  }
+                }
+              });
+            }).catch((err) => console.error("[MobilePush] Chunk send error:", err));
+          }
+          console.log(`[Ring] Sent Expo push to ${messages.length} mobile device(s) for user ${recipientUserId}`);
+        }
+      } catch (pushErr) {
+        console.error("[MobilePush] Failed to send Expo push:", pushErr);
       }
 
       res.json({ success: true, session: { bookingId, status: "ringing" } });

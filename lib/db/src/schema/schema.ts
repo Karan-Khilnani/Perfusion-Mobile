@@ -469,6 +469,20 @@ export const callSessionsTable = pgTable("call_sessions", {
 export type DbCallSession = typeof callSessionsTable.$inferSelect;
 export type InsertDbCallSession = typeof callSessionsTable.$inferInsert;
 
+// Mobile push tokens for FCM/APNs (Expo push)
+export const mobilePushTokens = pgTable("mobile_push_tokens", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  token: text("token").notNull(),
+  platform: varchar("platform", { length: 10 }).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertMobilePushTokenSchema = createInsertSchema(mobilePushTokens).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertMobilePushToken = z.infer<typeof insertMobilePushTokenSchema>;
+export type MobilePushToken = typeof mobilePushTokens.$inferSelect;
+
 // Search/filter types
 export interface LabSearchParams {
   location?: string;
