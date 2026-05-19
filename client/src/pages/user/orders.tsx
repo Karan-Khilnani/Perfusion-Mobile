@@ -19,6 +19,8 @@ import { useToast } from "@/hooks/use-toast";
 import type { Booking, BookingType } from "@shared/schema";
 import { format, differenceInDays } from "date-fns";
 import { useLocation } from "wouter";
+import { useEffect, useRef } from "react";
+import { ExternalLink, Image as ImageIcon } from "lucide-react";
 
 const typeIcons: Record<BookingType, typeof FlaskConical> = {
   lab: FlaskConical,
@@ -43,6 +45,96 @@ async function uploadFile(file: File): Promise<string> {
 
 function validUrls(urls: string[] | null | undefined): string[] {
   return (urls || []).filter((u) => u && u !== "undefined" && u !== "null");
+}
+
+function getFileExt(url: string): string {
+  return (url.split(".").pop() ?? "").toLowerCase().split("?")[0];
+}
+
+function isImageFile(url: string): boolean {
+  return ["jpg", "jpeg", "png", "webp", "gif", "bmp"].includes(getFileExt(url));
+}
+
+function getFileName(url: string): string {
+  try {
+    const parts = url.split("/");
+    const raw = decodeURIComponent(parts[parts.length - 1] ?? url);
+    return raw.split("?")[0];
+  } catch {
+    return url;
+  }
+}
+
+function InlineDocument({ url, label }: { url: string; label: string }) {
+  const image = isImageFile(url);
+  const [imgError, setImgError] = useState(false);
+  const [fileOk, setFileOk] = useState<boolean | null>(null);
+  const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
+
+  useEffect(() => {
+    if (image) return;
+    setFileOk(null);
+    fetch(url, { method: "HEAD", credentials: "include" })
+      .then(r => setFileOk(r.ok))
+      .catch(() => setFileOk(false));
+  }, [url, image]);
+
+  const FallbackCard = ({ reason }: { reason: string }) => (
+    <a
+      href={url}
+      target="_blank"
+      rel="noreferrer"
+      className="flex items-center gap-3 w-full rounded border bg-muted/40 px-4 py-3 hover:bg-muted/70 transition-colors"
+    >
+      <FileText className="h-8 w-8 text-muted-foreground shrink-0" />
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-medium truncate">{label}</p>
+        <p className="text-xs text-muted-foreground">{reason}</p>
+      </div>
+      <ExternalLink className="h-4 w-4 text-muted-foreground shrink-0" />
+    </a>
+  );
+
+  return (
+    <div className="mb-3 last:mb-0">
+      <div className="flex items-center justify-between mb-1.5 gap-2">
+        <div className="flex items-center gap-1.5 min-w-0">
+          {image
+            ? <ImageIcon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+            : <FileText className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+          }
+          <span className="text-xs text-muted-foreground truncate">{label}</span>
+        </div>
+        <a href={url} target="_blank" rel="noreferrer" className="shrink-0 text-muted-foreground hover:text-primary transition-colors" title="Open in new tab">
+          <ExternalLink className="h-3.5 w-3.5" />
+        </a>
+      </div>
+
+      {image ? (
+        imgError ? (
+          <FallbackCard reason="Image unavailable — tap to open directly" />
+        ) : (
+          <img
+            src={url}
+            alt={label}
+            className="w-full rounded border object-contain max-h-[600px] bg-muted"
+            onError={() => setImgError(true)}
+          />
+        )
+      ) : fileOk === false ? (
+        <FallbackCard reason="File unavailable — tap to open directly" />
+      ) : fileOk === null ? (
+        <div className="w-full rounded border bg-muted/30 animate-pulse" style={{ height: isMobile ? 380 : 500 }} />
+      ) : (
+        <iframe
+          src={url}
+          title={label}
+          className="w-full rounded border bg-white"
+          style={{ height: isMobile ? 380 : 500 }}
+        />
+      )}
+    </div>
+  );
 }
 
 export default function OrdersPage() {
@@ -332,49 +424,25 @@ export default function OrdersPage() {
 
         {validUrls(booking.documentUrls).length > 0 && (
           <div className="rounded-lg border p-4">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 mb-3">
               <FileText className="h-5 w-5 text-muted-foreground" />
               <span className="font-medium">Uploaded Reports</span>
             </div>
-            <div className="mt-3 space-y-2">
-              {validUrls(booking.documentUrls).map((url, i) => (
-                <a 
-                  key={i} 
-                  href={url} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-2 text-sm text-primary hover:underline"
-                  data-testid={`link-document-${i}`}
-                >
-                  <FileText className="h-4 w-4" />
-                  Report {i + 1}
-                </a>
-              ))}
-            </div>
+            {validUrls(booking.documentUrls).map((url, i) => (
+              <InlineDocument key={i} url={url} label={getFileName(url) || `Report ${i + 1}`} />
+            ))}
           </div>
         )}
 
         {validUrls((booking as any).treatmentChartUrls).length > 0 && (
           <div className="rounded-lg border p-4">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 mb-3">
               <Paperclip className="h-5 w-5 text-muted-foreground" />
               <span className="font-medium">Treatment Charts</span>
             </div>
-            <div className="mt-3 space-y-2">
-              {validUrls((booking as any).treatmentChartUrls).map((url, i) => (
-                <a 
-                  key={i} 
-                  href={url} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-2 text-sm text-primary hover:underline"
-                  data-testid={`link-treatment-chart-${i}`}
-                >
-                  <FileText className="h-4 w-4" />
-                  Treatment Chart {i + 1}
-                </a>
-              ))}
-            </div>
+            {validUrls((booking as any).treatmentChartUrls).map((url, i) => (
+              <InlineDocument key={i} url={url} label={getFileName(url) || `Treatment Chart ${i + 1}`} />
+            ))}
           </div>
         )}
 
@@ -494,24 +562,19 @@ export default function OrdersPage() {
 
         {booking.reportUrl && (
           <div className="rounded-lg border border-green-500/20 bg-green-500/5 p-4">
-            <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
+            <div className="flex items-center gap-2 text-green-600 dark:text-green-400 mb-1">
               <FileText className="h-5 w-5" />
               <span className="font-medium">Report Available</span>
             </div>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Your report is ready for download
-            </p>
             {booking.reportNotes && (
-              <p className="mt-2 text-sm italic text-muted-foreground">
+              <p className="mb-3 text-sm italic text-muted-foreground">
                 Provider notes: {booking.reportNotes}
               </p>
             )}
-            <a href={booking.processedReportUrl || booking.reportUrl} target="_blank" rel="noopener noreferrer">
-              <Button className="mt-3" variant="default" data-testid="button-download-report">
-                <Download className="mr-2 h-4 w-4" />
-                Download Report
-              </Button>
-            </a>
+            <InlineDocument
+              url={booking.processedReportUrl || booking.reportUrl}
+              label={getFileName(booking.processedReportUrl || booking.reportUrl) || "Report"}
+            />
           </div>
         )}
 
