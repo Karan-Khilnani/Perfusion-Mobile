@@ -1,7 +1,8 @@
 import { useRef, useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ClipboardList, ExternalLink, Upload, Loader2, FileText, Image, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ClipboardList, ExternalLink, Upload, Loader2, FileText, Image, AlertTriangle, CheckCircle2, Maximize2 } from "lucide-react";
 import type { Booking } from "@shared/schema";
 
 function useIsMobile() {
@@ -42,11 +43,11 @@ function InlineDocument({ url, label }: { url: string; label: string }) {
   const image = isImageFile(url);
   const isMobile = useIsMobile();
   const [imgError, setImgError] = useState(false);
-  // null = checking, true = reachable, false = 404/error
   const [fileOk, setFileOk] = useState<boolean | null>(null);
+  const [maximized, setMaximized] = useState(false);
 
   useEffect(() => {
-    if (image) return; // images use onError instead
+    if (image) return;
     setFileOk(null);
     fetch(url, { method: "HEAD", credentials: "include" })
       .then(r => setFileOk(r.ok))
@@ -71,55 +72,109 @@ function InlineDocument({ url, label }: { url: string; label: string }) {
   );
 
   return (
-    <div className="mb-4 last:mb-0">
-      {/* Row: icon + name + open button */}
-      <div className="flex items-center justify-between mb-1.5 gap-2">
-        <div className="flex items-center gap-1.5 min-w-0">
-          {image
-            ? <Image className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-            : <FileText className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-          }
-          <span className="text-xs text-muted-foreground truncate">{label}</span>
+    <>
+      <div className="mb-4 last:mb-0">
+        {/* Row: icon + name + action buttons */}
+        <div className="flex items-center justify-between mb-1.5 gap-2">
+          <div className="flex items-center gap-1.5 min-w-0">
+            {image
+              ? <Image className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+              : <FileText className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+            }
+            <span className="text-xs text-muted-foreground truncate">{label}</span>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={() => setMaximized(true)}
+              className="text-muted-foreground hover:text-primary transition-colors"
+              title="Open fullscreen"
+              data-testid={`button-maximize-${label}`}
+            >
+              <Maximize2 className="h-3.5 w-3.5" />
+            </button>
+            <a
+              href={url}
+              target="_blank"
+              rel="noreferrer"
+              className="text-muted-foreground hover:text-primary transition-colors"
+              title="Open in new tab"
+            >
+              <ExternalLink className="h-3.5 w-3.5" />
+            </a>
+          </div>
         </div>
-        <a
-          href={url}
-          target="_blank"
-          rel="noreferrer"
-          className="shrink-0 text-muted-foreground hover:text-primary transition-colors"
-          title="Open in new tab"
-        >
-          <ExternalLink className="h-3.5 w-3.5" />
-        </a>
+
+        {/* Inline preview */}
+        {image ? (
+          imgError ? (
+            <FallbackCard reason="Image not available on this server — tap to open directly" />
+          ) : (
+            <img
+              src={url}
+              alt={label}
+              className="w-full rounded border object-contain max-h-[600px] bg-muted cursor-pointer"
+              onError={() => setImgError(true)}
+              onClick={() => setMaximized(true)}
+              data-testid={`img-clinical-doc-${label}`}
+            />
+          )
+        ) : fileOk === false ? (
+          <FallbackCard reason="File not available on this server — tap to open directly" />
+        ) : fileOk === null ? (
+          <div className="w-full rounded border bg-muted/30 animate-pulse" style={{ height: isMobile ? 380 : 500 }} />
+        ) : (
+          <iframe
+            src={url}
+            title={label}
+            className="w-full rounded border bg-white"
+            style={{ height: isMobile ? 380 : 500 }}
+            data-testid={`iframe-clinical-doc-${label}`}
+          />
+        )}
       </div>
 
-      {/* Content */}
-      {image ? (
-        imgError ? (
-          <FallbackCard reason="Image not available on this server — tap to open directly" />
-        ) : (
-          <img
-            src={url}
-            alt={label}
-            className="w-full rounded border object-contain max-h-[600px] bg-muted"
-            onError={() => setImgError(true)}
-            data-testid={`img-clinical-doc-${label}`}
-          />
-        )
-      ) : fileOk === false ? (
-        <FallbackCard reason="File not available on this server — tap to open directly" />
-      ) : fileOk === null ? (
-        /* Checking availability — show a subtle skeleton placeholder */
-        <div className="w-full rounded border bg-muted/30 animate-pulse" style={{ height: isMobile ? 380 : 500 }} />
-      ) : (
-        <iframe
-          src={url}
-          title={label}
-          className="w-full rounded border bg-white"
-          style={{ height: isMobile ? 380 : 500 }}
-          data-testid={`iframe-clinical-doc-${label}`}
-        />
-      )}
-    </div>
+      {/* Fullscreen dialog — works on all mobile browsers */}
+      <Dialog open={maximized} onOpenChange={setMaximized}>
+        <DialogContent className="max-w-none w-screen h-[100dvh] p-0 flex flex-col gap-0 rounded-none">
+          <DialogHeader className="px-4 py-2 border-b flex-row items-center justify-between shrink-0">
+            <DialogTitle className="text-sm font-medium truncate pr-8">{label}</DialogTitle>
+            <a
+              href={url}
+              target="_blank"
+              rel="noreferrer"
+              className="text-muted-foreground hover:text-primary transition-colors shrink-0"
+              title="Open in new tab"
+            >
+              <ExternalLink className="h-4 w-4" />
+            </a>
+          </DialogHeader>
+          <div className="flex-1 overflow-auto bg-muted/20">
+            {image ? (
+              <img
+                src={url}
+                alt={label}
+                className="w-full h-full object-contain"
+              />
+            ) : (
+              <>
+                <iframe
+                  src={url}
+                  title={label}
+                  className="w-full h-full bg-white"
+                  style={{ minHeight: "calc(100dvh - 52px)" }}
+                />
+                <p className="text-xs text-center text-muted-foreground py-2">
+                  PDF not loading?{" "}
+                  <a href={url} target="_blank" rel="noreferrer" className="text-primary underline">
+                    Open directly
+                  </a>
+                </p>
+              </>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 

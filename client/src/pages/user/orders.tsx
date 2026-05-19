@@ -20,7 +20,7 @@ import type { Booking, BookingType } from "@shared/schema";
 import { format, differenceInDays } from "date-fns";
 import { useLocation } from "wouter";
 import { useEffect, useRef } from "react";
-import { ExternalLink, Image as ImageIcon } from "lucide-react";
+import { ExternalLink, Image as ImageIcon, Maximize2 } from "lucide-react";
 
 const typeIcons: Record<BookingType, typeof FlaskConical> = {
   lab: FlaskConical,
@@ -67,9 +67,10 @@ function getFileName(url: string): string {
 
 function InlineDocument({ url, label }: { url: string; label: string }) {
   const image = isImageFile(url);
+  const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
   const [imgError, setImgError] = useState(false);
   const [fileOk, setFileOk] = useState<boolean | null>(null);
-  const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
+  const [maximized, setMaximized] = useState(false);
 
   useEffect(() => {
     if (image) return;
@@ -96,44 +97,99 @@ function InlineDocument({ url, label }: { url: string; label: string }) {
   );
 
   return (
-    <div className="mb-3 last:mb-0">
-      <div className="flex items-center justify-between mb-1.5 gap-2">
-        <div className="flex items-center gap-1.5 min-w-0">
-          {image
-            ? <ImageIcon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-            : <FileText className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-          }
-          <span className="text-xs text-muted-foreground truncate">{label}</span>
+    <>
+      <div className="mb-3 last:mb-0">
+        <div className="flex items-center justify-between mb-1.5 gap-2">
+          <div className="flex items-center gap-1.5 min-w-0">
+            {image
+              ? <ImageIcon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+              : <FileText className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+            }
+            <span className="text-xs text-muted-foreground truncate">{label}</span>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={() => setMaximized(true)}
+              className="text-muted-foreground hover:text-primary transition-colors"
+              title="Open fullscreen"
+              data-testid={`button-maximize-doc-${label}`}
+            >
+              <Maximize2 className="h-3.5 w-3.5" />
+            </button>
+            <a href={url} target="_blank" rel="noreferrer" className="text-muted-foreground hover:text-primary transition-colors" title="Open in new tab">
+              <ExternalLink className="h-3.5 w-3.5" />
+            </a>
+          </div>
         </div>
-        <a href={url} target="_blank" rel="noreferrer" className="shrink-0 text-muted-foreground hover:text-primary transition-colors" title="Open in new tab">
-          <ExternalLink className="h-3.5 w-3.5" />
-        </a>
+
+        {image ? (
+          imgError ? (
+            <FallbackCard reason="Image unavailable — tap to open directly" />
+          ) : (
+            <img
+              src={url}
+              alt={label}
+              className="w-full rounded border object-contain max-h-[600px] bg-muted cursor-pointer"
+              onError={() => setImgError(true)}
+              onClick={() => setMaximized(true)}
+            />
+          )
+        ) : fileOk === false ? (
+          <FallbackCard reason="File unavailable — tap to open directly" />
+        ) : fileOk === null ? (
+          <div className="w-full rounded border bg-muted/30 animate-pulse" style={{ height: isMobile ? 380 : 500 }} />
+        ) : (
+          <iframe
+            src={url}
+            title={label}
+            className="w-full rounded border bg-white"
+            style={{ height: isMobile ? 380 : 500 }}
+          />
+        )}
       </div>
 
-      {image ? (
-        imgError ? (
-          <FallbackCard reason="Image unavailable — tap to open directly" />
-        ) : (
-          <img
-            src={url}
-            alt={label}
-            className="w-full rounded border object-contain max-h-[600px] bg-muted"
-            onError={() => setImgError(true)}
-          />
-        )
-      ) : fileOk === false ? (
-        <FallbackCard reason="File unavailable — tap to open directly" />
-      ) : fileOk === null ? (
-        <div className="w-full rounded border bg-muted/30 animate-pulse" style={{ height: isMobile ? 380 : 500 }} />
-      ) : (
-        <iframe
-          src={url}
-          title={label}
-          className="w-full rounded border bg-white"
-          style={{ height: isMobile ? 380 : 500 }}
-        />
-      )}
-    </div>
+      {/* Fullscreen dialog — works on all mobile browsers */}
+      <Dialog open={maximized} onOpenChange={setMaximized}>
+        <DialogContent className="max-w-none w-screen h-[100dvh] p-0 flex flex-col gap-0 rounded-none">
+          <DialogHeader className="px-4 py-2 border-b flex-row items-center justify-between shrink-0">
+            <DialogTitle className="text-sm font-medium truncate pr-8">{label}</DialogTitle>
+            <a
+              href={url}
+              target="_blank"
+              rel="noreferrer"
+              className="text-muted-foreground hover:text-primary transition-colors shrink-0"
+              title="Open in new tab"
+            >
+              <ExternalLink className="h-4 w-4" />
+            </a>
+          </DialogHeader>
+          <div className="flex-1 overflow-auto bg-muted/20">
+            {image ? (
+              <img
+                src={url}
+                alt={label}
+                className="w-full h-full object-contain"
+              />
+            ) : (
+              <>
+                <iframe
+                  src={url}
+                  title={label}
+                  className="w-full h-full bg-white"
+                  style={{ minHeight: "calc(100dvh - 52px)" }}
+                />
+                <p className="text-xs text-center text-muted-foreground py-2">
+                  PDF not loading?{" "}
+                  <a href={url} target="_blank" rel="noreferrer" className="text-primary underline">
+                    Open directly
+                  </a>
+                </p>
+              </>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
