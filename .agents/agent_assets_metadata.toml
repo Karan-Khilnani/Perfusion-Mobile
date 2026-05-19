@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "nwNd3RmOLkyv77HNa2BBF"
+uri = "https://nduibdqykwlvwlmltbhe.supabase.co/storage/v1/object/public/perfusion-uploads/prescriptions/1779193294591-191216759.pdf"
+type = "pdf"
+title = "Consultation Summary — Sample Preview"
