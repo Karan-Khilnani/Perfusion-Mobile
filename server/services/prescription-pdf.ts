@@ -129,8 +129,12 @@ function drawMultilineText(page: PDFPage, text: string, y: number, font: PDFFont
 }
 
 async function loadLogoBytes(): Promise<Uint8Array | null> {
-  const logoPath = path.join(process.cwd(), "attached_assets", "Pitchdeck_logo_1769590061051.png");
-  if (fs.existsSync(logoPath)) return fs.readFileSync(logoPath);
+  // Prefer the rusty-red logo (dark grey + red, transparent BG — visible on light headers)
+  const preferred = path.join(process.cwd(), "attached_assets", "Perfusion_rusty_red_logo_transparent_1779192329721.png");
+  if (fs.existsSync(preferred)) return fs.readFileSync(preferred);
+  // Fallback to older logo
+  const fallback = path.join(process.cwd(), "attached_assets", "Pitchdeck_logo_1769590061051.png");
+  if (fs.existsSync(fallback)) return fs.readFileSync(fallback);
   return null;
 }
 
@@ -191,14 +195,16 @@ export async function generateAndStorePrescriptionPdf(data: PrescriptionPdfData,
     console.error("[ConsultationSummaryPDF] Failed to generate QR code:", err);
   }
 
-  // Logo (left side of header) — shows in full colour on the light background
+  // Logo (left side of header) — shows in full colour on the light background.
+  // The rusty-red logo is 3:2 (1536×1024) with padding around the mark,
+  // so we render it tall to let the mark fill the header band properly.
   const logoBytes = await loadLogoBytes();
   if (logoBytes) {
     try {
       const logo = await doc.embedPng(logoBytes);
-      const lh = 44;
+      const lh = HEADER_H - 4; // nearly full header height; 2px breathing room top & bottom
       const lw = lh * (logo.width / logo.height);
-      page.drawImage(logo, { x: MARGIN, y: PAGE_H - HEADER_H + (HEADER_H - lh) / 2, width: lw, height: lh });
+      page.drawImage(logo, { x: MARGIN - 8, y: PAGE_H - HEADER_H + 2, width: lw, height: lh });
     } catch (err) {
       console.error("[ConsultationSummaryPDF] Failed to embed logo:", err);
       page.drawText("Perfusion Health Pvt Ltd", { x: MARGIN, y: PAGE_H - 45, size: 14, font: fontBold, color: RED });
