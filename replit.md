@@ -1,93 +1,67 @@
-# Perfusion Healthcare Platform
+# Perfusion
 
-## Overview
+A live healthcare platform connecting remote patients with labs, consultants, and radiology services across India.
 
-Perfusion is a healthcare operations platform designed to connect resource-limited hospitals with diagnostic labs, specialists, and critical care services. It offers three core services: Super Speciality Consultations (video consultations), Lab Tests (diagnostic test catalog with booking), and Teleradiology Reporting (medical imaging interpretation). The platform uses INR (₹) currency, features role-based access (Admin, Provider, Care Seeker), and comprehensive admin controls for managing services. It includes a robust billing and financial system with a pay-per-use model, Razorpay integration for payments, and a B2B registration approval workflow for hospitals. Key features also include Twilio-based voice call and WhatsApp notifications, an emergency teams feature for urgent consultations, a prescription generation system, and a PWA call ringing system for video consultations. Custom booking number format: `PHC/YYYY-YY/MM/X00000` (financial year, financial month, type letter L/C/R + sequence). Generator at `server/services/booking-number.ts`, sequence tracked in `booking_sequences` table. Pricing follows Provider Base Cost → Admin Margin/Price Override → Customer Price. `server/services/pricing.ts` handles price calculation. `customerPrice` and `marginOverride` fields on `lab_tests`, `consultants`, `emergency_teams` allow per-service admin overrides; global `default_margin_percent` in platform_settings is fallback. Seeker catalog only shows tests with active provider assignments. The platform aims to improve healthcare accessibility by leveraging technology to bridge geographical gaps.
+## Run & Operate
 
-## User Preferences
+- `pnpm --filter @workspace/api-server run dev` — run the API server (port from env)
+- `pnpm --filter @workspace/perfusion-web run dev` — run the frontend (port from env)
+- `pnpm run typecheck` — full typecheck across all packages
+- `pnpm run build` — typecheck + build all packages
+- `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
+- Required env: `DATABASE_URL` — Postgres connection string
 
-Preferred communication style: Simple, everyday language.
+## Stack
 
-## System Architecture
+- pnpm workspaces, Node.js 24, TypeScript 5.9
+- API: Express 5
+- DB: PostgreSQL + Drizzle ORM
+- Auth: Session-based (express-session + connect-pg-simple) + Google OAuth (passport-google-oauth20)
+- Validation: Zod (zod/v4), drizzle-zod
+- Frontend: React 18 + Vite + Tailwind CSS v3
+- Build: esbuild (CJS bundle for server)
 
-### Frontend Architecture
-- **Framework**: React with TypeScript, using Vite.
-- **Routing**: Wouter for client-side routing.
-- **State Management**: TanStack React Query for server state and caching.
-- **UI Components**: shadcn/ui built on Radix UI primitives.
-- **Styling**: Tailwind CSS with CSS custom properties for theming (light/dark mode).
-- **Design System**: System-based approach following Material Design principles.
+## Where things live
 
-### Backend Architecture
-- **Runtime**: Node.js with Express.
-- **Language**: TypeScript with ES modules.
-- **API Pattern**: RESTful JSON API.
-- **Authentication**: Replit Auth using OpenID Connect with Passport.js, session-based management.
-- **Core Features**: Twilio for voice/WhatsApp notifications, Resend for email verification, Multer for file uploads, Jitsi Meet for video conferencing, Razorpay for payment processing.
+- `artifacts/api-server/` — Express backend (auth, routes, services, storage)
+- `artifacts/api-server/src/routes/routes.ts` — all API routes (4000+ lines, `registerRoutes(httpServer, app)`)
+- `artifacts/api-server/src/auth/` — session auth + Google OAuth
+- `artifacts/api-server/src/services/` — msg91, supabase-storage, push-notifications, pricing, report-processor, prescription-pdf, etc.
+- `artifacts/perfusion-web/` — React frontend
+- `artifacts/perfusion-web/src/shared/` — type-only schema/models used by frontend
+- `lib/db/src/schema/` — Drizzle schema (schema.ts + models/auth.ts)
 
-### Data Storage
-- **Database**: PostgreSQL.
-- **ORM**: Drizzle ORM with drizzle-zod for schema validation.
-- **Key Entities**: Users, Sessions, Providers, Labs, Lab Tests, Consultants, Hospitals, Critical Care Doctors, Bookings, Emergency Teams, Platform Settings, Audit Logs.
+## Architecture decisions
 
-### Project Structure
-- `client/`: React frontend.
-- `server/`: Express backend.
-- `shared/`: Shared types and schemas.
-- `migrations/`: Database migrations.
+- Routes are kept as `registerRoutes(httpServer, app)` (not converted to Express Router) due to SSE streaming and complex middleware dependencies.
+- Frontend uses existing `apiRequest` fetch layer instead of generated OpenAPI hooks (too many endpoints for safe port).
+- `@shared` alias in frontend points to `artifacts/perfusion-web/src/shared/` — type-only copies of the schema, no DB connection.
+- Frontend is Tailwind v3 (original used v3 with PostCSS, not v4 plugin).
+- Incremental DB migrations run at startup via raw pool queries for columns added after schema creation.
 
-## External Dependencies
+## Product
 
-### Database
-- **PostgreSQL**: Primary database for all application data.
+Full healthcare platform with:
+- Care seeker portal: book lab tests, consultations, teleradiology
+- Provider portal: manage bookings, services, billing
+- Admin portal: users, providers, approvals, analytics, diagnostics
+- Google OAuth + email/password registration with admin approval flow
+- Real-time consultation video rooms (Daily.co)
+- Push notifications, SMS/voice via MSG91/Twilio
+- Razorpay payments, PDF reports, prescriptions
 
-### Authentication
-- **Replit Auth**: OpenID Connect provider.
-- **Google OAuth 2.0**: For Google Sign-In.
+## User preferences
 
-### Communication & Payments
-- **Twilio**: For automated voice calls and WhatsApp notifications.
-- **Resend**: For email verification services.
-- **Razorpay**: For payment gateway integration.
-- **Jitsi Meet**: Embedded for video consultations.
+_Populate as you build — explicit user instructions worth remembering across sessions._
 
-### Key NPM Packages
-- **UI**: Radix UI, Tailwind CSS, class-variance-authority.
-- **Data**: Drizzle ORM, @tanstack/react-query, zod.
-- **Auth**: passport, openid-client, express-session, connect-pg-simple.
-- **Utilities**: date-fns, lucide-react, wouter.
-- **PDF Processing**: pdf-lib (PDF manipulation), qrcode (QR code generation).
+## Gotchas
 
-## Prescription Medicolegal Safety System
+- `registerRoutes` must receive the `httpServer` (not just `app`) for SSE connections.
+- DB schema has `@shared` alias in frontend pointing to local type-only stubs — do NOT import from `@workspace/db` in frontend code (it imports DB connection code).
+- `@tailwindcss/vite` was removed from perfusion-web; uses postcss with tailwindcss@3 + autoprefixer.
+- `contact_phone` on consultants and `reminder_fired_at` on bookings are also in the schema; incremental migration at startup is for safety only.
+- Always run both workflows: api-server AND perfusion-web.
 
-Consultants can create, draft, and permanently confirm prescriptions for consultation bookings:
+## Pointers
 
-1. **Draft Mode**: Providers fill diagnosis, physician notes, treatment plan, and follow-up; click "Save Draft" to persist without locking
-2. **Confirm & Sign**: One-click confirmation that permanently locks the prescription — writes audit log with IP, timestamp, and consultant identity; generates a server-side frozen PDF
-3. **Server-side Frozen PDF**: `server/services/prescription-pdf.ts` uses pdf-lib to generate branded PDFs with QR code linking to public verification URL, approval seal, consultant credentials, legal disclaimer, and page footers; stored in `uploads/prescriptions/`
-4. **Public Verification**: `/verify/prescription/:bookingId` — no auth required; shows consultant details, patient name, confirmation timestamp, and download link for the signed PDF
-5. **Audit Trail**: `PRESCRIPTION_CONFIRMED` audit log entry with consultant name/reg no, patient name, approver IP, timestamp, and PDF URL
-6. **UI States**: BookingRow shows "Signed & Locked" green badge + "Download PDF" when approved; shows "Edit Draft" + "Draft PDF" when unsaved; prescription dialog shows locked read-only view when approved
-
-Key fields on `bookings` table: `prescriptionApprovedAt`, `prescriptionApprovedByUserId`, `prescriptionApproverIp`, `prescriptionOtpVerified`, `prescriptionPdfUrl`
-
-## PWA Call Ringing System
-
-When a consultation booking's "Join Call" is clicked, a WhatsApp-style ringing flow starts:
-1. **PWA Setup**: `client/public/manifest.json` + `client/public/sw.js` make the portal installable and enable background push notifications. Service worker registered in `client/index.html`.
-2. **Push Subscriptions**: `push_subscriptions` DB table stores per-user Web Push subscriptions. VAPID keys stored in env vars (`VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`). `web-push` npm package used. Endpoints: `GET /api/push/vapid-public-key`, `POST /api/push/subscribe`, `DELETE /api/push/unsubscribe`.
-3. **Permission Prompt**: `client/src/components/call-provider.tsx` wraps app globally, prompts for notification permission on login, subscribes via `client/src/lib/push-subscription.ts`.
-4. **Call Flow**: Person A clicks Join Call → pre-call form (seeker only) → `POST /api/call/ring/:bookingId` → server sends push notification + SSE event to Person B → Person B sees incoming call overlay or receives push notification → accept/decline → Daily.co video room loads.
-5. **Real-time Events**: SSE endpoint `GET /api/call-events` broadcasts call events (ringing, accepted, declined, timeout) between parties. In-memory `callSessions` Map tracks state. Auto-timeout at 65s.
-6. **Incoming Call UI**: `client/src/components/incoming-call-overlay.tsx` — full-screen ringing overlay with ringtone (Web Audio API oscillator), Accept/Decline buttons.
-7. **Caller Waiting Screen**: `client/src/pages/video-room.tsx` shows ringing animation + counter while waiting for other party; shows declined/timeout screens with retry option.
-
-## Report Processing
-
-When a provider lab uploads a report and sets booking status to `report_ready`, the system automatically processes the report:
-1. **Cover Page**: A branded Perfusion cover page is prepended with patient info, test details, lab name, QR verification code, and disclaimer
-2. **Footer**: A Perfusion-branded footer is added to every page of the original report (logo, tagline, contact, booking ref)
-3. **Original Untouched**: The original report body/header/signatures remain completely unchanged
-4. **Storage**: Processed PDF saved as `processedReportUrl` on the booking (original preserved as `reportUrl`)
-5. **Delivery**: Processed PDF attached to WhatsApp notifications (admin + seeker) via Twilio `mediaUrl`
-6. Service: `server/services/report-processor.ts`, uses pdf-lib for PDF creation/manipulation
+- See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details

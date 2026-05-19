@@ -1,0 +1,232 @@
+Build a functional MVP web portal for a healthcare platform called Perfusion, designed to connect resource-limited hospitals with diagnostic labs, specialists, and critical care services.
+
+Tech Expectations
+
+Use a modern frontend framework (React / Next.js preferred)
+
+Use basic backend logic (Node/Express or built-in Replit backend)
+
+Use mock database / in-memory data (JSON or simple DB)
+
+Payment flow can be mocked (simulate payment success)
+
+Authentication should be real (email/password) but can be simple
+
+Do NOT create static UI or dummy buttons
+
+1. Homepage (Landing Page)
+
+Full-width banner with healthcare imagery and storytelling text
+
+Clear headline explaining Perfusion’s mission (connecting remote healthcare)
+
+ONLY two clickable options on homepage:
+
+User Portal
+
+Service Provider Portal
+
+No other navigation buttons or menus on homepage
+
+2. User Portal Flow
+A. Authentication
+
+User must Sign Up or Login
+
+After login, user sees dashboard with 3 service modules:
+
+Labs
+
+Consultation
+
+Critical Care
+
+B. Lab Services Module
+
+Search Page
+
+User selects:
+
+Location (city / district dropdown)
+
+Lab test (searchable input)
+
+On search, show list of labs offering that test
+
+Lab Listing Results
+Each lab card must display:
+
+Lab name
+
+Turnaround time (TAT)
+
+Cost
+
+Accuracy rating (1–5)
+
+“Book Test” button
+
+Filters & Sorting
+
+Sort by:
+
+Cost
+
+Turnaround time
+
+Accuracy rating
+
+Filters must work dynamically
+
+Booking Flow
+
+On “Book Test”, open booking page
+
+Form fields:
+
+Patient name
+
+Age
+
+Provisional diagnosis
+
+Ordering physician name
+
+Proceed to Payment Page
+
+Simulate payment success
+
+Generate booking receipt
+
+Order Tracking
+
+Booking appears in user Account / Orders page
+
+Status examples:
+
+Booked
+
+Sample Collected
+
+Processing
+
+Report Ready
+
+C. Consultation Module
+
+Consultant Listing
+Each consultant card must show:
+
+Name
+
+Qualification
+
+Years of experience
+
+Rating
+
+Consultation fee
+
+Available slots
+
+Filters
+
+Sort by:
+
+Rating
+
+Cost
+
+Slot availability
+
+Booking Flow
+
+Select consultant → select slot
+
+Enter:
+
+Patient name
+
+Age
+
+Ordering physician
+
+Payment page → receipt
+
+Booking visible in user account
+
+D. Critical Care Module
+
+List Doctors and Hospitals
+
+Doctor cards show:
+
+Name
+
+Qualification
+
+Experience
+
+Response time
+
+Rating
+
+Hospital cards show:
+
+Hospital name
+
+Team strength (ICU capability indicator)
+
+Emergency response time
+
+Rating
+
+Booking flow similar to consultation
+
+Purpose: emergency decision support and escalation
+
+3. Service Provider Portal
+
+Separate login for providers.
+
+Provider Types:
+
+Diagnostic Labs
+
+Consultants / Doctors
+
+Hospitals (Critical Care)
+
+Provider Dashboard Features:
+
+Profile management
+
+Service listing management
+
+Pricing & availability
+
+Incoming booking requests
+
+Order status updates
+
+View completed services
+
+Providers should see only their relevant bookings.
+
+4. General Requirements
+
+All navigation must work
+
+All forms must submit data
+
+All bookings must persist during session
+
+Use clean, professional healthcare UI
+
+Avoid placeholder-only UI
+
+Do NOT generate a poster-style site
+
+Final Note to Builder
+
+This is a healthcare operations MVP, not a marketing website. Prioritize workflow, logic, and data movement over animations.

@@ -1,0 +1,140 @@
+Modify the existing Perfusion web portal.
+Do NOT regenerate the project.
+Do NOT change existing authentication, routing, or core structure.
+
+The application must remain deployable on AWS (EC2 / ECS / Elastic Beanstalk) without errors.
+Do not use Replit-only features or vendor lock-in.
+
+1. SEEKER SERVICES — SCOPE CHANGE
+
+Modify seeker services to ONLY these three:
+
+Super Speciality Consultation
+
+Lab Tests
+
+Teleradiology Reporting
+
+Remove or hide any other seeker services.
+
+2. SUPER SPECIALITY CONSULTATION — ADDITIONS
+
+After a consultation slot is booked:
+
+Show a patient details form with:
+
+Patient name
+
+Age
+
+Gender
+
+Clinical summary
+
+Provisional diagnosis
+
+Contact number
+
+Document upload (PDF / image)
+
+Allow editing of this form until consultation time.
+
+Video Consultation
+
+At consultation time, seeker and consultant must join a video call embedded inside the portal UI.
+
+Video is via a third-party provider (Zoom / Google Meet / similar).
+
+The video must:
+
+Open inside the portal (iframe or SDK)
+
+Not redirect to a new tab or external page
+
+3. LAB TESTS — LOGIC CHANGE
+
+Do NOT list lab service providers.
+
+Directly list lab tests.
+
+Assume a single internal lab backend.
+
+Each lab test must have:
+
+Name
+
+Category
+
+Price
+
+Status (Active / Paused / Deleted)
+
+Only Active tests are visible to seekers.
+
+4. TELERADIOLOGY — SIMPLE FLOW
+
+Booking form with:
+
+Patient details
+
+Radiology modality dropdown
+
+Emergency / Routine selection
+
+Upload images / DICOM / ZIP
+
+Do NOT attach any price to teleradiology.
+
+Modalities have:
+
+Name
+
+Status (Active / Paused / Deleted)
+
+Only Active modalities appear in seeker dropdown.
+
+5. ADMIN CONTROLS — ADD
+
+Admin must be able to:
+
+Add, pause, or delete consultant accounts
+
+Add, pause, or delete lab tests
+
+Add, pause, or delete radiology modalities
+
+Paused:
+
+Hidden from seeker
+
+Existing records remain
+
+Deleted:
+
+Removed from active use
+
+Historical records preserved
+
+6. INITIAL BULK DATA (ONE-TIME)
+
+Read lab tests and prices from the uploaded Excel file and seed lab test master data.
+
+Read the uploaded teleradiology document and extract only modality names.
+
+Ignore all radiology prices completely.
+
+Treat this as seed data, editable later via admin panel.
+
+Do not hardcode this data.
+
+HARD RULES (CRITICAL)
+
+Do not rename existing tables.
+
+Do not regenerate files.
+
+Do not add new services or features.
+
+Do not introduce Replit-specific dependencies.
+
+Ensure clean AWS deployment compatibility.

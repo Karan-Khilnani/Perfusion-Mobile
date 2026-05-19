@@ -1,0 +1,151 @@
+# PERFUSION – PAYMENT, BILLING & FINANCE (FINAL SPEC)
+
+## 1. Billing Model
+
+* Pay-per-use only:
+
+  * Lab tests
+  * Teleconsultations
+  * Teleradiology
+* No subscriptions
+
+---
+
+## 2. Pricing Logic
+
+* Provider sets base price
+* Perfusion adds margin
+
+  * Default margin auto-applied
+  * Admin can edit margin
+  * Admin can manually edit final price
+* Final price = base price + margin
+* Price locked at booking
+
+---
+
+## 3. Invoice & Payment
+
+* Invoice generated for every service
+* Payment options:
+
+  * Pay Now
+  * Pay Later
+* Default Pay Later tenure = 1 month
+* Partial payment allowed
+* Full payment must be completed within 1 month billing cycle
+
+---
+
+## 4. Service Disruption
+
+* If invoice not fully paid within 1 month:
+
+  * Account automatically disabled
+* Admin can:
+
+  * Disable anytime
+  * Extend due date
+  * Re-enable after payment or override
+
+---
+
+## 5. Money Split & Settlement
+
+* Provider receives base price
+* Perfusion retains margin
+* Provider payout only after customer payment
+
+---
+
+## 6. Billing Section (For All Roles)
+
+Common section name: Billing
+
+### Provider (Lab / Doctor / Radiologist)
+
+* Invoices for delivered services
+* Revenue earned (base price)
+* Paid vs pending
+* Date range filter
+* Export PDF / Excel
+
+### Seeker Hospital
+
+* Invoices for services consumed
+* Total cost incurred
+* Paid / outstanding
+* Due dates
+* Pay now / pay later
+
+### Admin (Perfusion)
+
+* All invoices
+* Payment status
+* Outstanding & overdue
+* Disable / enable accounts
+* Manual payment entry
+
+---
+
+## 7. Reports Section
+
+* Downloadable PDF / Excel
+* Date range filter
+* Role-based visibility
+
+---
+
+## 8. Analytics Section (Admin Only)
+
+Date-range based analysis:
+
+* Gross revenue
+* Provider payout
+* Net revenue / profit
+* Revenue & profit:
+
+  * Per seeker hospital
+  * Per provider
+  * Per service type
+  * Per lab test / doctor / radiology study
+* Outstanding & overdue analysis
+* Disabled accounts due to non-payment
+* Export PDF / Excel
+
+---
+
+## 9. Date Filters
+
+* All billing, reports, analytics:
+
+  * From date
+  * To date
+* Based on service date
+
+---
+
+## 10. Audit & Safety
+
+* Price locked per order
+* All admin actions logged:
+
+  * Price changes
+  * Due date changes
+  * Manual payments
+  * Account disable/enable
+
+---
+
+## 11. Sidebar Structure
+
+### Provider / Seeker
+
+* Billing
+* Reports
+
+### Admin
+
+* Billing
+* Reports
+* Analytics

@@ -1,57 +1,28 @@
-modules = ["nodejs-20", "web", "python-3.11", "postgresql-16"]
-run = "npm run dev"
-hidden = [".config", ".git", "generated-icon.png", "node_modules", "dist"]
-
-[nix]
-channel = "stable-24_05"
-
-[[ports]]
-localPort = 5000
-externalPort = 80
-
-[env]
-PORT = "5000"
+modules = ["nodejs-24", "python-3.11"]
 
 [deployment]
+router = "application"
 deploymentTarget = "autoscale"
-run = ["node", "./dist/index.cjs"]
-build = ["npm", "run", "build"]
+
+[deployment.postBuild]
+args = ["pnpm", "store", "prune"]
+env = { "CI" = "true" }
 
 [workflows]
 runButton = "Project"
 
-[[workflows.workflow]]
-name = "Project"
-mode = "parallel"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "Start application"
-
-[[workflows.workflow]]
-name = "Start application"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "npm run dev"
-waitForPort = 5000
-
 [agent]
-integrations = ["javascript_log_in_with_replit:2.0.0", "javascript_database:1.0.0"]
-
-[userenv]
-
-[userenv.shared]
-ADMIN_PHONE_NUMBER = "7869647941"
-TWILIO_ACCOUNT_SID = "AC1d7850488efae7704c8156c5f4ee95ba"
-TWILIO_AUTH_TOKEN = "53da86ff4c059dba4f381efab22fe77a"
-TWILIO_PHONE_NUMBER = "+19522990552"
-TWILIO_WHATSAPP_NUMBER = "+919244893295"
-VAPID_PUBLIC_KEY = "BMAvbcQdHB32SI5pWl0lhM4XLhyDVOkzvaXV9Sr1wgv-Kx0YM2TWl-Zrc4yYYyp7cLOiIO31zQdxfhomKqAd1yU"
-VAPID_EMAIL = "mailto:admin@perfusion.health"
+stack = "PNPM_WORKSPACE"
+expertMode = true
 
 [postMerge]
 path = "scripts/post-merge.sh"
 timeoutMs = 20000
+
+[[ports]]
+localPort = 8080
+externalPort = 8080
+
+[[ports]]
+localPort = 24725
+externalPort = 3000

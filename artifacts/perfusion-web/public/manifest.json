@@ -1,0 +1,20 @@
+{
+  "name": "Perfusion Healthcare",
+  "short_name": "Perfusion",
+  "description": "B2B Healthcare Operations Platform",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#2563eb",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/favicon.png",
+      "sizes": "any",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["medical", "health"],
+  "lang": "en"
+}

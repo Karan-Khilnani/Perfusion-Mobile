@@ -1,0 +1,62 @@
+Replit, currently our landing page only have login display and not a informating marketing visuals. What we need to do is make one new landing page for perfusion and current homepage will be directed from that landing page when someone clicks on button 'Enter perfusion'. So this landing page will be new rest whole webportal will remain same. Now about this landing page, we need to create something really premium, proffessional but creative. On top, first look we can use this india map i created on right side and on left side perfusion logo will be there with tagline. Then another highlighting we can use there "Replit, currently our landing page only have login display and not a informating marketing visuals. What we need to do is make one new landing page for perfusion and current homepage will be directed from that landing page when someone clicks on button 'Enter perfusion'. So this landing page will be new rest whole webportal will remain same. Now about this landing page, we need to create something really premium, proffessional but creative. On top, first look we can use this india map i created on right side and on left side perfusion logo will be there with tagline (connecting remote healthcare). Then another line will be highlighted "Because geography shouldn’t decide survival". ". One crucial challenging thing you need to do here but do it proffessionaly, you have to make a little motion like image here where one artery like vessel moving through our india map and finally connecting to our perfusion logo on left side of the page. that vessel will travel through india and end in perfusion underlining it and then again back.
+
+So after this top part, we'll scrol down for next part where this will be explained through visuals or graphic (you decide) how perfusion act as platform to connect peripheral hospitals to mainstream healthcare through, Superspeciality consultations, advanced diagnositics from door pick up and Teleradiology
+
+then scrolling down we'll show how perfusion offers Bedside assistance for critically ill patients 
+
+Scrolling down - Clinicians led platform, who understands importance of delayed investigations and inaccurate reporting. Offering Earliest turn around time and High quality reporting.
+
+Then put this somewhere where you feel right
+Call 9244893295 to book a demo
+
+Contact details section
+Address – Sundernagar, Raipur (CG)
+Email – mail@perfusionhealth.in 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+1. Perfusion logo is too small. Need 2 to 3 times larger 
+2. Artery running is nice but something is missing. Path should be more aligned with map and perfusion, its not reaching perfusion and underlining lying seperately far from perfusion logo which should also be curved manner rather than straight line 
+3. Bridging the gap part should not be box box like. Create some vector graphics, like perfusion platform in between other two sides, remote hospitals and mainstream healthcare
+
+4. Services offered should be separated from above section and may be you should use some photos or graphics here. Platform looks monotonous and non creative, everything box box text text. Visitors should feel the services.
+
+5. Try photos, 3ds, graphics content landing page should be more creative. Background should match with otherpages of our site. If you want put some textured background or whatever looks best, but all pages whole portal should have one kind of background. Also like whole site landing page should also have bright and dark swiches
+
+6. In bedside support, do not write so much of stuff like 24 x 7 support and all because currently we are not offering that. We just wanted to highlight its for in patient, critically ill patients, bedside is kind of marketing persuading. So write less stuf make them feel more with visuals
+
+7. Built by clinicans for clinicians line was awesome but again no box box thing. Think some creative thing

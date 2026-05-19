@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "Perfusion Web"
+version = "1.0.0"
+id = "artifacts/perfusion-web"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 24725
+
+[services.development]
+run = "pnpm --filter @workspace/perfusion-web run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/perfusion-web", "run", "build" ]
+publicDir = "artifacts/perfusion-web/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "24725"
+BASE_PATH = "/"
