@@ -166,14 +166,19 @@ export async function generateAndStorePrescriptionPdf(data: PrescriptionPdfData,
   pages.push(page);
 
   // ── Header band ──────────────────────────────────────────────────────────────
-  // 80px tall red band. QR code sits inside the band on the far right.
+  // Light off-white header so the logo (which has red in it) shows clearly.
   const HEADER_H = 80;
-  page.drawRectangle({ x: 0, y: PAGE_H - HEADER_H, width: PAGE_W, height: HEADER_H, color: RED });
+  // Off-white background
+  page.drawRectangle({ x: 0, y: PAGE_H - HEADER_H, width: PAGE_W, height: HEADER_H, color: rgb(0.98, 0.975, 0.97) });
+  // 3-pt red accent stripe along the very top edge
+  page.drawRectangle({ x: 0, y: PAGE_H - 3, width: PAGE_W, height: 3, color: RED });
+  // Thin separator line at the bottom of the header
+  page.drawLine({ start: { x: 0, y: PAGE_H - HEADER_H }, end: { x: PAGE_W, y: PAGE_H - HEADER_H }, thickness: 0.75, color: LINE_COLOR });
 
-  // QR code inside header (right side), 56×56
+  // QR code (right side), 56×56
   const QR_SIZE = 56;
   const QR_X = PAGE_W - MARGIN - QR_SIZE;
-  const QR_Y = PAGE_H - HEADER_H + (HEADER_H - QR_SIZE) / 2; // vertically centred in header
+  const QR_Y = PAGE_H - HEADER_H + (HEADER_H - QR_SIZE) / 2;
 
   try {
     const qrBytes = await generateQRCodeBytes(verificationUrl);
@@ -181,38 +186,38 @@ export async function generateAndStorePrescriptionPdf(data: PrescriptionPdfData,
     page.drawImage(qrImg, { x: QR_X, y: QR_Y, width: QR_SIZE, height: QR_SIZE });
     const qrLabel = "Scan to verify";
     const qrLW = font.widthOfTextAtSize(qrLabel, 6.5);
-    page.drawText(qrLabel, { x: QR_X + (QR_SIZE - qrLW) / 2, y: PAGE_H - HEADER_H + 3, size: 6.5, font, color: rgb(1, 0.85, 0.85) });
+    page.drawText(qrLabel, { x: QR_X + (QR_SIZE - qrLW) / 2, y: PAGE_H - HEADER_H + 3, size: 6.5, font, color: LIGHT_GREY });
   } catch (err) {
     console.error("[ConsultationSummaryPDF] Failed to generate QR code:", err);
   }
 
-  // Logo (left side of header)
+  // Logo (left side of header) — shows in full colour on the light background
   const logoBytes = await loadLogoBytes();
   if (logoBytes) {
     try {
       const logo = await doc.embedPng(logoBytes);
-      const lh = 40;
+      const lh = 44;
       const lw = lh * (logo.width / logo.height);
       page.drawImage(logo, { x: MARGIN, y: PAGE_H - HEADER_H + (HEADER_H - lh) / 2, width: lw, height: lh });
     } catch (err) {
       console.error("[ConsultationSummaryPDF] Failed to embed logo:", err);
-      page.drawText("Perfusion Health Pvt Ltd", { x: MARGIN, y: PAGE_H - 45, size: 14, font: fontBold, color: WHITE });
+      page.drawText("Perfusion Health Pvt Ltd", { x: MARGIN, y: PAGE_H - 45, size: 14, font: fontBold, color: RED });
     }
   } else {
-    page.drawText("Perfusion Health Pvt Ltd", { x: MARGIN, y: PAGE_H - 45, size: 14, font: fontBold, color: WHITE });
+    page.drawText("Perfusion Health Pvt Ltd", { x: MARGIN, y: PAGE_H - 45, size: 14, font: fontBold, color: RED });
   }
 
-  // Title text block (right of logo, left of QR)
-  const titleTextX = PAGE_W - MARGIN - QR_SIZE - 14; // right-align before QR
+  // Title text block (right of logo, left of QR) — dark on light background
+  const titleTextX = PAGE_W - MARGIN - QR_SIZE - 14;
   const titleText = "Digital Speciality Consultation Summary";
   const titleW = fontBold.widthOfTextAtSize(titleText, 9.5);
-  page.drawText(titleText, { x: titleTextX - titleW, y: PAGE_H - 36, size: 9.5, font: fontBold, color: WHITE });
+  page.drawText(titleText, { x: titleTextX - titleW, y: PAGE_H - 36, size: 9.5, font: fontBold, color: DARK });
   const idText = sanitizeOneLine(`Summary ID: ${summaryId}`);
   const idW = font.widthOfTextAtSize(idText, 8);
-  page.drawText(idText, { x: titleTextX - idW, y: PAGE_H - 50, size: 8, font, color: rgb(1, 0.85, 0.85) });
+  page.drawText(idText, { x: titleTextX - idW, y: PAGE_H - 50, size: 8, font, color: GREY });
   const modeText = "Mode: Teleconsultation";
   const modeW = font.widthOfTextAtSize(modeText, 8);
-  page.drawText(modeText, { x: titleTextX - modeW, y: PAGE_H - 63, size: 8, font, color: rgb(1, 0.85, 0.85) });
+  page.drawText(modeText, { x: titleTextX - modeW, y: PAGE_H - 63, size: 8, font, color: GREY });
 
   let y = PAGE_H - HEADER_H - 16;
 
