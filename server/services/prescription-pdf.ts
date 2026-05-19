@@ -170,8 +170,8 @@ export async function generateAndStorePrescriptionPdf(data: PrescriptionPdfData,
   pages.push(page);
 
   // ── Header band ──────────────────────────────────────────────────────────────
-  // Light off-white header so the logo (which has red in it) shows clearly.
-  const HEADER_H = 80;
+  // Taller header (160pt) to accommodate the 2× logo.
+  const HEADER_H = 160;
   // Off-white background
   page.drawRectangle({ x: 0, y: PAGE_H - HEADER_H, width: PAGE_W, height: HEADER_H, color: rgb(0.98, 0.975, 0.97) });
   // 3-pt red accent stripe along the very top edge
@@ -179,8 +179,8 @@ export async function generateAndStorePrescriptionPdf(data: PrescriptionPdfData,
   // Thin separator line at the bottom of the header
   page.drawLine({ start: { x: 0, y: PAGE_H - HEADER_H }, end: { x: PAGE_W, y: PAGE_H - HEADER_H }, thickness: 0.75, color: LINE_COLOR });
 
-  // QR code (right side), 56×56
-  const QR_SIZE = 56;
+  // QR code (right side), 64×64 — slightly larger to balance taller header
+  const QR_SIZE = 64;
   const QR_X = PAGE_W - MARGIN - QR_SIZE;
   const QR_Y = PAGE_H - HEADER_H + (HEADER_H - QR_SIZE) / 2;
 
@@ -190,40 +190,39 @@ export async function generateAndStorePrescriptionPdf(data: PrescriptionPdfData,
     page.drawImage(qrImg, { x: QR_X, y: QR_Y, width: QR_SIZE, height: QR_SIZE });
     const qrLabel = "Scan to verify";
     const qrLW = font.widthOfTextAtSize(qrLabel, 6.5);
-    page.drawText(qrLabel, { x: QR_X + (QR_SIZE - qrLW) / 2, y: PAGE_H - HEADER_H + 3, size: 6.5, font, color: LIGHT_GREY });
+    page.drawText(qrLabel, { x: QR_X + (QR_SIZE - qrLW) / 2, y: PAGE_H - HEADER_H + 4, size: 6.5, font, color: LIGHT_GREY });
   } catch (err) {
     console.error("[ConsultationSummaryPDF] Failed to generate QR code:", err);
   }
 
-  // Logo (left side of header) — shows in full colour on the light background.
-  // The rusty-red logo is 3:2 (1536×1024) with padding around the mark,
-  // so we render it tall to let the mark fill the header band properly.
+  // Logo (left side of header) — 2× the previous rendered size.
+  // The rusty-red logo is 3:2 (1536×1024) with padding around the mark.
   const logoBytes = await loadLogoBytes();
   if (logoBytes) {
     try {
       const logo = await doc.embedPng(logoBytes);
-      const lh = HEADER_H - 4; // nearly full header height; 2px breathing room top & bottom
-      const lw = lh * (logo.width / logo.height);
-      page.drawImage(logo, { x: MARGIN - 8, y: PAGE_H - HEADER_H + 2, width: lw, height: lh });
+      const lh = HEADER_H - 8; // 152pt tall (2× the previous 76pt)
+      const lw = lh * (logo.width / logo.height); // 228pt wide
+      page.drawImage(logo, { x: MARGIN - 8, y: PAGE_H - HEADER_H + 4, width: lw, height: lh });
     } catch (err) {
       console.error("[ConsultationSummaryPDF] Failed to embed logo:", err);
-      page.drawText("Perfusion Health Pvt Ltd", { x: MARGIN, y: PAGE_H - 45, size: 14, font: fontBold, color: RED });
+      page.drawText("Perfusion Health Pvt Ltd", { x: MARGIN, y: PAGE_H - 85, size: 18, font: fontBold, color: RED });
     }
   } else {
-    page.drawText("Perfusion Health Pvt Ltd", { x: MARGIN, y: PAGE_H - 45, size: 14, font: fontBold, color: RED });
+    page.drawText("Perfusion Health Pvt Ltd", { x: MARGIN, y: PAGE_H - 85, size: 18, font: fontBold, color: RED });
   }
 
-  // Title text block (right of logo, left of QR) — dark on light background
+  // Title text block — vertically centred in the taller header (right of logo, left of QR)
   const titleTextX = PAGE_W - MARGIN - QR_SIZE - 14;
   const titleText = "Digital Speciality Consultation Summary";
   const titleW = fontBold.widthOfTextAtSize(titleText, 9.5);
-  page.drawText(titleText, { x: titleTextX - titleW, y: PAGE_H - 36, size: 9.5, font: fontBold, color: DARK });
+  page.drawText(titleText, { x: titleTextX - titleW, y: PAGE_H - 68, size: 9.5, font: fontBold, color: DARK });
   const idText = sanitizeOneLine(`Summary ID: ${summaryId}`);
   const idW = font.widthOfTextAtSize(idText, 8);
-  page.drawText(idText, { x: titleTextX - idW, y: PAGE_H - 50, size: 8, font, color: GREY });
+  page.drawText(idText, { x: titleTextX - idW, y: PAGE_H - 82, size: 8, font, color: GREY });
   const modeText = "Mode: Teleconsultation";
   const modeW = font.widthOfTextAtSize(modeText, 8);
-  page.drawText(modeText, { x: titleTextX - modeW, y: PAGE_H - 63, size: 8, font, color: GREY });
+  page.drawText(modeText, { x: titleTextX - modeW, y: PAGE_H - 95, size: 8, font, color: GREY });
 
   let y = PAGE_H - HEADER_H - 16;
 
