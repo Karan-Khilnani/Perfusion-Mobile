@@ -4606,10 +4606,15 @@ export async function registerRoutes(
       }
 
       const exotelUrl = `https://${exotelApiKey}:${exotelApiToken}@api.exotel.com/v1/Accounts/${exotelSid}/Calls/connect.json`;
+      const appDomain = process.env.REPLIT_DOMAINS?.split(",")[0];
+      const statusCallbackUrl = appDomain
+        ? `https://${appDomain}/api/webhooks/exotel/status`
+        : undefined;
       const params = new URLSearchParams({
         From: fromPhone,
         To: toPhone,
         CallerId: exotelVirtualNumber,
+        ...(statusCallbackUrl ? { StatusCallback: statusCallbackUrl } : {}),
       });
 
       let exotelCallSid: string | null = null;
@@ -4667,6 +4672,41 @@ export async function registerRoutes(
       res.json(result.rows);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch call logs" });
+    }
+  });
+
+  // ── Exotel status callback webhook ────────────────────────────────────────
+  // POST /api/webhooks/exotel/status — called by Exotel when a call ends
+  // Payload (form-encoded): CallSid, Status, Duration (seconds)
+  // Updates call_logs.status and call_logs.duration_seconds for the matching SID.
+  // This endpoint is intentionally unauthenticated (Exotel initiates the request).
+  app.post("/api/webhooks/exotel/status", async (req: any, res) => {
+    try {
+      const callSid = req.body?.CallSid as string | undefined;
+      const rawStatus = (req.body?.Status as string | undefined)?.toLowerCase();
+      const duration = req.body?.Duration !== undefined ? parseInt(req.body.Duration, 10) : null;
+
+      if (!callSid) {
+        return res.status(400).send("Missing CallSid");
+      }
+
+      const terminalStatus: "completed" | "failed" =
+        rawStatus === "completed" ? "completed" : "failed";
+
+      const durationSeconds = duration != null && !isNaN(duration) && duration >= 0 ? duration : null;
+
+      const pool = getPool();
+      await pool.query(
+        `UPDATE call_logs
+         SET status = $1, duration_seconds = COALESCE($2, duration_seconds)
+         WHERE exotel_call_sid = $3`,
+        [terminalStatus, durationSeconds, callSid]
+      );
+
+      return res.status(200).send("OK");
+    } catch (error) {
+      console.error("[Exotel webhook] Error processing status callback:", error);
+      return res.status(500).send("Error");
     }
   });
 
