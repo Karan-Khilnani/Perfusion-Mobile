@@ -55,11 +55,17 @@ async function startServer() {
       booking_id varchar NOT NULL,
       initiator_user_id varchar NOT NULL,
       caller_role varchar(20) NOT NULL,
+      caller_phone_masked varchar(30),
+      callee_phone_masked varchar(30),
       exotel_call_sid varchar(255),
       status varchar(50) NOT NULL DEFAULT 'initiated',
+      duration_seconds integer,
       created_at timestamptz DEFAULT now()
     )`);
     await pool.query(`CREATE INDEX IF NOT EXISTS call_logs_booking_idx ON call_logs(booking_id)`);
+    await pool.query(`ALTER TABLE call_logs ADD COLUMN IF NOT EXISTS caller_phone_masked varchar(30)`);
+    await pool.query(`ALTER TABLE call_logs ADD COLUMN IF NOT EXISTS callee_phone_masked varchar(30)`);
+    await pool.query(`ALTER TABLE call_logs ADD COLUMN IF NOT EXISTS duration_seconds integer`);
 
     // Register all routes
     await registerRoutes(httpServer, app);

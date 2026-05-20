@@ -300,6 +300,7 @@ function RevenueSection({ revenue, isLoading, label = "All earnings" }: { revenu
 
 function CallSeekerButton({ booking }: { booking: ActiveConsultation }) {
   const { toast } = useToast();
+  const canCall = (booking as any).status === "booked";
   const callMutation = useMutation({
     mutationFn: () => apiRequest("POST", `/api/bookings/${booking.id}/call`),
     onSuccess: () => {
@@ -314,7 +315,8 @@ function CallSeekerButton({ booking }: { booking: ActiveConsultation }) {
       variant="outline"
       className="w-full h-10 gap-2 rounded-xl text-sm overflow-hidden border-green-500/40 text-green-700 dark:text-green-400 hover:bg-green-500/5"
       onClick={() => callMutation.mutate()}
-      disabled={callMutation.isPending}
+      disabled={callMutation.isPending || !canCall}
+      title={!canCall ? "Calls are only available for active (booked) consultations" : undefined}
       data-testid={`button-call-seeker-${booking.id}`}
     >
       <Phone className="h-4 w-4 shrink-0" />

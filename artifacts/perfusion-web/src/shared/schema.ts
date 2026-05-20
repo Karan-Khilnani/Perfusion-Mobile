@@ -491,8 +491,11 @@ export const callLogs = pgTable("call_logs", {
   bookingId: varchar("booking_id").notNull(),
   initiatorUserId: varchar("initiator_user_id").notNull(),
   callerRole: varchar("caller_role", { length: 20 }).notNull(),
+  callerPhoneMasked: varchar("caller_phone_masked", { length: 30 }),
+  calleePhoneMasked: varchar("callee_phone_masked", { length: 30 }),
   exotelCallSid: varchar("exotel_call_sid", { length: 255 }),
   status: varchar("status", { length: 50 }).notNull().default("initiated").$type<CallLogStatus>(),
+  durationSeconds: integer("duration_seconds"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

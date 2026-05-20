@@ -402,8 +402,9 @@ export default function OrdersPage() {
     );
   };
 
-  const CallConsultantButton = ({ bookingId }: { bookingId: string }) => {
+  const CallConsultantButton = ({ bookingId, status }: { bookingId: string; status: string }) => {
     const { toast } = useToast();
+    const canCall = status === "booked";
     const callMutation = useMutation({
       mutationFn: () => apiRequest("POST", `/api/bookings/${bookingId}/call`),
       onSuccess: () => {
@@ -425,14 +426,17 @@ export default function OrdersPage() {
           <span className="font-medium">Phone Consultation</span>
         </div>
         <p className="mt-1 text-sm text-muted-foreground">
-          Calls your registered ward number and connects you with the consultant — numbers are masked for privacy
+          {canCall
+            ? "Calls your registered ward number and connects you with the consultant — numbers are masked for privacy"
+            : "Phone calls are only available for active (booked) consultations"}
         </p>
         <Button
           className="mt-3 gap-2"
           variant="outline"
           onClick={() => callMutation.mutate()}
-          disabled={callMutation.isPending}
+          disabled={callMutation.isPending || !canCall}
           data-testid="button-call-consultant"
+          title={!canCall ? "Calls are only available for active bookings" : undefined}
         >
           {callMutation.isPending ? (
             <><Phone className="h-4 w-4 animate-pulse" />Connecting…</>
@@ -559,8 +563,8 @@ export default function OrdersPage() {
           );
         })()}
 
-        {booking.bookingType === "consultation" && !["completed", "cancelled"].includes(booking.status) && (booking as any).callbackPhone && (
-          <CallConsultantButton bookingId={booking.id} />
+        {booking.bookingType === "consultation" && (booking as any).callbackPhone && (
+          <CallConsultantButton bookingId={booking.id} status={booking.status} />
         )}
 
         {validUrls(booking.documentUrls).length > 0 && (

@@ -861,13 +861,21 @@ export default function AdminBookingsPage() {
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-sm font-medium capitalize">{log.caller_role === "seeker" ? "Seeker → Consultant" : "Consultant → Seeker"}</span>
                     <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                      log.status === "initiated"
+                      log.status === "initiated" || log.status === "completed"
                         ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
                         : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
                     }`}>
                       {log.status}
                     </span>
                   </div>
+                  {(log.caller_phone_masked || log.callee_phone_masked) && (
+                    <p className="text-xs text-muted-foreground">
+                      {log.caller_phone_masked ?? "—"} → {log.callee_phone_masked ?? "—"}
+                    </p>
+                  )}
+                  {log.duration_seconds != null && (
+                    <p className="text-xs text-muted-foreground">Duration: {log.duration_seconds}s</p>
+                  )}
                   {log.exotel_call_sid && (
                     <p className="text-xs font-mono text-muted-foreground">SID: {log.exotel_call_sid}</p>
                   )}

@@ -4544,6 +4544,13 @@ export async function registerRoutes(
   // POST /api/bookings/:id/call — initiates a masked bridge call via Exotel
   // Seeker calls: From=callbackPhone → To=consultant contactPhone
   // Provider calls: From=consultant contactPhone → To=callbackPhone
+
+  function maskPhone(phone: string): string {
+    const digits = phone.replace(/\D/g, "");
+    if (digits.length <= 4) return "XXXX";
+    return "X".repeat(digits.length - 4) + digits.slice(-4);
+  }
+
   app.post("/api/bookings/:id/call", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user?.id;
@@ -4562,8 +4569,8 @@ export async function registerRoutes(
       if (booking.bookingType !== "consultation") {
         return res.status(400).json({ error: "Phone calls are only available for consultation bookings" });
       }
-      if (["completed", "cancelled"].includes(booking.status)) {
-        return res.status(400).json({ error: "Cannot call for a completed or cancelled booking" });
+      if (booking.status !== "booked") {
+        return res.status(400).json({ error: "Calls are only available for active (booked) consultations" });
       }
 
       const isSeeker = booking.userId === userId;
@@ -4630,8 +4637,9 @@ export async function registerRoutes(
 
       const pool = getPool();
       await pool.query(
-        `INSERT INTO call_logs (booking_id, initiator_user_id, caller_role, exotel_call_sid, status) VALUES ($1, $2, $3, $4, $5)`,
-        [id, userId, callerRole, exotelCallSid, callStatus]
+        `INSERT INTO call_logs (booking_id, initiator_user_id, caller_role, caller_phone_masked, callee_phone_masked, exotel_call_sid, status)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [id, userId, callerRole, maskPhone(fromPhone), maskPhone(toPhone), exotelCallSid, callStatus]
       );
 
       if (callStatus === "failed") {
@@ -4651,7 +4659,8 @@ export async function registerRoutes(
       const { id } = req.params;
       const pool = getPool();
       const result = await pool.query(
-        `SELECT id, booking_id, initiator_user_id, caller_role, exotel_call_sid, status, created_at
+        `SELECT id, booking_id, initiator_user_id, caller_role, caller_phone_masked, callee_phone_masked,
+                exotel_call_sid, status, duration_seconds, created_at
          FROM call_logs WHERE booking_id = $1 ORDER BY created_at DESC`,
         [id]
       );
