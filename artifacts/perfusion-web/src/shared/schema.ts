@@ -483,6 +483,21 @@ export const callSessionsTable = pgTable("call_sessions", {
 export type DbCallSession = typeof callSessionsTable.$inferSelect;
 export type InsertDbCallSession = typeof callSessionsTable.$inferInsert;
 
+// Call Logs — records of Exotel-bridged phone calls per booking
+export type CallLogStatus = "initiated" | "completed" | "failed";
+
+export const callLogs = pgTable("call_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  bookingId: varchar("booking_id").notNull(),
+  initiatorUserId: varchar("initiator_user_id").notNull(),
+  callerRole: varchar("caller_role", { length: 20 }).notNull(),
+  exotelCallSid: varchar("exotel_call_sid", { length: 255 }),
+  status: varchar("status", { length: 50 }).notNull().default("initiated").$type<CallLogStatus>(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export type CallLog = typeof callLogs.$inferSelect;
+
 // Search/filter types
 export interface LabSearchParams {
   location?: string;

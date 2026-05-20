@@ -5,7 +5,7 @@ import { setupAuth, isAuthenticated, isAdmin, isProvider, updateUserRole } from 
 import { registerAuthRoutes } from "../auth/routes";
 import type { BookingStatus, UserRole, ProviderType, ProviderStatus, ServiceStatus } from "@workspace/db";
 import { consultants, bookings } from "@workspace/db";
-import { db } from "../db";
+import { db, getPool } from "../db";
 import { eq, or, and, isNotNull, notInArray } from "drizzle-orm";
 import { fireOneBooking } from "../services/consultation-scheduler";
 import multer from "multer";
@@ -4537,6 +4537,127 @@ export async function registerRoutes(
       res.json({ success: true, extendedUntil });
     } catch (error) {
       res.status(500).json({ error: "Failed to extend call window" });
+    }
+  });
+
+  // ── Exotel bridge call ─────────────────────────────────────────────────────
+  // POST /api/bookings/:id/call — initiates a masked bridge call via Exotel
+  // Seeker calls: From=callbackPhone → To=consultant contactPhone
+  // Provider calls: From=consultant contactPhone → To=callbackPhone
+  app.post("/api/bookings/:id/call", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.id;
+      const { id } = req.params;
+
+      const exotelSid = process.env.EXOTEL_SID;
+      const exotelApiKey = process.env.EXOTEL_API_KEY;
+      const exotelApiToken = process.env.EXOTEL_API_TOKEN;
+      const exotelVirtualNumber = process.env.EXOTEL_VIRTUAL_NUMBER;
+      if (!exotelSid || !exotelApiKey || !exotelApiToken || !exotelVirtualNumber) {
+        return res.status(503).json({ error: "Phone call service is not configured on this instance." });
+      }
+
+      const booking = await storage.getBookingById(id);
+      if (!booking) return res.status(404).json({ error: "Booking not found" });
+      if (booking.bookingType !== "consultation") {
+        return res.status(400).json({ error: "Phone calls are only available for consultation bookings" });
+      }
+      if (["completed", "cancelled"].includes(booking.status)) {
+        return res.status(400).json({ error: "Cannot call for a completed or cancelled booking" });
+      }
+
+      const isSeeker = booking.userId === userId;
+      const provider = booking.providerId ? await storage.getProviderById(booking.providerId) : null;
+      const isProviderUser = provider?.userId === userId;
+
+      if (!isSeeker && !isProviderUser) {
+        return res.status(403).json({ error: "Not authorised" });
+      }
+
+      if (!booking.callbackPhone) {
+        return res.status(400).json({ error: "No call-back number set on this booking" });
+      }
+
+      const consultant = await storage.getConsultantById(booking.serviceId);
+      const consultantPhone = (consultant as any)?.contactPhone;
+      if (!consultantPhone) {
+        return res.status(400).json({ error: "No contact phone number registered for this consultant" });
+      }
+
+      let fromPhone: string;
+      let toPhone: string;
+      let callerRole: "seeker" | "provider";
+
+      if (isSeeker) {
+        fromPhone = booking.callbackPhone;
+        toPhone = consultantPhone;
+        callerRole = "seeker";
+      } else {
+        fromPhone = consultantPhone;
+        toPhone = booking.callbackPhone;
+        callerRole = "provider";
+      }
+
+      const exotelUrl = `https://${exotelApiKey}:${exotelApiToken}@api.exotel.com/v1/Accounts/${exotelSid}/Calls/connect.json`;
+      const params = new URLSearchParams({
+        From: fromPhone,
+        To: toPhone,
+        CallerId: exotelVirtualNumber,
+      });
+
+      let exotelCallSid: string | null = null;
+      let callStatus: "initiated" | "failed" = "initiated";
+
+      try {
+        const exotelRes = await fetch(exotelUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: params.toString(),
+        });
+
+        if (exotelRes.ok) {
+          const data = await exotelRes.json() as any;
+          exotelCallSid = data?.Call?.Sid ?? null;
+        } else {
+          const errText = await exotelRes.text();
+          console.error("[Exotel] Call failed:", exotelRes.status, errText);
+          callStatus = "failed";
+        }
+      } catch (callErr) {
+        console.error("[Exotel] Network error:", callErr);
+        callStatus = "failed";
+      }
+
+      const pool = getPool();
+      await pool.query(
+        `INSERT INTO call_logs (booking_id, initiator_user_id, caller_role, exotel_call_sid, status) VALUES ($1, $2, $3, $4, $5)`,
+        [id, userId, callerRole, exotelCallSid, callStatus]
+      );
+
+      if (callStatus === "failed") {
+        return res.status(502).json({ error: "Failed to connect call via Exotel" });
+      }
+
+      return res.json({ success: true, callSid: exotelCallSid });
+    } catch (error) {
+      console.error("[Call] Error:", error);
+      return res.status(500).json({ error: "Failed to initiate call" });
+    }
+  });
+
+  // GET /api/admin/bookings/:id/call-logs — admin view of Exotel call logs per booking
+  app.get("/api/admin/bookings/:id/call-logs", isAdmin, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const pool = getPool();
+      const result = await pool.query(
+        `SELECT id, booking_id, initiator_user_id, caller_role, exotel_call_sid, status, created_at
+         FROM call_logs WHERE booking_id = $1 ORDER BY created_at DESC`,
+        [id]
+      );
+      res.json(result.rows);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch call logs" });
     }
   });
 

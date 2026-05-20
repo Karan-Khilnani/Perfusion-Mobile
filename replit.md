@@ -54,6 +54,19 @@ Full healthcare platform with:
 
 _Populate as you build — explicit user instructions worth remembering across sessions._
 
+## Exotel (phone call masking)
+
+Phone call bridging via Exotel requires these four env vars — all optional; the feature returns HTTP 503 gracefully if unset:
+
+| Variable | Description |
+|---|---|
+| `EXOTEL_SID` | Your Exotel Account SID |
+| `EXOTEL_API_KEY` | Exotel API key |
+| `EXOTEL_API_TOKEN` | Exotel API token |
+| `EXOTEL_VIRTUAL_NUMBER` | Exotel virtual/caller-ID number |
+
+API endpoint: `POST https://{EXOTEL_API_KEY}:{EXOTEL_API_TOKEN}@api.exotel.com/v1/Accounts/{EXOTEL_SID}/Calls/connect.json`
+
 ## Gotchas
 
 - `registerRoutes` must receive the `httpServer` (not just `app`) for SSE connections.
@@ -61,6 +74,7 @@ _Populate as you build — explicit user instructions worth remembering across s
 - `@tailwindcss/vite` was removed from perfusion-web; uses postcss with tailwindcss@3 + autoprefixer.
 - `contact_phone` on consultants and `reminder_fired_at` on bookings are also in the schema; incremental migration at startup is for safety only.
 - Always run both workflows: api-server AND perfusion-web.
+- `call_logs` table added via incremental startup migration (not in Drizzle push). Schema defined in both `lib/db` and `shared/schema.ts`.
 
 ## Pointers
 

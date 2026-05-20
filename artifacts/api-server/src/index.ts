@@ -50,6 +50,16 @@ async function startServer() {
       phone_number varchar(20) NOT NULL,
       created_at timestamptz DEFAULT now()
     )`);
+    await pool.query(`CREATE TABLE IF NOT EXISTS call_logs (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+      booking_id varchar NOT NULL,
+      initiator_user_id varchar NOT NULL,
+      caller_role varchar(20) NOT NULL,
+      exotel_call_sid varchar(255),
+      status varchar(50) NOT NULL DEFAULT 'initiated',
+      created_at timestamptz DEFAULT now()
+    )`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS call_logs_booking_idx ON call_logs(booking_id)`);
 
     // Register all routes
     await registerRoutes(httpServer, app);

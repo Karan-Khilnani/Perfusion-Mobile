@@ -13,7 +13,7 @@ import { StatusBadge } from "@/components/status-badge";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { format } from "date-fns";
-import { Search, Plus, Edit, Eye, Filter, Stethoscope, FlaskConical, ScanLine, Download, Upload, File, Loader2, ShieldCheck, FileSignature, Clock, TimerReset } from "lucide-react";
+import { Search, Plus, Edit, Eye, Filter, Stethoscope, FlaskConical, ScanLine, Download, Upload, File, Loader2, ShieldCheck, FileSignature, Clock, TimerReset, Phone } from "lucide-react";
 import type { Booking, Consultant, LabTest, RadiologyModality, BookingStatus } from "@shared/schema";
 
 type BookingFilter = "all" | "consultation" | "lab" | "teleradiology";
@@ -26,6 +26,15 @@ export default function AdminBookingsPage() {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [createType, setCreateType] = useState<"consultation" | "lab" | "teleradiology">("consultation");
   
+  // Call logs state
+  const [callLogsBookingId, setCallLogsBookingId] = useState<string | null>(null);
+  const { data: callLogsData = [] } = useQuery<any[]>({
+    queryKey: ["/api/admin/bookings", callLogsBookingId, "call-logs"],
+    queryFn: () =>
+      apiRequest("GET", `/api/admin/bookings/${callLogsBookingId}/call-logs`).then((r) => r.json()),
+    enabled: !!callLogsBookingId,
+  });
+
   // Extend call window state
   const [extendWindowBooking, setExtendWindowBooking] = useState<Booking | null>(null);
   const [extendDurationMinutes, setExtendDurationMinutes] = useState<number>(60);
@@ -567,6 +576,17 @@ export default function AdminBookingsPage() {
                   </div>
                   <div className="flex items-center gap-3">
                     <StatusBadge status={booking.status} />
+                    {booking.bookingType === "consultation" && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setCallLogsBookingId(booking.id)}
+                        data-testid={`button-call-logs-${booking.id}`}
+                      >
+                        <Phone className="mr-1 h-3.5 w-3.5" />
+                        Call Logs
+                      </Button>
+                    )}
                     {booking.bookingType === "consultation" && booking.videoRoomId && (
                       <Button
                         size="sm"
@@ -817,6 +837,47 @@ export default function AdminBookingsPage() {
               )}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Call Logs Dialog */}
+      <Dialog open={!!callLogsBookingId} onOpenChange={(open) => { if (!open) setCallLogsBookingId(null); }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Phone className="h-5 w-5 text-primary" />
+              Call Logs
+            </DialogTitle>
+            <DialogDescription>
+              Exotel bridge call history for this booking
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[60vh] overflow-y-auto space-y-2 py-1">
+            {callLogsData.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-6">No calls logged for this booking</p>
+            ) : (
+              callLogsData.map((log: any) => (
+                <div key={log.id} className="rounded-lg border px-4 py-3 space-y-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-sm font-medium capitalize">{log.caller_role === "seeker" ? "Seeker → Consultant" : "Consultant → Seeker"}</span>
+                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                      log.status === "initiated"
+                        ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                        : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                    }`}>
+                      {log.status}
+                    </span>
+                  </div>
+                  {log.exotel_call_sid && (
+                    <p className="text-xs font-mono text-muted-foreground">SID: {log.exotel_call_sid}</p>
+                  )}
+                  <p className="text-xs text-muted-foreground">
+                    {log.created_at ? format(new Date(log.created_at), "PPp") : "—"}
+                  </p>
+                </div>
+              ))
+            )}
+          </div>
         </DialogContent>
       </Dialog>
     </div>

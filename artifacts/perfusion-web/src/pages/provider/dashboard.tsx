@@ -21,6 +21,7 @@ import {
   TrendingUp,
   Image,
   ExternalLink,
+  Phone,
 } from "lucide-react";
 import { getCallWindow, callWindowLabel, toISTTimeString } from "@/lib/call-window";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -297,6 +298,31 @@ function RevenueSection({ revenue, isLoading, label = "All earnings" }: { revenu
   );
 }
 
+function CallSeekerButton({ booking }: { booking: ActiveConsultation }) {
+  const { toast } = useToast();
+  const callMutation = useMutation({
+    mutationFn: () => apiRequest("POST", `/api/bookings/${booking.id}/call`),
+    onSuccess: () => {
+      toast({ title: "Call initiated", description: "Connecting you with the patient's ward — numbers are masked for privacy." });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Call failed", description: err.message || "Failed to initiate call.", variant: "destructive" });
+    },
+  });
+  return (
+    <Button
+      variant="outline"
+      className="w-full h-10 gap-2 rounded-xl text-sm overflow-hidden border-green-500/40 text-green-700 dark:text-green-400 hover:bg-green-500/5"
+      onClick={() => callMutation.mutate()}
+      disabled={callMutation.isPending}
+      data-testid={`button-call-seeker-${booking.id}`}
+    >
+      <Phone className="h-4 w-4 shrink-0" />
+      <span className="truncate">{callMutation.isPending ? "Connecting…" : "Call Seeker"}</span>
+    </Button>
+  );
+}
+
 function ConsultationsSection({
   isLoading,
   activeConsultations,
@@ -437,6 +463,10 @@ function ConsultationsSection({
                     </span>
                   </Button>
                 </div>
+
+                {(booking as any).callbackPhone && (
+                  <CallSeekerButton booking={booking} />
+                )}
 
                 <div className="grid grid-cols-3 gap-2">
                   <PatientDetailsDialog

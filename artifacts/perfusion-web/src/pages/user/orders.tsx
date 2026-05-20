@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { StatusBadge } from "@/components/status-badge";
 import { BookingTimeline } from "@/components/booking-timeline";
-import { ClipboardList, FlaskConical, Stethoscope, Calendar, IndianRupee, ChevronRight, Video, Scan, Download, FileText, Upload, Paperclip, X, Search, CheckCircle2, Clock, RefreshCw } from "lucide-react";
+import { ClipboardList, FlaskConical, Stethoscope, Calendar, IndianRupee, ChevronRight, Video, Scan, Download, FileText, Upload, Paperclip, X, Search, CheckCircle2, Clock, RefreshCw, Phone } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -402,6 +402,48 @@ export default function OrdersPage() {
     );
   };
 
+  const CallConsultantButton = ({ bookingId }: { bookingId: string }) => {
+    const { toast } = useToast();
+    const callMutation = useMutation({
+      mutationFn: () => apiRequest("POST", `/api/bookings/${bookingId}/call`),
+      onSuccess: () => {
+        toast({ title: "Call initiated", description: "You will receive a call on your registered ward number shortly." });
+      },
+      onError: async (err: any) => {
+        let msg = "Failed to initiate call.";
+        try {
+          const data = await err?.response?.json?.();
+          if (data?.error) msg = data.error;
+        } catch {}
+        toast({ title: "Call failed", description: msg, variant: "destructive" });
+      },
+    });
+    return (
+      <div className="rounded-lg border border-green-500/20 bg-green-500/5 p-4">
+        <div className="flex items-center gap-2 text-green-700 dark:text-green-400">
+          <Phone className="h-5 w-5" />
+          <span className="font-medium">Phone Consultation</span>
+        </div>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Calls your registered ward number and connects you with the consultant — numbers are masked for privacy
+        </p>
+        <Button
+          className="mt-3 gap-2"
+          variant="outline"
+          onClick={() => callMutation.mutate()}
+          disabled={callMutation.isPending}
+          data-testid="button-call-consultant"
+        >
+          {callMutation.isPending ? (
+            <><Phone className="h-4 w-4 animate-pulse" />Connecting…</>
+          ) : (
+            <><Phone className="h-4 w-4" />Call Consultant</>
+          )}
+        </Button>
+      </div>
+    );
+  };
+
   const BookingDetails = ({ booking }: { booking: Booking }) => {
     const [, navigate] = useLocation();
     const isWithinFollowUpWindow = booking.bookingType === "consultation" &&
@@ -516,6 +558,10 @@ export default function OrdersPage() {
             </div>
           );
         })()}
+
+        {booking.bookingType === "consultation" && !["completed", "cancelled"].includes(booking.status) && (booking as any).callbackPhone && (
+          <CallConsultantButton bookingId={booking.id} />
+        )}
 
         {validUrls(booking.documentUrls).length > 0 && (
           <div className="rounded-lg border p-4">
