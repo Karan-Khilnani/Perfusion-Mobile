@@ -14,7 +14,7 @@ import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { ImageCropDialog } from "@/components/ui/image-crop-dialog";
 import { apiRequest } from "@/lib/queryClient";
-import { Camera, Loader2, Save, Building, User, Upload, FileText, X, Clock, PenLine, AlertCircle, CheckCircle2, Info } from "lucide-react";
+import { Camera, Loader2, Save, Building, User, Upload, FileText, X, Clock, PenLine, AlertCircle, CheckCircle2, Info, Phone, Plus, Pencil, Trash2 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ConsultantSlotEditor } from "@/components/consultant-slot-editor";
 
@@ -72,6 +72,143 @@ function fileToDataUrl(file: File): Promise<string> {
     reader.onerror = reject;
     reader.readAsDataURL(file);
   });
+}
+
+type WardContact = {
+  id: string;
+  userId: string;
+  wardName: string;
+  phoneNumber: string;
+  createdAt: string;
+};
+
+function WardContactsCard() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [wardName, setWardName] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const { data: contacts = [], isLoading } = useQuery<WardContact[]>({
+    queryKey: ["/api/profile/ward-contacts"],
+  });
+
+  const resetForm = () => {
+    setWardName("");
+    setPhoneNumber("");
+    setEditingId(null);
+    setShowForm(false);
+  };
+
+  const handleSave = async () => {
+    if (!wardName.trim()) { toast({ title: "Ward name is required", variant: "destructive" }); return; }
+    if (!phoneNumber.trim()) { toast({ title: "Phone number is required", variant: "destructive" }); return; }
+    setSaving(true);
+    try {
+      if (editingId) {
+        await apiRequest("PATCH", `/api/profile/ward-contacts/${editingId}`, { wardName: wardName.trim(), phoneNumber: phoneNumber.trim() });
+        toast({ title: "Ward contact updated" });
+      } else {
+        await apiRequest("POST", "/api/profile/ward-contacts", { wardName: wardName.trim(), phoneNumber: phoneNumber.trim() });
+        toast({ title: "Ward contact added" });
+      }
+      queryClient.invalidateQueries({ queryKey: ["/api/profile/ward-contacts"] });
+      resetForm();
+    } catch {
+      toast({ title: "Failed to save ward contact", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleEdit = (c: WardContact) => {
+    setEditingId(c.id);
+    setWardName(c.wardName);
+    setPhoneNumber(c.phoneNumber);
+    setShowForm(true);
+  };
+
+  const handleDelete = async (id: string) => {
+    setDeletingId(id);
+    try {
+      await apiRequest("DELETE", `/api/profile/ward-contacts/${id}`);
+      queryClient.invalidateQueries({ queryKey: ["/api/profile/ward-contacts"] });
+      toast({ title: "Ward contact deleted" });
+    } catch {
+      toast({ title: "Failed to delete ward contact", variant: "destructive" });
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base flex items-center gap-2">
+          <Phone className="h-4 w-4" />
+          Ward Contacts
+        </CardTitle>
+        <CardDescription>
+          Phone numbers for your ICU / ward nurses. These appear as options when booking a consultation so the specialist can call back the correct number.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {isLoading ? (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" />Loading…</div>
+        ) : contacts.length === 0 && !showForm ? (
+          <p className="text-sm text-muted-foreground">No ward contacts added yet.</p>
+        ) : (
+          <div className="space-y-2">
+            {contacts.map((c) => (
+              <div key={c.id} className="flex items-center justify-between rounded-md border px-3 py-2">
+                <div>
+                  <p className="text-sm font-medium">{c.wardName}</p>
+                  <p className="text-xs text-muted-foreground">{c.phoneNumber}</p>
+                </div>
+                <div className="flex items-center gap-1">
+                  <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEdit(c)} data-testid={`btn-edit-ward-${c.id}`}>
+                    <Pencil className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => handleDelete(c.id)} disabled={deletingId === c.id} data-testid={`btn-delete-ward-${c.id}`}>
+                    {deletingId === c.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {showForm ? (
+          <div className="rounded-md border p-3 space-y-3">
+            <p className="text-sm font-medium">{editingId ? "Edit ward contact" : "Add ward contact"}</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label htmlFor="wc-ward-name" className="text-xs">Ward / Location</Label>
+                <Input id="wc-ward-name" placeholder="e.g. MICU, CICU, CCU" value={wardName} onChange={(e) => setWardName(e.target.value)} data-testid="input-ward-name" />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="wc-phone" className="text-xs">Phone Number</Label>
+                <Input id="wc-phone" placeholder="+91 XXXXX XXXXX" value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} data-testid="input-ward-phone" />
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Button type="button" size="sm" onClick={handleSave} disabled={saving} data-testid="btn-save-ward-contact">
+                {saving ? <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />Saving…</> : <><Save className="h-3.5 w-3.5 mr-1" />Save</>}
+              </Button>
+              <Button type="button" size="sm" variant="outline" onClick={resetForm}>Cancel</Button>
+            </div>
+          </div>
+        ) : (
+          <Button type="button" variant="outline" size="sm" onClick={() => setShowForm(true)} data-testid="btn-add-ward-contact">
+            <Plus className="h-3.5 w-3.5 mr-1" />Add Ward Contact
+          </Button>
+        )}
+      </CardContent>
+    </Card>
+  );
 }
 
 export default function ProfilePage() {
@@ -992,6 +1129,8 @@ export default function ProfilePage() {
           </Form>
         </CardContent>
       </Card>
+
+      {user?.role === "care_seeker" && <WardContactsCard />}
 
       {user?.role === "provider" && provider && (
         <Card>

@@ -529,6 +529,11 @@ export default function AdminBookingsPage() {
                       <p className="text-xs font-mono text-muted-foreground">
                         {(booking as any).bookingNumber || booking.id.substring(0, 12).toUpperCase()} • {booking.createdAt && format(new Date(booking.createdAt), "PPp")}
                       </p>
+                      {booking.bookingType === "consultation" && (booking as any).callbackPhone && (
+                        <p className="text-xs text-muted-foreground">
+                          Call-back: {(booking as any).callbackPhone}{(booking as any).callbackWardName ? ` (${(booking as any).callbackWardName})` : ""}
+                        </p>
+                      )}
                       {booking.bookingType === "consultation" && (booking as any).prescriptionApprovedAt && (
                         <div className="mt-1 flex flex-wrap items-center gap-2">
                           <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400">

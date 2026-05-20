@@ -96,6 +96,7 @@ function PatientDetailsDialog({
     { label: "Age", value: booking.patientAge != null ? `${booking.patientAge} years` : null },
     { label: "Gender", value: booking.patientGender },
     { label: "Contact", value: booking.patientContact },
+    { label: "Call-back Number", value: (booking as any).callbackPhone ? `${(booking as any).callbackPhone}${(booking as any).callbackWardName ? ` (${(booking as any).callbackWardName})` : ""}` : null },
     { label: "Weight", value: booking.patientWeight },
     { label: "UHID / IP No.", value: booking.uhidIpNumber },
     { label: "IPD No.", value: booking.ipdNumber },

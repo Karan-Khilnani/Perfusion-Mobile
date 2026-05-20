@@ -2436,6 +2436,87 @@ export async function registerRoutes(
     }
   });
 
+  // ── Ward Contacts (seeker phone numbers per ward) ─────────────────────────
+  app.get("/api/profile/ward-contacts", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) return res.status(401).json({ message: "Unauthorized" });
+      const { getPool } = await import("../db");
+      const pool = getPool();
+      const result = await pool.query(
+        `SELECT id, user_id, ward_name, phone_number, created_at FROM seeker_ward_contacts WHERE user_id = $1 ORDER BY created_at ASC`,
+        [userId]
+      );
+      res.json(result.rows.map((r: any) => ({
+        id: r.id,
+        userId: r.user_id,
+        wardName: r.ward_name,
+        phoneNumber: r.phone_number,
+        createdAt: r.created_at,
+      })));
+    } catch (error) {
+      req.log?.error({ err: error }, "Error fetching ward contacts");
+      res.status(500).json({ message: "Failed to fetch ward contacts" });
+    }
+  });
+
+  app.post("/api/profile/ward-contacts", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) return res.status(401).json({ message: "Unauthorized" });
+      const { wardName, phoneNumber } = req.body as { wardName?: string; phoneNumber?: string };
+      if (!wardName?.trim()) return res.status(400).json({ message: "Ward name is required" });
+      if (!phoneNumber?.trim()) return res.status(400).json({ message: "Phone number is required" });
+      const { getPool } = await import("../db");
+      const pool = getPool();
+      const result = await pool.query(
+        `INSERT INTO seeker_ward_contacts (user_id, ward_name, phone_number) VALUES ($1, $2, $3) RETURNING id, user_id, ward_name, phone_number, created_at`,
+        [userId, wardName.trim(), phoneNumber.trim()]
+      );
+      const r = result.rows[0];
+      res.status(201).json({ id: r.id, userId: r.user_id, wardName: r.ward_name, phoneNumber: r.phone_number, createdAt: r.created_at });
+    } catch (error) {
+      req.log?.error({ err: error }, "Error creating ward contact");
+      res.status(500).json({ message: "Failed to create ward contact" });
+    }
+  });
+
+  app.patch("/api/profile/ward-contacts/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) return res.status(401).json({ message: "Unauthorized" });
+      const { wardName, phoneNumber } = req.body as { wardName?: string; phoneNumber?: string };
+      const { getPool } = await import("../db");
+      const pool = getPool();
+      const existing = await pool.query(`SELECT id FROM seeker_ward_contacts WHERE id = $1 AND user_id = $2`, [req.params.id, userId]);
+      if (!existing.rows.length) return res.status(404).json({ message: "Ward contact not found" });
+      const result = await pool.query(
+        `UPDATE seeker_ward_contacts SET ward_name = COALESCE($1, ward_name), phone_number = COALESCE($2, phone_number) WHERE id = $3 AND user_id = $4 RETURNING id, user_id, ward_name, phone_number, created_at`,
+        [wardName?.trim() ?? null, phoneNumber?.trim() ?? null, req.params.id, userId]
+      );
+      const r = result.rows[0];
+      res.json({ id: r.id, userId: r.user_id, wardName: r.ward_name, phoneNumber: r.phone_number, createdAt: r.created_at });
+    } catch (error) {
+      req.log?.error({ err: error }, "Error updating ward contact");
+      res.status(500).json({ message: "Failed to update ward contact" });
+    }
+  });
+
+  app.delete("/api/profile/ward-contacts/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) return res.status(401).json({ message: "Unauthorized" });
+      const { getPool } = await import("../db");
+      const pool = getPool();
+      const result = await pool.query(`DELETE FROM seeker_ward_contacts WHERE id = $1 AND user_id = $2`, [req.params.id, userId]);
+      if ((result as any).rowCount === 0) return res.status(404).json({ message: "Ward contact not found" });
+      res.json({ message: "Ward contact deleted" });
+    } catch (error) {
+      req.log?.error({ err: error }, "Error deleting ward contact");
+      res.status(500).json({ message: "Failed to delete ward contact" });
+    }
+  });
+
   // Admin - Lab Tests CRUD
   app.post("/api/admin/lab-tests", isAdmin, async (req, res) => {
     try {

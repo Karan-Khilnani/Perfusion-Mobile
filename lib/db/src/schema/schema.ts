@@ -319,6 +319,9 @@ export const bookings = pgTable("bookings", {
   callWindowExtendedUntil: timestamp("call_window_extended_until"),
   razorpayOrderId: varchar("razorpay_order_id", { length: 255 }),
   razorpayPaymentId: varchar("razorpay_payment_id", { length: 255 }),
+  // Callback contact for cellular calls (ward phone selected at booking time)
+  callbackPhone: varchar("callback_phone", { length: 20 }),
+  callbackWardName: varchar("callback_ward_name", { length: 100 }),
   // Follow-up consultation tracking
   isFollowUp: boolean("is_follow_up").default(false),
   parentBookingId: varchar("parent_booking_id", { length: 255 }),
@@ -420,6 +423,19 @@ export type PlatformSetting = typeof platformSettings.$inferSelect;
 export type InsertPlatformSetting = z.infer<typeof insertPlatformSettingSchema>;
 export type AuditLog = typeof auditLog.$inferSelect;
 export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
+
+// Seeker Ward Contacts — phone numbers per ward/area saved by care seekers
+export const seekerWardContacts = pgTable("seeker_ward_contacts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  wardName: varchar("ward_name", { length: 100 }).notNull(),
+  phoneNumber: varchar("phone_number", { length: 20 }).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertSeekerWardContactSchema = createInsertSchema(seekerWardContacts).omit({ id: true, createdAt: true });
+export type InsertSeekerWardContact = z.infer<typeof insertSeekerWardContactSchema>;
+export type SeekerWardContact = typeof seekerWardContacts.$inferSelect;
 
 // Push subscriptions for PWA notifications
 export const pushSubscriptions = pgTable("push_subscriptions", {

@@ -16,8 +16,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useRazorpay } from "@/hooks/use-razorpay";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ArrowLeft, Check, CreditCard, Briefcase, Video, Upload, FileText, X, ChevronLeft, ChevronRight, CalendarDays, Clock } from "lucide-react";
-import type { Consultant, ConsultantSlotOverride, SlotSeries } from "@shared/schema";
+import { ArrowLeft, Check, CreditCard, Briefcase, Video, Upload, FileText, X, ChevronLeft, ChevronRight, CalendarDays, Clock, Phone } from "lucide-react";
+import type { Consultant, ConsultantSlotOverride, SlotSeries, SeekerWardContact } from "@shared/schema";
 
 const bookingSchema = z.object({
   appointmentSlot: z.string().optional(),
@@ -124,6 +124,9 @@ export default function ConsultationBookingPage() {
   const [chartUrls, setChartUrls] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<"pay_now" | "pay_later">("pay_later");
+  const [callbackContactId, setCallbackContactId] = useState<string>("");
+  const [callbackOtherPhone, setCallbackOtherPhone] = useState<string>("");
+  const [callbackError, setCallbackError] = useState<string>("");
   const [calendarMonth, setCalendarMonth] = useState(() => { const d = new Date(); d.setDate(1); return d; });
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const { openCheckout } = useRazorpay();
@@ -133,6 +136,10 @@ export default function ConsultationBookingPage() {
   const { data: consultant, isLoading } = useQuery<Consultant>({
     queryKey: ["/api/consultants", id],
     enabled: !!id,
+  });
+
+  const { data: wardContacts = [] } = useQuery<SeekerWardContact[]>({
+    queryKey: ["/api/profile/ward-contacts"],
   });
 
   const { data: emergencyTeam } = useQuery<any>({
@@ -279,6 +286,8 @@ export default function ConsultationBookingPage() {
         status: "booked",
         paymentStatus: "pending",
         paymentMethod: paymentMethod,
+        callbackPhone: resolvedCallback.phone || null,
+        callbackWardName: resolvedCallback.wardName || null,
       });
       return response.json();
     },
@@ -334,11 +343,28 @@ export default function ConsultationBookingPage() {
     }
   };
 
-  const validateCurrentStep = () => {
+  const resolvedCallback = (() => {
+    if (!callbackContactId) return { phone: "", wardName: "" };
+    if (callbackContactId === "other") return { phone: callbackOtherPhone.trim(), wardName: "Other" };
+    const wc = wardContacts.find(w => w.id === callbackContactId);
+    return wc ? { phone: wc.phoneNumber, wardName: wc.wardName } : { phone: "", wardName: "" };
+  })();
+
+  const validateCurrentStep = async () => {
     if (step === "details") {
       const fields: (keyof BookingFormData)[] = ["patientName", "patientAge", "patientGender", "contactNumber"];
       if (!isEmergencyTeam) fields.unshift("appointmentSlot");
-      return form.trigger(fields);
+      const formValid = await form.trigger(fields);
+      if (!callbackContactId) {
+        setCallbackError("Please select a call-back number for this consultation.");
+        return false;
+      }
+      if (callbackContactId === "other" && !callbackOtherPhone.trim()) {
+        setCallbackError("Please enter the other phone number.");
+        return false;
+      }
+      setCallbackError("");
+      return formValid;
     } else if (step === "clinical") {
       return form.trigger(["clinicalSummary"]);
     }
@@ -1300,6 +1326,64 @@ export default function ConsultationBookingPage() {
                           </FormItem>
                         )}
                       />
+                    )}
+                  </div>
+
+                  {/* ── Call-back Number ── */}
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Phone className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm font-medium">Call-back Number *</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      The consultant will call this number during the consultation.
+                    </p>
+                    <Select
+                      value={callbackContactId}
+                      onValueChange={(val) => {
+                        setCallbackContactId(val);
+                        setCallbackError("");
+                        if (val !== "other") setCallbackOtherPhone("");
+                      }}
+                    >
+                      <SelectTrigger data-testid="select-callback-contact">
+                        <SelectValue placeholder="Select a ward contact or enter other number" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {wardContacts.length === 0 ? (
+                          <SelectItem value="other">Enter other number</SelectItem>
+                        ) : (
+                          <>
+                            {wardContacts.map((wc) => (
+                              <SelectItem key={wc.id} value={wc.id} data-testid={`option-ward-${wc.id}`}>
+                                {wc.wardName} — {wc.phoneNumber}
+                              </SelectItem>
+                            ))}
+                            <SelectItem value="other">Other (enter manually)</SelectItem>
+                          </>
+                        )}
+                      </SelectContent>
+                    </Select>
+                    {callbackContactId === "other" && (
+                      <Input
+                        placeholder="+91 XXXXX XXXXX"
+                        value={callbackOtherPhone}
+                        onChange={(e) => {
+                          setCallbackOtherPhone(e.target.value);
+                          setCallbackError("");
+                        }}
+                        data-testid="input-callback-other-phone"
+                      />
+                    )}
+                    {callbackError && (
+                      <p className="text-sm font-medium text-destructive">{callbackError}</p>
+                    )}
+                    {!callbackContactId && wardContacts.length === 0 && (
+                      <p className="text-xs text-muted-foreground">
+                        No ward contacts saved yet.{" "}
+                        <a href="/profile" className="underline text-primary">Add them in your profile</a>{" "}
+                        for faster booking next time.
+                      </p>
                     )}
                   </div>
 
