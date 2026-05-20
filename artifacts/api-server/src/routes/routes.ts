@@ -978,6 +978,13 @@ export async function registerRoutes(
         bookingData.uhidIpNumber = parentBooking.uhidIpNumber || null;
       }
       
+      // Consultation bookings require a callback phone number (unless it's a follow-up — callback is inherited)
+      if (bookingData.bookingType === "consultation" && !bookingData.isFollowUp) {
+        if (!bookingData.callbackPhone?.trim()) {
+          return res.status(400).json({ message: "A call-back phone number is required for consultation bookings." });
+        }
+      }
+
       // For consultation bookings, link to the provider who owns the consultant
       if (bookingData.bookingType === "consultation" && bookingData.serviceId) {
         const consultant = await storage.getConsultantById(bookingData.serviceId);
@@ -2467,6 +2474,7 @@ export async function registerRoutes(
       const { wardName, phoneNumber } = req.body as { wardName?: string; phoneNumber?: string };
       if (!wardName?.trim()) return res.status(400).json({ message: "Ward name is required" });
       if (!phoneNumber?.trim()) return res.status(400).json({ message: "Phone number is required" });
+      if (!/^\+?[\d\s\-(). ]{7,25}$/.test(phoneNumber.trim())) return res.status(400).json({ message: "Invalid phone number format" });
       const { getPool } = await import("../db");
       const pool = getPool();
       const result = await pool.query(
@@ -2486,6 +2494,7 @@ export async function registerRoutes(
       const userId = req.user?.id;
       if (!userId) return res.status(401).json({ message: "Unauthorized" });
       const { wardName, phoneNumber } = req.body as { wardName?: string; phoneNumber?: string };
+      if (phoneNumber !== undefined && !/^\+?[\d\s\-(). ]{7,25}$/.test(phoneNumber.trim())) return res.status(400).json({ message: "Invalid phone number format" });
       const { getPool } = await import("../db");
       const pool = getPool();
       const existing = await pool.query(`SELECT id FROM seeker_ward_contacts WHERE id = $1 AND user_id = $2`, [req.params.id, userId]);

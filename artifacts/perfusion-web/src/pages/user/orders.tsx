@@ -443,6 +443,17 @@ export default function OrdersPage() {
             <dt className="text-muted-foreground">Age</dt>
             <dd>{booking.patientAge} years</dd>
           </div>
+          {booking.bookingType === "consultation" && (booking as any).callbackPhone && (
+            <div className="flex justify-between border-b pb-2">
+              <dt className="text-muted-foreground">Call-back Number</dt>
+              <dd>
+                {(booking as any).callbackPhone}
+                {(booking as any).callbackWardName && (
+                  <span className="ml-1 text-xs text-muted-foreground">({(booking as any).callbackWardName})</span>
+                )}
+              </dd>
+            </div>
+          )}
           {booking.appointmentSlot && (
             <div className="flex justify-between border-b pb-2">
               <dt className="text-muted-foreground">Appointment</dt>
