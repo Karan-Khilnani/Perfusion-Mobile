@@ -35,6 +35,22 @@ export default function AdminBookingsPage() {
     enabled: !!callLogsBookingId,
   });
 
+  async function downloadAdminReceipt(bookingId: string, type: "seeker" | "provider", bookingNumber?: string) {
+    try {
+      const res = await fetch(`/api/bookings/${bookingId}/receipt?type=${type}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to generate receipt");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `receipt-${bookingNumber || bookingId.slice(0, 8)}-${type}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast({ title: "Download failed", description: "Could not generate receipt. Please try again.", variant: "destructive" });
+    }
+  }
+
   // Extend call window state
   const [extendWindowBooking, setExtendWindowBooking] = useState<Booking | null>(null);
   const [extendDurationMinutes, setExtendDurationMinutes] = useState<number>(60);
@@ -587,6 +603,24 @@ export default function AdminBookingsPage() {
                         Call Logs
                       </Button>
                     )}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => downloadAdminReceipt(booking.id, "seeker", (booking as any).bookingNumber)}
+                      data-testid={`button-seeker-receipt-${booking.id}`}
+                    >
+                      <Download className="mr-1 h-3.5 w-3.5" />
+                      Patient Receipt
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => downloadAdminReceipt(booking.id, "provider", (booking as any).bookingNumber)}
+                      data-testid={`button-provider-receipt-${booking.id}`}
+                    >
+                      <Download className="mr-1 h-3.5 w-3.5" />
+                      Partner Receipt
+                    </Button>
                     {booking.bookingType === "consultation" && booking.videoRoomId && (
                       <Button
                         size="sm"

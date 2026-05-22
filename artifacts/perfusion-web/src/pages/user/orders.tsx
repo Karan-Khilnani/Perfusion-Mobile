@@ -450,9 +450,30 @@ export default function OrdersPage() {
 
   const BookingDetails = ({ booking }: { booking: Booking }) => {
     const [, navigate] = useLocation();
+    const { toast } = useToast();
     const isWithinFollowUpWindow = booking.bookingType === "consultation" &&
       booking.createdAt &&
       differenceInDays(new Date(), new Date(booking.createdAt)) < 7;
+
+    const [downloadingReceipt, setDownloadingReceipt] = useState(false);
+    async function handleDownloadReceipt() {
+      setDownloadingReceipt(true);
+      try {
+        const res = await fetch(`/api/bookings/${booking.id}/receipt?type=seeker`, { credentials: "include" });
+        if (!res.ok) throw new Error("Failed to generate receipt");
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `receipt-${(booking as any).bookingNumber || booking.id.slice(0, 8)}.pdf`;
+        a.click();
+        URL.revokeObjectURL(url);
+      } catch {
+        toast({ title: "Download failed", description: "Could not generate receipt. Please try again.", variant: "destructive" });
+      } finally {
+        setDownloadingReceipt(false);
+      }
+    }
 
     return (
     <Card>
@@ -465,6 +486,17 @@ export default function OrdersPage() {
             </Badge>
           )}
           <StatusBadge status={booking.status} />
+          <Button
+            size="sm"
+            variant="outline"
+            className="ml-auto gap-1.5 text-xs"
+            onClick={handleDownloadReceipt}
+            disabled={downloadingReceipt}
+            data-testid={`button-download-receipt-${booking.id}`}
+          >
+            <Download className="h-3.5 w-3.5" />
+            {downloadingReceipt ? "Generating…" : "Download Receipt"}
+          </Button>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">

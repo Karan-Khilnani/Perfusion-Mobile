@@ -17,6 +17,7 @@ import { generateBookingNumber } from "../services/booking-number";
 import { calculateCustomerPrice, deriveMarginFromPrice, derivePriceFromMargin } from "../services/pricing";
 import { processReport, type BookingReportData } from "../services/report-processor";
 import { generateAndStorePrescriptionPdf, type PrescriptionPdfData } from "../services/prescription-pdf";
+import { generateReceiptPdf, type ReceiptData, type ReceiptType } from "../services/receipt-pdf";
 import { sendPushNotification, getVapidPublicKey, type PushPayload } from "../services/push-notifications";
 import { getCallWindow } from "../services/call-window";
 import { Expo, type ExpoPushMessage } from "expo-server-sdk";
@@ -4537,6 +4538,83 @@ export async function registerRoutes(
       res.json({ success: true, extendedUntil });
     } catch (error) {
       res.status(500).json({ error: "Failed to extend call window" });
+    }
+  });
+
+  // ── Booking receipt PDF ────────────────────────────────────────────────────
+  // GET /api/bookings/:id/receipt?type=seeker|provider
+  // seeker  → full amount paid by patient
+  // provider → base price after deducting Perfusion margin
+  // Admin can download either type; seeker/provider limited to their own
+  app.get("/api/bookings/:id/receipt", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.id;
+      const role   = req.user?.role as string;
+      const { id } = req.params;
+      const type: ReceiptType = req.query.type === "provider" ? "provider" : "seeker";
+
+      const booking = await storage.getBookingById(id);
+      if (!booking) return res.status(404).json({ error: "Booking not found" });
+
+      if (role !== "admin") {
+        if (type === "seeker" && booking.userId !== userId) {
+          return res.status(403).json({ error: "Access denied" });
+        }
+        if (type === "provider") {
+          const provider = booking.providerId ? await storage.getProviderById(booking.providerId) : null;
+          if (!provider || provider.userId !== userId) {
+            return res.status(403).json({ error: "Access denied" });
+          }
+        }
+      }
+
+      const b = booking as any;
+      const receiptData: ReceiptData = {
+        receiptType: type,
+        bookingNumber: b.bookingNumber || "",
+        bookingId: booking.id,
+        bookingType: booking.bookingType as "consultation" | "lab" | "teleradiology",
+        status: booking.status,
+        createdAt: new Date(booking.createdAt ?? Date.now()),
+        patientName: booking.patientName,
+        patientAge: booking.patientAge,
+        patientGender: b.patientGender ?? null,
+        patientContact: b.patientContact ?? null,
+        uhidIpNumber: b.uhidIpNumber ?? null,
+        ipdNumber: b.ipdNumber ?? null,
+        serviceName: booking.serviceName,
+        providerName: b.providerName ?? null,
+        appointmentSlot: b.appointmentSlot ?? null,
+        modalityName: b.modalityName ?? null,
+        urgency: b.urgency ?? null,
+        accessionNumber: b.accessionNumber ?? null,
+        provisionalDiagnosis: b.provisionalDiagnosis ?? null,
+        fullAmount: parseFloat(booking.amount ?? "0"),
+        basePrice: b.basePrice ? parseFloat(b.basePrice) : null,
+        marginAmount: b.marginAmount ? parseFloat(b.marginAmount) : null,
+        marginPercent: b.marginPercent ? parseFloat(b.marginPercent) : null,
+        amountPaid: parseFloat(b.amountPaid ?? "0"),
+        paymentStatus: b.paymentStatus ?? "pending",
+        paymentMethod: b.paymentMethod ?? null,
+        razorpayPaymentId: b.razorpayPaymentId ?? null,
+        razorpayOrderId: b.razorpayOrderId ?? null,
+        paidAt: b.paidAt ? new Date(b.paidAt) : null,
+        dueDate: b.dueDate ? new Date(b.dueDate) : null,
+      };
+
+      const pdfBytes = await generateReceiptPdf(receiptData);
+      const bn = b.bookingNumber || id.slice(0, 8).toUpperCase();
+      const filename = `receipt-${bn}-${type}.pdf`;
+
+      res.set({
+        "Content-Type": "application/pdf",
+        "Content-Disposition": `attachment; filename="${filename}"`,
+        "Content-Length": pdfBytes.length,
+      });
+      res.send(Buffer.from(pdfBytes));
+    } catch (error) {
+      console.error("[Receipt] Error generating receipt:", error);
+      res.status(500).json({ error: "Failed to generate receipt" });
     }
   });
 
