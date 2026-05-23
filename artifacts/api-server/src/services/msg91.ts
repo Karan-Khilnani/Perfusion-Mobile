@@ -6,9 +6,21 @@ const TWILIO_PHONE_NUMBER = process.env.TWILIO_PHONE_NUMBER;
 const TWILIO_WHATSAPP_NUMBER = process.env.TWILIO_WHATSAPP_NUMBER;
 const ADMIN_PHONE_NUMBER = process.env.ADMIN_PHONE_NUMBER;
 
+// Warn at startup so missing credentials are immediately visible in logs
+const missing: string[] = [];
+if (!TWILIO_ACCOUNT_SID) missing.push("TWILIO_ACCOUNT_SID");
+if (!TWILIO_AUTH_TOKEN)  missing.push("TWILIO_AUTH_TOKEN");
+if (!TWILIO_PHONE_NUMBER) missing.push("TWILIO_PHONE_NUMBER");
+if (!ADMIN_PHONE_NUMBER)  missing.push("ADMIN_PHONE_NUMBER");
+if (missing.length > 0) {
+  console.warn(`[Twilio] ⚠️  Voice calls & WhatsApp DISABLED — missing env vars: ${missing.join(", ")}`);
+} else {
+  console.log("[Twilio] Credentials loaded — voice calls and WhatsApp enabled.");
+}
+
 function getClient() {
   if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN) {
-    console.error("[Twilio] Missing Account SID or Auth Token");
+    console.error("[Twilio] Cannot make call — TWILIO_ACCOUNT_SID / TWILIO_AUTH_TOKEN not set");
     return null;
   }
   return twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);

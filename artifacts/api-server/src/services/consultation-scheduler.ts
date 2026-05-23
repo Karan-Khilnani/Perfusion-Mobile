@@ -9,9 +9,9 @@ const ADMIN_PHONE = process.env.ADMIN_PHONE_NUMBER || "";
 // IST = UTC+5:30
 const IST_OFFSET_MS = (5 * 60 + 30) * 60 * 1000;
 
-// 10-minute catch-up window — fires reminders for slots that occurred up to
-// 10 minutes ago so that server restarts during a slot window don't cause misses.
-const CATCHUP_WINDOW_MS = 10 * 60 * 1000;
+// Catch-up window — fires reminders for slots that occurred up to this long ago.
+// Set to 2 hours so server restarts / short deployments don't permanently miss a slot.
+const CATCHUP_WINDOW_MS = 2 * 60 * 60 * 1000;
 
 // In-memory dedup for the current server session (fast-path — avoids extra
 // DB round-trips for slots already fired in this process lifetime).
@@ -133,10 +133,18 @@ async function fireAppointmentReminders(): Promise<void> {
       }
 
       const slotMs = slotStart.getTime();
-      // Fire if slot is in the past (or right now) and within the 10-minute catch-up window
+      // Fire if slot is in the past (or right now) and within the catch-up window
+      const msUntilSlot = slotMs - nowMs;
+      const msSinceSlot = nowMs - slotMs;
       const shouldFire = slotMs <= nowMs && slotMs >= nowMs - CATCHUP_WINDOW_MS;
 
-      console.log(`[Scheduler]   Booking ${booking.bookingNumber || booking.id}: slot "${booking.appointmentSlot}" → IST ${toISTString(slotStart)} | fire=${shouldFire}`);
+      const reason = msUntilSlot > 0
+        ? `in ${Math.round(msUntilSlot / 60000)}min`
+        : msSinceSlot > CATCHUP_WINDOW_MS
+        ? `missed — ${Math.round(msSinceSlot / 60000)}min ago (outside ${CATCHUP_WINDOW_MS / 60000}min window)`
+        : `now — firing`;
+
+      console.log(`[Scheduler]   Booking ${booking.bookingNumber || booking.id}: slot "${booking.appointmentSlot}" → IST ${toISTString(slotStart)} | fire=${shouldFire} (${reason})`);
 
       if (!shouldFire) continue;
 
@@ -270,7 +278,7 @@ export async function fireOneBooking(booking: any, now: Date = new Date()): Prom
  * Fires every 60 seconds. Safe to call once at server startup.
  */
 export function startConsultationScheduler(): void {
-  console.log("[Scheduler] Consultation appointment reminder scheduler started (setInterval 60s, 10-min catch-up window).");
+  console.log("[Scheduler] Consultation appointment reminder scheduler started (setInterval 60s, 2-hour catch-up window).");
   // Run immediately on startup — catches slots missed during restart (within 10-min window)
   fireAppointmentReminders();
   setInterval(() => {
