@@ -156,6 +156,6 @@ export function callWindowLabel(status: CallWindowStatus): string {
     case "active":
     case "extended":
     case "always_open":
-      return "Join Call";
+      return "Join Video Room";
   }
 }

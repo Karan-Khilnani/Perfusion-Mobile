@@ -462,7 +462,7 @@ function ConsultationsSection({
                           data-testid={`button-join-call-${booking.id}`}
                         >
                           <Video className="h-4 w-4 shrink-0" />
-                          <span className="truncate">Join Call</span>
+                          <span className="truncate">Join Video Room</span>
                         </Button>
                       );
                     }

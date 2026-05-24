@@ -390,7 +390,7 @@ export default function UserDashboard() {
                                       data-testid={`button-join-call-${booking.id}`}
                                     >
                                       <Video className="h-4 w-4" />
-                                      Join Call
+                                      Join Video Room
                                     </Button>
                                   </Link>
                                   {win.reason === "extended" && win.extendedUntil && (
