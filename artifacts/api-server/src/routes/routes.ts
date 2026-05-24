@@ -4685,7 +4685,10 @@ export async function registerRoutes(
         callerRole = "provider";
       }
 
-      const exotelUrl = `https://${exotelApiKey}:${exotelApiToken}@api.exotel.com/v1/Accounts/${exotelSid}/Calls/connect.json`;
+      // Node 18+ WHATWG fetch rejects URLs with embedded credentials (user:pass@host).
+      // Use Authorization: Basic header instead.
+      const exotelUrl = `https://api.exotel.com/v1/Accounts/${exotelSid}/Calls/connect.json`;
+      const exotelBasicAuth = Buffer.from(`${exotelApiKey}:${exotelApiToken}`).toString("base64");
       const appDomain = process.env.REPLIT_DOMAINS?.split(",")[0];
       const statusCallbackUrl = appDomain
         ? `https://${appDomain}/api/webhooks/exotel/status`
@@ -4703,7 +4706,10 @@ export async function registerRoutes(
       try {
         const exotelRes = await fetch(exotelUrl, {
           method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+            "Authorization": `Basic ${exotelBasicAuth}`,
+          },
           body: params.toString(),
         });
 
