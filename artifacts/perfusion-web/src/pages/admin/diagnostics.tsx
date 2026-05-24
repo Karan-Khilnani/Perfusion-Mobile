@@ -13,15 +13,23 @@ import { useToast } from "@/hooks/use-toast";
 interface TestResult {
   ok: boolean;
   message: string;
+  raw?: string;
   stack?: string;
 }
 
 export default function DiagnosticsPage() {
   const { toast } = useToast();
+
+  // Twilio
   const [testPhone, setTestPhone] = useState("");
   const [bookingId, setBookingId] = useState("");
   const [twilioResult, setTwilioResult] = useState<TestResult | null>(null);
   const [reminderResult, setReminderResult] = useState<TestResult | null>(null);
+
+  // Exotel
+  const [exotelFrom, setExotelFrom] = useState("");
+  const [exotelTo, setExotelTo] = useState("");
+  const [exotelResult, setExotelResult] = useState<TestResult | null>(null);
 
   const testTwilio = useMutation({
     mutationFn: async () => {
@@ -63,16 +71,36 @@ export default function DiagnosticsPage() {
     },
   });
 
+  const testExotel = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/admin/test-exotel", { from: exotelFrom.trim(), to: exotelTo.trim() });
+      return res.json() as Promise<TestResult>;
+    },
+    onSuccess: (data) => {
+      setExotelResult(data);
+      if (data.ok) {
+        toast({ title: "Call initiated", description: data.message });
+      } else {
+        toast({ title: "Call failed", description: data.message, variant: "destructive" });
+      }
+    },
+    onError: (e: any) => {
+      const msg = e?.message || "Request failed";
+      setExotelResult({ ok: false, message: msg });
+      toast({ title: "Error", description: msg, variant: "destructive" });
+    },
+  });
+
   return (
     <div className="space-y-6 max-w-2xl">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Diagnostics</h1>
         <p className="text-muted-foreground mt-1">
-          Test Twilio voice calls and consultation reminders without waiting for a booking slot.
+          Test Twilio voice calls, Exotel masked calls, and consultation reminders without waiting for a booking slot.
         </p>
       </div>
 
-      {/* Single test call */}
+      {/* Single Twilio test call */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
@@ -115,7 +143,76 @@ export default function DiagnosticsPage() {
           </div>
 
           {twilioResult && (
-            <ResultBlock result={twilioResult} onClear={() => setTwilioResult(null)} />
+            <ResultBlock result={twilioResult} onClear={() => setTwilioResult(null)} testId="result-twilio-test" />
+          )}
+        </CardContent>
+      </Card>
+
+      <Separator />
+
+      {/* Exotel masked call test */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Phone className="h-4 w-4 text-green-600" />
+            Test Exotel Masked Call
+          </CardTitle>
+          <CardDescription>
+            Places a real masked bridged call via Exotel — exactly as it works during a consultation.
+            Both phones will ring and be connected through your virtual number. Use this to verify KYC
+            approval, credentials, and number masking end-to-end.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="exotel-from">From number (caller)</Label>
+              <Input
+                id="exotel-from"
+                data-testid="input-exotel-from"
+                placeholder="+917999833154"
+                value={exotelFrom}
+                onChange={(e) => setExotelFrom(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">e.g. seeker's ward / callback number</p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="exotel-to">To number (recipient)</Label>
+              <Input
+                id="exotel-to"
+                data-testid="input-exotel-to"
+                placeholder="+919876543210"
+                value={exotelTo}
+                onChange={(e) => setExotelTo(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">e.g. consultant's phone</p>
+            </div>
+          </div>
+
+          <div className="flex items-start gap-2 rounded-md bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
+            <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+            <span>
+              Both numbers must be with country code (e.g. <code className="font-mono">+91…</code>).
+              The caller will see your Exotel virtual number — not the actual recipient's number.
+            </span>
+          </div>
+
+          <Button
+            data-testid="button-test-exotel"
+            onClick={() => testExotel.mutate()}
+            disabled={!exotelFrom.trim() || !exotelTo.trim() || testExotel.isPending}
+            className="gap-2"
+          >
+            {testExotel.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Zap className="h-4 w-4" />
+            )}
+            {testExotel.isPending ? "Connecting…" : "Place Masked Call"}
+          </Button>
+
+          {exotelResult && (
+            <ResultBlock result={exotelResult} onClear={() => setExotelResult(null)} testId="result-exotel-test" showRaw />
           )}
         </CardContent>
       </Card>
@@ -169,7 +266,7 @@ export default function DiagnosticsPage() {
           </div>
 
           {reminderResult && (
-            <ResultBlock result={reminderResult} onClear={() => setReminderResult(null)} />
+            <ResultBlock result={reminderResult} onClear={() => setReminderResult(null)} testId="result-reminder-test" />
           )}
         </CardContent>
       </Card>
@@ -191,6 +288,10 @@ export default function DiagnosticsPage() {
               didn't ring.
             </li>
             <li>
+              <strong>Exotel Dashboard → CDR / Call Logs</strong> — shows call status, duration,
+              and any error codes. If KYC is pending, Exotel returns HTTP 403 with a clear message.
+            </li>
+            <li>
               On a Twilio <strong>Trial account</strong>, you can only call numbers that are verified
               in the Twilio console. Upgrade to a paid account to call any number.
             </li>
@@ -201,7 +302,7 @@ export default function DiagnosticsPage() {
   );
 }
 
-function ResultBlock({ result, onClear }: { result: TestResult; onClear: () => void }) {
+function ResultBlock({ result, onClear, testId, showRaw }: { result: TestResult; onClear: () => void; testId: string; showRaw?: boolean }) {
   return (
     <div
       className={`flex items-start gap-3 rounded-md border px-4 py-3 text-sm ${
@@ -209,7 +310,7 @@ function ResultBlock({ result, onClear }: { result: TestResult; onClear: () => v
           ? "border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950/30"
           : "border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950/30"
       }`}
-      data-testid="result-twilio-test"
+      data-testid={testId}
     >
       {result.ok ? (
         <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400 mt-0.5 shrink-0" />
@@ -231,8 +332,13 @@ function ResultBlock({ result, onClear }: { result: TestResult; onClear: () => v
         <p className={result.ok ? "text-green-800 dark:text-green-200" : "text-red-800 dark:text-red-200"}>
           {result.message}
         </p>
+        {showRaw && result.raw && !result.ok && (
+          <pre className="mt-2 text-xs bg-black/10 dark:bg-white/5 rounded p-2 overflow-x-auto whitespace-pre-wrap break-all">
+            {result.raw}
+          </pre>
+        )}
         {result.stack && (
-          <pre className="mt-2 text-xs text-red-700 dark:text-red-300 whitespace-pre-wrap break-all">
+          <pre className="mt-2 text-xs text-muted-foreground overflow-x-auto whitespace-pre-wrap break-all">
             {result.stack}
           </pre>
         )}

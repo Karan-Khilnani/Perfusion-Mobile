@@ -2337,6 +2337,59 @@ export async function registerRoutes(
     }
   });
 
+  // POST /api/admin/test-exotel  { from, to } — places a real masked call via Exotel
+  app.post("/api/admin/test-exotel", isAdmin, async (req, res) => {
+    try {
+      const exotelSid = process.env.EXOTEL_SID;
+      const exotelApiKey = process.env.EXOTEL_API_KEY;
+      const exotelApiToken = process.env.EXOTEL_API_TOKEN;
+      const exotelVirtualNumber = process.env.EXOTEL_VIRTUAL_NUMBER;
+
+      if (!exotelSid || !exotelApiKey || !exotelApiToken || !exotelVirtualNumber) {
+        return res.json({ ok: false, message: "Exotel env vars are not configured (EXOTEL_SID, EXOTEL_API_KEY, EXOTEL_API_TOKEN, EXOTEL_VIRTUAL_NUMBER)." });
+      }
+
+      const { from: fromPhone, to: toPhone } = req.body as { from?: string; to?: string };
+      if (!fromPhone || !toPhone) {
+        return res.status(400).json({ ok: false, message: "'from' and 'to' phone numbers are required." });
+      }
+
+      const exotelUrl = `https://api.exotel.com/v1/Accounts/${exotelSid}/Calls/connect.json`;
+      const exotelBasicAuth = Buffer.from(`${exotelApiKey}:${exotelApiToken}`).toString("base64");
+      const params = new URLSearchParams({
+        From: fromPhone,
+        To: toPhone,
+        CallerId: exotelVirtualNumber,
+      });
+
+      const exotelRes = await fetch(exotelUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          "Authorization": `Basic ${exotelBasicAuth}`,
+        },
+        body: params.toString(),
+      });
+
+      const rawText = await exotelRes.text();
+      let parsed: any = null;
+      try { parsed = JSON.parse(rawText); } catch {}
+
+      if (!exotelRes.ok) {
+        const errMsg = parsed?.RestException?.Message || rawText || `HTTP ${exotelRes.status}`;
+        console.error(`[Exotel] Test call failed: ${exotelRes.status}`, rawText);
+        return res.json({ ok: false, message: `Exotel returned ${exotelRes.status}: ${errMsg}`, raw: rawText });
+      }
+
+      const callSid = parsed?.Call?.Sid || parsed?.sid || "unknown";
+      console.log(`[Exotel] Test call initiated — Sid: ${callSid}, from: ${fromPhone}, to: ${toPhone}`);
+      res.json({ ok: true, message: `Call initiated successfully. Exotel Sid: ${callSid}. Both phones should ring within 5–10 seconds.`, raw: rawText });
+    } catch (e: any) {
+      console.error("[Exotel] Test call error:", e);
+      res.json({ ok: false, message: e?.message || "Request failed", stack: e?.stack });
+    }
+  });
+
   // Admin Routes
   app.get("/api/admin/providers", isAdmin, async (req, res) => {
     try {
