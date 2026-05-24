@@ -402,13 +402,13 @@ export default function OrdersPage() {
     );
   };
 
-  const CallConsultantButton = ({ bookingId, status }: { bookingId: string; status: string }) => {
+  const CallConsultantButton = ({ bookingId, status, callbackPhone }: { bookingId: string; status: string; callbackPhone?: string }) => {
     const { toast } = useToast();
-    const canCall = status === "booked";
+    const canCall = status === "booked" && !!callbackPhone;
     const callMutation = useMutation({
       mutationFn: () => apiRequest("POST", `/api/bookings/${bookingId}/call`),
       onSuccess: () => {
-        toast({ title: "Call initiated", description: "You will receive a call on your registered ward number shortly." });
+        toast({ title: "Call initiated", description: "You will receive a call on your registered ward number shortly — numbers are masked for privacy." });
       },
       onError: async (err: any) => {
         let msg = "Failed to initiate call.";
@@ -419,24 +419,27 @@ export default function OrdersPage() {
         toast({ title: "Call failed", description: msg, variant: "destructive" });
       },
     });
+
+    const description = !callbackPhone
+      ? "Add a call-back number to this booking to enable phone consultation"
+      : status !== "booked"
+      ? "Phone calls are only available for active (booked) consultations"
+      : "Exotel will call your registered ward number and bridge you with the consultant — both numbers are masked";
+
     return (
       <div className="rounded-lg border border-green-500/20 bg-green-500/5 p-4">
         <div className="flex items-center gap-2 text-green-700 dark:text-green-400">
           <Phone className="h-5 w-5" />
           <span className="font-medium">Phone Consultation</span>
         </div>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {canCall
-            ? "Calls your registered ward number and connects you with the consultant — numbers are masked for privacy"
-            : "Phone calls are only available for active (booked) consultations"}
-        </p>
+        <p className="mt-1 text-sm text-muted-foreground">{description}</p>
         <Button
           className="mt-3 gap-2"
           variant="outline"
           onClick={() => callMutation.mutate()}
           disabled={callMutation.isPending || !canCall}
           data-testid="button-call-consultant"
-          title={!canCall ? "Calls are only available for active bookings" : undefined}
+          title={!canCall ? description : undefined}
         >
           {callMutation.isPending ? (
             <><Phone className="h-4 w-4 animate-pulse" />Connecting…</>
@@ -595,8 +598,12 @@ export default function OrdersPage() {
           );
         })()}
 
-        {booking.bookingType === "consultation" && (booking as any).callbackPhone && (
-          <CallConsultantButton bookingId={booking.id} status={booking.status} />
+        {booking.bookingType === "consultation" && (
+          <CallConsultantButton
+            bookingId={booking.id}
+            status={booking.status}
+            callbackPhone={(booking as any).callbackPhone}
+          />
         )}
 
         {validUrls(booking.documentUrls).length > 0 && (

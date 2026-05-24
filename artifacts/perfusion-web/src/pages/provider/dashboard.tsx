@@ -306,8 +306,13 @@ function CallSeekerButton({ booking }: { booking: ActiveConsultation }) {
     onSuccess: () => {
       toast({ title: "Call initiated", description: "Connecting you with the patient's ward — numbers are masked for privacy." });
     },
-    onError: (err: Error) => {
-      toast({ title: "Call failed", description: err.message || "Failed to initiate call.", variant: "destructive" });
+    onError: async (err: any) => {
+      let msg = "Failed to initiate call.";
+      try {
+        const data = await err?.response?.json?.();
+        if (data?.error) msg = data.error;
+      } catch {}
+      toast({ title: "Call failed", description: msg, variant: "destructive" });
     },
   });
   return (
