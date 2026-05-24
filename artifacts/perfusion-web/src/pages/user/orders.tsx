@@ -368,7 +368,7 @@ export default function OrdersPage() {
                         className="h-7 text-xs border-blue-300 text-blue-700 hover:bg-blue-50 dark:border-blue-700 dark:text-blue-300 dark:hover:bg-blue-900/30 gap-1"
                       >
                         <Download className="h-3 w-3" />
-                        Download Prescription
+                        Download Consultation Summary
                       </Button>
                     </a>
                   </div>

@@ -445,7 +445,7 @@ export default function UserDashboard() {
                                 data-testid={`button-download-prescription-${booking.id}`}
                               >
                                 <Download className="h-4 w-4" />
-                                Download Prescription
+                                Download Consultation Summary
                               </Button>
                             </a>
                           )}
