@@ -16,6 +16,7 @@ import {
   CheckSquare,
   Square,
   X,
+  Phone,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -24,10 +25,42 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { getCallWindow, callWindowLabel, toISTTimeString } from "@/lib/call-window";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Clock } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 import type { Booking } from "@shared/schema";
 
 interface ActiveConsultation extends Booking {
   consultantSpecialization: string | null;
+}
+
+function DashboardCallButton({ bookingId, callbackPhone, status }: { bookingId: string; callbackPhone?: string; status: string }) {
+  const { toast } = useToast();
+  const canCall = status === "booked" && !!callbackPhone;
+  const callMutation = useMutation({
+    mutationFn: () => apiRequest("POST", `/api/bookings/${bookingId}/call`),
+    onSuccess: () => {
+      toast({ title: "Call initiated", description: "You will receive a call on your ward number shortly — numbers are masked for privacy." });
+    },
+    onError: async (err: any) => {
+      let msg = "Failed to initiate call.";
+      try { const d = await err?.response?.json?.(); if (d?.error) msg = d.error; } catch {}
+      toast({ title: "Call failed", description: msg, variant: "destructive" });
+    },
+  });
+  return (
+    <Button
+      size="sm"
+      variant="outline"
+      className="w-full gap-2 border-green-500/30 text-green-700 dark:text-green-400 hover:bg-green-500/5"
+      onClick={() => callMutation.mutate()}
+      disabled={callMutation.isPending || !canCall}
+      title={!canCall ? (!callbackPhone ? "No call-back number on this booking" : "Only available for active bookings") : undefined}
+      data-testid={`button-call-consultant-${bookingId}`}
+    >
+      {callMutation.isPending
+        ? <><Phone className="h-4 w-4 animate-pulse" />Connecting…</>
+        : <><Phone className="h-4 w-4" />Call Consultant</>}
+    </Button>
+  );
 }
 
 interface DashboardData {
@@ -406,6 +439,12 @@ export default function UserDashboard() {
                               </Button>
                             </a>
                           )}
+
+                          <DashboardCallButton
+                            bookingId={booking.id}
+                            callbackPhone={(booking as any).callbackPhone}
+                            status={booking.status}
+                          />
                         </div>
                       )}
                     </div>
