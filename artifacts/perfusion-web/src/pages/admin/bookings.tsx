@@ -51,6 +51,23 @@ export default function AdminBookingsPage() {
     }
   }
 
+  // Set callback phone state
+  const [callbackPhoneBooking, setCallbackPhoneBooking] = useState<Booking | null>(null);
+  const [callbackPhoneInput, setCallbackPhoneInput] = useState("");
+  const setCallbackMutation = useMutation({
+    mutationFn: ({ id, phone }: { id: string; phone: string }) =>
+      apiRequest("PATCH", `/api/admin/bookings/${id}`, { callbackPhone: phone }).then((r) => r.json()),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/bookings"] });
+      setCallbackPhoneBooking(null);
+      setCallbackPhoneInput("");
+      toast({ title: "Callback number saved", description: "The seeker's ward call-back number has been updated." });
+    },
+    onError: () => {
+      toast({ title: "Save failed", description: "Could not update the callback number.", variant: "destructive" });
+    },
+  });
+
   // Extend call window state
   const [extendWindowBooking, setExtendWindowBooking] = useState<Booking | null>(null);
   const [extendDurationMinutes, setExtendDurationMinutes] = useState<number>(60);
@@ -554,9 +571,12 @@ export default function AdminBookingsPage() {
                       <p className="text-xs font-mono text-muted-foreground">
                         {(booking as any).bookingNumber || booking.id.substring(0, 12).toUpperCase()} • {booking.createdAt && format(new Date(booking.createdAt), "PPp")}
                       </p>
-                      {booking.bookingType === "consultation" && (booking as any).callbackPhone && (
+                      {booking.bookingType === "consultation" && (
                         <p className="text-xs text-muted-foreground">
-                          Call-back: {(booking as any).callbackPhone}{(booking as any).callbackWardName ? ` (${(booking as any).callbackWardName})` : ""}
+                          {(booking as any).callbackPhone
+                            ? <>Call-back: {(booking as any).callbackPhone}{(booking as any).callbackWardName ? ` (${(booking as any).callbackWardName})` : ""}</>
+                            : <span className="text-amber-600 dark:text-amber-400">No call-back number set</span>
+                          }
                         </p>
                       )}
                       {booking.bookingType === "consultation" && (booking as any).prescriptionApprovedAt && (
@@ -593,15 +613,29 @@ export default function AdminBookingsPage() {
                   <div className="flex items-center gap-3">
                     <StatusBadge status={booking.status} />
                     {booking.bookingType === "consultation" && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => setCallLogsBookingId(booking.id)}
-                        data-testid={`button-call-logs-${booking.id}`}
-                      >
-                        <Phone className="mr-1 h-3.5 w-3.5" />
-                        Call Logs
-                      </Button>
+                      <>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setCallbackPhoneBooking(booking);
+                            setCallbackPhoneInput((booking as any).callbackPhone || "");
+                          }}
+                          data-testid={`button-set-callback-${booking.id}`}
+                        >
+                          <Phone className="mr-1 h-3.5 w-3.5" />
+                          {(booking as any).callbackPhone ? "Edit Callback" : "Set Callback"}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setCallLogsBookingId(booking.id)}
+                          data-testid={`button-call-logs-${booking.id}`}
+                        >
+                          <Phone className="mr-1 h-3.5 w-3.5" />
+                          Call Logs
+                        </Button>
+                      </>
                     )}
                     <Button
                       size="sm"
@@ -920,6 +954,43 @@ export default function AdminBookingsPage() {
               ))
             )}
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Set / Edit Callback Phone Dialog */}
+      <Dialog open={!!callbackPhoneBooking} onOpenChange={(open) => { if (!open) { setCallbackPhoneBooking(null); setCallbackPhoneInput(""); } }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Phone className="h-4 w-4" />
+              {callbackPhoneBooking && (callbackPhoneBooking as any).callbackPhone ? "Edit Call-back Number" : "Set Call-back Number"}
+            </DialogTitle>
+            <DialogDescription>
+              The ward phone number Exotel will ring first when a call is initiated for this consultation booking.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="space-y-1">
+              <Label htmlFor="callbackPhoneInput">Ward / Call-back Phone Number</Label>
+              <Input
+                id="callbackPhoneInput"
+                placeholder="+91XXXXXXXXXX"
+                value={callbackPhoneInput}
+                onChange={(e) => setCallbackPhoneInput(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setCallbackPhoneBooking(null); setCallbackPhoneInput(""); }}>
+              Cancel
+            </Button>
+            <Button
+              disabled={!callbackPhoneInput.trim() || setCallbackMutation.isPending}
+              onClick={() => callbackPhoneBooking && setCallbackMutation.mutate({ id: callbackPhoneBooking.id, phone: callbackPhoneInput.trim() })}
+            >
+              {setCallbackMutation.isPending ? "Saving…" : "Save"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
