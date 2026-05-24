@@ -4664,9 +4664,11 @@ export async function registerRoutes(
       }
 
       const consultant = await storage.getConsultantById(booking.serviceId);
-      const consultantPhone = (consultant as any)?.contactPhone;
+      // For individual consultant providers the phone lives on provider.phone (My Profile);
+      // for hospital/clinic providers it lives on consultant.contactPhone (Services page).
+      const consultantPhone = (consultant as any)?.contactPhone || (provider as any)?.phone;
       if (!consultantPhone) {
-        return res.status(400).json({ error: "No contact phone number registered for this consultant" });
+        return res.status(400).json({ error: "No contact phone number found for this consultant. Please add one in My Profile or the consultant's Services profile." });
       }
 
       let fromPhone: string;
