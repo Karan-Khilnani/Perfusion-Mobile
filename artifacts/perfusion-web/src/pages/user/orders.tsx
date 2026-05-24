@@ -402,9 +402,10 @@ export default function OrdersPage() {
     );
   };
 
-  const CallConsultantButton = ({ bookingId, status, callbackPhone }: { bookingId: string; status: string; callbackPhone?: string }) => {
+  const CallConsultantButton = ({ bookingId, status, callbackPhone, appointmentSlot, callWindowExtendedUntil }: { bookingId: string; status: string; callbackPhone?: string; appointmentSlot?: string | null; callWindowExtendedUntil?: string | null }) => {
     const { toast } = useToast();
-    const canCall = status === "booked" && !!callbackPhone;
+    const win = getCallWindow({ appointmentSlot, callWindowExtendedUntil });
+    const canCall = status === "booked" && !!callbackPhone && win.open;
     const callMutation = useMutation({
       mutationFn: () => apiRequest("POST", `/api/bookings/${bookingId}/call`),
       onSuccess: () => {
@@ -424,6 +425,10 @@ export default function OrdersPage() {
       ? "Add a call-back number to this booking to enable phone consultation"
       : status !== "booked"
       ? "Phone calls are only available for active (booked) consultations"
+      : win.reason === "before_window" && win.windowStart
+      ? `Call window opens at ${toISTTimeString(win.windowStart)} IST — same window as video call`
+      : win.reason === "expired"
+      ? "Slot has ended — contact admin to extend if needed"
       : "Exotel will call your registered ward number and bridge you with the consultant — both numbers are masked";
 
     return (
@@ -603,6 +608,8 @@ export default function OrdersPage() {
             bookingId={booking.id}
             status={booking.status}
             callbackPhone={(booking as any).callbackPhone}
+            appointmentSlot={(booking as any).appointmentSlot}
+            callWindowExtendedUntil={(booking as any).callWindowExtendedUntil}
           />
         )}
 

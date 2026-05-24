@@ -32,9 +32,19 @@ interface ActiveConsultation extends Booking {
   consultantSpecialization: string | null;
 }
 
-function DashboardCallButton({ bookingId, callbackPhone, status }: { bookingId: string; callbackPhone?: string; status: string }) {
+function DashboardCallButton({ bookingId, callbackPhone, status, appointmentSlot, callWindowExtendedUntil }: { bookingId: string; callbackPhone?: string; status: string; appointmentSlot?: string | null; callWindowExtendedUntil?: string | null }) {
   const { toast } = useToast();
-  const canCall = status === "booked" && !!callbackPhone;
+  const win = getCallWindow({ appointmentSlot, callWindowExtendedUntil });
+  const canCall = status === "booked" && !!callbackPhone && win.open;
+  const disabledTitle = !callbackPhone
+    ? "No call-back number on this booking"
+    : status !== "booked"
+    ? "Only available for active bookings"
+    : win.reason === "before_window" && win.windowStart
+    ? `Call window opens at ${toISTTimeString(win.windowStart)} IST`
+    : win.reason === "expired"
+    ? "Slot has ended"
+    : undefined;
   const callMutation = useMutation({
     mutationFn: () => apiRequest("POST", `/api/bookings/${bookingId}/call`),
     onSuccess: () => {
@@ -53,7 +63,7 @@ function DashboardCallButton({ bookingId, callbackPhone, status }: { bookingId: 
       className="w-full gap-2 border-green-500/30 text-green-700 dark:text-green-400 hover:bg-green-500/5"
       onClick={() => callMutation.mutate()}
       disabled={callMutation.isPending || !canCall}
-      title={!canCall ? (!callbackPhone ? "No call-back number on this booking" : "Only available for active bookings") : undefined}
+      title={!canCall ? disabledTitle : undefined}
       data-testid={`button-call-consultant-${bookingId}`}
     >
       {callMutation.isPending
@@ -444,6 +454,8 @@ export default function UserDashboard() {
                             bookingId={booking.id}
                             callbackPhone={(booking as any).callbackPhone}
                             status={booking.status}
+                            appointmentSlot={(booking as any).appointmentSlot}
+                            callWindowExtendedUntil={(booking as any).callWindowExtendedUntil}
                           />
                         </div>
                       )}
