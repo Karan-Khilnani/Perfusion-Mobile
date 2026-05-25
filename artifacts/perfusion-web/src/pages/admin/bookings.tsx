@@ -13,7 +13,7 @@ import { StatusBadge } from "@/components/status-badge";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { format } from "date-fns";
-import { Search, Plus, Edit, Eye, Filter, Stethoscope, FlaskConical, ScanLine, Download, Upload, File, Loader2, ShieldCheck, FileSignature, Clock, TimerReset, Phone, MessageSquare, Copy, Check } from "lucide-react";
+import { Search, Plus, Edit, Eye, Filter, Stethoscope, FlaskConical, ScanLine, Download, Upload, File, Loader2, ShieldCheck, FileSignature, Clock, TimerReset, Phone, MessageSquare, Copy, Check, Share2 } from "lucide-react";
 import type { Booking, Consultant, LabTest, RadiologyModality, BookingStatus } from "@shared/schema";
 
 type BookingFilter = "all" | "consultation" | "lab" | "teleradiology";
@@ -174,6 +174,20 @@ export default function AdminBookingsPage() {
       setTimeout(() => setCopiedTab(null), 2000);
     } catch {
       toast({ title: "Copy failed", description: "Could not copy to clipboard.", variant: "destructive" });
+    }
+  }
+
+  async function shareMessage(text: string, label: string) {
+    if (navigator.share) {
+      try {
+        await navigator.share({ text });
+      } catch (err: any) {
+        if (err?.name !== "AbortError") {
+          toast({ title: "Share failed", description: "Could not open share dialog.", variant: "destructive" });
+        }
+      }
+    } else {
+      await copyToClipboard(text, label);
     }
   }
 
@@ -1144,7 +1158,7 @@ export default function AdminBookingsPage() {
                   WhatsApp Messages
                 </DialogTitle>
                 <DialogDescription>
-                  {waMessageBooking.bookingType === "consultation" ? "2 messages" : "3 messages"} ready to copy — paste each into the relevant WhatsApp chat.
+                  {waMessageBooking.bookingType === "consultation" ? "2 messages" : "3 messages"} ready — share directly or copy to paste into WhatsApp.
                 </DialogDescription>
               </DialogHeader>
               <Tabs defaultValue={defaultTab} className="w-full">
@@ -1161,17 +1175,26 @@ export default function AdminBookingsPage() {
                       className="min-h-[260px] font-mono text-xs resize-none bg-muted/40"
                       onClick={(e) => (e.target as HTMLTextAreaElement).select()}
                     />
-                    <Button
-                      className="w-full"
-                      variant={copiedTab === m.label ? "secondary" : "default"}
-                      onClick={() => copyToClipboard(m.message, m.label)}
-                    >
-                      {copiedTab === m.label ? (
-                        <><Check className="mr-2 h-4 w-4 text-green-600" />Copied!</>
-                      ) : (
-                        <><Copy className="mr-2 h-4 w-4" />Copy {m.label} Message</>
-                      )}
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button
+                        className="flex-1"
+                        onClick={() => shareMessage(m.message, m.label)}
+                      >
+                        <Share2 className="mr-2 h-4 w-4" />
+                        Share
+                      </Button>
+                      <Button
+                        className="flex-1"
+                        variant={copiedTab === m.label ? "secondary" : "outline"}
+                        onClick={() => copyToClipboard(m.message, m.label)}
+                      >
+                        {copiedTab === m.label ? (
+                          <><Check className="mr-2 h-4 w-4 text-green-600" />Copied!</>
+                        ) : (
+                          <><Copy className="mr-2 h-4 w-4" />Copy</>
+                        )}
+                      </Button>
+                    </div>
                   </TabsContent>
                 ))}
               </Tabs>
