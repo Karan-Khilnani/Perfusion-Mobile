@@ -1,0 +1,32 @@
+1.	when consultation is opening reports and treatment chart from their dashboard active consultation panel. he/she is unable to see the reports and treatment chart
+2.	incomplete slot is shown in consultant list, logged in seeker page shows something else and doctors browsing showing something else
+3.	On slots drop down menu, slots are not arranged early to late while they arranged in sequence consultant added them
+4.	Still sample patient and sunil
+5.	Left swipe for reports, right swipe for summary. More smoother
+6.	In mobile during video call, when swiping to reports or summary, video goes into pip mode but the pip window should be draggable, user should be able to touch it and move it anywhere in screen, currently it is fixed at one place
+7.	Pdf document still we need to open while call in mobile
+8.	Perfusion logo in prescription
+9.	Even if a consultant has slot for today but its showing slot for tomorrow, I was checking dr. tesu Kesharwani, around 5 pm, he had slot for 8 pm but still in doctors list page, it was written available for tomorrow
+10.	In mobile when hover over enter perfusion, consultation and labs both are not visible, labs is out of screen
+11.	Mobile calling not working
+12.	Expired slot is still visible as join call,
+13.	In mobile pdf is not appearing as display
+14.	In mobile cant open the pdf or image in full 
+15.	Unable to download the prescription 
+16.	Call seeker or consultant options are showing out of slot boundaries. They shouldn’t be able to call each other before or after the slot, just like video call 
+17.	Everywhere in dashboard and booking for all seeker, provide hospital and individual consultant provider. For video call, currently term ‘join call’ is being used, instead we should use ‘Join video room’ as ‘call’ term is confusing with audio exotel call
+18.	On seeker dashboard, instead of download prescription we need term download consultation summary
+19.	Calling feature not working due to KYC verification from exotel
+20.	Whatsapp is not set due to meta verification
+
+
+
+
+21.	Here is the idea, meta business verification is taking just too long. For now what we can do, for every booking admin already  has panel where amdin can seee all booking details. what we can do for every booking in same panel there will be option to download the message, we are planning to send to seeker, provider and consultant. so admin can download this message and manually send it to all the relevant users manually through official business number. Now lets talk about messages need to be generated in consultation flow. When consultation booking is made one message is for consultant and one is for seeker. 
+
+
+
+
+
+ 
+

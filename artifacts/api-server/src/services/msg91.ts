@@ -83,6 +83,39 @@ export async function triggerVoiceCall(
   }
 }
 
+/**
+ * Initiates a masked two-leg bridge call via Twilio.
+ * 1. Twilio calls `fromPhone` first.
+ * 2. When fromPhone answers, Twilio fetches `bridgeWebhookUrl` and receives TwiML
+ *    instructing it to dial `toPhone` — connecting both parties through a Twilio
+ *    number so neither sees the other's real number.
+ */
+export async function triggerBridgeCall(
+  fromPhone: string,
+  bridgeWebhookUrl: string,
+): Promise<string | null> {
+  const client = getClient();
+  if (!client || !TWILIO_PHONE_NUMBER) {
+    console.error("[Twilio] Missing credentials or phone number for bridge call");
+    return null;
+  }
+
+  const formattedFrom = formatPhoneNumber(fromPhone);
+
+  try {
+    const call = await client.calls.create({
+      url: bridgeWebhookUrl,
+      to: formattedFrom,
+      from: TWILIO_PHONE_NUMBER,
+    });
+    console.log("[Twilio] Bridge call initiated to:", formattedFrom, "SID:", call.sid);
+    return call.sid;
+  } catch (error: any) {
+    console.error("[Twilio] Bridge call failed:", error?.message || error);
+    return null;
+  }
+}
+
 export async function cancelVoiceCall(callSid: string): Promise<void> {
   const client = getClient();
   if (!client) return;

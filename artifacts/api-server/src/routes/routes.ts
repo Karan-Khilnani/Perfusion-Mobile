@@ -12,7 +12,7 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import { uploadFile as supabaseUpload } from "../services/supabase-storage";
-import { notifyAdminLabBooking, notifyUserReportReady, cancelVoiceCall, triggerVoiceCall } from "../services/msg91";
+import { notifyAdminLabBooking, notifyUserReportReady, cancelVoiceCall, triggerVoiceCall, triggerBridgeCall } from "../services/msg91";
 import { generateBookingNumber } from "../services/booking-number";
 import { calculateCustomerPrice, deriveMarginFromPrice, derivePriceFromMargin } from "../services/pricing";
 import { processReport, type BookingReportData } from "../services/report-processor";
@@ -4671,10 +4671,12 @@ export async function registerRoutes(
     }
   });
 
-  // ── Exotel bridge call ─────────────────────────────────────────────────────
-  // POST /api/bookings/:id/call — initiates a masked bridge call via Exotel
-  // Seeker calls: From=callbackPhone → To=consultant contactPhone
-  // Provider calls: From=consultant contactPhone → To=callbackPhone
+  // ── Twilio masked bridge call ──────────────────────────────────────────────
+  // POST /api/bookings/:id/call — initiates a two-leg masked bridge call via Twilio.
+  // Step 1: Twilio calls Party A (the initiator's phone).
+  // Step 2: When Party A answers, Twilio hits /api/webhooks/twilio/bridge?to=<partyB>
+  //         and receives TwiML telling it to dial Party B — bridging both through
+  //         a Twilio number so neither sees the other's real number.
 
   function maskPhone(phone: string): string {
     const digits = phone.replace(/\D/g, "");
@@ -4687,11 +4689,7 @@ export async function registerRoutes(
       const userId = req.user?.id;
       const { id } = req.params;
 
-      const exotelSid = process.env.EXOTEL_SID;
-      const exotelApiKey = process.env.EXOTEL_API_KEY;
-      const exotelApiToken = process.env.EXOTEL_API_TOKEN;
-      const exotelVirtualNumber = process.env.EXOTEL_VIRTUAL_NUMBER;
-      if (!exotelSid || !exotelApiKey || !exotelApiToken || !exotelVirtualNumber) {
+      if (!process.env.TWILIO_ACCOUNT_SID || !process.env.TWILIO_AUTH_TOKEN || !process.env.TWILIO_PHONE_NUMBER) {
         return res.status(503).json({ error: "Phone call service is not configured on this instance." });
       }
 
@@ -4738,44 +4736,21 @@ export async function registerRoutes(
         callerRole = "provider";
       }
 
-      // Node 18+ WHATWG fetch rejects URLs with embedded credentials (user:pass@host).
-      // Use Authorization: Basic header instead.
-      const exotelUrl = `https://api.exotel.com/v1/Accounts/${exotelSid}/Calls/connect.json`;
-      const exotelBasicAuth = Buffer.from(`${exotelApiKey}:${exotelApiToken}`).toString("base64");
+      // Build the TwiML webhook URL — Twilio fetches this when Party A answers
+      // and receives instructions to dial Party B.
       const appDomain = process.env.REPLIT_DOMAINS?.split(",")[0];
-      const statusCallbackUrl = appDomain
-        ? `https://${appDomain}/api/webhooks/exotel/status`
-        : undefined;
-      const params = new URLSearchParams({
-        From: fromPhone,
-        To: toPhone,
-        CallerId: exotelVirtualNumber,
-        ...(statusCallbackUrl ? { StatusCallback: statusCallbackUrl } : {}),
-      });
+      if (!appDomain) {
+        return res.status(503).json({ error: "App domain not configured — cannot build bridge webhook URL." });
+      }
+      const bridgeWebhookUrl = `https://${appDomain}/api/webhooks/twilio/bridge?to=${encodeURIComponent(toPhone)}`;
 
-      let exotelCallSid: string | null = null;
+      let twilioCallSid: string | null = null;
       let callStatus: "initiated" | "failed" = "initiated";
 
-      try {
-        const exotelRes = await fetch(exotelUrl, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/x-www-form-urlencoded",
-            "Authorization": `Basic ${exotelBasicAuth}`,
-          },
-          body: params.toString(),
-        });
-
-        if (exotelRes.ok) {
-          const data = await exotelRes.json() as any;
-          exotelCallSid = data?.Call?.Sid ?? null;
-        } else {
-          const errText = await exotelRes.text();
-          console.error("[Exotel] Call failed:", exotelRes.status, errText);
-          callStatus = "failed";
-        }
-      } catch (callErr) {
-        console.error("[Exotel] Network error:", callErr);
+      const sid = await triggerBridgeCall(fromPhone, bridgeWebhookUrl);
+      if (sid) {
+        twilioCallSid = sid;
+      } else {
         callStatus = "failed";
       }
 
@@ -4783,18 +4758,35 @@ export async function registerRoutes(
       await pool.query(
         `INSERT INTO call_logs (booking_id, initiator_user_id, caller_role, caller_phone_masked, callee_phone_masked, exotel_call_sid, status)
          VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-        [id, userId, callerRole, maskPhone(fromPhone), maskPhone(toPhone), exotelCallSid, callStatus]
+        [id, userId, callerRole, maskPhone(fromPhone), maskPhone(toPhone), twilioCallSid, callStatus]
       );
 
       if (callStatus === "failed") {
-        return res.status(502).json({ error: "Failed to connect call via Exotel" });
+        return res.status(502).json({ error: "Failed to connect call. Check Twilio credentials and account balance." });
       }
 
-      return res.json({ success: true, callSid: exotelCallSid });
+      return res.json({ success: true, callSid: twilioCallSid });
     } catch (error) {
       console.error("[Call] Error:", error);
       return res.status(500).json({ error: "Failed to initiate call" });
     }
+  });
+
+  // ── Twilio TwiML bridge webhook ─────────────────────────────────────────────
+  // POST /api/webhooks/twilio/bridge?to=<partyB>
+  // Twilio fetches this URL when Party A answers. We return TwiML instructing
+  // Twilio to dial Party B, completing the masked bridge.
+  // Intentionally unauthenticated — Twilio initiates this request.
+  app.post("/api/webhooks/twilio/bridge", (req: any, res) => {
+    const toPhone = req.query.to as string | undefined;
+    if (!toPhone) {
+      res.set("Content-Type", "text/xml");
+      return res.send("<Response><Say>Configuration error. Missing bridge target.</Say></Response>");
+    }
+    const safePhone = toPhone.replace(/[^+\d]/g, "");
+    const twiml = `<Response><Dial>${safePhone}</Dial></Response>`;
+    res.set("Content-Type", "text/xml");
+    res.send(twiml);
   });
 
   // GET /api/admin/bookings/:id/call-logs — admin view of Exotel call logs per booking
