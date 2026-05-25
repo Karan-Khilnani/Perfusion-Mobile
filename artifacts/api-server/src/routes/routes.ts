@@ -12,7 +12,7 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import { uploadFile as supabaseUpload } from "../services/supabase-storage";
-import { notifyAdminLabBooking, notifyUserReportReady, cancelVoiceCall, triggerVoiceCall, triggerBridgeCall } from "../services/msg91";
+import { notifyAdminLabBooking, notifyUserReportReady, cancelVoiceCall, triggerVoiceCall, triggerBridgeCall, formatPhoneNumber } from "../services/msg91";
 import { generateBookingNumber } from "../services/booking-number";
 import { calculateCustomerPrice, deriveMarginFromPrice, derivePriceFromMargin } from "../services/pricing";
 import { processReport, type BookingReportData } from "../services/report-processor";
@@ -4738,11 +4738,14 @@ export async function registerRoutes(
 
       // Build the TwiML webhook URL — Twilio fetches this when Party A answers
       // and receives instructions to dial Party B.
+      // Normalise toPhone to E.164 here so the webhook always dials the right number
+      // regardless of how the phone was stored (e.g. bare 10-digit vs +91...).
       const appDomain = process.env.REPLIT_DOMAINS?.split(",")[0];
       if (!appDomain) {
         return res.status(503).json({ error: "App domain not configured — cannot build bridge webhook URL." });
       }
-      const bridgeWebhookUrl = `https://${appDomain}/api/webhooks/twilio/bridge?to=${encodeURIComponent(toPhone)}`;
+      const toPhoneE164 = formatPhoneNumber(toPhone);
+      const bridgeWebhookUrl = `https://${appDomain}/api/webhooks/twilio/bridge?to=${encodeURIComponent(toPhoneE164)}`;
 
       let twilioCallSid: string | null = null;
       let callStatus: "initiated" | "failed" = "initiated";

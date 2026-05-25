@@ -35,7 +35,7 @@ function getClient() {
  * - Anything else → returned with leading "+" so Twilio rejects it cleanly
  *   instead of silently misrouting (e.g. "45..." being read as Denmark).
  */
-function formatPhoneNumber(phone: string): string {
+export function formatPhoneNumber(phone: string): string {
   if (!phone) return phone;
   const trimmed = phone.trim();
   if (trimmed.startsWith("+")) {
