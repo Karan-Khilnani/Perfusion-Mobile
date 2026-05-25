@@ -13,7 +13,7 @@ import { StatusBadge } from "@/components/status-badge";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { format } from "date-fns";
-import { Search, Plus, Edit, Eye, Filter, Stethoscope, FlaskConical, ScanLine, Download, Upload, File, Loader2, ShieldCheck, FileSignature, Clock, TimerReset, Phone } from "lucide-react";
+import { Search, Plus, Edit, Eye, Filter, Stethoscope, FlaskConical, ScanLine, Download, Upload, File, Loader2, ShieldCheck, FileSignature, Clock, TimerReset, Phone, MessageSquare, Copy, Check } from "lucide-react";
 import type { Booking, Consultant, LabTest, RadiologyModality, BookingStatus } from "@shared/schema";
 
 type BookingFilter = "all" | "consultation" | "lab" | "teleradiology";
@@ -26,6 +26,10 @@ export default function AdminBookingsPage() {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [createType, setCreateType] = useState<"consultation" | "lab" | "teleradiology">("consultation");
   
+  // WhatsApp message state
+  const [waMessageBooking, setWaMessageBooking] = useState<any | null>(null);
+  const [copiedTab, setCopiedTab] = useState<string | null>(null);
+
   // Call logs state
   const [callLogsBookingId, setCallLogsBookingId] = useState<string | null>(null);
   const { data: callLogsData = [] } = useQuery<any[]>({
@@ -48,6 +52,128 @@ export default function AdminBookingsPage() {
       URL.revokeObjectURL(url);
     } catch {
       toast({ title: "Download failed", description: "Could not generate receipt. Please try again.", variant: "destructive" });
+    }
+  }
+
+  function generateWhatsAppMessages(booking: any): { label: string; message: string }[] {
+    const bookingRef = booking.bookingNumber || booking.id.substring(0, 12).toUpperCase();
+    const seeker = users.find((u: any) => u.id === booking.userId);
+    const seekerHospital = seeker?.hospitalName || "Referring Hospital";
+    const bookedOn = booking.createdAt ? format(new Date(booking.createdAt), "dd MMM yyyy, h:mm a") : "—";
+    const portalUrl = window.location.origin;
+
+    if (booking.bookingType === "consultation") {
+      const slot = booking.appointmentSlot || "As scheduled";
+      const videoLine = booking.videoRoomId
+        ? `🎥 *Video Call:* Log in to ${portalUrl} and join from My Bookings`
+        : "";
+
+      const seekerMsg = [
+        `*Consultation Booking Confirmed* ✅`,
+        ``,
+        `📋 *Booking Ref:* ${bookingRef}`,
+        `👤 *Patient:* ${booking.patientName} (${booking.patientAge} yrs)`,
+        `🩺 *Consultant:* ${booking.serviceName}`,
+        booking.providerName ? `🏥 *Provider:* ${booking.providerName}` : "",
+        `🕐 *Slot:* ${slot}`,
+        videoLine,
+        ``,
+        `Please ensure the patient is ready at the scheduled time. Join the video call from the Perfusion portal at your appointment time.`,
+        ``,
+        `_Perfusion Healthcare Platform_`,
+      ].filter(Boolean).join("\n");
+
+      const consultantMsg = [
+        `*Consultation Appointment* 📅`,
+        ``,
+        `📋 *Booking Ref:* ${bookingRef}`,
+        `👤 *Patient:* ${booking.patientName} (${booking.patientAge} yrs)`,
+        `🏥 *From:* ${seekerHospital}`,
+        `🕐 *Slot:* ${slot}`,
+        videoLine,
+        ``,
+        `Please log in to the Perfusion portal at ${portalUrl} to join the video call at the scheduled time.`,
+        ``,
+        `_Perfusion Healthcare Platform_`,
+      ].filter(Boolean).join("\n");
+
+      return [
+        { label: "Seeker", message: seekerMsg },
+        { label: "Consultant", message: consultantMsg },
+      ];
+    }
+
+    if (booking.bookingType === "lab") {
+      const urgencyBanner = booking.urgency === "emergency" ? `🚨 *URGENT / EMERGENCY*\n` : "";
+
+      const seekerMsg = [
+        `*Lab Test Booking Confirmed* 🔬`,
+        ``,
+        urgencyBanner,
+        `📋 *Booking Ref:* ${bookingRef}`,
+        `👤 *Patient:* ${booking.patientName} (${booking.patientAge} yrs)`,
+        booking.patientContact ? `📞 *Patient Contact:* ${booking.patientContact}` : "",
+        `🧪 *Test:* ${booking.serviceName}`,
+        booking.providerName ? `🏥 *Processing Lab:* ${booking.providerName}` : "",
+        `📅 *Booked On:* ${bookedOn}`,
+        ``,
+        `A sample collection agent will be in touch shortly. Please keep the patient ready as per the test requirements.`,
+        ``,
+        `_Perfusion Healthcare Platform_`,
+      ].filter(Boolean).join("\n");
+
+      const agentMsg = [
+        `*Sample Pickup Assignment* 🚗`,
+        ``,
+        urgencyBanner,
+        `📋 *Booking Ref:* ${bookingRef}`,
+        `🧪 *Test:* ${booking.serviceName}`,
+        `👤 *Patient:* ${booking.patientName} (${booking.patientAge} yrs)`,
+        booking.patientContact ? `📞 *Patient Contact:* ${booking.patientContact}` : "",
+        booking.callbackPhone
+          ? `📞 *Ward Contact:* ${booking.callbackPhone}${booking.callbackWardName ? ` (${booking.callbackWardName})` : ""}`
+          : "",
+        `🏥 *Pickup From:* ${seekerHospital}`,
+        booking.providerName ? `📦 *Deliver To:* ${booking.providerName}` : "",
+        `📅 *Booked On:* ${bookedOn}`,
+        ``,
+        `Please collect the sample and deliver to the lab at the earliest. Handle with care.`,
+        ``,
+        `_Perfusion Healthcare Platform_`,
+      ].filter(Boolean).join("\n");
+
+      const labMsg = [
+        `*Incoming Sample Alert* 🧪`,
+        ``,
+        urgencyBanner,
+        `📋 *Booking Ref:* ${bookingRef}`,
+        `🔬 *Test:* ${booking.serviceName}`,
+        `👤 *Patient:* ${booking.patientName} (${booking.patientAge} yrs)`,
+        `🏥 *From:* ${seekerHospital}`,
+        `📅 *Booked On:* ${bookedOn}`,
+        ``,
+        `Sample is being dispatched. Please prepare for processing upon arrival.`,
+        ``,
+        `_Perfusion Healthcare Platform_`,
+      ].filter(Boolean).join("\n");
+
+      return [
+        { label: "Seeker", message: seekerMsg },
+        { label: "Delivery Agent", message: agentMsg },
+        { label: "Lab Provider", message: labMsg },
+      ];
+    }
+
+    return [];
+  }
+
+  async function copyToClipboard(text: string, tabKey: string) {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedTab(tabKey);
+      setTimeout(() => setCopiedTab(null), 2000);
+    } catch {
+      toast({ title: "Copy failed", description: "Could not copy to clipboard.", variant: "destructive" });
     }
   }
 
@@ -655,6 +781,18 @@ export default function AdminBookingsPage() {
                       <Download className="mr-1 h-3.5 w-3.5" />
                       Partner Receipt
                     </Button>
+                    {(booking.bookingType === "consultation" || booking.bookingType === "lab") && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-green-700 dark:text-green-400 border-green-200 dark:border-green-800 hover:bg-green-50 dark:hover:bg-green-950/20"
+                        onClick={() => { setWaMessageBooking(booking); setCopiedTab(null); }}
+                        data-testid={`button-wa-message-${booking.id}`}
+                      >
+                        <MessageSquare className="mr-1 h-3.5 w-3.5" />
+                        WA Msg
+                      </Button>
+                    )}
                     {booking.bookingType === "consultation" && booking.videoRoomId && (
                       <Button
                         size="sm"
@@ -993,6 +1131,54 @@ export default function AdminBookingsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {/* WhatsApp Message Dialog */}
+      {waMessageBooking && (() => {
+        const messages = generateWhatsAppMessages(waMessageBooking);
+        const defaultTab = messages[0]?.label ?? "";
+        return (
+          <Dialog open={!!waMessageBooking} onOpenChange={(open) => { if (!open) { setWaMessageBooking(null); setCopiedTab(null); } }}>
+            <DialogContent className="max-w-lg">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <MessageSquare className="h-5 w-5 text-green-600" />
+                  WhatsApp Messages
+                </DialogTitle>
+                <DialogDescription>
+                  {waMessageBooking.bookingType === "consultation" ? "2 messages" : "3 messages"} ready to copy — paste each into the relevant WhatsApp chat.
+                </DialogDescription>
+              </DialogHeader>
+              <Tabs defaultValue={defaultTab} className="w-full">
+                <TabsList className={`grid w-full ${messages.length === 2 ? "grid-cols-2" : "grid-cols-3"}`}>
+                  {messages.map((m) => (
+                    <TabsTrigger key={m.label} value={m.label}>{m.label}</TabsTrigger>
+                  ))}
+                </TabsList>
+                {messages.map((m) => (
+                  <TabsContent key={m.label} value={m.label} className="space-y-3 mt-3">
+                    <Textarea
+                      readOnly
+                      value={m.message}
+                      className="min-h-[260px] font-mono text-xs resize-none bg-muted/40"
+                      onClick={(e) => (e.target as HTMLTextAreaElement).select()}
+                    />
+                    <Button
+                      className="w-full"
+                      variant={copiedTab === m.label ? "secondary" : "default"}
+                      onClick={() => copyToClipboard(m.message, m.label)}
+                    >
+                      {copiedTab === m.label ? (
+                        <><Check className="mr-2 h-4 w-4 text-green-600" />Copied!</>
+                      ) : (
+                        <><Copy className="mr-2 h-4 w-4" />Copy {m.label} Message</>
+                      )}
+                    </Button>
+                  </TabsContent>
+                ))}
+              </Tabs>
+            </DialogContent>
+          </Dialog>
+        );
+      })()}
     </div>
   );
 }
