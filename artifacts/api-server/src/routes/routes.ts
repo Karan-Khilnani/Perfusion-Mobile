@@ -43,6 +43,7 @@ async function createDailyRoom(roomName: string): Promise<{ url: string; name: s
           enable_chat: true,
           enable_screenshare: true,
           enable_recording: "cloud",
+          start_cloud_recording_after_guest_joins: true,
           exp: Math.floor(Date.now() / 1000) + 30 * 24 * 3600, // Expires in 30 days
         },
       }),
