@@ -403,8 +403,9 @@ export default function ProfilePage() {
       const url = await uploadImage(blob, filename);
       setCurrentPhotoUrl(url);
       await updateProfileMutation.mutateAsync({ profileImageUrl: url });
-    } catch {
+    } catch (err) {
       toast({ title: "Upload failed", description: "Could not upload photo.", variant: "destructive" });
+      throw err;
     } finally {
       setPhotoUploading(false);
     }

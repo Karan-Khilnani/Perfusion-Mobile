@@ -1853,21 +1853,17 @@ export default function ProviderServicesPage() {
         title="Crop Consultant Photo"
         onCropComplete={async (blob, filename) => {
           if (!cropTargetConsultantId) return;
-          try {
-            const formData = new FormData();
-            formData.append("photo", blob, filename);
-            const res = await fetch(`/api/consultants/${cropTargetConsultantId}/upload-photo`, { method: "POST", body: formData, credentials: "include" });
-            if (!res.ok) {
-              const err = await res.json().catch(() => ({}));
-              if (res.status === 401) { toast({ title: "Session expired", description: "Please refresh the page and try again.", variant: "destructive" }); return; }
-              throw new Error(err.message || "Upload failed");
-            }
-            queryClient.invalidateQueries({ queryKey: ["/api/provider/my-consultants"] });
-            queryClient.invalidateQueries({ queryKey: ["/api/consultants"] });
-            toast({ title: "Photo updated" });
-          } catch {
-            toast({ title: "Failed to update photo", variant: "destructive" });
+          const formData = new FormData();
+          formData.append("photo", blob, filename);
+          const res = await fetch(`/api/consultants/${cropTargetConsultantId}/upload-photo`, { method: "POST", body: formData, credentials: "include" });
+          if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            if (res.status === 401) { toast({ title: "Session expired", description: "Please refresh the page and try again.", variant: "destructive" }); }
+            throw new Error(err.message || "Upload failed");
           }
+          queryClient.invalidateQueries({ queryKey: ["/api/provider/my-consultants"] });
+          queryClient.invalidateQueries({ queryKey: ["/api/consultants"] });
+          toast({ title: "Photo updated" });
         }}
       />
 
@@ -1880,19 +1876,15 @@ export default function ProviderServicesPage() {
         title="Crop Digital Signature"
         onCropComplete={async (blob, filename) => {
           if (!cropTargetConsultantId) return;
-          try {
-            const formData = new FormData();
-            formData.append("signature", blob, filename);
-            const res = await fetch(`/api/consultants/${cropTargetConsultantId}/upload-signature`, { method: "POST", body: formData, credentials: "include" });
-            if (!res.ok) {
-              if (res.status === 401) { toast({ title: "Session expired", description: "Please refresh and try again.", variant: "destructive" }); return; }
-              throw new Error("Upload failed");
-            }
-            queryClient.invalidateQueries({ queryKey: ["/api/provider/my-consultants"] });
-            toast({ title: "Signature updated" });
-          } catch {
-            toast({ title: "Failed to update signature", variant: "destructive" });
+          const formData = new FormData();
+          formData.append("signature", blob, filename);
+          const res = await fetch(`/api/consultants/${cropTargetConsultantId}/upload-signature`, { method: "POST", body: formData, credentials: "include" });
+          if (!res.ok) {
+            if (res.status === 401) { toast({ title: "Session expired", description: "Please refresh and try again.", variant: "destructive" }); }
+            throw new Error("Upload failed");
           }
+          queryClient.invalidateQueries({ queryKey: ["/api/provider/my-consultants"] });
+          toast({ title: "Signature updated" });
         }}
       />
     </div>

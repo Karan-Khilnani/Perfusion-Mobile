@@ -521,17 +521,16 @@ export default function AdminUsersPage() {
         aspect={1}
         title="Crop Profile Photo"
         onCropComplete={async (blob, filename) => {
-          try {
-            const formData = new FormData();
-            formData.append("file", blob, filename);
-            const res = await fetch("/api/upload/document", { method: "POST", body: formData, credentials: "include" });
-            if (!res.ok) throw new Error("Upload failed");
-            const { url } = await res.json();
-            setPendingPhotoUrl(url);
-            toast({ title: "Photo ready", description: "Save the profile to apply the new photo." });
-          } catch {
+          const formData = new FormData();
+          formData.append("file", blob, filename);
+          const res = await fetch("/api/upload/document", { method: "POST", body: formData, credentials: "include" });
+          if (!res.ok) {
             toast({ title: "Failed to upload photo", variant: "destructive" });
+            throw new Error("Upload failed");
           }
+          const { url } = await res.json();
+          setPendingPhotoUrl(url);
+          toast({ title: "Photo ready", description: "Save the profile to apply the new photo." });
         }}
       />
     </div>

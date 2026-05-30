@@ -3,14 +3,16 @@ import ReactCrop, { type Crop, type PixelCrop, centerCrop, makeAspectCrop } from
 import "react-image-crop/dist/ReactCrop.css";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Loader2, RotateCcw, ZoomIn, ZoomOut } from "lucide-react";
+import { Loader2, RotateCcw, ZoomIn, ZoomOut, AlertCircle } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
+
+const MAX_OUTPUT_PX = 1200;
 
 interface ImageCropDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   imageFile: File | null;
-  onCropComplete: (blob: Blob, filename: string) => void;
+  onCropComplete: (blob: Blob, filename: string) => Promise<void> | void;
   aspect?: number;
   title?: string;
 }
@@ -36,6 +38,7 @@ export function ImageCropDialog({
   const [imgSrc, setImgSrc] = useState<string>("");
   const [scale, setScale] = useState(1);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [uploadError, setUploadError] = useState<string>("");
   const imgRef = useRef<HTMLImageElement>(null);
 
   useEffect(() => {
@@ -44,6 +47,7 @@ export function ImageCropDialog({
       setCrop(undefined);
       setCompletedCrop(undefined);
       setScale(1);
+      setUploadError("");
       const reader = new FileReader();
       reader.onload = (e) => setImgSrc(e.target?.result as string);
       reader.readAsDataURL(imageFile);
@@ -53,6 +57,7 @@ export function ImageCropDialog({
       setCrop(undefined);
       setCompletedCrop(undefined);
       setScale(1);
+      setUploadError("");
     }
   }, [open, imageFile]);
 
@@ -68,8 +73,6 @@ export function ImageCropDialog({
         initialCrop = { unit: "%", width: 90, height: 90, x: 5, y: 5 };
       }
       setCrop(initialCrop);
-      // Pre-populate completedCrop so "Apply Crop" is enabled without requiring
-      // the user to manually drag the selection first.
       setCompletedCrop({
         unit: "px",
         x: Math.round((initialCrop.x / 100) * displayW),
@@ -85,16 +88,29 @@ export function ImageCropDialog({
     if (!imgRef.current || !completedCrop || !imageFile) return;
 
     setIsProcessing(true);
+    setUploadError("");
+
     try {
-      const canvas = document.createElement("canvas");
       const scaleX = imgRef.current.naturalWidth / imgRef.current.width;
       const scaleY = imgRef.current.naturalHeight / imgRef.current.height;
 
-      canvas.width = completedCrop.width * scaleX;
-      canvas.height = completedCrop.height * scaleY;
+      // Natural-resolution dimensions of the cropped area
+      let outW = Math.round(completedCrop.width * scaleX);
+      let outH = Math.round(completedCrop.height * scaleY);
+
+      // Cap to MAX_OUTPUT_PX on the longest side — keeps JPEG output well under 500 KB
+      if (outW > MAX_OUTPUT_PX || outH > MAX_OUTPUT_PX) {
+        const ratio = Math.min(MAX_OUTPUT_PX / outW, MAX_OUTPUT_PX / outH);
+        outW = Math.round(outW * ratio);
+        outH = Math.round(outH * ratio);
+      }
+
+      const canvas = document.createElement("canvas");
+      canvas.width = outW;
+      canvas.height = outH;
 
       const ctx = canvas.getContext("2d");
-      if (!ctx) return;
+      if (!ctx) { setIsProcessing(false); return; }
 
       ctx.drawImage(
         imgRef.current,
@@ -102,24 +118,28 @@ export function ImageCropDialog({
         completedCrop.y * scaleY,
         completedCrop.width * scaleX,
         completedCrop.height * scaleY,
-        0,
-        0,
-        canvas.width,
-        canvas.height
+        0, 0, outW, outH
       );
 
+      // Use JPEG so the quality parameter actually compresses the file.
+      // PNG ignores quality and outputs lossless, which can be 10–30 MB for high-res crops.
       canvas.toBlob(
-        (blob) => {
-          if (blob) {
+        async (blob) => {
+          if (!blob) { setIsProcessing(false); return; }
+          try {
             const baseName = imageFile.name.replace(/\.[^/.]+$/, "");
-            const filename = `${baseName}-cropped.png`;
-            onCropComplete(blob, filename);
+            const filename = `${baseName}-cropped.jpg`;
+            await onCropComplete(blob, filename);
             onOpenChange(false);
+          } catch (err) {
+            // onCropComplete threw (upload failed) — keep the dialog open so the
+            // user can retry. Callers are responsible for showing the error toast.
+            setUploadError(err instanceof Error ? err.message : "Upload failed. Please try again.");
+            setIsProcessing(false);
           }
-          setIsProcessing(false);
         },
-        "image/png",
-        0.95
+        "image/jpeg",
+        0.88
       );
     } catch {
       setIsProcessing(false);
@@ -194,6 +214,13 @@ export function ImageCropDialog({
               <Loader2 className="h-6 w-6 animate-spin" />
             </div>
           )}
+
+          {uploadError && (
+            <div className="flex items-center gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              <AlertCircle className="h-4 w-4 shrink-0" />
+              {uploadError}
+            </div>
+          )}
         </div>
 
         <DialogFooter className="flex items-center justify-between gap-2">
@@ -201,7 +228,7 @@ export function ImageCropDialog({
             variant="outline"
             size="sm"
             onClick={handleReset}
-            disabled={!imgSrc}
+            disabled={!imgSrc || isProcessing}
             data-testid="button-crop-reset"
           >
             <RotateCcw className="h-4 w-4 mr-2" />
@@ -211,6 +238,7 @@ export function ImageCropDialog({
             <Button
               variant="outline"
               onClick={() => onOpenChange(false)}
+              disabled={isProcessing}
               data-testid="button-crop-cancel"
             >
               Cancel
@@ -220,7 +248,7 @@ export function ImageCropDialog({
               disabled={!completedCrop || isProcessing}
               data-testid="button-crop-confirm"
             >
-              {isProcessing ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Processing...</> : "Apply Crop"}
+              {isProcessing ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Uploading…</> : "Apply Crop"}
             </Button>
           </div>
         </DialogFooter>

@@ -892,20 +892,16 @@ export default function AdminConsultantsPage() {
         title="Crop Consultant Photo"
         onCropComplete={async (blob, filename) => {
           if (!cropTargetId) return;
-          try {
-            const formData = new FormData();
-            formData.append("photo", blob, filename);
-            const res = await fetch(`/api/consultants/${cropTargetId}/upload-photo`, { method: "POST", body: formData, credentials: "include" });
-            if (!res.ok) {
-              const err = await res.json().catch(() => ({}));
-              if (res.status === 401) { toast({ title: "Session expired", description: "Please refresh the page and try again.", variant: "destructive" }); return; }
-              throw new Error(err.message || "Upload failed");
-            }
-            queryClient.invalidateQueries({ queryKey: ["/api/admin/consultants"] });
-            toast({ title: "Photo updated" });
-          } catch {
-            toast({ title: "Failed to update photo", variant: "destructive" });
+          const formData = new FormData();
+          formData.append("photo", blob, filename);
+          const res = await fetch(`/api/consultants/${cropTargetId}/upload-photo`, { method: "POST", body: formData, credentials: "include" });
+          if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            if (res.status === 401) { toast({ title: "Session expired", description: "Please refresh the page and try again.", variant: "destructive" }); }
+            throw new Error(err.message || "Upload failed");
           }
+          queryClient.invalidateQueries({ queryKey: ["/api/admin/consultants"] });
+          toast({ title: "Photo updated" });
         }}
       />
 
