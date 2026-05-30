@@ -338,40 +338,6 @@ function CallSeekerButton({ booking }: { booking: ActiveConsultation }) {
   );
 }
 
-function ProviderReceiptButton({ bookingId, bookingNumber }: { bookingId: string; bookingNumber?: string }) {
-  const { toast } = useToast();
-  const [loading, setLoading] = useState(false);
-  async function handleDownload() {
-    setLoading(true);
-    try {
-      const res = await fetch(`/api/bookings/${bookingId}/receipt?type=provider`, { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to generate receipt");
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `partner-receipt-${bookingNumber || bookingId.slice(0, 8)}.pdf`;
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch {
-      toast({ title: "Download failed", description: "Could not generate receipt. Please try again.", variant: "destructive" });
-    } finally {
-      setLoading(false);
-    }
-  }
-  return (
-    <Button
-      variant="outline"
-      className="w-full h-9 gap-2 rounded-xl text-sm"
-      onClick={handleDownload}
-      disabled={loading}
-      data-testid={`button-provider-receipt-${bookingId}`}
-    >
-      <Download className="h-4 w-4 shrink-0" />
-      <span className="truncate">{loading ? "Generating…" : "Download Payment Receipt"}</span>
-    </Button>
-  );
-}
 
 function ConsultationsSection({
   isLoading,
@@ -518,7 +484,6 @@ function ConsultationsSection({
                   <CallSeekerButton booking={booking} />
                 )}
 
-                <ProviderReceiptButton bookingId={booking.id} bookingNumber={(booking as any).bookingNumber} />
 
                 <div className="grid grid-cols-3 gap-2">
                   <PatientDetailsDialog
