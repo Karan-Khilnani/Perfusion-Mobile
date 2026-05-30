@@ -353,8 +353,19 @@ export default function ConsultationBookingPage() {
   const validateCurrentStep = async () => {
     if (step === "details") {
       const fields: (keyof BookingFormData)[] = ["patientName", "patientAge", "patientGender", "contactNumber"];
-      if (!isEmergencyTeam) fields.unshift("appointmentSlot");
       const formValid = await form.trigger(fields);
+
+      // appointmentSlot is z.string().optional() in the schema so trigger() alone
+      // never rejects it — enforce manually when the consultant has slots to pick from.
+      if (!isEmergencyTeam) {
+        const slotRequired = consultantAvailableSlots.length > 0 || isCalendarMode;
+        const slot = form.getValues("appointmentSlot");
+        if (slotRequired && (!slot || slot.trim() === "")) {
+          form.setError("appointmentSlot", { message: "Please select an appointment slot" });
+          return false;
+        }
+      }
+
       if (!callbackContactId) {
         setCallbackError("Please select a call-back number for this consultation.");
         return false;
