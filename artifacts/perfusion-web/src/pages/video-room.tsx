@@ -226,10 +226,9 @@ export default function VideoRoomPage() {
   }, [phase, dailyUrl]);
 
   useEffect(() => {
-    if (phase === "connected") {
-      const timer = setTimeout(() => setIsLoading(false), 2000);
-      return () => clearTimeout(timer);
-    }
+    if (phase !== "connected") return;
+    const timer = setTimeout(() => setIsLoading(false), 2000);
+    return () => clearTimeout(timer);
   }, [phase]);
 
   const handleRing = useCallback(async () => {
@@ -371,8 +370,8 @@ export default function VideoRoomPage() {
     if (!pipDragRef.current) return;
     const dx = e.clientX - pipDragRef.current.startX;
     const dy = e.clientY - pipDragRef.current.startY;
-    // PiP size: 128×96 — keep it fully inside the viewport with 4px clearance
-    const pipW = 132, pipH = 100;
+    // PiP size: 192×144 — keep it fully inside the viewport with 4px clearance
+    const pipW = 196, pipH = 148;
     const newRight  = Math.max(4, Math.min(window.innerWidth  - pipW, pipDragRef.current.startRight  - dx));
     const newBottom = Math.max(4, Math.min(window.innerHeight - pipH - 90, pipDragRef.current.startBottom - dy));
     setPipPos({ bottom: newBottom, right: newRight });
@@ -382,6 +381,34 @@ export default function VideoRoomPage() {
     isDraggingPip.current = false;
     pipDragRef.current = null;
   };
+
+  // Hardware back button → PiP while call is live (popstate intercept)
+  useEffect(() => {
+    if (phase !== "connected") return;
+    // Push a dummy entry so the very first back gesture is caught here
+    window.history.pushState({ pipGuard: true }, "");
+    const handlePopstate = () => {
+      // If in full video, shrink to PiP; always re-push to keep catching back presses
+      if (mobilePanelRef.current === "video") {
+        switchPanel("docs");
+      }
+      window.history.pushState({ pipGuard: true }, "");
+    };
+    window.addEventListener("popstate", handlePopstate);
+    return () => window.removeEventListener("popstate", handlePopstate);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase]);
+
+  // Warn before accidental tab close / hard refresh during active call
+  useEffect(() => {
+    if (phase !== "connected") return;
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [phase]);
 
   if (!roomId || !dailyUrl) {
     return (
@@ -603,11 +630,22 @@ export default function VideoRoomPage() {
         {/* Header */}
         <header className="flex items-center justify-between border-b px-3 py-2 shrink-0 z-20 bg-background">
           <div className="flex items-center gap-2">
-            <Link href={returnTo}>
-              <Button variant="ghost" size="icon" className="h-8 w-8" data-testid="button-back">
-                <ArrowLeft className="h-4 w-4" />
-              </Button>
-            </Link>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              data-testid="button-back"
+              onClick={() => {
+                if (phase === "connected") {
+                  // While in a call: toggle between full video and PiP
+                  switchPanel(mobilePanel === "video" ? "docs" : "video");
+                } else {
+                  navigate(returnTo);
+                }
+              }}
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
             <div>
               <h1 className="text-sm font-semibold leading-tight">Video Consultation</h1>
               <p className="text-xs text-muted-foreground leading-tight truncate max-w-[160px]">
@@ -640,8 +678,8 @@ export default function VideoRoomPage() {
                 : {
                     bottom: pipPos.bottom,
                     right: pipPos.right,
-                    width: 128,
-                    height: 96,
+                    width: 192,
+                    height: 144,
                     zIndex: 50,
                     borderRadius: 10,
                     overflow: "hidden",
@@ -681,7 +719,22 @@ export default function VideoRoomPage() {
                 ref={iframeRef}
                 src={buildDailyUrl(dailyUrl)}
                 allow="camera; microphone; fullscreen; display-capture; autoplay"
-                style={{ width: "100%", height: "100%", border: "none", display: "block" }}
+                style={
+                  mobilePanel === "video"
+                    ? { width: "100%", height: "100%", border: "none", display: "block" }
+                    : {
+                        // Render at a larger virtual size and scale down so the top
+                        // (camera tile) fills the PiP — the bottom controls row is clipped off.
+                        // scale = PiP-width / iframe-width = 192 / 400 = 0.48
+                        width: 400,
+                        height: 600,
+                        border: "none",
+                        display: "block",
+                        transform: "scale(0.48)",
+                        transformOrigin: "top left",
+                        flexShrink: 0,
+                      }
+                }
                 data-testid="video-container"
               />
             )}
