@@ -4289,6 +4289,13 @@ export async function registerRoutes(
       const recipientUserId = isSeeker ? provider?.userId : booking.userId;
       if (!recipientUserId) return res.status(400).json({ error: "Cannot find recipient" });
 
+      // Guard: if the call is already accepted (both parties are in the room),
+      // skip re-ringing so the recipient doesn't get a ghost incoming-call alert.
+      const existingSession = await storage.getCallSession(bookingId);
+      if (existingSession && existingSession.status === "accepted") {
+        return res.json({ success: true, session: { bookingId, status: "accepted" } });
+      }
+
       // Persist call session to DB — shared across all autoscale instances
       const SESSION_TTL_MS = 300_000; // 5 minutes
       await storage.createCallSession({
@@ -4444,8 +4451,9 @@ export async function registerRoutes(
         videoRoomUrl: session.videoRoomUrl,
       });
 
-      // Clean up after 10s
-      setTimeout(() => storage.deleteCallSession(bookingId), 10000);
+      // Keep the accepted session alive for 2 hours so the ring-guard can detect
+      // it on page refresh — the 10 s window was too short and caused ghost re-rings.
+      setTimeout(() => storage.deleteCallSession(bookingId), 2 * 60 * 60 * 1000);
 
       res.json({ success: true, videoRoomUrl: session.videoRoomUrl });
     } catch (error) {

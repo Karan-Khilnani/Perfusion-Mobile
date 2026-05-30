@@ -268,12 +268,24 @@ export default function VideoRoomPage() {
     ringTimeoutRef.current = t;
   }, [booking, isProvider, onCallDoctorName, onCallDoctorDesignation]);
 
-  // Provider skips pre-call form and rings immediately (unless they accepted an incoming call)
+  // Provider skips pre-call form and rings immediately (unless they accepted an incoming call).
+  // First check status — if the call is already accepted (other party in room), go straight
+  // to connected so we don't fire a ghost ring that alerts the recipient again.
   useEffect(() => {
-    if (isProvider && !joinedAsCallee && phase === "precall" && booking) {
-      handleRing();
-    }
-  }, [isProvider, joinedAsCallee, booking, handleRing, phase]);
+    if (!isProvider || joinedAsCallee || phase !== "precall" || !booking) return;
+    fetch(`/api/call/status/${booking.id}`, { credentials: "include" })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (phaseRef.current !== "precall") return; // phase changed while fetching
+        if (data?.status === "accepted") {
+          setPhase("connected"); // both already in room — skip ringing
+        } else {
+          handleRing();
+        }
+      })
+      .catch(() => handleRing()); // network error — fall back to ringing normally
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isProvider, joinedAsCallee, booking?.id, phase]);
 
   const handleCancelRing = async () => {
     clearRingTimer();
