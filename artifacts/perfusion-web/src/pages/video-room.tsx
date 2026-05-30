@@ -735,16 +735,19 @@ export default function VideoRoomPage() {
                   mobilePanel === "video"
                     ? { width: "100%", height: "100%", border: "none", display: "block" }
                     : {
-                        // Render at a larger virtual size and scale down so the top
-                        // (camera tile) fills the PiP — the bottom controls row is clipped off.
-                        // scale = PiP-width / iframe-width = 192 / 400 = 0.48
+                        // Render at a larger virtual size, scale to fit PiP width (192/400=0.48),
+                        // and shift upward so the Daily.co header (~65px) is clipped off and
+                        // the remote camera tile is centred in the PiP window.
+                        // With top:-31 the PiP clips original y≈65–365 (skipping header+showing camera).
+                        position: "absolute",
+                        top: -31,
+                        left: 0,
                         width: 400,
-                        height: 600,
+                        height: 650,
                         border: "none",
                         display: "block",
                         transform: "scale(0.48)",
                         transformOrigin: "top left",
-                        flexShrink: 0,
                       }
                 }
                 data-testid="video-container"
