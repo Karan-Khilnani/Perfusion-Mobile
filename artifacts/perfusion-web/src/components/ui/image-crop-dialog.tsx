@@ -59,11 +59,24 @@ export function ImageCropDialog({
   const handleImageLoad = useCallback(
     (e: React.SyntheticEvent<HTMLImageElement>) => {
       const { naturalWidth: width, naturalHeight: height } = e.currentTarget;
+      const displayW = e.currentTarget.width;
+      const displayH = e.currentTarget.height;
+      let initialCrop: Crop;
       if (aspect) {
-        setCrop(centerAspectCrop(width, height, aspect));
+        initialCrop = centerAspectCrop(width, height, aspect);
       } else {
-        setCrop({ unit: "%", width: 90, height: 90, x: 5, y: 5 });
+        initialCrop = { unit: "%", width: 90, height: 90, x: 5, y: 5 };
       }
+      setCrop(initialCrop);
+      // Pre-populate completedCrop so "Apply Crop" is enabled without requiring
+      // the user to manually drag the selection first.
+      setCompletedCrop({
+        unit: "px",
+        x: Math.round((initialCrop.x / 100) * displayW),
+        y: Math.round((initialCrop.y / 100) * displayH),
+        width: Math.round((initialCrop.width / 100) * displayW),
+        height: Math.round((initialCrop.height / 100) * displayH),
+      });
     },
     [aspect]
   );
