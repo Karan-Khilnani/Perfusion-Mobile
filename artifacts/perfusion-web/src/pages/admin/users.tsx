@@ -49,7 +49,10 @@ import { apiRequest } from "@/lib/queryClient";
 const editProfileSchema = z.object({
   firstName: z.string().min(1, "First name is required"),
   lastName: z.string().min(1, "Last name is required"),
-  phone: z.string().optional(),
+  phone: z.string().refine(
+    (val) => !val || val === "+91" || /^\+91\d{10}$/.test(val),
+    "Enter a valid 10-digit mobile number"
+  ).optional(),
   email: z.string().email("Invalid email").optional().or(z.literal("")),
   hospitalName: z.string().optional(),
   hospitalAddress: z.string().optional(),
@@ -185,6 +188,7 @@ export default function AdminUsersPage() {
       userId: editingUser.id,
       data: {
         ...data,
+        phone: (data.phone && data.phone !== "+91") ? data.phone : "",
         profileImageUrl: pendingPhotoUrl || editingUser.profileImageUrl || undefined,
       },
     });

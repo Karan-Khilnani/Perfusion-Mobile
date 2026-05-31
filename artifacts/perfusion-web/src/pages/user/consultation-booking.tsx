@@ -42,7 +42,10 @@ const followUpBookingSchema = z.object({
   patientName: z.string().optional(),
   patientAge: z.coerce.number().optional(),
   patientGender: z.enum(["male", "female", "other"]).optional(),
-  contactNumber: z.string().optional(),
+  contactNumber: z.string().refine(
+    (val) => !val || val === "+91" || /^\+91\d{10}$/.test(val),
+    "Enter a valid 10-digit mobile number"
+  ).optional(),
   patientWeight: z.string().optional(),
   allergyNotSpecified: z.boolean().default(true),
   patientAllergies: z.string().optional(),
