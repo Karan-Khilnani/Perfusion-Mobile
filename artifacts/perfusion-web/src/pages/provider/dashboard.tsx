@@ -301,8 +301,11 @@ function RevenueSection({ revenue, isLoading, label = "All earnings" }: { revenu
 function CallSeekerButton({ booking }: { booking: ActiveConsultation }) {
   const { toast } = useToast();
   const win = getCallWindow(booking as any);
-  const canCall = (booking as any).status === "booked" && win.open;
-  const disabledReason = (booking as any).status !== "booked"
+  const callbackPhone = (booking as any).callbackPhone as string | null | undefined;
+  const canCall = (booking as any).status === "booked" && !!callbackPhone && win.open;
+  const disabledReason = !callbackPhone
+    ? "No callback number on this booking — seeker must add a ward number"
+    : (booking as any).status !== "booked"
     ? "Only available for active (booked) consultations"
     : win.reason === "before_window" && win.windowStart
     ? `Call window opens at ${toISTTimeString(win.windowStart)} IST`
@@ -480,9 +483,7 @@ function ConsultationsSection({
                   </Button>
                 </div>
 
-                {(booking as any).callbackPhone && (
-                  <CallSeekerButton booking={booking} />
-                )}
+                <CallSeekerButton booking={booking} />
 
 
                 <div className="grid grid-cols-3 gap-2">
