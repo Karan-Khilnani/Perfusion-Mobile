@@ -3472,12 +3472,16 @@ export async function registerRoutes(
         return res.status(403).json({ message: "Access denied. You can only upload documents to your own bookings." });
       }
 
-      // After prescription: block if uploads toggle is disabled and window is active
+      // After prescription: uploads only allowed while in 24h window AND uploads toggle is on
       if ((booking as any).prescriptionApprovedAt) {
         const expiresAt = (booking as any).postRxExpiresAt ? new Date((booking as any).postRxExpiresAt) : null;
-        const inWindow = expiresAt && new Date() < expiresAt;
-        if (inWindow && !(booking as any).postRxUploadsEnabled) {
-          return res.status(403).json({ message: "Document uploads are currently disabled. Ask the consultant to re-enable uploads." });
+        const inWindow = !!(expiresAt && new Date() < expiresAt);
+        const uploadsEnabled = !!(booking as any).postRxUploadsEnabled;
+        if (!inWindow || !uploadsEnabled) {
+          const message = !inWindow
+            ? "Post-consultation 24-hour window has expired — no further uploads are accepted."
+            : "Document uploads are currently disabled. Ask the consultant to re-enable uploads.";
+          return res.status(403).json({ message });
         }
       }
       
@@ -3509,12 +3513,16 @@ export async function registerRoutes(
         return res.status(403).json({ message: "Access denied." });
       }
 
-      // After prescription: block if uploads toggle is disabled and window is active
+      // After prescription: uploads only allowed while in 24h window AND uploads toggle is on
       if ((booking as any).prescriptionApprovedAt) {
         const expiresAt = (booking as any).postRxExpiresAt ? new Date((booking as any).postRxExpiresAt) : null;
-        const inWindow = expiresAt && new Date() < expiresAt;
-        if (inWindow && !(booking as any).postRxUploadsEnabled) {
-          return res.status(403).json({ message: "Document uploads are currently disabled. Ask the consultant to re-enable uploads." });
+        const inWindow = !!(expiresAt && new Date() < expiresAt);
+        const uploadsEnabled = !!(booking as any).postRxUploadsEnabled;
+        if (!inWindow || !uploadsEnabled) {
+          const message = !inWindow
+            ? "Post-consultation 24-hour window has expired — no further uploads are accepted."
+            : "Document uploads are currently disabled. Ask the consultant to re-enable uploads.";
+          return res.status(403).json({ message });
         }
       }
       
@@ -4276,15 +4284,29 @@ export async function registerRoutes(
 
       const callerRole: "seeker" | "provider" = isSeeker ? "seeker" : "provider";
 
-      // Enforce call window — block ring if outside the scheduled slot
-      const window = getCallWindow(booking);
-      if (!window.open) {
-        return res.status(403).json({
-          error: "Call window is not active",
-          reason: window.reason,
-          windowStart: window.windowStart,
-          windowEnd: window.windowEnd,
-        });
+      // Enforce access gate — post-prescription uses post-rx toggles; pre-prescription uses slot window
+      const prescriptionApprovedAtRing = (booking as any).prescriptionApprovedAt;
+      if (prescriptionApprovedAtRing) {
+        const expiresAt = (booking as any).postRxExpiresAt ? new Date((booking as any).postRxExpiresAt) : null;
+        const inWindow = !!(expiresAt && new Date() < expiresAt);
+        const videoEnabled = !!(booking as any).postRxVideoEnabled;
+        if (!inWindow || !videoEnabled) {
+          return res.status(403).json({
+            error: inWindow
+              ? "Video calls are currently disabled for this consultation"
+              : "Post-consultation 24-hour window has expired",
+          });
+        }
+      } else {
+        const window = getCallWindow(booking);
+        if (!window.open) {
+          return res.status(403).json({
+            error: "Call window is not active",
+            reason: window.reason,
+            windowStart: window.windowStart,
+            windowEnd: window.windowEnd,
+          });
+        }
       }
 
       // Get caller display name
@@ -4659,6 +4681,11 @@ export async function registerRoutes(
       }
       const provider = await storage.getProviderByUserId(user.id);
       if (!provider) return res.status(403).json({ error: "Provider profile not found" });
+      // Primary ownership check: booking must belong to this provider
+      if (booking.providerId && booking.providerId !== provider.id) {
+        return res.status(403).json({ error: "You can only update features for your own bookings" });
+      }
+      // Supplemental check: if it's a consultant service, verify consultant belongs to this provider
       const consultant = await storage.getConsultantById(booking.serviceId);
       if (consultant?.providerId && consultant.providerId !== provider.id) {
         return res.status(403).json({ error: "You can only update features for your own bookings" });
@@ -4788,6 +4815,26 @@ export async function registerRoutes(
       }
       if (booking.status !== "booked") {
         return res.status(400).json({ error: "Calls are only available for active (booked) consultations" });
+      }
+
+      // After prescription: gate on post-rx calls toggle within 24h window
+      const prescriptionApprovedAtCall = (booking as any).prescriptionApprovedAt;
+      if (prescriptionApprovedAtCall) {
+        const expiresAt = (booking as any).postRxExpiresAt ? new Date((booking as any).postRxExpiresAt) : null;
+        const inWindow = !!(expiresAt && new Date() < expiresAt);
+        const callsEnabled = !!(booking as any).postRxCallsEnabled;
+        if (!inWindow) {
+          return res.status(403).json({ error: "Post-consultation 24-hour window has expired" });
+        }
+        if (!callsEnabled) {
+          return res.status(403).json({ error: "Phone calls are currently disabled for this consultation" });
+        }
+      } else {
+        // Before prescription: check slot window
+        const win = getCallWindow(booking);
+        if (!win.open) {
+          return res.status(403).json({ error: "Call window is not active", reason: win.reason });
+        }
       }
 
       const isSeeker = booking.userId === userId;
