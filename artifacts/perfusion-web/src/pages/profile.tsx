@@ -106,7 +106,7 @@ function WardContactsCard() {
 
   const handleSave = async () => {
     if (!wardName.trim()) { toast({ title: "Ward name is required", variant: "destructive" }); return; }
-    if (!phoneNumber.trim() || phoneNumber === "+91") { toast({ title: "Phone number is required", variant: "destructive" }); return; }
+    if (!/^\+91\d{10}$/.test(phoneNumber)) { toast({ title: "Enter a valid 10-digit mobile number", variant: "destructive" }); return; }
     setSaving(true);
     try {
       if (editingId) {

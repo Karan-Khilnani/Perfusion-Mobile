@@ -126,7 +126,7 @@ export default function ConsultationBookingPage() {
   const [uploading, setUploading] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<"pay_now" | "pay_later">("pay_later");
   const [callbackContactId, setCallbackContactId] = useState<string>("");
-  const [callbackOtherPhone, setCallbackOtherPhone] = useState<string>("");
+  const [callbackOtherPhone, setCallbackOtherPhone] = useState<string>("+91");
   const [callbackError, setCallbackError] = useState<string>("");
   const [calendarMonth, setCalendarMonth] = useState(() => { const d = new Date(); d.setDate(1); return d; });
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
@@ -371,8 +371,8 @@ export default function ConsultationBookingPage() {
         setCallbackError("Please select a call-back number for this consultation.");
         return false;
       }
-      if (callbackContactId === "other" && !callbackOtherPhone.trim()) {
-        setCallbackError("Please enter the other phone number.");
+      if (callbackContactId === "other" && !/^\+91\d{10}$/.test(callbackOtherPhone)) {
+        setCallbackError("Enter a valid 10-digit mobile number.");
         return false;
       }
       setCallbackError("");
@@ -1354,7 +1354,7 @@ export default function ConsultationBookingPage() {
                       onValueChange={(val) => {
                         setCallbackContactId(val);
                         setCallbackError("");
-                        if (val !== "other") setCallbackOtherPhone("");
+                        if (val !== "other") setCallbackOtherPhone("+91");
                       }}
                     >
                       <SelectTrigger data-testid="select-callback-contact">
