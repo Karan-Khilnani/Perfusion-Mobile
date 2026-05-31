@@ -12,7 +12,7 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import { uploadFile as supabaseUpload } from "../services/supabase-storage";
-import { notifyAdminLabBooking, notifyUserReportReady, cancelVoiceCall, triggerVoiceCall, triggerBridgeCall, formatPhoneNumber } from "../services/msg91";
+import { notifyAdminLabBooking, notifyAdminConsultantBooking, notifyUserReportReady, cancelVoiceCall, triggerVoiceCall, triggerBridgeCall, formatPhoneNumber } from "../services/msg91";
 import { generateBookingNumber } from "../services/booking-number";
 import { calculateCustomerPrice, deriveMarginFromPrice, derivePriceFromMargin } from "../services/pricing";
 import { processReport, type BookingReportData } from "../services/report-processor";
@@ -1097,6 +1097,22 @@ export async function registerRoutes(
           contactPersonName: "",
           contactPersonNumber: "",
         }).catch((err: any) => console.error("[Twilio] Lab booking notification failed:", err));
+      }
+
+      if (booking.bookingType === "consultation") {
+        const seekerProvider = await storage.getProviderByUserId(userId);
+        const bookingDate = new Date();
+        const dateStr = bookingDate.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+        const timeStr = bookingDate.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true });
+        const appointmentDateTime = booking.appointmentSlot
+          ? `${booking.appointmentSlot}, ${dateStr}`
+          : `${dateStr}, ${timeStr}`;
+
+        notifyAdminConsultantBooking({
+          seekerHospitalName: seekerProvider?.name || "Unknown Hospital",
+          consultantName: booking.serviceName || "Consultant",
+          appointmentDateTime,
+        }).catch((err: any) => console.error("[Twilio] Consultant booking notification failed:", err));
       }
 
       res.status(201).json(booking);

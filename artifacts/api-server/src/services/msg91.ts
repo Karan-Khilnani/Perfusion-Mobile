@@ -200,6 +200,21 @@ export async function sendWhatsAppTemplate(
   }
 }
 
+const CONSULTANT_BOOKING_ADMIN_PHONE = "6268564602";
+
+export interface ConsultantBookingNotification {
+  seekerHospitalName: string;
+  consultantName: string;
+  appointmentDateTime: string;
+}
+
+export async function notifyAdminConsultantBooking(data: ConsultantBookingNotification) {
+  const voiceMessage = `New consultant booking. Hospital: ${data.seekerHospitalName}. Consultant: ${data.consultantName}. Appointment: ${data.appointmentDateTime}.`;
+  triggerVoiceCall(CONSULTANT_BOOKING_ADMIN_PHONE, voiceMessage).catch((err: any) =>
+    console.error("[Twilio] Consultant booking admin call failed:", err)
+  );
+}
+
 export interface LabBookingNotification {
   bookingId: string;
   seekerHospitalName: string;
