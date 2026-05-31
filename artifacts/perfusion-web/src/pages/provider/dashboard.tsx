@@ -638,65 +638,66 @@ function ConsultationsSection({
                   </Button>
                 )}
 
-                <div className="grid grid-cols-3 gap-2">
-                  <PatientDetailsDialog
-                    booking={booking}
+                <PatientDetailsDialog
+                  booking={booking}
+                  trigger={
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full gap-2"
+                      data-testid={`button-patient-details-${booking.id}`}
+                    >
+                      <User className="h-4 w-4 shrink-0" />
+                      Patient Details
+                    </Button>
+                  }
+                />
+
+                {docUrls.length > 0 ? (
+                  <FileListDialog
+                    title="Patient Reports"
+                    urls={docUrls}
                     trigger={
                       <Button
                         variant="outline"
-                        className="w-full flex flex-col items-center gap-1 h-auto py-2.5 px-1"
-                        data-testid={`button-patient-details-${booking.id}`}
+                        size="sm"
+                        className="w-full gap-2"
+                        data-testid={`button-view-reports-${booking.id}`}
                       >
-                        <User className="h-4 w-4 shrink-0" />
-                        <span className="text-[10px] sm:text-xs leading-tight text-center">Patient Details</span>
+                        <Activity className="h-4 w-4 shrink-0" />
+                        View Reports
                       </Button>
                     }
                   />
+                ) : (
+                  <Button variant="outline" size="sm" className="w-full gap-2" disabled>
+                    <Activity className="h-4 w-4 shrink-0" />
+                    No Reports Uploaded
+                  </Button>
+                )}
 
-                  {docUrls.length > 0 ? (
-                    <FileListDialog
-                      title="Patient Reports"
-                      urls={docUrls}
-                      trigger={
-                        <Button
-                          variant="outline"
-                          className="w-full flex flex-col items-center gap-1 h-auto py-2.5 px-1"
-                          data-testid={`button-view-reports-${booking.id}`}
-                        >
-                          <Activity className="h-4 w-4 shrink-0" />
-                          <span className="text-[10px] sm:text-xs leading-tight text-center">View Reports</span>
-                        </Button>
-                      }
-                    />
-                  ) : (
-                    <Button variant="outline" className="w-full flex flex-col items-center gap-1 h-auto py-2.5 px-1" disabled>
-                      <Activity className="h-4 w-4 shrink-0" />
-                      <span className="text-[10px] sm:text-xs leading-tight text-center">No Reports</span>
-                    </Button>
-                  )}
-
-                  {chartUrls.length > 0 ? (
-                    <FileListDialog
-                      title="Treatment Charts"
-                      urls={chartUrls}
-                      trigger={
-                        <Button
-                          variant="outline"
-                          className="w-full flex flex-col items-center gap-1 h-auto py-2.5 px-1"
-                          data-testid={`button-view-charts-${booking.id}`}
-                        >
-                          <ClipboardList className="h-4 w-4 shrink-0" />
-                          <span className="text-[10px] sm:text-xs leading-tight text-center">Treatment Charts</span>
-                        </Button>
-                      }
-                    />
-                  ) : (
-                    <Button variant="outline" className="w-full flex flex-col items-center gap-1 h-auto py-2.5 px-1" disabled>
-                      <ClipboardList className="h-4 w-4 shrink-0" />
-                      <span className="text-[10px] sm:text-xs leading-tight text-center">No Charts</span>
-                    </Button>
-                  )}
-                </div>
+                {chartUrls.length > 0 ? (
+                  <FileListDialog
+                    title="Treatment Charts"
+                    urls={chartUrls}
+                    trigger={
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full gap-2"
+                        data-testid={`button-view-charts-${booking.id}`}
+                      >
+                        <ClipboardList className="h-4 w-4 shrink-0" />
+                        View Treatment Chart
+                      </Button>
+                    }
+                  />
+                ) : (
+                  <Button variant="outline" size="sm" className="w-full gap-2" disabled>
+                    <ClipboardList className="h-4 w-4 shrink-0" />
+                    No Treatment Chart
+                  </Button>
+                )}
               </div>
             );
           })}

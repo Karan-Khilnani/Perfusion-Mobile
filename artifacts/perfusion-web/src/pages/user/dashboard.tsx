@@ -17,10 +17,17 @@ import {
   Square,
   X,
   Phone,
+  Upload,
+  Paperclip,
+  Loader2,
+  Activity,
+  ClipboardList,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { getCallWindow, callWindowLabel, toISTTimeString, getPostRxStatus } from "@/lib/call-window";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -30,6 +37,15 @@ import type { Booking, PrescriptionReview } from "@shared/schema";
 
 interface ActiveConsultation extends Booking {
   consultantSpecialization: string | null;
+}
+
+async function uploadFile(file: File): Promise<string> {
+  const formData = new FormData();
+  formData.append("file", file);
+  const res = await fetch("/api/upload/document", { method: "POST", body: formData, credentials: "include" });
+  if (!res.ok) throw new Error("Upload failed");
+  const data = await res.json();
+  return data.url;
 }
 
 function ReviewDownloads({ bookingId }: { bookingId: string }) {
@@ -154,6 +170,11 @@ export default function UserDashboard() {
 
   const [cleanMode, setCleanMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [showUploadDialog, setShowUploadDialog] = useState(false);
+  const [uploadBooking, setUploadBooking] = useState<ActiveConsultation | null>(null);
+  const [uploadCategory, setUploadCategory] = useState<"reports" | "charts">("reports");
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [uploadingFiles, setUploadingFiles] = useState(false);
 
   const activeConsultations = data?.activeConsultations ?? [];
   const readyReports = data?.readyReports ?? [];
@@ -173,6 +194,41 @@ export default function UserDashboard() {
       setCleanMode(false);
     },
   });
+
+  const { toast } = useToast();
+
+  async function handleUploadFiles() {
+    if (!uploadBooking || pendingFiles.length === 0) return;
+    setUploadingFiles(true);
+    try {
+      for (const file of pendingFiles) {
+        const fileUrl = await uploadFile(file);
+        if (uploadCategory === "reports") {
+          await apiRequest("PATCH", `/api/bookings/${uploadBooking.id}/documents`, { documentUrl: fileUrl });
+        } else {
+          await apiRequest("PATCH", `/api/bookings/${uploadBooking.id}/treatment-charts`, { chartUrl: fileUrl });
+        }
+      }
+      queryClient.invalidateQueries({ queryKey: ["/api/user/dashboard"] });
+      setShowUploadDialog(false);
+      setUploadBooking(null);
+      setPendingFiles([]);
+      toast({ title: "Uploaded", description: `${pendingFiles.length} file(s) uploaded as ${uploadCategory === "reports" ? "reports" : "treatment charts"}.` });
+    } catch {
+      toast({ title: "Upload Failed", description: "Failed to upload one or more files.", variant: "destructive" });
+    } finally {
+      setUploadingFiles(false);
+    }
+  }
+
+  function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files || []);
+    setPendingFiles((prev) => [...prev, ...files]);
+  }
+
+  function removeFile(index: number) {
+    setPendingFiles((prev) => prev.filter((_, i) => i !== index));
+  }
 
   function toggleSelect(id: string) {
     setSelectedIds((prev) => {
@@ -535,6 +591,38 @@ export default function UserDashboard() {
                             postRxExpiresAt={(booking as any).postRxExpiresAt}
                             postRxCallsEnabled={(booking as any).postRxCallsEnabled}
                           />
+
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="w-full gap-2"
+                            onClick={() => {
+                              setUploadBooking(booking);
+                              setUploadCategory("reports");
+                              setPendingFiles([]);
+                              setShowUploadDialog(true);
+                            }}
+                            data-testid={`button-upload-reports-${booking.id}`}
+                          >
+                            <Activity className="h-4 w-4" />
+                            Upload Reports
+                          </Button>
+
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="w-full gap-2"
+                            onClick={() => {
+                              setUploadBooking(booking);
+                              setUploadCategory("charts");
+                              setPendingFiles([]);
+                              setShowUploadDialog(true);
+                            }}
+                            data-testid={`button-upload-charts-${booking.id}`}
+                          >
+                            <ClipboardList className="h-4 w-4" />
+                            Upload Treatment Chart
+                          </Button>
                         </div>
                       )}
                     </div>
@@ -650,6 +738,57 @@ export default function UserDashboard() {
           </div>
         </section>
       </div>
+
+      <Dialog open={showUploadDialog} onOpenChange={(open) => { setShowUploadDialog(open); if (!open) { setUploadBooking(null); setPendingFiles([]); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{uploadCategory === "reports" ? "Upload Reports" : "Upload Treatment Chart"}</DialogTitle>
+            <DialogDescription>
+              {uploadCategory === "reports"
+                ? "Upload patient reports, lab results, or medical records."
+                : "Upload treatment records, nursing charts, or medication charts."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="rounded-lg border-2 border-dashed border-muted-foreground/25 p-4">
+              <div className="flex flex-col items-center gap-2">
+                <Upload className="h-8 w-8 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">Select files to upload</p>
+                <Input
+                  type="file"
+                  accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+                  onChange={handleFileSelect}
+                  multiple
+                  className="max-w-xs"
+                />
+              </div>
+            </div>
+            {pendingFiles.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-sm font-medium">{pendingFiles.length} file(s) selected</p>
+                {pendingFiles.map((file, i) => (
+                  <div key={i} className="flex items-center justify-between rounded border p-2 text-sm">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <FileText className="h-4 w-4 shrink-0" />
+                      <span className="truncate">{file.name}</span>
+                      <span className="text-xs text-muted-foreground shrink-0">({(file.size / 1024).toFixed(0)} KB)</span>
+                    </div>
+                    <Button type="button" variant="ghost" size="icon" onClick={() => removeFile(i)}>
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowUploadDialog(false)}>Cancel</Button>
+            <Button onClick={handleUploadFiles} disabled={pendingFiles.length === 0 || uploadingFiles}>
+              {uploadingFiles ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Uploading…</> : `Upload ${pendingFiles.length} File(s)`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
