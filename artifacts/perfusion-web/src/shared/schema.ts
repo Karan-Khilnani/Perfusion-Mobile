@@ -534,3 +534,20 @@ export interface ReferralHospitalSearchParams {
   supportEcmo?: boolean;
   supportCrrt?: boolean;
 }
+
+export interface PrescriptionReview {
+  id: string;
+  bookingId: string;
+  providerId: string;
+  reviewNumber: number;
+  diagnosis: string | null;
+  medications: string | null;
+  physicianNotes: string | null;
+  followUp: string | null;
+  advice: string | null;
+  approvedAt: string;
+  approvedByUserId: string | null;
+  approverIp: string | null;
+  pdfUrl: string | null;
+  createdAt: string;
+}

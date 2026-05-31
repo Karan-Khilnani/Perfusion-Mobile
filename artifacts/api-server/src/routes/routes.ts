@@ -1649,6 +1649,247 @@ export async function registerRoutes(
     }
   });
 
+  // ── Prescription Review Summaries ──────────────────────────────────────────────
+
+  // Create + confirm a review summary (within 24h post-rx window)
+  app.post("/api/bookings/:id/prescription-reviews", isAuthenticated, async (req: any, res) => {
+    try {
+      const user = req.user;
+      if (user.role !== "provider") {
+        return res.status(403).json({ message: "Only providers may add review summaries." });
+      }
+
+      const booking = await storage.getBookingById(req.params.id);
+      if (!booking) return res.status(404).json({ message: "Booking not found" });
+      if (booking.bookingType !== "consultation") {
+        return res.status(400).json({ message: "Review summaries are only for consultation bookings." });
+      }
+      if (!(booking as any).prescriptionApprovedAt) {
+        return res.status(409).json({ message: "The initial prescription must be confirmed before adding review summaries." });
+      }
+
+      // Gating: must be within the 24h post-rx window
+      const postRxExpiresAt = (booking as any).postRxExpiresAt ? new Date((booking as any).postRxExpiresAt) : null;
+      if (!postRxExpiresAt || new Date() > postRxExpiresAt) {
+        return res.status(403).json({ message: "The 24-hour review window has expired. No new review summaries can be added." });
+      }
+
+      // Ownership check
+      const provider = await storage.getProviderByUserId(user.id);
+      if (!provider) return res.status(403).json({ message: "Provider profile not found" });
+      const consultant = await storage.getConsultantById(booking.serviceId);
+      if (consultant?.providerId && consultant.providerId !== provider.id) {
+        return res.status(403).json({ message: "You can only add review summaries for your own consultants." });
+      }
+
+      const { diagnosis, medications, physicianNotes, followUp, advice } = req.body as {
+        diagnosis?: string;
+        medications?: string;
+        physicianNotes?: string;
+        followUp?: string;
+        advice?: string;
+      };
+      if (!diagnosis?.trim()) {
+        return res.status(400).json({ message: "Diagnosis is required for a review summary." });
+      }
+
+      // Determine review number
+      const pool = getPool();
+      const countResult = await pool.query(
+        "SELECT COUNT(*) as cnt FROM prescription_reviews WHERE booking_id = $1",
+        [booking.id]
+      );
+      const reviewNumber = parseInt(countResult.rows[0]?.cnt ?? "0", 10) + 1;
+
+      const approvedAt = new Date();
+      const approverIp = req.ip || req.socket?.remoteAddress || "unknown";
+
+      const protocol = req.headers["x-forwarded-proto"] || "https";
+      const host = req.headers.host || "localhost:5000";
+      const baseUrl = process.env.REPLIT_DEV_DOMAIN
+        ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+        : `${protocol}://${host}`;
+
+      const bookingUser = await storage.getUserById(booking.userId);
+
+      const pdfData: PrescriptionPdfData = {
+        bookingId: booking.id,
+        bookingNumber: (booking as any).bookingNumber || `PFN-${booking.id.substring(0, 8).toUpperCase()}`,
+        approvedAt,
+        approverIp,
+        reviewNumber,
+        referringFacility: bookingUser?.hospitalName || null,
+        referringPhysician: (booking as any).referringPhysician || null,
+        onCallDoctorName: (booking as any).onCallDoctorName || null,
+        onCallDoctorDesignation: (booking as any).onCallDoctorDesignation || null,
+        patientName: booking.patientName,
+        patientAge: booking.patientAge,
+        patientGender: booking.patientGender,
+        uhidIpNumber: (booking as any).uhidIpNumber || null,
+        patientContact: booking.patientContact,
+        patientWeight: (booking as any).patientWeight || null,
+        patientAllergies: (booking as any).patientAllergyNotSpecified ? null : (booking as any).patientAllergies,
+        patientAllergyNotSpecified: (booking as any).patientAllergyNotSpecified ?? true,
+        consultantName: consultant?.name || booking.serviceName,
+        consultantSpecialization: consultant?.specialization || null,
+        consultantQualification: consultant?.qualification || null,
+        consultantRegistrationNo: consultant?.registrationNumber || null,
+        consultantYearsExperience: consultant?.yearsExperience || null,
+        consultantAffiliation: consultant?.affiliatedInstitution || null,
+        consultantSignatureUrl: consultant?.digitalSignatureUrl || null,
+        clinicalHistory: booking.clinicalSummary || null,
+        examination: booking.examination || null,
+        investigations: booking.investigations || null,
+        diagnosis: diagnosis.trim(),
+        physicianNotes: (physicianNotes || "").trim() || null,
+        treatmentPlan: (medications || "").trim() || null,
+        followUp: (followUp || "").trim() || null,
+      };
+
+      const pdfUrl = await generateAndStorePrescriptionPdf(pdfData, baseUrl);
+
+      const insertResult = await pool.query(
+        `INSERT INTO prescription_reviews
+          (booking_id, provider_id, review_number, diagnosis, medications, physician_notes, follow_up, advice, approved_at, approved_by_user_id, approver_ip, pdf_url)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+         RETURNING *`,
+        [
+          booking.id,
+          provider.id,
+          reviewNumber,
+          diagnosis.trim(),
+          (medications || "").trim() || null,
+          (physicianNotes || "").trim() || null,
+          (followUp || "").trim() || null,
+          (advice || "").trim() || null,
+          approvedAt,
+          user.id,
+          approverIp,
+          pdfUrl,
+        ]
+      );
+
+      const review = insertResult.rows[0];
+      await storage.createAuditLog({
+        userId: user.id,
+        action: "REVIEW_SUMMARY_CONFIRMED",
+        entityType: "booking",
+        entityId: booking.id,
+        details: JSON.stringify({
+          reviewId: review.id,
+          reviewNumber,
+          consultantName: consultant?.name,
+          patientName: booking.patientName,
+          approverIp,
+          pdfUrl,
+          confirmedAt: approvedAt.toISOString(),
+        }),
+      });
+
+      res.status(201).json({ ...review, reviewNumber });
+    } catch (error) {
+      req.log?.error({ error }, "Error creating review summary");
+      res.status(500).json({ message: "Failed to create review summary" });
+    }
+  });
+
+  // List all review summaries for a booking
+  app.get("/api/bookings/:id/prescription-reviews", isAuthenticated, async (req: any, res) => {
+    try {
+      const user = req.user;
+      const booking = await storage.getBookingById(req.params.id);
+      if (!booking) return res.status(404).json({ message: "Booking not found" });
+
+      // Auth: booking owner, assigned provider, or admin
+      const isOwner = booking.userId === user.id;
+      const isAdminUser = user.role === "admin";
+      let isProviderUser = false;
+      if (user.role === "provider") {
+        const provider = await storage.getProviderByUserId(user.id);
+        if (provider && booking.providerId === provider.id) isProviderUser = true;
+        // Also allow if consultant belongs to provider
+        if (!isProviderUser && booking.serviceId) {
+          const consultant = await storage.getConsultantById(booking.serviceId);
+          if (consultant?.providerId) {
+            if (provider && consultant.providerId === provider.id) isProviderUser = true;
+          }
+        }
+      }
+      if (!isOwner && !isAdminUser && !isProviderUser) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const pool = getPool();
+      const result = await pool.query(
+        "SELECT * FROM prescription_reviews WHERE booking_id = $1 ORDER BY review_number ASC",
+        [booking.id]
+      );
+      const reviews = result.rows.map((r: any) => ({
+        id: r.id,
+        bookingId: r.booking_id,
+        providerId: r.provider_id,
+        reviewNumber: r.review_number,
+        diagnosis: r.diagnosis,
+        medications: r.medications,
+        physicianNotes: r.physician_notes,
+        followUp: r.follow_up,
+        advice: r.advice,
+        approvedAt: r.approved_at,
+        approvedByUserId: r.approved_by_user_id,
+        approverIp: r.approver_ip,
+        pdfUrl: r.pdf_url,
+        createdAt: r.created_at,
+      }));
+      res.json(reviews);
+    } catch (error) {
+      req.log?.error({ error }, "Error fetching review summaries");
+      res.status(500).json({ message: "Failed to fetch review summaries" });
+    }
+  });
+
+  // Download a review summary PDF
+  app.get("/api/prescription-reviews/:reviewId/download", isAuthenticated, async (req: any, res) => {
+    try {
+      const user = req.user;
+      const pool = getPool();
+      const result = await pool.query(
+        "SELECT * FROM prescription_reviews WHERE id = $1",
+        [req.params.reviewId]
+      );
+      if (!result.rows.length) return res.status(404).json({ message: "Review summary not found" });
+      const review = result.rows[0];
+
+      const booking = await storage.getBookingById(review.booking_id);
+      if (!booking) return res.status(404).json({ message: "Booking not found" });
+
+      // Auth: booking owner, assigned provider, or admin
+      const isOwner = booking.userId === user.id;
+      const isAdminUser = user.role === "admin";
+      let isProviderUser = false;
+      if (user.role === "provider") {
+        const provider = await storage.getProviderByUserId(user.id);
+        if (provider && booking.providerId === provider.id) isProviderUser = true;
+        if (!isProviderUser && booking.serviceId) {
+          const consultant = await storage.getConsultantById(booking.serviceId);
+          if (consultant?.providerId) {
+            if (provider && consultant.providerId === provider.id) isProviderUser = true;
+          }
+        }
+      }
+      if (!isOwner && !isAdminUser && !isProviderUser) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      if (review.pdf_url && /^https?:\/\//i.test(review.pdf_url)) {
+        return res.redirect(review.pdf_url);
+      }
+      return res.status(404).json({ message: "PDF not available" });
+    } catch (error) {
+      req.log?.error({ error }, "Error downloading review summary PDF");
+      res.status(500).json({ message: "Failed to download review summary" });
+    }
+  });
+
   // Public verification endpoint (no auth required)
   app.get("/api/verify/prescription/:bookingId", async (req: any, res) => {
     try {

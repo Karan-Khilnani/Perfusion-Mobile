@@ -71,6 +71,24 @@ async function startServer() {
     await pool.query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS post_rx_video_enabled boolean NOT NULL DEFAULT false`);
     await pool.query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS post_rx_calls_enabled boolean NOT NULL DEFAULT false`);
     await pool.query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS post_rx_uploads_enabled boolean NOT NULL DEFAULT false`);
+    // Review summaries — additional prescriptions within the 24h post-rx window
+    await pool.query(`CREATE TABLE IF NOT EXISTS prescription_reviews (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+      booking_id varchar NOT NULL,
+      provider_id varchar NOT NULL,
+      review_number integer NOT NULL,
+      diagnosis text,
+      medications text,
+      physician_notes text,
+      follow_up varchar(255),
+      advice text,
+      approved_at timestamptz NOT NULL DEFAULT now(),
+      approved_by_user_id varchar,
+      approver_ip varchar(100),
+      pdf_url varchar(500),
+      created_at timestamptz DEFAULT now()
+    )`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS prescription_reviews_booking_idx ON prescription_reviews(booking_id)`);
 
     // Register all routes
     await registerRoutes(httpServer, app);

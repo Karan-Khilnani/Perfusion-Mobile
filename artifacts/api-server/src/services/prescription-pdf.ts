@@ -9,6 +9,7 @@ export interface PrescriptionPdfData {
   bookingNumber: string;
   approvedAt: Date;
   approverIp: string;
+  reviewNumber?: number;
   referringFacility: string | null;
   referringPhysician: string | null;
   onCallDoctorName: string | null;
@@ -160,7 +161,10 @@ export async function generateAndStorePrescriptionPdf(data: PrescriptionPdfData,
 
   const verificationUrl = `${verificationBaseUrl}/verify/prescription/${data.bookingId}`;
   const approvalDateStr = data.approvedAt.toLocaleString("en-IN", { dateStyle: "long", timeStyle: "medium", timeZone: "Asia/Kolkata" });
-  const summaryId = data.bookingNumber || `PFN-${data.bookingId.substring(0, 8).toUpperCase()}`;
+  const isReview = typeof data.reviewNumber === "number";
+  const summaryId = isReview
+    ? `${data.bookingNumber || `PFN-${data.bookingId.substring(0, 8).toUpperCase()}`}-R${data.reviewNumber}`
+    : data.bookingNumber || `PFN-${data.bookingId.substring(0, 8).toUpperCase()}`;
 
   // Consultant name without duplicate "Dr." prefix
   const consultantDisplayName = `Dr. ${cleanDrPrefix(data.consultantName)}`;
@@ -214,7 +218,7 @@ export async function generateAndStorePrescriptionPdf(data: PrescriptionPdfData,
 
   // Title text block — vertically centred in the taller header (right of logo, left of QR)
   const titleTextX = PAGE_W - MARGIN - QR_SIZE - 14;
-  const titleText = "Digital Speciality Consultation Summary";
+  const titleText = isReview ? `Review Summary #${data.reviewNumber}` : "Digital Speciality Consultation Summary";
   const titleW = fontBold.widthOfTextAtSize(titleText, 9.5);
   page.drawText(titleText, { x: titleTextX - titleW, y: PAGE_H - 68, size: 9.5, font: fontBold, color: DARK });
   const idText = sanitizeOneLine(`Summary ID: ${summaryId}`);
@@ -355,8 +359,8 @@ export async function generateAndStorePrescriptionPdf(data: PrescriptionPdfData,
   const SEAL_H = 50;
   page.drawRectangle({ x: MARGIN, y: y - SEAL_H, width: CONTENT_W, height: SEAL_H, color: GREEN_BG });
   page.drawLine({ start: { x: MARGIN, y }, end: { x: MARGIN + CONTENT_W, y }, thickness: 1.5, color: GREEN });
-  page.drawText("CONFIRMED & SIGNED", { x: MARGIN + 12, y: y - 14, size: 11, font: fontBold, color: GREEN });
-  page.drawText("Consultant confirmed this consultation summary on:", { x: MARGIN + 12, y: y - 28, size: 8, font, color: GREY });
+  page.drawText(isReview ? `REVIEW SUMMARY #${data.reviewNumber} SIGNED` : "CONFIRMED & SIGNED", { x: MARGIN + 12, y: y - 14, size: 11, font: fontBold, color: GREEN });
+  page.drawText(isReview ? `Consultant signed this review summary on:` : "Consultant confirmed this consultation summary on:", { x: MARGIN + 12, y: y - 28, size: 8, font, color: GREY });
   page.drawText(approvalDateStr, { x: MARGIN + 12, y: y - 40, size: 9, font: fontBold, color: DARK });
   y -= SEAL_H + 18;
 
@@ -431,7 +435,9 @@ export async function generateAndStorePrescriptionPdf(data: PrescriptionPdfData,
   }
 
   const pdfBytes = await doc.save();
-  const fileName = `consultation-summary-${data.bookingId}-${Date.now()}.pdf`;
+  const fileName = isReview
+    ? `review-summary-${data.bookingId}-r${data.reviewNumber}-${Date.now()}.pdf`
+    : `consultation-summary-${data.bookingId}-${Date.now()}.pdf`;
   const buffer = Buffer.from(pdfBytes);
 
   const publicUrl = await supabaseUpload(buffer, fileName, "prescriptions", "application/pdf");

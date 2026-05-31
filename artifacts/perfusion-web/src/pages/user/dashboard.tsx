@@ -26,10 +26,38 @@ import { getCallWindow, callWindowLabel, toISTTimeString, getPostRxStatus } from
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Clock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import type { Booking } from "@shared/schema";
+import type { Booking, PrescriptionReview } from "@shared/schema";
 
 interface ActiveConsultation extends Booking {
   consultantSpecialization: string | null;
+}
+
+function ReviewDownloads({ bookingId }: { bookingId: string }) {
+  const { data: reviews = [] } = useQuery<PrescriptionReview[]>({
+    queryKey: [`/api/bookings/${bookingId}/prescription-reviews`],
+  });
+  if (!reviews.length) return null;
+  return (
+    <>
+      {reviews.map((r) => (
+        <a
+          key={r.id}
+          href={`/api/prescription-reviews/${r.id}/download`}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          <Button
+            size="sm"
+            variant="outline"
+            className="w-full gap-2 border-indigo-500/30 text-indigo-700 dark:text-indigo-400 hover:bg-indigo-500/5"
+          >
+            <Download className="h-4 w-4" />
+            Review Summary #{r.reviewNumber}
+          </Button>
+        </a>
+      ))}
+    </>
+  );
 }
 
 function DashboardCallButton({ bookingId, callbackPhone, status, appointmentSlot, callWindowExtendedUntil, prescriptionApprovedAt, postRxExpiresAt, postRxCallsEnabled }: { bookingId: string; callbackPhone?: string; status: string; appointmentSlot?: string | null; callWindowExtendedUntil?: string | null; prescriptionApprovedAt?: string | null; postRxExpiresAt?: string | null; postRxCallsEnabled?: boolean | null }) {
@@ -477,21 +505,24 @@ export default function UserDashboard() {
                           )}
 
                           {isSigned && (
-                            <a
-                              href={`/api/bookings/${booking.id}/prescription/download`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                            >
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="w-full gap-2 border-blue-500/30 text-blue-700 dark:text-blue-400 hover:bg-blue-500/5"
-                                data-testid={`button-download-prescription-${booking.id}`}
+                            <>
+                              <a
+                                href={`/api/bookings/${booking.id}/prescription/download`}
+                                target="_blank"
+                                rel="noopener noreferrer"
                               >
-                                <Download className="h-4 w-4" />
-                                Download Consultation Summary
-                              </Button>
-                            </a>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="w-full gap-2 border-blue-500/30 text-blue-700 dark:text-blue-400 hover:bg-blue-500/5"
+                                  data-testid={`button-download-prescription-${booking.id}`}
+                                >
+                                  <Download className="h-4 w-4" />
+                                  Download Consultation Summary
+                                </Button>
+                              </a>
+                              <ReviewDownloads bookingId={booking.id} />
+                            </>
                           )}
 
                           <DashboardCallButton

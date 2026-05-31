@@ -359,6 +359,24 @@ export const auditLog = pgTable("audit_log", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Prescription Reviews table — additional review summaries after initial prescription
+export const prescriptionReviews = pgTable("prescription_reviews", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  bookingId: varchar("booking_id").notNull(),
+  providerId: varchar("provider_id").notNull(),
+  reviewNumber: integer("review_number").notNull(),
+  diagnosis: text("diagnosis"),
+  medications: text("medications"),
+  physicianNotes: text("physician_notes"),
+  followUp: varchar("follow_up", { length: 255 }),
+  advice: text("advice"),
+  approvedAt: timestamp("approved_at").notNull().defaultNow(),
+  approvedByUserId: varchar("approved_by_user_id"),
+  approverIp: varchar("approver_ip", { length: 100 }),
+  pdfUrl: varchar("pdf_url", { length: 500 }),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Insert schemas
 export const insertProviderSchema = createInsertSchema(providers).omit({ id: true, createdAt: true });
 export const insertLabSchema = createInsertSchema(labs).omit({ id: true });

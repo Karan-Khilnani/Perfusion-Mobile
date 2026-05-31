@@ -16,7 +16,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { getCallWindow, callWindowLabel, toISTTimeString, getPostRxStatus } from "@/lib/call-window";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
-import type { Booking, BookingType } from "@shared/schema";
+import type { Booking, BookingType, PrescriptionReview } from "@shared/schema";
 import { format, differenceInDays } from "date-fns";
 import { useLocation } from "wouter";
 import { useEffect, useRef } from "react";
@@ -354,7 +354,7 @@ export default function OrdersPage() {
                   )}
                 </div>
                 {(booking as any).prescriptionApprovedAt && (
-                  <div className="mt-3">
+                  <div className="mt-3 space-y-1">
                     <a
                       href={`/api/bookings/${booking.id}/prescription/download`}
                       target="_blank"
@@ -371,6 +371,7 @@ export default function OrdersPage() {
                         Download Consultation Summary
                       </Button>
                     </a>
+                    <ReviewDownloads bookingId={booking.id} />
                   </div>
                 )}
                 {canFollowUp && (
@@ -401,6 +402,35 @@ export default function OrdersPage() {
       </Card>
     );
   };
+
+  function ReviewDownloads({ bookingId }: { bookingId: string }) {
+    const { data: reviews = [] } = useQuery<PrescriptionReview[]>({
+      queryKey: [`/api/bookings/${bookingId}/prescription-reviews`],
+    });
+    if (!reviews.length) return null;
+    return (
+      <>
+        {reviews.map((r) => (
+          <a
+            key={r.id}
+            href={`/api/prescription-reviews/${r.id}/download`}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 text-xs border-indigo-300 text-indigo-700 hover:bg-indigo-50 dark:border-indigo-700 dark:text-indigo-300 dark:hover:bg-indigo-900/30 gap-1"
+            >
+              <Download className="h-3 w-3" />
+              Review Summary #{r.reviewNumber}
+            </Button>
+          </a>
+        ))}
+      </>
+    );
+  }
 
   const CallConsultantButton = ({ bookingId, status, callbackPhone, appointmentSlot, callWindowExtendedUntil, prescriptionApprovedAt, postRxExpiresAt, postRxCallsEnabled }: { bookingId: string; status: string; callbackPhone?: string; appointmentSlot?: string | null; callWindowExtendedUntil?: string | null; prescriptionApprovedAt?: string | null; postRxExpiresAt?: string | null; postRxCallsEnabled?: boolean | null }) => {
     const { toast } = useToast();
@@ -1135,16 +1165,19 @@ export default function OrdersPage() {
                                   </td>
                                   <td className="px-3 py-2 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                                     {(b as any).prescriptionApprovedAt ? (
-                                      <a
-                                        href={`/api/bookings/${b.id}/prescription/download`}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        data-testid={`button-download-prescription-${b.id}`}
-                                      >
-                                        <Button size="sm" variant="default" className="h-7 text-xs gap-1">
-                                          <Download className="h-3 w-3" /> Prescription
-                                        </Button>
-                                      </a>
+                                      <div className="flex flex-col gap-1 items-start">
+                                        <a
+                                          href={`/api/bookings/${b.id}/prescription/download`}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          data-testid={`button-download-prescription-${b.id}`}
+                                        >
+                                          <Button size="sm" variant="default" className="h-7 text-xs gap-1">
+                                            <Download className="h-3 w-3" /> Prescription
+                                          </Button>
+                                        </a>
+                                        <ReviewDownloads bookingId={b.id} />
+                                      </div>
                                     ) : (
                                       <span className="text-xs text-muted-foreground">—</span>
                                     )}

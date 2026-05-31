@@ -13,10 +13,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { StatusBadge } from "@/components/status-badge";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { ClipboardList, RefreshCw, Video, Upload, Stethoscope, FlaskConical, ScanLine, FileText, Download, Paperclip, FileSignature, Loader2, File, ShieldCheck, Lock, Clock, Image, ExternalLink } from "lucide-react";
+import { ClipboardList, RefreshCw, Video, Upload, Stethoscope, FlaskConical, ScanLine, FileText, Download, Paperclip, FileSignature, Loader2, File, ShieldCheck, Lock, Clock, Image, ExternalLink, FilePlus } from "lucide-react";
 import { getCallWindow, callWindowLabel, toISTTimeString, getPostRxStatus } from "@/lib/call-window";
 import { Link } from "wouter";
-import type { Booking, BookingStatus, BookingType, Provider } from "@shared/schema";
+import type { Booking, BookingStatus, BookingType, Provider, PrescriptionReview } from "@shared/schema";
 import { format } from "date-fns";
 
 function docFileExt(url: string): string {
@@ -196,6 +196,13 @@ export default function ProviderBookingsPage() {
   const [prescriptionBooking, setPrescriptionBooking] = useState<Booking | null>(null);
   const [showPostRxDialog, setShowPostRxDialog] = useState(false);
   const [postRxBooking, setPostRxBooking] = useState<Booking | null>(null);
+  const [showReviewDialog, setShowReviewDialog] = useState(false);
+  const [reviewBooking, setReviewBooking] = useState<Booking | null>(null);
+  const [reviewDiagnosis, setReviewDiagnosis] = useState("");
+  const [reviewMedications, setReviewMedications] = useState("");
+  const [reviewPhysicianNotes, setReviewPhysicianNotes] = useState("");
+  const [reviewFollowUp, setReviewFollowUp] = useState("");
+  const [reviewAdvice, setReviewAdvice] = useState("");
   const [prescriptionDiagnosis, setPrescriptionDiagnosis] = useState("");
   const [prescriptionMedications, setPrescriptionMedications] = useState("");
   const [prescriptionAdvice, setPrescriptionAdvice] = useState("");
@@ -230,6 +237,28 @@ export default function ProviderBookingsPage() {
   });
 
   const filteredBookings = bookings?.filter((b) => allowedBookingTypes.includes(b.bookingType)) ?? [];
+
+  const addReviewMutation = useMutation({
+    mutationFn: async ({ id, ...body }: { id: string; diagnosis: string; medications: string; physicianNotes: string; followUp: string; advice: string }) => {
+      const res = await apiRequest("POST", `/api/bookings/${id}/prescription-reviews`, body);
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error(d?.message || "Failed to add review summary");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/provider/bookings"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/provider/dashboard"] });
+      setShowReviewDialog(false);
+      setReviewBooking(null);
+      setReviewDiagnosis(""); setReviewMedications(""); setReviewPhysicianNotes(""); setReviewFollowUp(""); setReviewAdvice("");
+      toast({ title: "Review Summary Added", description: "The review summary has been confirmed and a PDF generated for the patient." });
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed", description: error?.message || "Failed to add review summary.", variant: "destructive" });
+    },
+  });
 
   const updateStatusMutation = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: BookingStatus }) => {
@@ -617,6 +646,22 @@ export default function ProviderBookingsPage() {
           </>
         )}
         <PostRxToggles booking={booking} />
+        {booking.bookingType === "consultation" && (booking as any).prescriptionApprovedAt && getPostRxStatus(booking as any).inWindow && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="w-full gap-2 border-violet-500/30 text-violet-700 dark:text-violet-400 hover:bg-violet-500/5"
+            onClick={() => {
+              setReviewBooking(booking);
+              setReviewDiagnosis(""); setReviewMedications(""); setReviewPhysicianNotes(""); setReviewFollowUp(""); setReviewAdvice("");
+              setShowReviewDialog(true);
+            }}
+            data-testid={`button-add-review-${booking.id}`}
+          >
+            <FilePlus className="mr-2 h-3.5 w-3.5" />
+            Add Review Summary
+          </Button>
+        )}
         {(booking.bookingType === "lab" || booking.bookingType === "teleradiology") && !booking.reportUrl && (
           <Button
             size="sm"
@@ -1100,6 +1145,52 @@ export default function ProviderBookingsPage() {
           <DialogFooter>
             <Button onClick={() => { setShowPostRxDialog(false); setPostRxBooking(null); }}>
               Done
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showReviewDialog} onOpenChange={(open) => { if (!open) { setShowReviewDialog(false); setReviewBooking(null); } }}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FilePlus className="h-5 w-5 text-violet-600" />
+              Add Review Summary
+            </DialogTitle>
+            <DialogDescription>
+              {reviewBooking?.patientName} · Additional prescription based on new reports or follow-up assessment.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div>
+              <label className="text-sm font-medium mb-1 block">Diagnosis <span className="text-destructive">*</span></label>
+              <Textarea placeholder="Updated or confirmed diagnosis..." value={reviewDiagnosis} onChange={(e) => setReviewDiagnosis(e.target.value)} className="min-h-[80px]" />
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">Treatment / Medications</label>
+              <Textarea placeholder="Revised treatment plan or medications..." value={reviewMedications} onChange={(e) => setReviewMedications(e.target.value)} className="min-h-[80px]" />
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">Physician Notes</label>
+              <Textarea placeholder="Any additional physician notes..." value={reviewPhysicianNotes} onChange={(e) => setReviewPhysicianNotes(e.target.value)} className="min-h-[60px]" />
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">Advice</label>
+              <Textarea placeholder="Advice for the patient..." value={reviewAdvice} onChange={(e) => setReviewAdvice(e.target.value)} className="min-h-[60px]" />
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">Follow-up</label>
+              <Input placeholder="e.g. 1 week, after lab results..." value={reviewFollowUp} onChange={(e) => setReviewFollowUp(e.target.value)} />
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => { setShowReviewDialog(false); setReviewBooking(null); }}>Cancel</Button>
+            <Button
+              onClick={() => reviewBooking && addReviewMutation.mutate({ id: reviewBooking.id, diagnosis: reviewDiagnosis, medications: reviewMedications, physicianNotes: reviewPhysicianNotes, followUp: reviewFollowUp, advice: reviewAdvice })}
+              disabled={!reviewDiagnosis.trim() || addReviewMutation.isPending}
+              className="gap-2"
+            >
+              {addReviewMutation.isPending ? <><Loader2 className="h-4 w-4 animate-spin" /> Generating PDF…</> : <><ShieldCheck className="h-4 w-4" /> Confirm & Sign Review</>}
             </Button>
           </DialogFooter>
         </DialogContent>
