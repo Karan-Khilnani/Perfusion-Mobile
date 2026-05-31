@@ -173,19 +173,12 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
         } else {
           // Browser has no subscription at all — need user to re-grant
           setNotificationsEnabled(false);
-          const dismissedUntil = getPromptDismissedUntil();
-          if (Date.now() > dismissedUntil) {
-            setTimeout(() => setShowPermissionPrompt(true), 2000);
-          }
+          // push prompt disabled
         }
       });
     } else if (permission === "default") {
-      // Never asked — show prompt unless recently dismissed
+      // Never asked — prompt disabled for now
       setNotificationsEnabled(false);
-      const dismissedUntil = getPromptDismissedUntil();
-      if (Date.now() > dismissedUntil) {
-        setTimeout(() => setShowPermissionPrompt(true), 2000);
-      }
     } else {
       // "denied" — user has blocked notifications in browser settings
       setNotificationsEnabled(false);
