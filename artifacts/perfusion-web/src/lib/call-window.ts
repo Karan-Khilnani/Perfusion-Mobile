@@ -144,6 +144,53 @@ export function toISTTimeString(date: Date): string {
   });
 }
 
+// ── Post-prescription feature gate ────────────────────────────────────────────
+
+export interface PostRxStatus {
+  /** Prescription confirmed AND still within the 24-hour override window */
+  inWindow: boolean;
+  expiresAt: Date | null;
+  videoEnabled: boolean;
+  callsEnabled: boolean;
+  uploadsEnabled: boolean;
+}
+
+/**
+ * Returns post-prescription override state for a consultation booking.
+ * When `inWindow` is false the caller should fall back to slot-timing logic
+ * (i.e. prescriptionApprovedAt not yet set) OR treat all features as closed
+ * (prescription signed but 24-hour window expired).
+ */
+export function getPostRxStatus(booking: {
+  prescriptionApprovedAt?: string | Date | null;
+  postRxExpiresAt?: string | Date | null;
+  postRxVideoEnabled?: boolean | null;
+  postRxCallsEnabled?: boolean | null;
+  postRxUploadsEnabled?: boolean | null;
+}): PostRxStatus {
+  const now = new Date();
+  const approvedAt = booking.prescriptionApprovedAt
+    ? new Date(booking.prescriptionApprovedAt as string)
+    : null;
+
+  if (!approvedAt) {
+    return { inWindow: false, expiresAt: null, videoEnabled: false, callsEnabled: false, uploadsEnabled: false };
+  }
+
+  const expiresAt = booking.postRxExpiresAt
+    ? new Date(booking.postRxExpiresAt as string)
+    : null;
+  const inWindow = expiresAt !== null && !isNaN(expiresAt.getTime()) && now < expiresAt;
+
+  return {
+    inWindow,
+    expiresAt,
+    videoEnabled: inWindow && !!booking.postRxVideoEnabled,
+    callsEnabled: inWindow && !!booking.postRxCallsEnabled,
+    uploadsEnabled: inWindow && !!booking.postRxUploadsEnabled,
+  };
+}
+
 /** Returns a short human label for the Join Call button state */
 export function callWindowLabel(status: CallWindowStatus): string {
   switch (status.reason) {

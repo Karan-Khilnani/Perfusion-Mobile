@@ -13,7 +13,7 @@ import { ClipboardList, FlaskConical, Stethoscope, Calendar, IndianRupee, Chevro
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { getCallWindow, callWindowLabel, toISTTimeString } from "@/lib/call-window";
+import { getCallWindow, callWindowLabel, toISTTimeString, getPostRxStatus } from "@/lib/call-window";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
 import type { Booking, BookingType } from "@shared/schema";
@@ -402,10 +402,13 @@ export default function OrdersPage() {
     );
   };
 
-  const CallConsultantButton = ({ bookingId, status, callbackPhone, appointmentSlot, callWindowExtendedUntil }: { bookingId: string; status: string; callbackPhone?: string; appointmentSlot?: string | null; callWindowExtendedUntil?: string | null }) => {
+  const CallConsultantButton = ({ bookingId, status, callbackPhone, appointmentSlot, callWindowExtendedUntil, prescriptionApprovedAt, postRxExpiresAt, postRxCallsEnabled }: { bookingId: string; status: string; callbackPhone?: string; appointmentSlot?: string | null; callWindowExtendedUntil?: string | null; prescriptionApprovedAt?: string | null; postRxExpiresAt?: string | null; postRxCallsEnabled?: boolean | null }) => {
     const { toast } = useToast();
+    const rxStatus = getPostRxStatus({ prescriptionApprovedAt, postRxExpiresAt, postRxCallsEnabled });
     const win = getCallWindow({ appointmentSlot, callWindowExtendedUntil });
-    const canCall = status === "booked" && !!callbackPhone && win.open;
+    const canCall = prescriptionApprovedAt
+      ? !!callbackPhone && rxStatus.callsEnabled
+      : status === "booked" && !!callbackPhone && win.open;
     const callMutation = useMutation({
       mutationFn: () => apiRequest("POST", `/api/bookings/${bookingId}/call`),
       onSuccess: () => {
@@ -421,7 +424,15 @@ export default function OrdersPage() {
       },
     });
 
-    const description = !callbackPhone
+    const description = prescriptionApprovedAt
+      ? !callbackPhone
+        ? "Add a call-back number to this booking to enable phone consultation"
+        : !rxStatus.inWindow
+          ? "Post-consultation 24-hour window has expired"
+          : !rxStatus.callsEnabled
+            ? "Phone calls are currently disabled for this consultation"
+            : "Exotel will call your registered ward number and bridge you with the consultant — both numbers are masked"
+      : !callbackPhone
       ? "Add a call-back number to this booking to enable phone consultation"
       : status !== "booked"
       ? "Phone calls are only available for active (booked) consultations"
@@ -563,7 +574,22 @@ export default function OrdersPage() {
         </dl>
 
         {booking.bookingType === "consultation" && booking.videoRoomId && !["completed", "cancelled"].includes(booking.status) && (() => {
+          const prescriptionApprovedAt = (booking as any).prescriptionApprovedAt;
+          const rxStatus = getPostRxStatus(booking as any);
           const win = getCallWindow(booking as any);
+          const videoOpen = prescriptionApprovedAt ? rxStatus.videoEnabled : win.open;
+          const disabledLabel = prescriptionApprovedAt
+            ? rxStatus.inWindow ? "Video Disabled" : "Consult Ended"
+            : callWindowLabel(win);
+          const disabledTip = prescriptionApprovedAt
+            ? rxStatus.inWindow
+              ? "Video calls are currently disabled for this consultation"
+              : "Post-consultation 24-hour window has expired"
+            : win.reason === "before_window" && win.windowStart
+            ? `Call opens at ${toISTTimeString(win.windowStart)} IST`
+            : win.reason === "expired" && win.windowEnd
+            ? `Slot ended at ${toISTTimeString(win.windowEnd)} IST`
+            : "Call window is not active";
           return (
             <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
               <div className="flex items-center gap-2 text-primary">
@@ -573,7 +599,7 @@ export default function OrdersPage() {
               <p className="mt-1 text-sm text-muted-foreground">
                 Join the video call at your scheduled appointment time
               </p>
-              {win.open ? (
+              {videoOpen ? (
                 <Link href={`/video/${encodeURIComponent(booking.videoRoomId)}?returnTo=/user/orders`}>
                   <Button className="mt-3" data-testid="button-join-video-call">
                     <Video className="mr-2 h-4 w-4" />
@@ -586,16 +612,10 @@ export default function OrdersPage() {
                     <TooltipTrigger asChild>
                       <Button className="mt-3" disabled variant="outline" data-testid="button-join-video-call">
                         <Clock className="mr-2 h-4 w-4" />
-                        {callWindowLabel(win)}
+                        {disabledLabel}
                       </Button>
                     </TooltipTrigger>
-                    <TooltipContent>
-                      {win.reason === "before_window" && win.windowStart
-                        ? `Call opens at ${toISTTimeString(win.windowStart)} IST`
-                        : win.reason === "expired" && win.windowEnd
-                        ? `Slot ended at ${toISTTimeString(win.windowEnd)} IST`
-                        : "Call window is not active"}
-                    </TooltipContent>
+                    <TooltipContent>{disabledTip}</TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
               )}
@@ -610,6 +630,9 @@ export default function OrdersPage() {
             callbackPhone={(booking as any).callbackPhone}
             appointmentSlot={(booking as any).appointmentSlot}
             callWindowExtendedUntil={(booking as any).callWindowExtendedUntil}
+            prescriptionApprovedAt={(booking as any).prescriptionApprovedAt}
+            postRxExpiresAt={(booking as any).postRxExpiresAt}
+            postRxCallsEnabled={(booking as any).postRxCallsEnabled}
           />
         )}
 
@@ -637,45 +660,67 @@ export default function OrdersPage() {
           </div>
         )}
 
-        {!["completed", "cancelled"].includes(booking.status) && (
-          <div className="rounded-lg border p-4">
-            <div className="flex items-center gap-2">
-              <Upload className="h-5 w-5 text-muted-foreground" />
-              <span className="font-medium">Upload More Documents</span>
+        {!["completed", "cancelled"].includes(booking.status) && (() => {
+          const prescriptionApprovedAt = (booking as any).prescriptionApprovedAt;
+          const rxStatus = getPostRxStatus(booking as any);
+          const uploadsAllowed = prescriptionApprovedAt
+            ? rxStatus.uploadsEnabled
+            : true;
+          if (!uploadsAllowed && prescriptionApprovedAt) {
+            return (
+              <div className="rounded-lg border border-dashed p-4">
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Upload className="h-5 w-5" />
+                  <span className="font-medium">Document Uploads</span>
+                </div>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {rxStatus.inWindow
+                    ? "Uploads are currently disabled for this consultation — contact your consultant to re-enable them."
+                    : "Post-consultation 24-hour window has expired. No further uploads are accepted."}
+                </p>
+              </div>
+            );
+          }
+          return (
+            <div className="rounded-lg border p-4">
+              <div className="flex items-center gap-2">
+                <Upload className="h-5 w-5 text-muted-foreground" />
+                <span className="font-medium">Upload More Documents</span>
+              </div>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Upload additional reports or treatment charts
+              </p>
+              <div className="mt-3 flex gap-2 flex-wrap">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setUploadBooking(booking);
+                    setUploadCategory("reports");
+                    setPendingFiles([]);
+                    setShowUploadDialog(true);
+                  }}
+                  data-testid="button-upload-reports"
+                >
+                  <Upload className="mr-2 h-4 w-4" />
+                  Upload Reports
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setUploadBooking(booking);
+                    setUploadCategory("charts");
+                    setPendingFiles([]);
+                    setShowUploadDialog(true);
+                  }}
+                  data-testid="button-upload-charts"
+                >
+                  <Paperclip className="mr-2 h-4 w-4" />
+                  Upload Treatment Charts
+                </Button>
+              </div>
             </div>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Upload additional reports or treatment charts
-            </p>
-            <div className="mt-3 flex gap-2 flex-wrap">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setUploadBooking(booking);
-                  setUploadCategory("reports");
-                  setPendingFiles([]);
-                  setShowUploadDialog(true);
-                }}
-                data-testid="button-upload-reports"
-              >
-                <Upload className="mr-2 h-4 w-4" />
-                Upload Reports
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setUploadBooking(booking);
-                  setUploadCategory("charts");
-                  setPendingFiles([]);
-                  setShowUploadDialog(true);
-                }}
-                data-testid="button-upload-charts"
-              >
-                <Paperclip className="mr-2 h-4 w-4" />
-                Upload Treatment Charts
-              </Button>
-            </div>
-          </div>
-        )}
+          );
+        })()}
 
         {(booking as any).prescriptionGeneratedAt && booking.bookingType === "consultation" && (
           <div className="rounded-lg border border-blue-500/20 bg-blue-500/5 p-4">

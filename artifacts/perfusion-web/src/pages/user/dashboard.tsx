@@ -22,7 +22,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { getCallWindow, callWindowLabel, toISTTimeString } from "@/lib/call-window";
+import { getCallWindow, callWindowLabel, toISTTimeString, getPostRxStatus } from "@/lib/call-window";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Clock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -32,11 +32,24 @@ interface ActiveConsultation extends Booking {
   consultantSpecialization: string | null;
 }
 
-function DashboardCallButton({ bookingId, callbackPhone, status, appointmentSlot, callWindowExtendedUntil }: { bookingId: string; callbackPhone?: string; status: string; appointmentSlot?: string | null; callWindowExtendedUntil?: string | null }) {
+function DashboardCallButton({ bookingId, callbackPhone, status, appointmentSlot, callWindowExtendedUntil, prescriptionApprovedAt, postRxExpiresAt, postRxCallsEnabled }: { bookingId: string; callbackPhone?: string; status: string; appointmentSlot?: string | null; callWindowExtendedUntil?: string | null; prescriptionApprovedAt?: string | null; postRxExpiresAt?: string | null; postRxCallsEnabled?: boolean | null }) {
   const { toast } = useToast();
+  const rxStatus = getPostRxStatus({ prescriptionApprovedAt, postRxExpiresAt, postRxCallsEnabled });
   const win = getCallWindow({ appointmentSlot, callWindowExtendedUntil });
-  const canCall = status === "booked" && !!callbackPhone && win.open;
-  const disabledTitle = !callbackPhone
+
+  const canCall = prescriptionApprovedAt
+    ? !!callbackPhone && rxStatus.callsEnabled
+    : status === "booked" && !!callbackPhone && win.open;
+
+  const disabledTitle = prescriptionApprovedAt
+    ? !callbackPhone
+      ? "No call-back number on this booking"
+      : !rxStatus.inWindow
+        ? "Post-consultation 24-hour window has expired"
+        : !rxStatus.callsEnabled
+          ? "Phone calls are currently disabled — ask the consultant to re-enable them"
+          : undefined
+    : !callbackPhone
     ? "No call-back number on this booking"
     : status !== "booked"
     ? "Only available for active bookings"
@@ -379,6 +392,37 @@ export default function UserDashboard() {
                       {!cleanMode && (
                         <div className="space-y-2">
                           {booking.videoRoomId ? (() => {
+                            const prescriptionApprovedAt = (booking as any).prescriptionApprovedAt;
+                            const rxStatus = getPostRxStatus(booking as any);
+                            if (prescriptionApprovedAt) {
+                              if (rxStatus.videoEnabled) {
+                                return (
+                                  <Link href={`/video/${encodeURIComponent(booking.videoRoomId!)}?returnTo=/user`}>
+                                    <Button size="sm" className="w-full gap-2" data-testid={`button-join-call-${booking.id}`}>
+                                      <Video className="h-4 w-4" />
+                                      Join Video Room
+                                    </Button>
+                                  </Link>
+                                );
+                              }
+                              return (
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button size="sm" className="w-full gap-2" variant="outline" disabled data-testid={`button-join-call-${booking.id}`}>
+                                        <Clock className="h-4 w-4" />
+                                        {rxStatus.inWindow ? "Video Disabled" : "Consult Ended"}
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      {rxStatus.inWindow
+                                        ? "Video calls are currently disabled for this consultation"
+                                        : "Post-consultation 24-hour window has expired"}
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              );
+                            }
                             const win = getCallWindow(booking as any);
                             if (win.open) {
                               return (
@@ -456,6 +500,9 @@ export default function UserDashboard() {
                             status={booking.status}
                             appointmentSlot={(booking as any).appointmentSlot}
                             callWindowExtendedUntil={(booking as any).callWindowExtendedUntil}
+                            prescriptionApprovedAt={(booking as any).prescriptionApprovedAt}
+                            postRxExpiresAt={(booking as any).postRxExpiresAt}
+                            postRxCallsEnabled={(booking as any).postRxCallsEnabled}
                           />
                         </div>
                       )}

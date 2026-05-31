@@ -23,7 +23,7 @@ import {
   ExternalLink,
   Phone,
 } from "lucide-react";
-import { getCallWindow, callWindowLabel, toISTTimeString } from "@/lib/call-window";
+import { getCallWindow, callWindowLabel, toISTTimeString, getPostRxStatus } from "@/lib/call-window";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -300,10 +300,22 @@ function RevenueSection({ revenue, isLoading, label = "All earnings" }: { revenu
 
 function CallSeekerButton({ booking }: { booking: ActiveConsultation }) {
   const { toast } = useToast();
+  const prescriptionApprovedAt = (booking as any).prescriptionApprovedAt;
+  const rxStatus = getPostRxStatus(booking as any);
   const win = getCallWindow(booking as any);
   const callbackPhone = (booking as any).callbackPhone as string | null | undefined;
-  const canCall = (booking as any).status === "booked" && !!callbackPhone && win.open;
-  const disabledReason = !callbackPhone
+  const canCall = prescriptionApprovedAt
+    ? !!callbackPhone && rxStatus.callsEnabled
+    : (booking as any).status === "booked" && !!callbackPhone && win.open;
+  const disabledReason = prescriptionApprovedAt
+    ? !callbackPhone
+      ? "No callback number on this booking — ask admin to update it"
+      : !rxStatus.inWindow
+        ? "Post-consultation 24-hour window has expired"
+        : !rxStatus.callsEnabled
+          ? "Calls are disabled — toggle on from the post-consultation controls below"
+          : undefined
+    : !callbackPhone
     ? "No callback number on this booking — ask admin to update it"
     : (booking as any).status !== "booked"
     ? "Only available for active (booked) consultations"
@@ -341,6 +353,61 @@ function CallSeekerButton({ booking }: { booking: ActiveConsultation }) {
   );
 }
 
+
+function PostRxToggles({ booking }: { booking: ActiveConsultation }) {
+  const { toast } = useToast();
+  const rxStatus = getPostRxStatus(booking as any);
+  if (!rxStatus.inWindow) return null;
+  const hoursLeft = rxStatus.expiresAt
+    ? Math.max(1, Math.ceil((rxStatus.expiresAt.getTime() - Date.now()) / (1000 * 60 * 60)))
+    : 0;
+  const toggleMutation = useMutation({
+    mutationFn: (patch: { videoEnabled?: boolean; callsEnabled?: boolean; uploadsEnabled?: boolean }) =>
+      apiRequest("PATCH", `/api/bookings/${booking.id}/post-rx-features`, patch).then((r) => r.json()),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/provider/dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/provider/bookings"] });
+    },
+    onError: async (err: any) => {
+      let msg = "Failed to update.";
+      try { const d = await (err as any)?.response?.json?.(); if (d?.error) msg = d.error; } catch {}
+      toast({ title: "Update failed", description: msg, variant: "destructive" });
+    },
+  });
+  const toggles: { key: string; label: string; enabled: boolean; field: "videoEnabled" | "callsEnabled" | "uploadsEnabled" }[] = [
+    { key: "video", label: "Video", enabled: !!(booking as any).postRxVideoEnabled, field: "videoEnabled" },
+    { key: "calls", label: "Calls", enabled: !!(booking as any).postRxCallsEnabled, field: "callsEnabled" },
+    { key: "uploads", label: "Uploads", enabled: !!(booking as any).postRxUploadsEnabled, field: "uploadsEnabled" },
+  ];
+  return (
+    <div className="rounded-xl border bg-muted/30 p-3 space-y-2">
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Post-consultation access</p>
+        <span className="text-xs text-muted-foreground">~{hoursLeft}h remaining</span>
+      </div>
+      <div className="grid grid-cols-3 gap-2">
+        {toggles.map(({ key, label, enabled, field }) => (
+          <button
+            key={key}
+            onClick={() => !toggleMutation.isPending && toggleMutation.mutate({ [field]: !enabled })}
+            disabled={toggleMutation.isPending}
+            className={`flex flex-col items-center gap-1 rounded-lg border py-2 px-1 text-xs font-medium transition-colors ${
+              enabled
+                ? "border-primary/50 bg-primary/10 text-primary"
+                : "border-border text-muted-foreground hover:border-muted-foreground/50 hover:bg-muted/50"
+            }`}
+            data-testid={`toggle-post-rx-${key}-${booking.id}`}
+          >
+            <span className={`h-4 w-4 rounded-full border-2 flex items-center justify-center ${enabled ? "border-primary bg-primary" : "border-muted-foreground/40"}`}>
+              {enabled && <span className="h-1.5 w-1.5 rounded-full bg-white" />}
+            </span>
+            {label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 function ConsultationsSection({
   isLoading,
@@ -422,8 +489,11 @@ function ConsultationsSection({
 
                 <div className="grid grid-cols-2 gap-2.5">
                   {booking.videoRoomId ? (() => {
+                    const prescriptionApprovedAt = (booking as any).prescriptionApprovedAt;
+                    const rxStatus = getPostRxStatus(booking as any);
                     const win = getCallWindow(booking as any);
-                    if (win.open) {
+                    const videoOpen = prescriptionApprovedAt ? rxStatus.videoEnabled : win.open;
+                    if (videoOpen) {
                       return (
                         <Button
                           className="w-full h-10 gap-2 rounded-xl text-sm overflow-hidden"
@@ -446,11 +516,19 @@ function ConsultationsSection({
                               data-testid={`button-join-call-${booking.id}`}
                             >
                               <Clock className="h-4 w-4 shrink-0" />
-                              <span className="truncate">{callWindowLabel(win)}</span>
+                              <span className="truncate">
+                                {prescriptionApprovedAt
+                                  ? rxStatus.inWindow ? "Video Disabled" : "Consult Ended"
+                                  : callWindowLabel(win)}
+                              </span>
                             </Button>
                           </TooltipTrigger>
                           <TooltipContent>
-                            {win.reason === "before_window" && win.windowStart
+                            {prescriptionApprovedAt
+                              ? rxStatus.inWindow
+                                ? "Video is disabled — toggle on from the post-consultation controls"
+                                : "Post-consultation 24-hour window has expired"
+                              : win.reason === "before_window" && win.windowStart
                               ? `Call opens at ${toISTTimeString(win.windowStart)} IST`
                               : win.reason === "expired" && win.windowEnd
                               ? `Slot ended at ${toISTTimeString(win.windowEnd)} IST`
@@ -485,6 +563,7 @@ function ConsultationsSection({
 
                 <CallSeekerButton booking={booking} />
 
+                <PostRxToggles booking={booking} />
 
                 <div className="grid grid-cols-3 gap-2">
                   <PatientDetailsDialog
@@ -587,6 +666,8 @@ export default function ProviderDashboard() {
 
   const [showSummaryDialog, setShowSummaryDialog] = useState(false);
   const [summaryBooking, setSummaryBooking] = useState<ActiveConsultation | null>(null);
+  const [showPostRxDialog, setShowPostRxDialog] = useState(false);
+  const [postRxBooking, setPostRxBooking] = useState<ActiveConsultation | null>(null);
   const [diagnosis, setDiagnosis] = useState("");
   const [medications, setMedications] = useState("");
   const [physicianNotes, setPhysicianNotes] = useState("");
@@ -612,12 +693,14 @@ export default function ProviderDashboard() {
       const res = await apiRequest("POST", `/api/bookings/${id}/prescription/confirm`, body);
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/provider/dashboard"] });
       queryClient.invalidateQueries({ queryKey: ["/api/provider/bookings"] });
       setShowSummaryDialog(false);
       setSummaryBooking(null);
-      toast({ title: "Summary Confirmed & Signed", description: "The consultation summary is now locked with a medicolegal audit trail." });
+      setPostRxBooking(data as ActiveConsultation);
+      setShowPostRxDialog(true);
+      toast({ title: "Summary Confirmed & Signed", description: "Consultation locked. You can re-enable video, calls, or uploads for up to 24 hours." });
     },
     onError: (error: any) => {
       toast({ title: "Confirmation Failed", description: error?.message || "Failed to confirm consultation summary.", variant: "destructive" });
@@ -779,6 +862,23 @@ export default function ProviderDashboard() {
             onClose={() => setShowSummaryDialog(false)}
           />
         </Dialog>
+
+        <Dialog open={showPostRxDialog} onOpenChange={(open) => { setShowPostRxDialog(open); if (!open) setPostRxBooking(null); }}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle>Post-Consultation Access</DialogTitle>
+              <DialogDescription>
+                All features are now off. Re-enable video, calls, or uploads for the patient for up to 24 hours.
+              </DialogDescription>
+            </DialogHeader>
+            {postRxBooking && <PostRxToggles booking={postRxBooking} />}
+            <DialogFooter>
+              <Button onClick={() => { setShowPostRxDialog(false); setPostRxBooking(null); }}>
+                Done
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     );
   }
@@ -837,6 +937,23 @@ export default function ProviderDashboard() {
           confirmPending={confirmMutation.isPending}
           onClose={() => setShowSummaryDialog(false)}
         />
+      </Dialog>
+
+      <Dialog open={showPostRxDialog} onOpenChange={(open) => { setShowPostRxDialog(open); if (!open) setPostRxBooking(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Post-Consultation Access</DialogTitle>
+            <DialogDescription>
+              All features are now off. Re-enable video, calls, or uploads for the patient for up to 24 hours.
+            </DialogDescription>
+          </DialogHeader>
+          {postRxBooking && <PostRxToggles booking={postRxBooking} />}
+          <DialogFooter>
+            <Button onClick={() => { setShowPostRxDialog(false); setPostRxBooking(null); }}>
+              Done
+            </Button>
+          </DialogFooter>
+        </DialogContent>
       </Dialog>
     </div>
   );

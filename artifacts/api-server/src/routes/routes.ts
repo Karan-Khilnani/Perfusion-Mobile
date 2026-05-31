@@ -1502,13 +1502,18 @@ export async function registerRoutes(
 
       const prescriptionPdfUrl = await generateAndStorePrescriptionPdf(pdfData, baseUrl);
 
-      // Lock the prescription with approval metadata
+      // Lock the prescription with approval metadata and reset all post-rx feature toggles
+      const postRxExpiresAt = new Date(approvedAt.getTime() + 24 * 60 * 60 * 1000);
       const updated = await storage.updateBooking(freshBooking.id, {
         prescriptionApprovedAt: approvedAt,
         prescriptionApprovedByUserId: user.id,
         prescriptionApproverIp: approverIp,
         prescriptionOtpVerified: false,
         prescriptionPdfUrl,
+        postRxExpiresAt,
+        postRxVideoEnabled: false,
+        postRxCallsEnabled: false,
+        postRxUploadsEnabled: false,
       } as any);
 
       // Write medicolegal audit log
@@ -3466,6 +3471,15 @@ export async function registerRoutes(
       if (booking.userId !== userId) {
         return res.status(403).json({ message: "Access denied. You can only upload documents to your own bookings." });
       }
+
+      // After prescription: block if uploads toggle is disabled and window is active
+      if ((booking as any).prescriptionApprovedAt) {
+        const expiresAt = (booking as any).postRxExpiresAt ? new Date((booking as any).postRxExpiresAt) : null;
+        const inWindow = expiresAt && new Date() < expiresAt;
+        if (inWindow && !(booking as any).postRxUploadsEnabled) {
+          return res.status(403).json({ message: "Document uploads are currently disabled. Ask the consultant to re-enable uploads." });
+        }
+      }
       
       const { documentUrl } = req.body as { documentUrl: string };
       
@@ -3493,6 +3507,15 @@ export async function registerRoutes(
       
       if (booking.userId !== userId) {
         return res.status(403).json({ message: "Access denied." });
+      }
+
+      // After prescription: block if uploads toggle is disabled and window is active
+      if ((booking as any).prescriptionApprovedAt) {
+        const expiresAt = (booking as any).postRxExpiresAt ? new Date((booking as any).postRxExpiresAt) : null;
+        const inWindow = expiresAt && new Date() < expiresAt;
+        if (inWindow && !(booking as any).postRxUploadsEnabled) {
+          return res.status(403).json({ message: "Document uploads are currently disabled. Ask the consultant to re-enable uploads." });
+        }
       }
       
       const { chartUrl } = req.body as { chartUrl: string };
@@ -4615,6 +4638,47 @@ export async function registerRoutes(
       res.json({ success: true, extendedUntil });
     } catch (error) {
       res.status(500).json({ error: "Failed to extend call window" });
+    }
+  });
+
+  // PATCH /api/bookings/:id/post-rx-features — provider toggles post-prescription feature access
+  app.patch("/api/bookings/:id/post-rx-features", isAuthenticated, async (req: any, res) => {
+    try {
+      const user = req.user;
+      if (user.role !== "provider") {
+        return res.status(403).json({ error: "Only providers can update post-prescription features" });
+      }
+      const booking = await storage.getBookingById(req.params.id);
+      if (!booking) return res.status(404).json({ error: "Booking not found" });
+      if (!(booking as any).prescriptionApprovedAt) {
+        return res.status(400).json({ error: "Prescription must be confirmed before toggling post-prescription features" });
+      }
+      const expiresAt = (booking as any).postRxExpiresAt ? new Date((booking as any).postRxExpiresAt) : null;
+      if (!expiresAt || new Date() > expiresAt) {
+        return res.status(400).json({ error: "The 24-hour post-prescription feature window has expired" });
+      }
+      const provider = await storage.getProviderByUserId(user.id);
+      if (!provider) return res.status(403).json({ error: "Provider profile not found" });
+      const consultant = await storage.getConsultantById(booking.serviceId);
+      if (consultant?.providerId && consultant.providerId !== provider.id) {
+        return res.status(403).json({ error: "You can only update features for your own bookings" });
+      }
+      const { videoEnabled, callsEnabled, uploadsEnabled } = req.body as {
+        videoEnabled?: boolean;
+        callsEnabled?: boolean;
+        uploadsEnabled?: boolean;
+      };
+      const patch: Record<string, boolean> = {};
+      if (videoEnabled !== undefined) patch.postRxVideoEnabled = videoEnabled;
+      if (callsEnabled !== undefined) patch.postRxCallsEnabled = callsEnabled;
+      if (uploadsEnabled !== undefined) patch.postRxUploadsEnabled = uploadsEnabled;
+      if (Object.keys(patch).length === 0) {
+        return res.status(400).json({ error: "At least one feature flag must be specified" });
+      }
+      const updated = await storage.updateBooking(booking.id, patch as any);
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update post-prescription features" });
     }
   });
 

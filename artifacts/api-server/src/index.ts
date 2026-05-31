@@ -66,6 +66,11 @@ async function startServer() {
     await pool.query(`ALTER TABLE call_logs ADD COLUMN IF NOT EXISTS caller_phone_masked varchar(30)`);
     await pool.query(`ALTER TABLE call_logs ADD COLUMN IF NOT EXISTS callee_phone_masked varchar(30)`);
     await pool.query(`ALTER TABLE call_logs ADD COLUMN IF NOT EXISTS duration_seconds integer`);
+    // Post-prescription feature toggle columns
+    await pool.query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS post_rx_expires_at timestamptz`);
+    await pool.query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS post_rx_video_enabled boolean NOT NULL DEFAULT false`);
+    await pool.query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS post_rx_calls_enabled boolean NOT NULL DEFAULT false`);
+    await pool.query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS post_rx_uploads_enabled boolean NOT NULL DEFAULT false`);
 
     // Register all routes
     await registerRoutes(httpServer, app);

@@ -317,6 +317,11 @@ export const bookings = pgTable("bookings", {
   dashboardHiddenAt: timestamp("dashboard_hidden_at"),
   reminderFiredAt: timestamp("reminder_fired_at"),
   callWindowExtendedUntil: timestamp("call_window_extended_until"),
+  // Post-prescription feature toggles — set when prescription is confirmed; all off by default
+  postRxExpiresAt: timestamp("post_rx_expires_at"),
+  postRxVideoEnabled: boolean("post_rx_video_enabled").default(false),
+  postRxCallsEnabled: boolean("post_rx_calls_enabled").default(false),
+  postRxUploadsEnabled: boolean("post_rx_uploads_enabled").default(false),
   razorpayOrderId: varchar("razorpay_order_id", { length: 255 }),
   razorpayPaymentId: varchar("razorpay_payment_id", { length: 255 }),
   // Callback contact for cellular calls (ward phone selected at booking time)
