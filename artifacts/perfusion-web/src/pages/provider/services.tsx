@@ -45,7 +45,10 @@ const consultantSchema = z.object({
   yearsExperience: z.coerce.number().min(0, "Experience is required"),
   consultationFee: z.string().min(1, "Fee is required"),
   portfolio: z.string().optional(),
-  contactPhone: z.string().optional(),
+  contactPhone: z.string().refine(
+    (val) => !val || val === "+91" || /^\+91\d{10}$/.test(val),
+    "Enter a valid 10-digit mobile number"
+  ).optional(),
 });
 
 const emergencyTeamSchema = z.object({
@@ -202,7 +205,7 @@ export default function ProviderServicesPage() {
 
   const consultantForm = useForm<ConsultantFormData>({
     resolver: zodResolver(consultantSchema),
-    defaultValues: { name: "", qualification: "", specialization: "", yearsExperience: 0, consultationFee: "", portfolio: "" },
+    defaultValues: { name: "", qualification: "", specialization: "", yearsExperience: 0, consultationFee: "", portfolio: "", contactPhone: "+91" },
   });
 
   const emergencyForm = useForm<EmergencyTeamFormData>({
@@ -242,6 +245,7 @@ export default function ProviderServicesPage() {
       }
       const response = await apiRequest("POST", "/api/provider/consultants", {
         ...data,
+        contactPhone: (data.contactPhone && data.contactPhone !== "+91") ? data.contactPhone : undefined,
         registrationNumber: consultantRegNo || undefined,
         registeredOrganization: consultantRegOrg || undefined,
         registrationDocumentUrl,
@@ -298,7 +302,7 @@ export default function ProviderServicesPage() {
 
   const editConsultantForm = useForm<ConsultantFormData>({
     resolver: zodResolver(consultantSchema),
-    defaultValues: { name: "", qualification: "", specialization: "", yearsExperience: 0, consultationFee: "", portfolio: "", contactPhone: "" },
+    defaultValues: { name: "", qualification: "", specialization: "", yearsExperience: 0, consultationFee: "", portfolio: "", contactPhone: "+91" },
   });
 
   const editEmergencyForm = useForm<EmergencyTeamFormData>({
@@ -315,7 +319,7 @@ export default function ProviderServicesPage() {
       yearsExperience: c.yearsExperience || 0,
       consultationFee: c.consultationFee || "",
       portfolio: c.portfolio || "",
-      contactPhone: c.contactPhone || "",
+      contactPhone: c.contactPhone || "+91",
     });
     setEditConsultantRegNo(c.registrationNumber || "");
     setEditConsultantRegOrg(c.registeredOrganization || "");
@@ -345,6 +349,7 @@ export default function ProviderServicesPage() {
       }
       const res = await apiRequest("PATCH", `/api/provider/consultants/${editingConsultant.id}`, {
         ...data,
+        contactPhone: (data.contactPhone && data.contactPhone !== "+91") ? data.contactPhone : undefined,
         registrationNumber: editConsultantRegNo || undefined,
         registeredOrganization: editConsultantRegOrg || undefined,
         affiliatedInstitution: editConsultantAffiliation || undefined,

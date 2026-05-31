@@ -194,14 +194,14 @@ export default function AdminBookingsPage() {
 
   // Set callback phone state
   const [callbackPhoneBooking, setCallbackPhoneBooking] = useState<Booking | null>(null);
-  const [callbackPhoneInput, setCallbackPhoneInput] = useState("");
+  const [callbackPhoneInput, setCallbackPhoneInput] = useState("+91");
   const setCallbackMutation = useMutation({
     mutationFn: ({ id, phone }: { id: string; phone: string }) =>
       apiRequest("PATCH", `/api/admin/bookings/${id}`, { callbackPhone: phone }).then((r) => r.json()),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/bookings"] });
       setCallbackPhoneBooking(null);
-      setCallbackPhoneInput("");
+      setCallbackPhoneInput("+91");
       toast({ title: "Callback number saved", description: "The seeker's ward call-back number has been updated." });
     },
     onError: () => {
@@ -760,7 +760,7 @@ export default function AdminBookingsPage() {
                           variant="outline"
                           onClick={() => {
                             setCallbackPhoneBooking(booking);
-                            setCallbackPhoneInput((booking as any).callbackPhone || "");
+                            setCallbackPhoneInput((booking as any).callbackPhone || "+91");
                           }}
                           data-testid={`button-set-callback-${booking.id}`}
                         >
@@ -1111,7 +1111,7 @@ export default function AdminBookingsPage() {
       </Dialog>
 
       {/* Set / Edit Callback Phone Dialog */}
-      <Dialog open={!!callbackPhoneBooking} onOpenChange={(open) => { if (!open) { setCallbackPhoneBooking(null); setCallbackPhoneInput(""); } }}>
+      <Dialog open={!!callbackPhoneBooking} onOpenChange={(open) => { if (!open) { setCallbackPhoneBooking(null); setCallbackPhoneInput("+91"); } }}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -1133,11 +1133,11 @@ export default function AdminBookingsPage() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setCallbackPhoneBooking(null); setCallbackPhoneInput(""); }}>
+            <Button variant="outline" onClick={() => { setCallbackPhoneBooking(null); setCallbackPhoneInput("+91"); }}>
               Cancel
             </Button>
             <Button
-              disabled={!callbackPhoneInput.trim() || setCallbackMutation.isPending}
+              disabled={!/^\+91\d{10}$/.test(callbackPhoneInput) || setCallbackMutation.isPending}
               onClick={() => callbackPhoneBooking && setCallbackMutation.mutate({ id: callbackPhoneBooking.id, phone: callbackPhoneInput.trim() })}
             >
               {setCallbackMutation.isPending ? "Saving…" : "Save"}

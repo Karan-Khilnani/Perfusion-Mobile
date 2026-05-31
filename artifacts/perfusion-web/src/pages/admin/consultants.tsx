@@ -66,7 +66,10 @@ const consultantSchema = z.object({
   availabilityFrom: z.string().optional(),
   availabilityTo: z.string().optional(),
   portfolio: z.string().optional(),
-  contactPhone: z.string().optional(),
+  contactPhone: z.string().refine(
+    (val) => !val || val === "+91" || /^\+91\d{10}$/.test(val),
+    "Enter a valid 10-digit mobile number"
+  ).optional(),
 });
 
 type ConsultantFormData = z.infer<typeof consultantSchema>;
@@ -110,7 +113,7 @@ export default function AdminConsultantsPage() {
       rating: "4.5",
       availabilityFrom: "09:00 AM",
       availabilityTo: "05:00 PM",
-      contactPhone: "",
+      contactPhone: "+91",
     },
   });
 
@@ -118,6 +121,7 @@ export default function AdminConsultantsPage() {
     mutationFn: async (data: ConsultantFormData) => {
       return apiRequest("POST", "/api/admin/consultants", {
         ...data,
+        contactPhone: (data.contactPhone && data.contactPhone !== "+91") ? data.contactPhone : null,
         status: "active",
       });
     },
@@ -175,7 +179,7 @@ export default function AdminConsultantsPage() {
 
   const editConsultantForm = useForm<ConsultantFormData>({
     resolver: zodResolver(consultantSchema),
-    defaultValues: { name: "", qualification: "", specialization: "", yearsExperience: 0, consultationFee: "", followUpFee: "", rating: "4.0", availabilityFrom: "09:00 AM", availabilityTo: "05:00 PM", portfolio: "", contactPhone: "" },
+    defaultValues: { name: "", qualification: "", specialization: "", yearsExperience: 0, consultationFee: "", followUpFee: "", rating: "4.0", availabilityFrom: "09:00 AM", availabilityTo: "05:00 PM", portfolio: "", contactPhone: "+91" },
   });
 
   const openEditDetails = (c: EnrichedConsultant) => {
@@ -191,7 +195,7 @@ export default function AdminConsultantsPage() {
       availabilityFrom: c.availabilityFrom || "09:00 AM",
       availabilityTo: c.availabilityTo || "05:00 PM",
       portfolio: c.portfolio || "",
-      contactPhone: (c as any).contactPhone || "",
+      contactPhone: (c as any).contactPhone || "+91",
     });
     setEditRegNo(c.registrationNumber || "");
     setEditRegOrg(c.registeredOrganization || "");
@@ -230,7 +234,7 @@ export default function AdminConsultantsPage() {
         registeredOrganization: editRegOrg || undefined,
         affiliatedInstitution: editAffiliation || undefined,
         portfolio: data.portfolio ?? "",
-        contactPhone: data.contactPhone || null,
+        contactPhone: (data.contactPhone && data.contactPhone !== "+91") ? data.contactPhone : null,
         ...(registrationDocumentUrl ? { registrationDocumentUrl } : {}),
       });
     },

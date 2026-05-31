@@ -33,7 +33,7 @@ const profileSchema = z.object({
   return true;
 }, { message: "Please select your provider type", path: ["providerType"] })
   .refine((data) => {
-    if (data.role === "provider") return !!data.phone && data.phone.length >= 10;
+    if (data.role === "provider") return /^\+91\d{10}$/.test(data.phone || "");
     return true;
   }, { message: "Valid phone number is required for providers", path: ["phone"] })
   .refine((data) => {
@@ -66,7 +66,7 @@ export default function CompleteProfilePage() {
       hospitalAddress: "",
       hospitalRegistrationNo: "",
       hospitalRegisteredOrg: "",
-      phone: "",
+      phone: "+91",
       providerType: undefined,
       description: "",
       location: "",

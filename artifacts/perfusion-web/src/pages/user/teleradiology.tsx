@@ -36,7 +36,7 @@ const teleradiologySchema = z.object({
   priority: z.enum(["routine", "emergency"], { required_error: "Priority is required" }),
   clinicalHistory: z.string().min(10, "Please provide clinical history"),
   provisionalDiagnosis: z.string().optional(),
-  contactNumber: z.string().min(10, "Valid contact number required"),
+  contactNumber: z.string().regex(/^\+91\d{10}$/, "Enter a valid 10-digit mobile number"),
 });
 
 type TeleradiologyFormData = z.infer<typeof teleradiologySchema>;
@@ -62,7 +62,7 @@ export default function TeleradiologyPage() {
       priority: "routine",
       clinicalHistory: "",
       provisionalDiagnosis: "",
-      contactNumber: "",
+      contactNumber: "+91",
     },
   });
 

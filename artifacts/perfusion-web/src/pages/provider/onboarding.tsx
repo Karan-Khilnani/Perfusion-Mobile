@@ -48,7 +48,7 @@ export default function ProviderOnboardingPage() {
     resolver: zodResolver(providerSchema),
     defaultValues: {
       type: undefined,
-      phone: currentUser?.phone || "",
+      phone: currentUser?.phone || "+91",
       location: "",
       description: "",
     },

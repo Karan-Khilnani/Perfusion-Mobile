@@ -12,10 +12,13 @@ export const PhoneInput = forwardRef<HTMLInputElement, PhoneInputProps>(
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       if (onChange) {
+        const raw = e.target.value;
+        const digits = raw.replace(/^\+?91/, "").replace(/\D/g, "").slice(0, 10);
+        const newValue = PREFIX + digits;
         const synthetic = {
           ...e,
-          target: { ...e.target, value: PREFIX + e.target.value },
-          currentTarget: { ...e.currentTarget, value: PREFIX + e.currentTarget.value },
+          target: { ...e.target, value: newValue },
+          currentTarget: { ...e.currentTarget, value: newValue },
         };
         (onChange as React.ChangeEventHandler<HTMLInputElement>)(synthetic as unknown as React.ChangeEvent<HTMLInputElement>);
       }

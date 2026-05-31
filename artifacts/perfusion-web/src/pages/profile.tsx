@@ -89,7 +89,7 @@ function WardContactsCard() {
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [wardName, setWardName] = useState("");
-  const [phoneNumber, setPhoneNumber] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("+91");
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
@@ -99,14 +99,14 @@ function WardContactsCard() {
 
   const resetForm = () => {
     setWardName("");
-    setPhoneNumber("");
+    setPhoneNumber("+91");
     setEditingId(null);
     setShowForm(false);
   };
 
   const handleSave = async () => {
     if (!wardName.trim()) { toast({ title: "Ward name is required", variant: "destructive" }); return; }
-    if (!phoneNumber.trim()) { toast({ title: "Phone number is required", variant: "destructive" }); return; }
+    if (!phoneNumber.trim() || phoneNumber === "+91") { toast({ title: "Phone number is required", variant: "destructive" }); return; }
     setSaving(true);
     try {
       if (editingId) {
@@ -128,7 +128,7 @@ function WardContactsCard() {
   const handleEdit = (c: WardContact) => {
     setEditingId(c.id);
     setWardName(c.wardName);
-    setPhoneNumber(c.phoneNumber);
+    setPhoneNumber(c.phoneNumber || "+91");
     setShowForm(true);
   };
 

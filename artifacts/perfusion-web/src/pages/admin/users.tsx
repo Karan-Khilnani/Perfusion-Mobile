@@ -135,7 +135,7 @@ export default function AdminUsersPage() {
     defaultValues: {
       firstName: "",
       lastName: "",
-      phone: "",
+      phone: "+91",
       email: "",
       hospitalName: "",
       hospitalAddress: "",
@@ -150,7 +150,7 @@ export default function AdminUsersPage() {
     form.reset({
       firstName: user.firstName || "",
       lastName: user.lastName || "",
-      phone: user.phone || "",
+      phone: user.phone || "+91",
       email: user.email || "",
       hospitalName: user.hospitalName || "",
       hospitalAddress: user.hospitalAddress || "",
