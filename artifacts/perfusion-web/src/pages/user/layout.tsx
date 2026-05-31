@@ -28,6 +28,7 @@ import {
   IndianRupee,
   LogOut,
   User,
+  Phone,
 } from "lucide-react";
 import logoImage from "@assets/Perfusion_website_logo_1766464970393.png";
 
@@ -137,6 +138,14 @@ export default function UserLayout({ children }: { children: React.ReactNode }) 
           <header className="flex h-14 items-center justify-between gap-4 border-b bg-background px-4">
             <SidebarTrigger data-testid="button-sidebar-toggle" />
             <div className="flex items-center gap-2">
+              <a
+                href="tel:6268564602"
+                className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                title="Customer care"
+              >
+                <Phone className="h-3.5 w-3.5 text-primary" />
+                <span className="hidden sm:inline font-medium">62685 64602</span>
+              </a>
               <ThemeToggle />
               <Button
                 variant="ghost"
