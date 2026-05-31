@@ -304,7 +304,7 @@ function CallSeekerButton({ booking }: { booking: ActiveConsultation }) {
   const callbackPhone = (booking as any).callbackPhone as string | null | undefined;
   const canCall = (booking as any).status === "booked" && !!callbackPhone && win.open;
   const disabledReason = !callbackPhone
-    ? "No callback number on this booking — seeker must add a ward number"
+    ? "No callback number on this booking — ask admin to update it"
     : (booking as any).status !== "booked"
     ? "Only available for active (booked) consultations"
     : win.reason === "before_window" && win.windowStart
