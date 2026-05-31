@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -92,12 +92,28 @@ function DocInlineViewer({ url, index, prefix }: { url: string; index: number; p
 }
 
 function PostRxToggles({ booking }: { booking: Booking }) {
-  const { toast } = useToast();
   const rxStatus = getPostRxStatus(booking as any);
   if (!rxStatus.inWindow) return null;
-  const hoursLeft = rxStatus.expiresAt
-    ? Math.max(1, Math.ceil((rxStatus.expiresAt.getTime() - Date.now()) / (1000 * 60 * 60)))
+  return <PostRxTogglesInner booking={booking} expiresAt={rxStatus.expiresAt} />;
+}
+
+function PostRxTogglesInner({ booking, expiresAt }: { booking: Booking; expiresAt: Date | null }) {
+  const { toast } = useToast();
+  const hoursLeft = expiresAt
+    ? Math.max(1, Math.ceil((expiresAt.getTime() - Date.now()) / (1000 * 60 * 60)))
     : 0;
+  const [localState, setLocalState] = useState({
+    videoEnabled: !!(booking as any).postRxVideoEnabled,
+    callsEnabled: !!(booking as any).postRxCallsEnabled,
+    uploadsEnabled: !!(booking as any).postRxUploadsEnabled,
+  });
+  useEffect(() => {
+    setLocalState({
+      videoEnabled: !!(booking as any).postRxVideoEnabled,
+      callsEnabled: !!(booking as any).postRxCallsEnabled,
+      uploadsEnabled: !!(booking as any).postRxUploadsEnabled,
+    });
+  }, [(booking as any).postRxVideoEnabled, (booking as any).postRxCallsEnabled, (booking as any).postRxUploadsEnabled]);
   const toggleMutation = useMutation({
     mutationFn: (patch: { videoEnabled?: boolean; callsEnabled?: boolean; uploadsEnabled?: boolean }) =>
       apiRequest("PATCH", `/api/bookings/${booking.id}/post-rx-features`, patch).then((r) => r.json()),
@@ -105,16 +121,29 @@ function PostRxToggles({ booking }: { booking: Booking }) {
       queryClient.invalidateQueries({ queryKey: ["/api/provider/bookings"] });
       queryClient.invalidateQueries({ queryKey: ["/api/provider/dashboard"] });
     },
-    onError: async (err: any) => {
+    onError: async (err: any, variables) => {
+      setLocalState((prev) => {
+        const reverted = { ...prev };
+        for (const k of Object.keys(variables) as (keyof typeof variables)[]) {
+          reverted[k] = !variables[k];
+        }
+        return reverted;
+      });
       let msg = "Failed to update.";
       try { const d = await (err as any)?.response?.json?.(); if (d?.error) msg = d.error; } catch {}
       toast({ title: "Update failed", description: msg, variant: "destructive" });
     },
   });
+  function handleToggle(field: "videoEnabled" | "callsEnabled" | "uploadsEnabled") {
+    if (toggleMutation.isPending) return;
+    const next = !localState[field];
+    setLocalState((prev) => ({ ...prev, [field]: next }));
+    toggleMutation.mutate({ [field]: next });
+  }
   const toggles: { key: string; label: string; enabled: boolean; field: "videoEnabled" | "callsEnabled" | "uploadsEnabled" }[] = [
-    { key: "video", label: "Video", enabled: !!(booking as any).postRxVideoEnabled, field: "videoEnabled" },
-    { key: "calls", label: "Calls", enabled: !!(booking as any).postRxCallsEnabled, field: "callsEnabled" },
-    { key: "uploads", label: "Uploads", enabled: !!(booking as any).postRxUploadsEnabled, field: "uploadsEnabled" },
+    { key: "video", label: "Video", enabled: localState.videoEnabled, field: "videoEnabled" },
+    { key: "calls", label: "Calls", enabled: localState.callsEnabled, field: "callsEnabled" },
+    { key: "uploads", label: "Uploads", enabled: localState.uploadsEnabled, field: "uploadsEnabled" },
   ];
   return (
     <div className="rounded-lg border bg-muted/20 p-2.5 space-y-2 w-full">
@@ -126,7 +155,7 @@ function PostRxToggles({ booking }: { booking: Booking }) {
         {toggles.map(({ key, label, enabled, field }) => (
           <button
             key={key}
-            onClick={() => !toggleMutation.isPending && toggleMutation.mutate({ [field]: !enabled })}
+            onClick={() => handleToggle(field)}
             disabled={toggleMutation.isPending}
             className={`flex-1 flex flex-col items-center gap-0.5 rounded-lg border py-1.5 text-xs font-medium transition-colors ${
               enabled
