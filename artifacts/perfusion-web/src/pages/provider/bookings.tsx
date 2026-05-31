@@ -586,27 +586,14 @@ export default function ProviderBookingsPage() {
                   <ShieldCheck className="h-3.5 w-3.5" />
                   Signed & Locked
                 </div>
-                {(booking as any).prescriptionPdfUrl && (
-                  <a
-                    href={(booking as any).prescriptionPdfUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    data-testid={`button-download-prescription-${booking.id}`}
-                  >
-                    <Button size="sm" variant="outline">
-                      <Download className="mr-2 h-3.5 w-3.5" />
-                      Download PDF
-                    </Button>
-                  </a>
-                )}
                 <Button
                   size="sm"
-                  variant="ghost"
-                  className="h-7 px-2 text-xs text-muted-foreground"
+                  variant="outline"
                   onClick={() => openPrescriptionDialog(booking)}
                   data-testid={`button-view-prescription-${booking.id}`}
                 >
-                  View Details
+                  <FileText className="mr-2 h-3.5 w-3.5" />
+                  View Consultation Summary
                 </Button>
               </div>
             ) : (
