@@ -39,10 +39,12 @@ function getNextAvailability(consultant: Consultant & { computedCustomerPrice?: 
 
   if (slotSeries && slotSeries.length > 0) {
     for (const s of slotSeries) {
-      const mins = parseTimeMinutes(s.from);
+      // Use booking cutoff = slot end − 15 min so the day stays visible while bookable.
+      const toMins = parseTimeMinutes(s.to);
+      const cutoff = toMins >= 0 ? toMins - 15 : parseTimeMinutes(s.from);
       for (const d of s.days) {
-        if (!(d in dayLatest) || (mins >= 0 && mins > dayLatest[d]))
-          dayLatest[d] = mins >= 0 ? mins : 0;
+        if (!(d in dayLatest) || (cutoff >= 0 && cutoff > dayLatest[d]))
+          dayLatest[d] = cutoff >= 0 ? cutoff : 0;
       }
     }
   } else if (fixedSlots.length > 0) {

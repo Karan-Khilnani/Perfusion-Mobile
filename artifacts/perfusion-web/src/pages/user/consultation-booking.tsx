@@ -86,7 +86,9 @@ function sortLegacySlots(slots: string[]): string[] {
   });
 }
 
-/** Remove slots whose weekday matches today AND whose time has already passed. */
+/** Remove slots whose weekday matches today AND that have fewer than 15 minutes
+ *  remaining. For range slots (e.g. "Mon 9:00 AM–1:00 PM") the end time is used;
+ *  for start-time-only slots the start time is used (legacy fallback). */
 function filterPastLegacySlots(slots: string[]): string[] {
   const now = new Date();
   const todayName = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][now.getDay()];
@@ -94,11 +96,20 @@ function filterPastLegacySlots(slots: string[]): string[] {
   return slots.filter((slot) => {
     const [dayName, ...timeParts] = slot.split(" ");
     if (dayName !== todayName) return true;
-    return parseTimeToMinutes(timeParts.join(" ")) > nowMin;
+    const timeStr = timeParts.join(" ");
+    // Range format: "9:00 AM–1:00 PM" or "9:00 AM - 1:00 PM"
+    const rangeParts = timeStr.split(/\s*[–\-]\s*/);
+    if (rangeParts.length >= 2) {
+      const endMins = parseTimeToMinutes(rangeParts[rangeParts.length - 1].trim());
+      if (endMins > 0) return endMins - 15 > nowMin;
+    }
+    // Start-time-only: keep if start hasn't passed yet
+    return parseTimeToMinutes(timeStr) > nowMin;
   });
 }
 
-/** When today is selected, remove time windows whose `from` time has passed.
+/** When today is selected, remove time windows that have fewer than 15 minutes
+ *  remaining before they end (i.e. bookable until 15 min before slot end).
  *  Always returns windows sorted earliest-first by `from` time. */
 function filterPastTimeWindows(
   windows: { from: string; to: string }[],
@@ -108,7 +119,7 @@ function filterPastTimeWindows(
   const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
   const nowMin = now.getHours() * 60 + now.getMinutes();
   const filtered = dateStr === todayStr
-    ? windows.filter((w) => parseTimeToMinutes(w.from) > nowMin)
+    ? windows.filter((w) => parseTimeToMinutes(w.to) - 15 > nowMin)
     : windows;
   return [...filtered].sort((a, b) => parseTimeToMinutes(a.from) - parseTimeToMinutes(b.from));
 }
