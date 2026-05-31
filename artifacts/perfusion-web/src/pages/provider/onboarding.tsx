@@ -17,7 +17,7 @@ import { useToast } from "@/hooks/use-toast";
 
 const providerSchema = z.object({
   type: z.enum(["lab", "consultant", "hospital", "transport"], { required_error: "Provider type is required" }),
-  phone: z.string().min(10, "Valid phone number is required"),
+  phone: z.string().regex(/^\+91\d{10}$/, "Enter a valid 10-digit mobile number"),
   location: z.string().min(2, "City/location is required"),
   description: z.string().optional(),
 });
