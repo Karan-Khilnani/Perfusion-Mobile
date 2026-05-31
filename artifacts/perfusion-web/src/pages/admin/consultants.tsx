@@ -46,7 +46,7 @@ import { Label } from "@/components/ui/label";
 import { Plus, MoreHorizontal, Pause, Play, Trash2, Stethoscope, Search, Calendar, Edit, X, DollarSign, Camera, PenLine, Upload, FileText, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import type { Consultant } from "@shared/schema";
+import type { Consultant, SlotSeries } from "@shared/schema";
 import { ImageCropDialog } from "@/components/ui/image-crop-dialog";
 
 type EnrichedConsultant = Consultant & {
@@ -54,6 +54,28 @@ type EnrichedConsultant = Consultant & {
   computedCustomerPrice: string;
   computedMarginPercent: string;
 };
+
+const DAYS_ORDER = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+function formatSlots(c: EnrichedConsultant): { lines: string[]; empty: boolean } {
+  const series: SlotSeries[] = (c as any).slotSeries || [];
+  if (series.length > 0) {
+    return {
+      lines: series.map(s => {
+        const days = DAYS_ORDER.filter(d => s.days.includes(d)).join(" · ");
+        return `${days}: ${s.from} – ${s.to}`;
+      }),
+      empty: false,
+    };
+  }
+  const days: string[] = (c as any).availableDays || [];
+  const from: string = (c as any).availabilityFrom || "";
+  const to: string = (c as any).availabilityTo || "";
+  if (days.length > 0 && from && to) {
+    return { lines: [`${days.join(" · ")}: ${from} – ${to}`], empty: false };
+  }
+  return { empty: true, lines: [] };
+}
 
 const consultantSchema = z.object({
   name: z.string().min(2, "Name is required"),
@@ -522,6 +544,7 @@ export default function AdminConsultantsPage() {
                   <TableHead>Base Fee</TableHead>
                   <TableHead>Customer Price</TableHead>
                   <TableHead>Margin %</TableHead>
+                  <TableHead>Slots</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="w-[70px]">Actions</TableHead>
                 </TableRow>
@@ -554,6 +577,19 @@ export default function AdminConsultantsPage() {
                     <TableCell data-testid={`text-base-fee-${consultant.id}`}>₹{consultant.providerBaseCost}</TableCell>
                     <TableCell data-testid={`text-customer-price-${consultant.id}`}>₹{consultant.computedCustomerPrice}</TableCell>
                     <TableCell data-testid={`text-margin-${consultant.id}`}>{consultant.computedMarginPercent}%</TableCell>
+                    <TableCell>
+                      {(() => {
+                        const { lines, empty } = formatSlots(consultant);
+                        if (empty) return <span className="text-xs text-muted-foreground">No slots set</span>;
+                        return (
+                          <div className="space-y-0.5">
+                            {lines.map((line, i) => (
+                              <p key={i} className="text-xs text-foreground whitespace-nowrap">{line}</p>
+                            ))}
+                          </div>
+                        );
+                      })()}
+                    </TableCell>
                     <TableCell>{getStatusBadge(consultant.status || "active")}</TableCell>
                     <TableCell>
                       <DropdownMenu>
