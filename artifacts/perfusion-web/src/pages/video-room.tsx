@@ -14,7 +14,7 @@ import { ClinicalPanel } from "@/components/clinical-panel";
 import { InCallSummaryForm } from "@/components/in-call-summary-form";
 import type { Booking } from "@shared/schema";
 
-import { getCallWindow, toISTTimeString } from "@/lib/call-window";
+import { getCallWindow, toISTTimeString, getPostRxStatus } from "@/lib/call-window";
 
 type CallPhase =
   | "precall"
@@ -140,11 +140,17 @@ export default function VideoRoomPage() {
     }
   }, [joinedAsCallee, phase]);
 
-  // Call window check — block precall if outside the scheduled slot
+  // Call window check — after prescription use post-rx gate; before prescription use slot window
   useEffect(() => {
     if (booking && phase === "precall" && !joinedAsCallee) {
-      const win = getCallWindow(booking as any);
-      if (!win.open) setPhase("window_closed");
+      const prescriptionApprovedAt = (booking as any).prescriptionApprovedAt;
+      if (prescriptionApprovedAt) {
+        const rxStatus = getPostRxStatus(booking as any);
+        if (!rxStatus.videoEnabled) setPhase("window_closed");
+      } else {
+        const win = getCallWindow(booking as any);
+        if (!win.open) setPhase("window_closed");
+      }
     }
   }, [booking, phase, joinedAsCallee]);
 
