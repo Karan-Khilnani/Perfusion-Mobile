@@ -6,6 +6,7 @@ import { z } from "zod";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PhoneInput } from "@/components/ui/phone-input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -245,8 +246,7 @@ export default function TeleradiologyPage() {
                           <FormItem>
                             <FormLabel>Contact Number</FormLabel>
                             <FormControl>
-                              <Input
-                                placeholder="+91 XXXXX XXXXX"
+                              <PhoneInput
                                 {...field}
                                 data-testid="input-contact"
                               />

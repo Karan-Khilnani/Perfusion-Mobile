@@ -7,6 +7,7 @@ import { z } from "zod";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PhoneInput } from "@/components/ui/phone-input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -1253,8 +1254,7 @@ export default function ConsultationBookingPage() {
                         <FormItem>
                           <FormLabel>Contact Number *</FormLabel>
                           <FormControl>
-                            <Input
-                              placeholder="+91 XXXXX XXXXX"
+                            <PhoneInput
                               {...field}
                               data-testid="input-contact"
                             />
@@ -1376,8 +1376,7 @@ export default function ConsultationBookingPage() {
                       </SelectContent>
                     </Select>
                     {callbackContactId === "other" && (
-                      <Input
-                        placeholder="+91 XXXXX XXXXX"
+                      <PhoneInput
                         value={callbackOtherPhone}
                         onChange={(e) => {
                           setCallbackOtherPhone(e.target.value);

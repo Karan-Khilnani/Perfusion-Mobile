@@ -6,6 +6,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PhoneInput } from "@/components/ui/phone-input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -191,7 +192,7 @@ function WardContactsCard() {
               </div>
               <div className="space-y-1">
                 <Label htmlFor="wc-phone" className="text-xs">Phone Number</Label>
-                <Input id="wc-phone" placeholder="+91 XXXXX XXXXX" value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} data-testid="input-ward-phone" />
+                <PhoneInput id="wc-phone" value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} data-testid="input-ward-phone" />
               </div>
             </div>
             <div className="flex gap-2">
@@ -605,7 +606,7 @@ export default function ProfilePage() {
                         <FormItem>
                           <FormLabel>Contact Phone</FormLabel>
                           <FormControl>
-                            <Input placeholder="+91 XXXXX XXXXX" {...field} data-testid="input-provider-phone" />
+                            <PhoneInput {...field} data-testid="input-provider-phone" />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -875,7 +876,7 @@ export default function ProfilePage() {
                   )} />
                 </div>
                 <FormField control={fullAccountForm.control} name="phone" render={({ field }) => (
-                  <FormItem><FormLabel>Phone Number</FormLabel><FormControl><Input placeholder="+91 XXXXX XXXXX" {...field} data-testid="input-phone" /></FormControl><FormMessage /></FormItem>
+                  <FormItem><FormLabel>Phone Number</FormLabel><FormControl><PhoneInput {...field} data-testid="input-phone" /></FormControl><FormMessage /></FormItem>
                 )} />
                 <FormField control={fullAccountForm.control} name="email" render={({ field }) => (
                   <FormItem><FormLabel>Email</FormLabel><FormControl><Input placeholder="you@example.com" type="email" {...field} data-testid="input-email" /></FormControl><FormMessage /></FormItem>
@@ -944,7 +945,7 @@ export default function ProfilePage() {
                       <FormItem><FormLabel>City / Location</FormLabel><FormControl><Input placeholder="e.g. Raipur" {...field} data-testid="input-provider-location" /></FormControl><FormMessage /></FormItem>
                     )} />
                     <FormField control={providerForm.control} name="phone" render={({ field }) => (
-                      <FormItem><FormLabel>Contact Phone</FormLabel><FormControl><Input placeholder="+91 XXXXX XXXXX" {...field} data-testid="input-provider-phone" /></FormControl><FormMessage /></FormItem>
+                      <FormItem><FormLabel>Contact Phone</FormLabel><FormControl><PhoneInput {...field} data-testid="input-provider-phone" /></FormControl><FormMessage /></FormItem>
                     )} />
                   </div>
                   <FormField control={providerForm.control} name="description" render={({ field }) => (
@@ -995,7 +996,7 @@ export default function ProfilePage() {
                   )} />
                 </div>
                 <FormField control={personalForm.control} name="phone" render={({ field }) => (
-                  <FormItem><FormLabel>Phone Number</FormLabel><FormControl><Input placeholder="+91 XXXXX XXXXX" {...field} data-testid="input-phone" /></FormControl><FormMessage /></FormItem>
+                  <FormItem><FormLabel>Phone Number</FormLabel><FormControl><PhoneInput {...field} data-testid="input-phone" /></FormControl><FormMessage /></FormItem>
                 )} />
                 <FormField control={personalForm.control} name="email" render={({ field }) => (
                   <FormItem><FormLabel>Email</FormLabel><FormControl><Input placeholder="you@example.com" type="email" {...field} data-testid="input-email" /></FormControl><FormMessage /></FormItem>
@@ -1028,7 +1029,7 @@ export default function ProfilePage() {
                       <FormItem><FormLabel>City / Location</FormLabel><FormControl><Input placeholder="e.g. Raipur" {...field} data-testid="input-provider-location" /></FormControl><FormMessage /></FormItem>
                     )} />
                     <FormField control={providerForm.control} name="phone" render={({ field }) => (
-                      <FormItem><FormLabel>Contact Phone</FormLabel><FormControl><Input placeholder="+91 XXXXX XXXXX" {...field} data-testid="input-provider-phone" /></FormControl><FormMessage /></FormItem>
+                      <FormItem><FormLabel>Contact Phone</FormLabel><FormControl><PhoneInput {...field} data-testid="input-provider-phone" /></FormControl><FormMessage /></FormItem>
                     )} />
                   </div>
                   <FormField control={providerForm.control} name="description" render={({ field }) => (
@@ -1078,7 +1079,7 @@ export default function ProfilePage() {
                 )} />
               </div>
               <FormField control={fullAccountForm.control} name="phone" render={({ field }) => (
-                <FormItem><FormLabel>Phone Number</FormLabel><FormControl><Input placeholder="+91 XXXXX XXXXX" {...field} data-testid="input-phone" /></FormControl><FormMessage /></FormItem>
+                <FormItem><FormLabel>Phone Number</FormLabel><FormControl><PhoneInput {...field} data-testid="input-phone" /></FormControl><FormMessage /></FormItem>
               )} />
               <FormField control={fullAccountForm.control} name="email" render={({ field }) => (
                 <FormItem><FormLabel>Email</FormLabel><FormControl><Input placeholder="you@example.com" type="email" {...field} data-testid="input-email" /></FormControl><FormMessage /></FormItem>
@@ -1153,7 +1154,7 @@ export default function ProfilePage() {
                     <FormItem><FormLabel>City / Location</FormLabel><FormControl><Input placeholder="e.g. Raipur" {...field} data-testid="input-provider-location" /></FormControl><FormMessage /></FormItem>
                   )} />
                   <FormField control={providerForm.control} name="phone" render={({ field }) => (
-                    <FormItem><FormLabel>Contact Phone</FormLabel><FormControl><Input placeholder="+91 XXXXX XXXXX" {...field} data-testid="input-provider-phone" /></FormControl><FormMessage /></FormItem>
+                    <FormItem><FormLabel>Contact Phone</FormLabel><FormControl><PhoneInput {...field} data-testid="input-provider-phone" /></FormControl><FormMessage /></FormItem>
                   )} />
                 </div>
                 <FormField control={providerForm.control} name="description" render={({ field }) => (

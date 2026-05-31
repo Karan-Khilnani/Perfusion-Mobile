@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { PhoneInput } from "@/components/ui/phone-input";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -398,7 +399,7 @@ export default function AdminUsersPage() {
                     <FormItem>
                       <FormLabel>Phone</FormLabel>
                       <FormControl>
-                        <Input placeholder="+91 XXXXX XXXXX" {...field} data-testid="input-admin-phone" />
+                        <PhoneInput {...field} data-testid="input-admin-phone" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

@@ -7,6 +7,7 @@ import { z } from "zod";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PhoneInput } from "@/components/ui/phone-input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -419,7 +420,7 @@ export default function AdminConsultantsPage() {
                     <FormItem>
                       <FormLabel>Contact Phone <span className="text-muted-foreground font-normal text-xs">— for appointment reminders</span></FormLabel>
                       <FormControl>
-                        <Input placeholder="+919876543210" {...field} data-testid="input-consultant-phone" />
+                        <PhoneInput {...field} data-testid="input-consultant-phone" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -774,7 +775,7 @@ export default function AdminConsultantsPage() {
                 <FormField control={editConsultantForm.control} name="contactPhone" render={({ field }) => (
                   <FormItem>
                     <FormLabel>Contact Phone <span className="text-muted-foreground font-normal text-xs">— for appointment reminders</span></FormLabel>
-                    <FormControl><Input placeholder="+919876543210" {...field} data-testid="input-admin-edit-consultant-phone" /></FormControl>
+                    <FormControl><PhoneInput {...field} data-testid="input-admin-edit-consultant-phone" /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )} />
