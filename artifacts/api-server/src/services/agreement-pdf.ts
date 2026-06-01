@@ -160,8 +160,9 @@ export async function generateAndStoreAgreementPdf(data: AgreementPdfData): Prom
     ["Registered Mobile Number", data.phone || "-"],
     ["Date & Time of Acceptance (IST)", signedAtStr],
     ["IP Address of Device", data.ipAddress],
+    ["Device / Browser Fingerprint", data.userAgent ? data.userAgent.substring(0, 120) : "-"],
     ["Agreement Version", AGREEMENT_VERSION],
-    ["Unique Acceptance Ref.", data.agreementId],
+    ["Unique Acceptance Ref.", data.uniqueRef],
   ];
 
   for (const [label, value] of fields) {

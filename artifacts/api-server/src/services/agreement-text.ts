@@ -1,4 +1,4 @@
-export const AGREEMENT_VERSION = "v1.0";
+export const AGREEMENT_VERSION = "v2.1";
 
 export const AGREEMENT_FULL_TEXT = `PERFUSION HEALTHCARE PRIVATE LIMITED
 CIN: U86900CT2026PTC020133 | Regd. Office: House No. 45, Sunder Nagar, Rajendra Nagar, Raipur - 492001, Chhattisgarh
