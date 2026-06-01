@@ -20,6 +20,21 @@ import { loginSchema, registerSchema, type UserRole } from "@workspace/db";
 import { z } from "zod/v4";
 import { generateVerificationCode, sendVerificationEmail } from "../email";
 import { storage } from "../storage";
+import { getPool } from "../db";
+import { AGREEMENT_VERSION } from "../services/agreement-text";
+
+async function userRequiresAgreement(user: { id: string; role?: string | null; approvalStatus?: string | null }): Promise<boolean> {
+  if (!user || user.role === "admin") return false;
+  if (user.approvalStatus !== "approved") return false;
+  const pool = getPool();
+  const result = await pool.query(
+    `SELECT 1 FROM user_agreements WHERE user_id = $1 AND agreement_version = $2 LIMIT 1`,
+    [user.id, AGREEMENT_VERSION]
+  );
+  // Fail closed: an approved non-admin user is treated as requiring the
+  // agreement unless we can positively confirm a signed row for this version.
+  return result.rows.length === 0;
+}
 
 function getCallbackURL(req: any): string {
   let protocol = req.headers["x-forwarded-proto"] || req.protocol || "https";
@@ -346,7 +361,17 @@ export function registerAuthRoutes(app: Express): void {
         req.session.destroy(() => {});
         return res.status(401).json({ message: "Unauthorized" });
       }
-      res.json(user);
+      let requiresAgreement = false;
+      try {
+        requiresAgreement = await userRequiresAgreement(user as any);
+      } catch (agreementErr) {
+        // Fail closed: if we cannot confirm a signed agreement, require it
+        // (admins / non-approved users were already excluded above).
+        requiresAgreement =
+          (user as any).role !== "admin" &&
+          (user as any).approvalStatus === "approved";
+      }
+      res.json({ ...user, requiresAgreement });
     } catch (error) {
       console.error("Error fetching user:", error);
       res.status(500).json({ message: "Failed to fetch user" });

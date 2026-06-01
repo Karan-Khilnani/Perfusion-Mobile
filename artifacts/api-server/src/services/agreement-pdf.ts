@@ -2,15 +2,16 @@ import { PDFDocument, rgb, StandardFonts, PDFPage, PDFFont } from "pdf-lib";
 import fs from "fs";
 import path from "path";
 import { uploadFile as supabaseUpload } from "./supabase-storage";
-import { AGREEMENT_FULL_TEXT, AGREEMENT_VERSION } from "./agreement-text";
+import { AGREEMENT_FULL_TEXT, AGREEMENT_VERSION, partnerTypeLabel } from "./agreement-text";
 
 export interface AgreementPdfData {
-  agreementId: string;
+  uniqueRef: string;
   partyName: string;
   organizationName: string;
   email: string;
   phone: string;
   role: string;
+  providerType?: string | null;
   signedAt: Date;
   ipAddress: string;
   userAgent: string;
@@ -117,10 +118,7 @@ export async function generateAndStoreAgreementPdf(data: AgreementPdfData): Prom
     dateStyle: "long", timeStyle: "long", timeZone: "Asia/Kolkata"
   });
 
-  const roleLabel =
-    data.role === "care_seeker" ? "Seeker Hospital / Healthcare Facility" :
-    data.role === "provider" ? "Provider Specialist / Healthcare Provider" :
-    data.role === "admin" ? "Platform Administrator" : data.role;
+  const roleLabel = partnerTypeLabel(data.role, data.providerType);
 
   drawPageHeader(page, font, fontBold);
   const HEADER_H = 70;
@@ -267,7 +265,7 @@ export async function generateAndStoreAgreementPdf(data: AgreementPdfData): Prom
   }
 
   const pdfBytes = await doc.save();
-  const fileName = `agreement-${data.agreementId}-${Date.now()}.pdf`;
+  const fileName = `agreement-${data.uniqueRef}-${Date.now()}.pdf`;
   const buffer = Buffer.from(pdfBytes);
   const publicUrl = await supabaseUpload(buffer, fileName, "agreements", "application/pdf");
   return publicUrl;

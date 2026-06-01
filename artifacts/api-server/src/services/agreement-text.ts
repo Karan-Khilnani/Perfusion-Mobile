@@ -169,3 +169,25 @@ Neither Party shall be liable for failure or delay in performance caused by even
 17.2 Entire Agreement: This Agreement, together with any applicable Schedule of Fees and the Acceptance Record, constitutes the entire agreement between the Parties and supersedes all prior understandings.
 
 17.3 Notices: All formal notices shall be in writing and delivered to the registered contact details of each Party as recorded on the Platform.`;
+
+export function partnerTypeLabel(role: string, providerType?: string | null): string {
+  if (role === "admin") return "Platform Administrator";
+  if (role === "care_seeker") return "Seeker Hospital / Healthcare Facility";
+  if (role === "provider") {
+    switch (providerType) {
+      case "lab":
+        return "Diagnostic Lab / Laboratory Partner";
+      case "teleradiology":
+        return "Teleradiology / Radiology Partner";
+      case "hospital":
+        return "Provider Hospital / Tertiary-Care Institution";
+      case "consultant":
+        return "Provider Specialist / Consultant";
+      case "transport":
+        return "Logistics / Transport Partner";
+      default:
+        return "Provider Specialist / Healthcare Provider";
+    }
+  }
+  return role;
+}

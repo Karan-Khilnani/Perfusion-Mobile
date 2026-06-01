@@ -1,22 +1,26 @@
 ---
 name: Click-wrap agreement system
-description: Architecture decisions and gotchas for the Perfusion click-wrap agreement system
+description: Durable design decisions and gotchas for the Perfusion click-wrap agreement system
 ---
 
-## How it works
+## Decisions
 
-- `user_agreements` table created via incremental startup migration in `index.ts` (same pattern as `call_logs`).
-- `AGREEMENT_VERSION = "v1.0"` in `agreement-text.ts`. Bump this string to force all users to re-accept.
-- API routes: `GET /api/agreements/check` and `POST /api/agreements/sign` both use `isAuthenticated` middleware — they are NOT blocked by a hypothetical agreement middleware so the gate can call them.
-- Sign endpoint is idempotent (checks for existing row before inserting).
-- PDF is generated asynchronously after the HTTP response is sent (non-blocking). `pdf_url` column is updated once ready.
-- `AgreementGate` in frontend wraps the entire Router. It skips for: unauthenticated users, admins (`role === "admin"`), users with `approvalStatus !== "approved"`.
+- **Server is the single source of truth** for the agreement version and canonical text. The frontend never hardcodes either — it fetches them and renders whatever the server returns.
+  - **Why:** prevents version/text drift between the gate, the rendered page, and the generated PDF. There is exactly one place to edit to roll a new version.
+  - **How to apply:** to publish a new agreement version, bump the version constant and body in the agreement-text service only; the startup migration default and all API responses follow automatically.
 
-**Why:**
-- Courts need the actual document with embedded metadata, not a screenshot.
-- Non-blocking PDF generation prevents sign latency (Supabase upload takes ~1-3s).
-- Gate in UI (not middleware) avoids chicken-and-egg: the sign endpoint itself must be reachable without agreement.
+- **Enforcement fails closed.** If the "has this user signed the current version?" check cannot positively confirm a signed row (e.g. transient DB error), an approved non-admin user is treated as still requiring the agreement. Admins and non-approved users are always exempt.
+  - **Why:** a fail-open check let users bypass a legally-required signature on any lookup failure (flagged in code review).
 
-**How to apply:**
-- To update the agreement: change `AGREEMENT_VERSION` in `agreement-text.ts` AND `agreement-pdf.ts` AND the frontend `AGREEMENT_VERSION` constant in `agreement-gate.tsx`. All three must match.
-- Admin can view all signed agreements at `/admin/agreements`.
+- **Idempotency is enforced at the DB layer**, not just application logic: a unique index on `(user_id, agreement_version)` plus `INSERT ... ON CONFLICT DO NOTHING`. Concurrent double-submits collapse to one row; the loser re-reads the winning row.
+  - **Why:** a SELECT-then-INSERT check races under concurrency and produced duplicate signature rows.
+
+- **PDF generation is non-blocking** — the sign response returns immediately and the PDF URL is filled in afterward.
+  - **Why:** Supabase upload takes ~1-3s; courts need the actual rendered document (with embedded metadata incl. the device/browser fingerprint), not a screenshot.
+
+- **Frontend gate is a redirect guard, not a modal/middleware.** It reads a `requiresAgreement` flag from the auth endpoint and redirects to a dedicated, route-accessible agreement page. The signing UI lives on that page, never inside the gate.
+  - **Why:** keeps the sign/current endpoints reachable before signing (no chicken-and-egg) and gives the agreement its own URL.
+
+## Migration gotchas (incremental startup migrations)
+
+- This project applies schema changes as a flat sequence of raw `pool.query` calls at startup (same pattern as other tables here). A failing query crashes startup, so retrofits for pre-existing installs must be safe: backfill nullable→NOT NULL in two steps, dedupe before adding a unique index, and add/validate a retrofit FK inside a try/catch (use `NOT VALID` + `VALIDATE CONSTRAINT`) so a legacy orphan row cannot block boot.

@@ -9,23 +9,18 @@ import { FileDown, Search, Shield, CheckCircle2 } from "lucide-react";
 interface AgreementRecord {
   id: string;
   userId: string;
+  uniqueRef: string | null;
   agreementVersion: string;
   partyName: string;
   organizationName: string | null;
   email: string;
   phone: string | null;
   role: string;
+  roleLabel: string;
   ipAddress: string | null;
   pdfUrl: string | null;
   signedAt: string;
   createdAt: string;
-}
-
-function roleLabel(role: string) {
-  if (role === "care_seeker") return "Seeker";
-  if (role === "provider") return "Provider";
-  if (role === "admin") return "Admin";
-  return role;
 }
 
 function roleBadgeClass(role: string) {
@@ -48,6 +43,7 @@ export default function AdminAgreementsPage() {
       a.partyName.toLowerCase().includes(q) ||
       a.email.toLowerCase().includes(q) ||
       (a.organizationName || "").toLowerCase().includes(q) ||
+      (a.uniqueRef || "").toLowerCase().includes(q) ||
       a.agreementVersion.toLowerCase().includes(q)
     );
   });
@@ -95,7 +91,8 @@ export default function AdminAgreementsPage() {
                   <tr className="border-b bg-gray-50">
                     <th className="text-left px-4 py-3 font-medium text-gray-600">Partner</th>
                     <th className="text-left px-4 py-3 font-medium text-gray-600">Organisation</th>
-                    <th className="text-left px-4 py-3 font-medium text-gray-600">Role</th>
+                    <th className="text-left px-4 py-3 font-medium text-gray-600">Partner Type</th>
+                    <th className="text-left px-4 py-3 font-medium text-gray-600">Reference</th>
                     <th className="text-left px-4 py-3 font-medium text-gray-600">Version</th>
                     <th className="text-left px-4 py-3 font-medium text-gray-600">Signed At (IST)</th>
                     <th className="text-left px-4 py-3 font-medium text-gray-600">IP Address</th>
@@ -115,8 +112,11 @@ export default function AdminAgreementsPage() {
                       </td>
                       <td className="px-4 py-3">
                         <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${roleBadgeClass(a.role)}`}>
-                          {roleLabel(a.role)}
+                          {a.roleLabel}
                         </span>
+                      </td>
+                      <td className="px-4 py-3 text-gray-500 text-xs font-mono">
+                        {a.uniqueRef || "—"}
                       </td>
                       <td className="px-4 py-3">
                         <Badge variant="outline" className="text-xs">{a.agreementVersion}</Badge>

@@ -93,21 +93,64 @@ async function startServer() {
     // User agreements table (click-wrap)
     await pool.query(`CREATE TABLE IF NOT EXISTS user_agreements (
       id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
-      user_id varchar NOT NULL,
-      agreement_version varchar(20) NOT NULL DEFAULT 'v1.0',
+      user_id varchar NOT NULL REFERENCES users(id),
+      unique_ref varchar(120) NOT NULL,
+      agreement_version varchar(20) NOT NULL DEFAULT 'v2.1',
       party_name varchar(255) NOT NULL,
       organization_name varchar(255),
       email varchar(255) NOT NULL,
       phone varchar(30),
       role varchar(30) NOT NULL,
+      provider_type varchar(30),
       ip_address varchar(100),
       user_agent text,
       pdf_url varchar(500),
       signed_at timestamptz NOT NULL DEFAULT now(),
       created_at timestamptz DEFAULT now()
     )`);
+    // Backfill columns for pre-existing installations (idempotent)
+    await pool.query(`ALTER TABLE user_agreements ADD COLUMN IF NOT EXISTS unique_ref varchar(120)`);
+    await pool.query(`ALTER TABLE user_agreements ADD COLUMN IF NOT EXISTS provider_type varchar(30)`);
+    // Backfill unique_ref for legacy rows (PK guarantees uniqueness), then enforce NOT NULL.
+    await pool.query(
+      `UPDATE user_agreements SET unique_ref = 'PHPL-AGR-LEGACY-' || id WHERE unique_ref IS NULL`
+    );
+    await pool.query(`ALTER TABLE user_agreements ALTER COLUMN unique_ref SET NOT NULL`);
     await pool.query(`CREATE INDEX IF NOT EXISTS user_agreements_user_idx ON user_agreements(user_id)`);
-    await pool.query(`CREATE INDEX IF NOT EXISTS user_agreements_version_idx ON user_agreements(user_id, agreement_version)`);
+    await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS user_agreements_unique_ref_idx ON user_agreements(unique_ref)`);
+    // Hard idempotency: one signed agreement per (user, version). Dedupe any
+    // legacy duplicates (keep earliest) before adding the unique index.
+    await pool.query(`
+      DELETE FROM user_agreements ua
+      WHERE ua.id NOT IN (
+        SELECT DISTINCT ON (user_id, agreement_version) id
+        FROM user_agreements
+        ORDER BY user_id, agreement_version, signed_at ASC, id ASC
+      )
+    `);
+    await pool.query(
+      `CREATE UNIQUE INDEX IF NOT EXISTS user_agreements_user_version_unique ON user_agreements(user_id, agreement_version)`
+    );
+    // Retrofit the FK to users(id) for tables created before it was added.
+    // NOT VALID avoids a blocking scan; validation is best-effort so a legacy
+    // orphan row cannot crash startup.
+    try {
+      await pool.query(`
+        DO $$ BEGIN
+          IF NOT EXISTS (
+            SELECT 1 FROM information_schema.table_constraints
+            WHERE table_name = 'user_agreements' AND constraint_type = 'FOREIGN KEY'
+          ) THEN
+            ALTER TABLE user_agreements
+              ADD CONSTRAINT user_agreements_user_id_fkey
+              FOREIGN KEY (user_id) REFERENCES users(id) NOT VALID;
+          END IF;
+        END $$;
+      `);
+      await pool.query(`ALTER TABLE user_agreements VALIDATE CONSTRAINT user_agreements_user_id_fkey`);
+    } catch (fkErr) {
+      logger.warn({ err: fkErr }, "user_agreements FK retrofit/validation skipped");
+    }
 
     // Register all routes
     await registerRoutes(httpServer, app);

@@ -16,6 +16,7 @@ import CompleteProfilePage from "@/pages/complete-profile";
 import VerifyEmailPage from "@/pages/verify-email";
 import VerifyPrescriptionPage from "@/pages/verify-prescription";
 import PendingApprovalPage from "@/pages/pending-approval";
+import AgreementPage from "@/pages/agreement";
 import UserLayout from "@/pages/user/layout";
 import UserDashboard from "@/pages/user/dashboard";
 import LabsPage from "@/pages/user/labs";
@@ -96,6 +97,7 @@ function Router() {
       <Route path="/verify-email" component={VerifyEmailPage} />
       <Route path="/verify/prescription/:bookingId" component={VerifyPrescriptionPage} />
       <Route path="/pending-approval" component={PendingApprovalPage} />
+      <Route path="/agreement" component={AgreementPage} />
       <Route path="/consultants" component={PublicConsultantsPage} />
       <Route path="/lab-tests" component={PublicLabTestsPage} />
       <Route path="/provider/onboarding" component={ProviderOnboardingPage} />

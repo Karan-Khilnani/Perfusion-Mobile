@@ -19,7 +19,7 @@ import { processReport, type BookingReportData } from "../services/report-proces
 import { generateAndStorePrescriptionPdf, type PrescriptionPdfData } from "../services/prescription-pdf";
 import { generateReceiptPdf, type ReceiptData, type ReceiptType } from "../services/receipt-pdf";
 import { generateAndStoreAgreementPdf, type AgreementPdfData } from "../services/agreement-pdf";
-import { AGREEMENT_VERSION } from "../services/agreement-text";
+import { AGREEMENT_VERSION, AGREEMENT_FULL_TEXT, partnerTypeLabel } from "../services/agreement-text";
 import { sendPushNotification, getVapidPublicKey, type PushPayload } from "../services/push-notifications";
 import { getCallWindow } from "../services/call-window";
 import { Expo, type ExpoPushMessage } from "expo-server-sdk";
@@ -5246,6 +5246,44 @@ export async function registerRoutes(
     }
   });
 
+  // GET /api/agreements/current — returns the canonical agreement text, version,
+  // and the current user's pre-filled acceptance fields (single source of truth).
+  app.get("/api/agreements/current", isAuthenticated, async (req: any, res) => {
+    try {
+      const user = req.user as any;
+      if (!user?.id) return res.status(401).json({ message: "Unauthorized" });
+
+      let providerType: string | null = null;
+      if (user.role === "provider") {
+        try {
+          const provider = await storage.getProviderByUserId(user.id);
+          providerType = (provider as any)?.type ?? null;
+        } catch {
+          providerType = null;
+        }
+      }
+
+      const partyName = `${user.firstName || ""} ${user.lastName || ""}`.trim() || user.email;
+      const organizationName = user.hospitalName || user.registeredOrganization || "";
+
+      return res.json({
+        version: AGREEMENT_VERSION,
+        text: AGREEMENT_FULL_TEXT,
+        fields: {
+          partyName,
+          organizationName,
+          email: user.email,
+          phone: user.phone || "",
+          role: user.role,
+          roleLabel: partnerTypeLabel(user.role, providerType),
+        },
+      });
+    } catch (error) {
+      req.log.error({ err: error }, "Error fetching current agreement");
+      return res.status(500).json({ message: "Failed to fetch agreement" });
+    }
+  });
+
   // POST /api/agreements/sign — record electronic acceptance and generate PDF
   app.post("/api/agreements/sign", isAuthenticated, async (req: any, res) => {
     try {
@@ -5256,11 +5294,11 @@ export async function registerRoutes(
 
       // Idempotency: already signed this version?
       const existing = await pool.query(
-        `SELECT id FROM user_agreements WHERE user_id = $1 AND agreement_version = $2`,
+        `SELECT id, unique_ref FROM user_agreements WHERE user_id = $1 AND agreement_version = $2`,
         [user.id, AGREEMENT_VERSION]
       );
       if (existing.rows.length > 0) {
-        return res.json({ signed: true, id: existing.rows[0].id });
+        return res.json({ signed: true, id: existing.rows[0].id, uniqueRef: existing.rows[0].unique_ref });
       }
 
       const ipAddress =
@@ -5271,31 +5309,60 @@ export async function registerRoutes(
       const partyName = `${user.firstName || ""} ${user.lastName || ""}`.trim() || user.email;
       const orgName = user.hospitalName || user.registeredOrganization || "";
 
-      // Insert agreement record first (without PDF)
+      // Resolve provider type (for partner-type label) if this is a provider
+      let providerType: string | null = null;
+      if (user.role === "provider") {
+        try {
+          const provider = await storage.getProviderByUserId(user.id);
+          providerType = (provider as any)?.type ?? null;
+        } catch {
+          providerType = null;
+        }
+      }
+
+      // Unique acceptance reference: PHPL-AGR-{userId8}-{timestamp}{rand}
+      const rand = Math.random().toString(36).slice(2, 8).toUpperCase();
+      const uniqueRef = `PHPL-AGR-${String(user.id).replace(/-/g, "").slice(0, 8).toUpperCase()}-${Date.now()}${rand}`;
+
+      // Insert agreement record first (without PDF). ON CONFLICT makes this
+      // concurrency-safe: a unique index on (user_id, agreement_version)
+      // collapses concurrent double-submits to a single row.
       const insertResult = await pool.query(
         `INSERT INTO user_agreements
-           (user_id, agreement_version, party_name, organization_name, email, phone, role, ip_address, user_agent, signed_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, now())
+           (user_id, unique_ref, agreement_version, party_name, organization_name, email, phone, role, provider_type, ip_address, user_agent, signed_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, now())
+         ON CONFLICT (user_id, agreement_version) DO NOTHING
          RETURNING id, signed_at`,
-        [user.id, AGREEMENT_VERSION, partyName, orgName || null, user.email, user.phone || null, user.role, ipAddress, userAgent]
+        [user.id, uniqueRef, AGREEMENT_VERSION, partyName, orgName || null, user.email, user.phone || null, user.role, providerType, ipAddress, userAgent]
       );
+
+      // Lost the race: another concurrent request already inserted the row.
+      if (insertResult.rows.length === 0) {
+        const winner = await pool.query(
+          `SELECT id, unique_ref FROM user_agreements WHERE user_id = $1 AND agreement_version = $2`,
+          [user.id, AGREEMENT_VERSION]
+        );
+        return res.json({ signed: true, id: winner.rows[0]?.id, uniqueRef: winner.rows[0]?.unique_ref });
+      }
+
       const agreementId = insertResult.rows[0].id;
       const signedAt: Date = insertResult.rows[0].signed_at;
 
       // Generate signed PDF in background (don't block response)
       const pdfData: AgreementPdfData = {
-        agreementId,
+        uniqueRef,
         partyName,
         organizationName: orgName,
         email: user.email,
         phone: user.phone || "",
         role: user.role,
+        providerType,
         signedAt,
         ipAddress,
         userAgent,
       };
 
-      res.json({ signed: true, id: agreementId });
+      res.json({ signed: true, id: agreementId, uniqueRef });
 
       // Generate and store PDF asynchronously
       generateAndStoreAgreementPdf(pdfData)
@@ -5315,20 +5382,22 @@ export async function registerRoutes(
     try {
       const pool = getPool();
       const result = await pool.query(
-        `SELECT id, user_id, agreement_version, party_name, organization_name, email, phone, role,
-                ip_address, pdf_url, signed_at, created_at
+        `SELECT id, user_id, unique_ref, agreement_version, party_name, organization_name, email, phone, role,
+                provider_type, ip_address, pdf_url, signed_at, created_at
          FROM user_agreements
          ORDER BY signed_at DESC`
       );
       const rows = result.rows.map((r: any) => ({
         id: r.id,
         userId: r.user_id,
+        uniqueRef: r.unique_ref,
         agreementVersion: r.agreement_version,
         partyName: r.party_name,
         organizationName: r.organization_name,
         email: r.email,
         phone: r.phone,
         role: r.role,
+        roleLabel: partnerTypeLabel(r.role, r.provider_type),
         ipAddress: r.ip_address,
         pdfUrl: r.pdf_url,
         signedAt: r.signed_at,
