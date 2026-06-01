@@ -1,0 +1,1 @@
+- [Click-wrap agreement system](agreement-system.md) — user_agreements table (incremental migration); agreement gate skips admins and pending-approval users; PDF generated async post-response.

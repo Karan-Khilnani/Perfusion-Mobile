@@ -18,6 +18,8 @@ import { calculateCustomerPrice, deriveMarginFromPrice, derivePriceFromMargin } 
 import { processReport, type BookingReportData } from "../services/report-processor";
 import { generateAndStorePrescriptionPdf, type PrescriptionPdfData } from "../services/prescription-pdf";
 import { generateReceiptPdf, type ReceiptData, type ReceiptType } from "../services/receipt-pdf";
+import { generateAndStoreAgreementPdf, type AgreementPdfData } from "../services/agreement-pdf";
+import { AGREEMENT_VERSION } from "../services/agreement-text";
 import { sendPushNotification, getVapidPublicKey, type PushPayload } from "../services/push-notifications";
 import { getCallWindow } from "../services/call-window";
 import { Expo, type ExpoPushMessage } from "expo-server-sdk";
@@ -5217,6 +5219,125 @@ export async function registerRoutes(
     } catch (error) {
       console.error("[Exotel webhook] Error processing status callback:", error);
       return res.status(500).send("Error");
+    }
+  });
+
+  // ── Agreement Routes ───────────────────────────────────────────────────────
+
+  // GET /api/agreements/check — check if current user has signed the current version
+  app.get("/api/agreements/check", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) return res.status(401).json({ message: "Unauthorized" });
+      const pool = getPool();
+      const result = await pool.query(
+        `SELECT id, agreement_version, signed_at FROM user_agreements
+         WHERE user_id = $1 AND agreement_version = $2
+         ORDER BY signed_at DESC LIMIT 1`,
+        [userId, AGREEMENT_VERSION]
+      );
+      if (result.rows.length > 0) {
+        return res.json({ signed: true, version: result.rows[0].agreement_version, signedAt: result.rows[0].signed_at });
+      }
+      return res.json({ signed: false });
+    } catch (error) {
+      req.log.error({ err: error }, "Error checking agreement");
+      return res.status(500).json({ message: "Failed to check agreement" });
+    }
+  });
+
+  // POST /api/agreements/sign — record electronic acceptance and generate PDF
+  app.post("/api/agreements/sign", isAuthenticated, async (req: any, res) => {
+    try {
+      const user = req.user as any;
+      if (!user?.id) return res.status(401).json({ message: "Unauthorized" });
+
+      const pool = getPool();
+
+      // Idempotency: already signed this version?
+      const existing = await pool.query(
+        `SELECT id FROM user_agreements WHERE user_id = $1 AND agreement_version = $2`,
+        [user.id, AGREEMENT_VERSION]
+      );
+      if (existing.rows.length > 0) {
+        return res.json({ signed: true, id: existing.rows[0].id });
+      }
+
+      const ipAddress =
+        (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() ||
+        req.socket?.remoteAddress ||
+        "unknown";
+      const userAgent = req.headers["user-agent"] || "";
+      const partyName = `${user.firstName || ""} ${user.lastName || ""}`.trim() || user.email;
+      const orgName = user.hospitalName || user.registeredOrganization || "";
+
+      // Insert agreement record first (without PDF)
+      const insertResult = await pool.query(
+        `INSERT INTO user_agreements
+           (user_id, agreement_version, party_name, organization_name, email, phone, role, ip_address, user_agent, signed_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, now())
+         RETURNING id, signed_at`,
+        [user.id, AGREEMENT_VERSION, partyName, orgName || null, user.email, user.phone || null, user.role, ipAddress, userAgent]
+      );
+      const agreementId = insertResult.rows[0].id;
+      const signedAt: Date = insertResult.rows[0].signed_at;
+
+      // Generate signed PDF in background (don't block response)
+      const pdfData: AgreementPdfData = {
+        agreementId,
+        partyName,
+        organizationName: orgName,
+        email: user.email,
+        phone: user.phone || "",
+        role: user.role,
+        signedAt,
+        ipAddress,
+        userAgent,
+      };
+
+      res.json({ signed: true, id: agreementId });
+
+      // Generate and store PDF asynchronously
+      generateAndStoreAgreementPdf(pdfData)
+        .then((pdfUrl) => {
+          pool.query(`UPDATE user_agreements SET pdf_url = $1 WHERE id = $2`, [pdfUrl, agreementId])
+            .catch((e) => req.log.error({ err: e }, "Failed to update agreement pdf_url"));
+        })
+        .catch((e) => req.log.error({ err: e }, "Failed to generate agreement PDF"));
+    } catch (error) {
+      req.log.error({ err: error }, "Error signing agreement");
+      return res.status(500).json({ message: "Failed to record agreement" });
+    }
+  });
+
+  // GET /api/admin/agreements — list all signed agreements (admin)
+  app.get("/api/admin/agreements", isAdmin, async (req: any, res) => {
+    try {
+      const pool = getPool();
+      const result = await pool.query(
+        `SELECT id, user_id, agreement_version, party_name, organization_name, email, phone, role,
+                ip_address, pdf_url, signed_at, created_at
+         FROM user_agreements
+         ORDER BY signed_at DESC`
+      );
+      const rows = result.rows.map((r: any) => ({
+        id: r.id,
+        userId: r.user_id,
+        agreementVersion: r.agreement_version,
+        partyName: r.party_name,
+        organizationName: r.organization_name,
+        email: r.email,
+        phone: r.phone,
+        role: r.role,
+        ipAddress: r.ip_address,
+        pdfUrl: r.pdf_url,
+        signedAt: r.signed_at,
+        createdAt: r.created_at,
+      }));
+      return res.json(rows);
+    } catch (error) {
+      req.log.error({ err: error }, "Error fetching agreements");
+      return res.status(500).json({ message: "Failed to fetch agreements" });
     }
   });
 

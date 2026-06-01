@@ -90,6 +90,25 @@ async function startServer() {
     )`);
     await pool.query(`CREATE INDEX IF NOT EXISTS prescription_reviews_booking_idx ON prescription_reviews(booking_id)`);
 
+    // User agreements table (click-wrap)
+    await pool.query(`CREATE TABLE IF NOT EXISTS user_agreements (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id varchar NOT NULL,
+      agreement_version varchar(20) NOT NULL DEFAULT 'v1.0',
+      party_name varchar(255) NOT NULL,
+      organization_name varchar(255),
+      email varchar(255) NOT NULL,
+      phone varchar(30),
+      role varchar(30) NOT NULL,
+      ip_address varchar(100),
+      user_agent text,
+      pdf_url varchar(500),
+      signed_at timestamptz NOT NULL DEFAULT now(),
+      created_at timestamptz DEFAULT now()
+    )`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS user_agreements_user_idx ON user_agreements(user_id)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS user_agreements_version_idx ON user_agreements(user_id, agreement_version)`);
+
     // Register all routes
     await registerRoutes(httpServer, app);
 
