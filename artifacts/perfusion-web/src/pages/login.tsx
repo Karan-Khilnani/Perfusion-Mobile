@@ -78,7 +78,12 @@ export default function LoginPage() {
         toast({ title: "Registration Rejected", description: "Your registration has been rejected. Please contact support.", variant: "destructive" });
         return;
       }
-      
+
+      if (user.requiresAgreement) {
+        setLocation("/agreement");
+        return;
+      }
+
       toast({ title: "Welcome back!", description: "You have been logged in successfully." });
       const redirectTo = new URLSearchParams(searchString).get("redirect");
       if (redirectTo) {

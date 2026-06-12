@@ -9,7 +9,7 @@ import { Shield, FileText, CheckCircle2, Loader2 } from "lucide-react";
 
 interface CurrentAgreement {
   version: string;
-  text: string;
+  content: string;
   fields: {
     partyName: string;
     organizationName: string;
@@ -88,7 +88,7 @@ export default function AgreementPage() {
     );
   }
 
-  const { partyName, organizationName, email, roleLabel } = agreement.fields;
+  const { partyName, organizationName, email, phone, roleLabel } = agreement.fields;
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
@@ -109,6 +109,7 @@ export default function AgreementPage() {
           <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm">
             <div><span className="text-gray-500">Name:</span> <span className="font-medium">{partyName}</span></div>
             <div><span className="text-gray-500">Email:</span> <span className="font-medium">{email}</span></div>
+            {phone && <div><span className="text-gray-500">Phone:</span> <span className="font-medium">{phone}</span></div>}
             {organizationName && <div><span className="text-gray-500">Organisation:</span> <span className="font-medium">{organizationName}</span></div>}
             <div><span className="text-gray-500">Partner Type:</span> <span className="font-medium">{roleLabel}</span></div>
           </div>
@@ -121,7 +122,7 @@ export default function AgreementPage() {
           className="flex-1 overflow-y-auto px-6 py-4 text-gray-700 whitespace-pre-wrap bg-white min-h-0"
           style={{ fontFamily: "Georgia, serif", fontSize: "13px", lineHeight: "1.7" }}
         >
-          {agreement.text}
+          {agreement.content}
         </div>
 
         {/* Scroll prompt */}

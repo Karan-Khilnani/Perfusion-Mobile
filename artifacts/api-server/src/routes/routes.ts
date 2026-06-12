@@ -5254,21 +5254,23 @@ export async function registerRoutes(
       if (!user?.id) return res.status(401).json({ message: "Unauthorized" });
 
       let providerType: string | null = null;
+      let providerOrgName: string | null = null;
       if (user.role === "provider") {
         try {
           const provider = await storage.getProviderByUserId(user.id);
           providerType = (provider as any)?.type ?? null;
+          providerOrgName = (provider as any)?.registeredOrganization ?? null;
         } catch {
           providerType = null;
         }
       }
 
       const partyName = `${user.firstName || ""} ${user.lastName || ""}`.trim() || user.email;
-      const organizationName = user.hospitalName || user.registeredOrganization || "";
+      const organizationName = providerOrgName || user.hospitalName || "";
 
       return res.json({
         version: AGREEMENT_VERSION,
-        text: AGREEMENT_FULL_TEXT,
+        content: AGREEMENT_FULL_TEXT,
         fields: {
           partyName,
           organizationName,
@@ -5307,18 +5309,20 @@ export async function registerRoutes(
         "unknown";
       const userAgent = req.headers["user-agent"] || "";
       const partyName = `${user.firstName || ""} ${user.lastName || ""}`.trim() || user.email;
-      const orgName = user.hospitalName || user.registeredOrganization || "";
 
-      // Resolve provider type (for partner-type label) if this is a provider
+      // Resolve provider record for type + registered org name (mirrors /api/agreements/current)
       let providerType: string | null = null;
+      let providerOrgName: string | null = null;
       if (user.role === "provider") {
         try {
           const provider = await storage.getProviderByUserId(user.id);
           providerType = (provider as any)?.type ?? null;
+          providerOrgName = (provider as any)?.registeredOrganization ?? null;
         } catch {
           providerType = null;
         }
       }
+      const orgName = providerOrgName || user.hospitalName || "";
 
       // Unique acceptance reference: PHPL-AGR-{userId8}-{timestamp}{rand}
       const rand = Math.random().toString(36).slice(2, 8).toUpperCase();

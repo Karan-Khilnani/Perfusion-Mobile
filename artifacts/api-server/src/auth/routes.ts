@@ -308,6 +308,18 @@ export function registerAuthRoutes(app: Express): void {
       }
       
       req.session.userId = user.id;
+
+      // Compute requiresAgreement before session.save so the login response
+      // mirrors /api/auth/user — without this, the gate can be bypassed on
+      // the first post-login navigation (React Query staleTime prevents refetch).
+      let requiresAgreement = false;
+      try {
+        requiresAgreement = await userRequiresAgreement(user as any);
+      } catch {
+        // Fail closed for approved non-admin users.
+        requiresAgreement = user.role !== "admin" && user.approvalStatus === "approved";
+      }
+
       req.session.save((err) => {
         if (err) {
           console.error("Session save error:", err);
@@ -318,7 +330,7 @@ export function registerAuthRoutes(app: Express): void {
         if (!user.emailVerified && !user.googleId) {
           return res.json({ ...safeUser, needsVerification: true });
         }
-        res.json(safeUser);
+        res.json({ ...safeUser, requiresAgreement });
       });
     } catch (error) {
       if (error instanceof z.ZodError) {
