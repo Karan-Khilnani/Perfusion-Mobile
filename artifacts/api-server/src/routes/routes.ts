@@ -5414,6 +5414,38 @@ export async function registerRoutes(
     }
   });
 
+  // GET /api/admin/agreements/enforcement — current pause/resume status
+  app.get("/api/admin/agreements/enforcement", isAdmin, async (req: any, res) => {
+    try {
+      const pool = getPool();
+      const row = await pool.query(
+        `SELECT setting_value FROM platform_settings WHERE setting_key = 'agreement_enforcement_enabled' LIMIT 1`
+      );
+      // Default: enabled (if setting row absent, enforcement is on)
+      const enabled = row.rows.length === 0 || row.rows[0].setting_value !== "false";
+      return res.json({ enabled });
+    } catch (error) {
+      req.log.error({ err: error }, "Error fetching agreement enforcement status");
+      return res.status(500).json({ message: "Failed to fetch enforcement status" });
+    }
+  });
+
+  // POST /api/admin/agreements/enforcement — pause or resume agreement prompting
+  app.post("/api/admin/agreements/enforcement", isAdmin, async (req: any, res) => {
+    try {
+      const { enabled } = req.body as { enabled: boolean };
+      if (typeof enabled !== "boolean") {
+        return res.status(400).json({ message: "'enabled' (boolean) is required" });
+      }
+      await storage.upsertPlatformSetting("agreement_enforcement_enabled", String(enabled));
+      req.log.info({ enabled }, "Agreement enforcement status updated");
+      return res.json({ enabled });
+    } catch (error) {
+      req.log.error({ err: error }, "Error updating agreement enforcement");
+      return res.status(500).json({ message: "Failed to update enforcement status" });
+    }
+  });
+
   // ── Admin: test Twilio voice call ─────────────────────────────────────────
   // POST /api/admin/test-voice-call  { phone: "+919876543210" }
   // Lets an admin verify that Twilio is configured and can place calls.

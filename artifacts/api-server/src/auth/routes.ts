@@ -27,6 +27,14 @@ async function userRequiresAgreement(user: { id: string; role?: string | null; a
   if (!user || user.role === "admin") return false;
   if (user.approvalStatus !== "approved") return false;
   const pool = getPool();
+  // If enforcement is paused by admin, no user needs to sign (signed records
+  // are kept — this only affects whether unsigned users are prompted).
+  const enforcementRow = await pool.query(
+    `SELECT setting_value FROM platform_settings WHERE setting_key = 'agreement_enforcement_enabled' LIMIT 1`
+  );
+  if (enforcementRow.rows.length > 0 && enforcementRow.rows[0].setting_value === "false") {
+    return false;
+  }
   const result = await pool.query(
     `SELECT 1 FROM user_agreements WHERE user_id = $1 AND agreement_version = $2 LIMIT 1`,
     [user.id, AGREEMENT_VERSION]
