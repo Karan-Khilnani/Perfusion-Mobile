@@ -44,7 +44,22 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
     function unlock() {
       if (audioUnlocked.current) return;
       audioUnlocked.current = true;
-      audio.play().then(() => { audio.pause(); audio.currentTime = 0; }).catch(() => {});
+      // Unlock the browser audio context with a completely silent 1-sample
+      // buffer. This satisfies iOS Safari's "user gesture required" rule
+      // without making any audible sound. The ringtone will only play when an
+      // actual incoming call arrives.
+      try {
+        const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+        if (AudioCtx) {
+          const ctx = new AudioCtx();
+          const buf = ctx.createBuffer(1, 1, 22050);
+          const src = ctx.createBufferSource();
+          src.buffer = buf;
+          src.connect(ctx.destination);
+          src.start(0);
+          ctx.close();
+        }
+      } catch {}
       document.removeEventListener("click", unlock);
       document.removeEventListener("touchstart", unlock);
       document.removeEventListener("keydown", unlock);
