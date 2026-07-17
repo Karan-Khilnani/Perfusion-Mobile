@@ -13,12 +13,16 @@ declare module "express-session" {
 }
 
 export function getSession(): RequestHandler {
-  const sessionTtl = 30 * 24 * 60 * 60 * 1000; // 30 days
+  // Cookie maxAge in milliseconds (express-session expects ms)
+  const sessionMaxAgeMs = 90 * 24 * 60 * 60 * 1000; // 90 days
+  // DB TTL in seconds (connect-pg-simple expects seconds, not ms)
+  const sessionTtlSeconds = 90 * 24 * 60 * 60; // 90 days
+
   const pgStore = connectPg(session);
   const sessionStore = new pgStore({
     conString: process.env.DATABASE_URL,
     createTableIfMissing: true,
-    ttl: sessionTtl,
+    ttl: sessionTtlSeconds,
     tableName: "sessions",
   });
 
@@ -27,14 +31,19 @@ export function getSession(): RequestHandler {
   return session({
     secret: process.env.SESSION_SECRET || "development-secret-change-in-production",
     store: sessionStore,
-    resave: false,
+    // resave: true — forces a full save to the store on every rolling request
+    // instead of a lightweight touch(). This guarantees the DB row's TTL is
+    // always refreshed so the session never expires server-side while the
+    // browser still holds a valid cookie (the root cause of iOS logout on
+    // browser close).
+    resave: true,
     saveUninitialized: false,
     rolling: true,
     proxy: true,
     cookie: {
       httpOnly: true,
       secure: isProduction,
-      maxAge: sessionTtl,
+      maxAge: sessionMaxAgeMs,
       sameSite: "lax",
     },
   });
