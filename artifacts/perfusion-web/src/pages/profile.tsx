@@ -663,6 +663,8 @@ export default function ProfilePage() {
 
         {photoCard}
 
+        <ChangePasswordCard />
+
         {/* Display Details — shown to seekers */}
         {provider && (
           <Card>
@@ -936,8 +938,6 @@ export default function ProfilePage() {
             </div>
           </CardContent>
         </Card>
-
-        <ChangePasswordCard />
 
         <ImageCropDialog
           open={cropOpen}
