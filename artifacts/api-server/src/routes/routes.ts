@@ -2761,6 +2761,48 @@ export async function registerRoutes(
     }
   });
 
+  // POST /api/profile/change-password ─────────────────────────────────────────
+  app.post("/api/profile/change-password", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) return res.status(401).json({ message: "Unauthorized" });
+
+      const { currentPassword, newPassword } = req.body as { currentPassword?: string; newPassword?: string };
+      if (!currentPassword || !newPassword) {
+        return res.status(400).json({ message: "Current password and new password are required" });
+      }
+      if (newPassword.length < 8) {
+        return res.status(400).json({ message: "New password must be at least 8 characters" });
+      }
+
+      const { getPool } = await import("../db");
+      const pool = getPool();
+      const { rows } = await pool.query(`SELECT password FROM users WHERE id = $1`, [userId]);
+      if (!rows[0]) return res.status(404).json({ message: "User not found" });
+
+      const existingHash: string | null = rows[0].password;
+      if (!existingHash) {
+        return res.status(400).json({ message: "Your account uses Google sign-in and does not have a password. Please use Google to log in." });
+      }
+
+      const { verifyPassword } = await import("../auth/index");
+      const isValid = await verifyPassword(currentPassword, existingHash);
+      if (!isValid) {
+        return res.status(400).json({ message: "Current password is incorrect" });
+      }
+
+      const bcrypt = await import("bcryptjs");
+      const newHash = await bcrypt.hash(newPassword, 10);
+      await pool.query(`UPDATE users SET password = $1 WHERE id = $2`, [newHash, userId]);
+
+      req.log?.info({ userId }, "User changed password");
+      return res.json({ success: true });
+    } catch (error) {
+      req.log?.error({ err: error }, "Error changing password");
+      return res.status(500).json({ message: "Failed to change password" });
+    }
+  });
+
   // ── Ward Contacts (seeker phone numbers per ward) ─────────────────────────
   app.get("/api/profile/ward-contacts", isAuthenticated, async (req: any, res) => {
     try {

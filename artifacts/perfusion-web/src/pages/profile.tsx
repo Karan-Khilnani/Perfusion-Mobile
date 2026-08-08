@@ -15,7 +15,7 @@ import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { ImageCropDialog } from "@/components/ui/image-crop-dialog";
 import { apiRequest } from "@/lib/queryClient";
-import { Camera, Loader2, Save, Building, User, Upload, FileText, X, Clock, PenLine, AlertCircle, CheckCircle2, Info, Phone, Plus, Pencil, Trash2 } from "lucide-react";
+import { Camera, Loader2, Save, Building, User, Upload, FileText, X, Clock, PenLine, AlertCircle, CheckCircle2, Info, Phone, Plus, Pencil, Trash2, KeyRound } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ConsultantSlotEditor } from "@/components/consultant-slot-editor";
 
@@ -207,6 +207,110 @@ function WardContactsCard() {
             <Plus className="h-3.5 w-3.5 mr-1" />Add Ward Contact
           </Button>
         )}
+      </CardContent>
+    </Card>
+  );
+}
+
+const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1, "Current password is required"),
+  newPassword: z.string().min(8, "New password must be at least 8 characters"),
+  confirmPassword: z.string().min(1, "Please confirm your new password"),
+}).refine((d) => d.newPassword === d.confirmPassword, {
+  message: "Passwords do not match",
+  path: ["confirmPassword"],
+});
+type ChangePasswordData = z.infer<typeof changePasswordSchema>;
+
+function ChangePasswordCard() {
+  const { toast } = useToast();
+  const [showCurrent, setShowCurrent] = useState(false);
+  const [showNew, setShowNew] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const form = useForm<ChangePasswordData>({
+    resolver: zodResolver(changePasswordSchema),
+    defaultValues: { currentPassword: "", newPassword: "", confirmPassword: "" },
+  });
+
+  const mutation = useMutation({
+    mutationFn: async (data: ChangePasswordData) => {
+      const res = await apiRequest("POST", "/api/profile/change-password", {
+        currentPassword: data.currentPassword,
+        newPassword: data.newPassword,
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || "Failed to change password");
+      }
+    },
+    onSuccess: () => {
+      toast({ title: "Password changed", description: "Your password has been updated successfully." });
+      form.reset();
+    },
+    onError: (err: Error) => {
+      toast({ title: "Could not change password", description: err.message, variant: "destructive" });
+    },
+  });
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base flex items-center gap-2">
+          <KeyRound className="h-4 w-4" />
+          Change Password
+        </CardTitle>
+        <CardDescription>Update your login password. You'll need your current password to continue.</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit((d) => mutation.mutate(d))} className="space-y-4 max-w-sm">
+            <FormField control={form.control} name="currentPassword" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Current Password</FormLabel>
+                <FormControl>
+                  <div className="relative">
+                    <Input type={showCurrent ? "text" : "password"} placeholder="Current password" {...field} data-testid="input-current-password" />
+                    <button type="button" onClick={() => setShowCurrent((v) => !v)} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground text-xs">
+                      {showCurrent ? "Hide" : "Show"}
+                    </button>
+                  </div>
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <FormField control={form.control} name="newPassword" render={({ field }) => (
+              <FormItem>
+                <FormLabel>New Password</FormLabel>
+                <FormControl>
+                  <div className="relative">
+                    <Input type={showNew ? "text" : "password"} placeholder="At least 8 characters" {...field} data-testid="input-new-password" />
+                    <button type="button" onClick={() => setShowNew((v) => !v)} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground text-xs">
+                      {showNew ? "Hide" : "Show"}
+                    </button>
+                  </div>
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <FormField control={form.control} name="confirmPassword" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Confirm New Password</FormLabel>
+                <FormControl>
+                  <div className="relative">
+                    <Input type={showConfirm ? "text" : "password"} placeholder="Repeat new password" {...field} data-testid="input-confirm-password" />
+                    <button type="button" onClick={() => setShowConfirm((v) => !v)} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground text-xs">
+                      {showConfirm ? "Hide" : "Show"}
+                    </button>
+                  </div>
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <Button type="submit" disabled={mutation.isPending} data-testid="button-change-password">
+              {mutation.isPending ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Updating…</> : <><KeyRound className="h-4 w-4 mr-2" />Update Password</>}
+            </Button>
+          </form>
+        </Form>
       </CardContent>
     </Card>
   );
@@ -833,6 +937,8 @@ export default function ProfilePage() {
           </CardContent>
         </Card>
 
+        <ChangePasswordCard />
+
         <ImageCropDialog
           open={cropOpen}
           onOpenChange={setCropOpen}
@@ -960,6 +1066,8 @@ export default function ProfilePage() {
           </Card>
         )}
 
+        <ChangePasswordCard />
+
         <ImageCropDialog open={cropOpen} onOpenChange={setCropOpen} imageFile={photoCropFile} onCropComplete={handleCropComplete} aspect={1} title="Crop Profile Photo" />
       </div>
     );
@@ -1043,6 +1151,8 @@ export default function ProfilePage() {
             </CardContent>
           </Card>
         )}
+
+        <ChangePasswordCard />
 
         <ImageCropDialog open={cropOpen} onOpenChange={setCropOpen} imageFile={photoCropFile} onCropComplete={handleCropComplete} aspect={1} title="Crop Profile Photo" />
       </div>
@@ -1133,6 +1243,8 @@ export default function ProfilePage() {
       </Card>
 
       {user?.role === "care_seeker" && <WardContactsCard />}
+
+      <ChangePasswordCard />
 
       {user?.role === "provider" && provider && (
         <Card>
