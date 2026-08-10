@@ -4,7 +4,7 @@ import { useCallEvents, type CallEvent } from "@/hooks/use-call-events";
 import { IncomingCallOverlay } from "./incoming-call-overlay";
 import { subscribeToPush, isPushSupported, getNotificationPermission, hasPushSubscription } from "@/lib/push-subscription";
 import { useToast } from "@/hooks/use-toast";
-import { Bell, BellOff } from "lucide-react";
+import { Bell } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const PUSH_DISMISSED_KEY = "push_prompt_dismissed_until";
@@ -278,22 +278,6 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
         </div>
       )}
 
-      {/* Persistent mini-indicator when notifications are off and prompt is hidden */}
-      {!showPermissionPrompt && notificationsEnabled === false && isAuthenticated && isPushSupported() && getNotificationPermission() !== "denied" && (
-        <div className="fixed bottom-4 right-4 z-40">
-          <Button
-            size="sm"
-            variant="outline"
-            className="gap-1.5 shadow-md text-xs"
-            onClick={() => setShowPermissionPrompt(true)}
-            data-testid="button-notifications-off-indicator"
-            title="Call notifications are off — click to enable"
-          >
-            <BellOff className="h-3.5 w-3.5 text-muted-foreground" />
-            Notifications off
-          </Button>
-        </div>
-      )}
     </>
   );
 }
