@@ -57,6 +57,33 @@ type FullAccountFormData = z.infer<typeof fullAccountSchema>;
 type ProviderFormData = z.infer<typeof providerSchema>;
 type ConsultantDetailsFormData = z.infer<typeof consultantDetailsSchema>;
 
+const MIN_BYTES = 10 * 1024; // 10 KB
+
+function validateUpload(
+  file: File | Blob,
+  opts: { maxBytes: number; allowedTypes?: string[] }
+): string | null {
+  if (file.size < MIN_BYTES) {
+    const kb = Math.round(file.size / 1024);
+    return `File is too small (${kb} KB). Minimum size is 10 KB.`;
+  }
+  if (file.size > opts.maxBytes) {
+    const maxMb = opts.maxBytes / (1024 * 1024);
+    const fileMb = (file.size / (1024 * 1024)).toFixed(1);
+    return `File is too large (${fileMb} MB). Maximum allowed size is ${maxMb} MB.`;
+  }
+  if (opts.allowedTypes && file instanceof File) {
+    const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
+    const mime = file.type.toLowerCase();
+    const allowed = opts.allowedTypes;
+    const ok = allowed.some((t) => mime.includes(t) || ext === t);
+    if (!ok) {
+      return `Invalid file type. Accepted formats: ${allowed.join(", ").toUpperCase()}.`;
+    }
+  }
+  return null;
+}
+
 async function uploadImage(blob: Blob, filename: string): Promise<string> {
   const formData = new FormData();
   formData.append("file", blob, filename);
@@ -479,6 +506,8 @@ export default function ProfilePage() {
   });
 
   const handleConsultantRegDocUpload = async (file: File) => {
+    const err = validateUpload(file, { maxBytes: 5 * 1024 * 1024, allowedTypes: ["pdf", "jpeg", "jpg", "png"] });
+    if (err) { toast({ title: "Cannot upload this file", description: err, variant: "destructive" }); return; }
     setConsultantRegDocUploading(true);
     try {
       const url = await uploadImage(file, file.name);
@@ -487,8 +516,8 @@ export default function ProfilePage() {
       await res.json();
       queryClient.invalidateQueries({ queryKey: ["/api/provider/my-consultants"] });
       toast({ title: "Registration document saved" });
-    } catch (err: any) {
-      toast({ title: "Upload failed", description: err?.message || "Could not upload document.", variant: "destructive" });
+    } catch {
+      toast({ title: "Upload failed", description: "Something went wrong. Please try again.", variant: "destructive" });
     } finally {
       setConsultantRegDocUploading(false);
     }
@@ -497,10 +526,8 @@ export default function ProfilePage() {
   const handlePhotoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (!file.type.startsWith("image/")) {
-      toast({ title: "Invalid file", description: "Please select an image file.", variant: "destructive" });
-      return;
-    }
+    const err = validateUpload(file, { maxBytes: 5 * 1024 * 1024, allowedTypes: ["jpeg", "jpg", "png"] });
+    if (err) { toast({ title: "Cannot upload this file", description: err, variant: "destructive" }); e.target.value = ""; return; }
     setPhotoCropFile(file);
     setCropOpen(true);
     e.target.value = "";
@@ -512,21 +539,22 @@ export default function ProfilePage() {
       const url = await uploadImage(blob, filename);
       setCurrentPhotoUrl(url);
       await updateProfileMutation.mutateAsync({ profileImageUrl: url });
-    } catch (err: any) {
-      toast({ title: "Upload failed", description: err?.message || "Could not upload photo.", variant: "destructive" });
-      throw err;
+    } catch {
+      toast({ title: "Upload failed", description: "Something went wrong. Please try again.", variant: "destructive" });
     } finally {
       setPhotoUploading(false);
     }
   };
 
   const handleRegDocUpload = async (file: File) => {
+    const err = validateUpload(file, { maxBytes: 5 * 1024 * 1024, allowedTypes: ["pdf", "jpeg", "jpg", "png"] });
+    if (err) { toast({ title: "Cannot upload this file", description: err, variant: "destructive" }); return; }
     setRegDocUploading(true);
     try {
       const url = await uploadImage(file, file.name);
       await updateProfileMutation.mutateAsync({ registrationDocumentUrl: url });
-    } catch (err: any) {
-      toast({ title: "Upload failed", description: err?.message || "Could not upload document.", variant: "destructive" });
+    } catch {
+      toast({ title: "Upload failed", description: "Something went wrong. Please try again.", variant: "destructive" });
     } finally {
       setRegDocUploading(false);
       setRegDocFile(null);
@@ -534,12 +562,14 @@ export default function ProfilePage() {
   };
 
   const handleSignatureUpload = async (file: File) => {
+    const err = validateUpload(file, { maxBytes: 2 * 1024 * 1024, allowedTypes: ["jpeg", "jpg", "png"] });
+    if (err) { toast({ title: "Cannot upload this file", description: err, variant: "destructive" }); return; }
     setSignatureUploading(true);
     try {
       const dataUrl = await fileToDataUrl(file);
       await updateConsultantMutation.mutateAsync({ digitalSignatureUrl: dataUrl });
     } catch {
-      toast({ title: "Upload failed", description: "Could not save signature.", variant: "destructive" });
+      toast({ title: "Upload failed", description: "Something went wrong. Please try again.", variant: "destructive" });
     } finally {
       setSignatureUploading(false);
     }
