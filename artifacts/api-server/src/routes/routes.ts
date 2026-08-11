@@ -3882,9 +3882,10 @@ export async function registerRoutes(
         filename: req.file.originalname,
         size: req.file.size
       });
-    } catch (error) {
+    } catch (error: any) {
       req.log?.error({ err: error }, "Error uploading document");
-      res.status(500).json({ message: "Failed to upload document" });
+      const reason = error?.message || "Unknown server error";
+      res.status(500).json({ message: `Upload failed: ${reason}` });
     }
   });
 

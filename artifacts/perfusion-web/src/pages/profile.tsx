@@ -61,7 +61,11 @@ async function uploadImage(blob: Blob, filename: string): Promise<string> {
   const formData = new FormData();
   formData.append("file", blob, filename);
   const res = await fetch("/api/upload/document", { method: "POST", body: formData, credentials: "include" });
-  if (!res.ok) throw new Error("Image upload failed");
+  if (!res.ok) {
+    let reason = "Upload failed";
+    try { const body = await res.json(); reason = body.message || reason; } catch {}
+    throw new Error(reason);
+  }
   const data = await res.json();
   return data.url as string;
 }
@@ -483,8 +487,8 @@ export default function ProfilePage() {
       await res.json();
       queryClient.invalidateQueries({ queryKey: ["/api/provider/my-consultants"] });
       toast({ title: "Registration document saved" });
-    } catch {
-      toast({ title: "Upload failed", description: "Could not upload document.", variant: "destructive" });
+    } catch (err: any) {
+      toast({ title: "Upload failed", description: err?.message || "Could not upload document.", variant: "destructive" });
     } finally {
       setConsultantRegDocUploading(false);
     }
@@ -508,8 +512,8 @@ export default function ProfilePage() {
       const url = await uploadImage(blob, filename);
       setCurrentPhotoUrl(url);
       await updateProfileMutation.mutateAsync({ profileImageUrl: url });
-    } catch (err) {
-      toast({ title: "Upload failed", description: "Could not upload photo.", variant: "destructive" });
+    } catch (err: any) {
+      toast({ title: "Upload failed", description: err?.message || "Could not upload photo.", variant: "destructive" });
       throw err;
     } finally {
       setPhotoUploading(false);
@@ -521,8 +525,8 @@ export default function ProfilePage() {
     try {
       const url = await uploadImage(file, file.name);
       await updateProfileMutation.mutateAsync({ registrationDocumentUrl: url });
-    } catch {
-      toast({ title: "Upload failed", description: "Could not upload document.", variant: "destructive" });
+    } catch (err: any) {
+      toast({ title: "Upload failed", description: err?.message || "Could not upload document.", variant: "destructive" });
     } finally {
       setRegDocUploading(false);
       setRegDocFile(null);
