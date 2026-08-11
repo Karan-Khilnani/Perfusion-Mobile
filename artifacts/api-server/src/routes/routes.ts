@@ -3853,13 +3853,28 @@ export async function registerRoutes(
   });
 
   // File upload endpoint for registration documents (used during registration and service addition)
-  app.post("/api/upload/document", uploadDocument.single("file"), async (req: any, res) => {
+  app.post("/api/upload/document", isAuthenticated, uploadDocument.single("file"), async (req: any, res) => {
     try {
       if (!req.file) {
         return res.status(400).json({ message: "No file uploaded" });
       }
 
-      const fileUrl = await supabaseUpload(req.file.buffer, req.file.originalname, "documents", req.file.mimetype);
+      let fileUrl: string;
+
+      // Try Supabase first; fall back to local disk if credentials are not configured
+      if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+        fileUrl = await supabaseUpload(req.file.buffer, req.file.originalname, "documents", req.file.mimetype);
+      } else {
+        // Local disk fallback — served at /api/uploads/documents/
+        const { default: fsSync } = await import("fs");
+        const { default: pathLib } = await import("path");
+        const ext = pathLib.extname(req.file.originalname) || ".bin";
+        const uniqueName = `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`;
+        const uploadsDir = pathLib.join(process.cwd(), "uploads", "documents");
+        fsSync.mkdirSync(uploadsDir, { recursive: true });
+        fsSync.writeFileSync(pathLib.join(uploadsDir, uniqueName), req.file.buffer);
+        fileUrl = `/api/uploads/documents/${uniqueName}`;
+      }
 
       res.json({ 
         success: true, 
@@ -3868,7 +3883,7 @@ export async function registerRoutes(
         size: req.file.size
       });
     } catch (error) {
-      console.error("Error uploading document:", error);
+      req.log?.error({ err: error }, "Error uploading document");
       res.status(500).json({ message: "Failed to upload document" });
     }
   });

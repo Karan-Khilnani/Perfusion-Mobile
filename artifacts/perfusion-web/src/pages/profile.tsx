@@ -588,7 +588,7 @@ export default function ProfilePage() {
             <p className="text-sm text-muted-foreground">
               Upload a professional photo. It will be cropped and adjusted before saving.
             </p>
-            <p className="text-xs text-muted-foreground">JPG or PNG · max 5 MB</p>
+            <p className="text-xs text-muted-foreground">JPG or PNG · min 10 KB · max 5 MB</p>
             <Button
               variant="outline"
               size="sm"
@@ -850,7 +850,7 @@ export default function ProfilePage() {
                           <Upload className="h-4 w-4 text-muted-foreground" />
                           <div>
                             <span className="text-sm text-muted-foreground">{consultantRegDocUploading ? "Uploading..." : "Upload registration certificate (PDF or image)"}</span>
-                            <p className="text-xs text-muted-foreground mt-0.5">PDF, JPG or PNG · max 5 MB</p>
+                            <p className="text-xs text-muted-foreground mt-0.5">PDF, JPG or PNG · min 10 KB · max 5 MB</p>
                           </div>
                           <input type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleConsultantRegDocUpload(f); if (e.target) e.target.value = ""; }} />
                         </label>
@@ -932,7 +932,7 @@ export default function ProfilePage() {
                   <Upload className="h-4 w-4 text-muted-foreground" />
                   <div>
                     <span className="text-sm text-muted-foreground">{signatureUploading ? "Uploading..." : "Upload your digital signature (image)"}</span>
-                    <p className="text-xs text-muted-foreground mt-0.5">JPG or PNG · max 2 MB · white/transparent background preferred</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">JPG or PNG · min 10 KB · max 2 MB · white/transparent background preferred</p>
                   </div>
                   <input
                     type="file"
@@ -1027,7 +1027,7 @@ export default function ProfilePage() {
                       <Upload className="h-4 w-4 text-muted-foreground" />
                       <div>
                         <span className="text-sm">{regDocUploading ? "Uploading..." : "Upload registration certificate"}</span>
-                        <p className="text-xs text-muted-foreground mt-0.5">PDF, JPG or PNG · max 5 MB</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">PDF, JPG or PNG · min 10 KB · max 5 MB</p>
                       </div>
                       <input type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleRegDocUpload(f); if (e.target) e.target.value = ""; }} />
                     </label>
@@ -1241,7 +1241,7 @@ export default function ProfilePage() {
                     <Upload className="h-4 w-4 text-muted-foreground" />
                     <div>
                       <span className="text-sm">{regDocUploading ? "Uploading..." : "Upload registration certificate"}</span>
-                      <p className="text-xs text-muted-foreground mt-0.5">PDF, JPG or PNG · max 5 MB</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">PDF, JPG or PNG · min 10 KB · max 5 MB</p>
                     </div>
                     <input type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleRegDocUpload(f); if (e.target) e.target.value = ""; }} />
                   </label>

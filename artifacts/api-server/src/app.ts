@@ -60,9 +60,9 @@ const uploadsPrescriptionsDir = path.join(process.cwd(), "uploads", "prescriptio
 fs.mkdirSync(uploadsReportsDir, { recursive: true });
 fs.mkdirSync(uploadsDocsDir, { recursive: true });
 fs.mkdirSync(uploadsPrescriptionsDir, { recursive: true });
-app.use("/uploads/reports", express.static(uploadsReportsDir));
-app.use("/uploads/documents", express.static(uploadsDocsDir));
-app.use("/uploads/prescriptions", express.static(uploadsPrescriptionsDir));
+app.use("/api/uploads/reports", express.static(uploadsReportsDir));
+app.use("/api/uploads/documents", express.static(uploadsDocsDir));
+app.use("/api/uploads/prescriptions", express.static(uploadsPrescriptionsDir));
 
 // Setup session-based auth
 await setupAuth(app);
