@@ -588,6 +588,7 @@ export default function ProfilePage() {
             <p className="text-sm text-muted-foreground">
               Upload a professional photo. It will be cropped and adjusted before saving.
             </p>
+            <p className="text-xs text-muted-foreground">JPG or PNG · max 5 MB</p>
             <Button
               variant="outline"
               size="sm"
@@ -847,7 +848,10 @@ export default function ProfilePage() {
                       ) : (
                         <label className="flex items-center gap-2 rounded-md border border-dashed p-3 cursor-pointer hover:bg-muted/50 transition-colors" data-testid="label-upload-consultant-reg-doc">
                           <Upload className="h-4 w-4 text-muted-foreground" />
-                          <span className="text-sm text-muted-foreground">{consultantRegDocUploading ? "Uploading..." : "Upload registration certificate (PDF or image)"}</span>
+                          <div>
+                            <span className="text-sm text-muted-foreground">{consultantRegDocUploading ? "Uploading..." : "Upload registration certificate (PDF or image)"}</span>
+                            <p className="text-xs text-muted-foreground mt-0.5">PDF, JPG or PNG · max 5 MB</p>
+                          </div>
                           <input type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleConsultantRegDocUpload(f); if (e.target) e.target.value = ""; }} />
                         </label>
                       )}
@@ -926,7 +930,10 @@ export default function ProfilePage() {
               ) : (
                 <label className="flex items-center gap-2 rounded-md border border-dashed p-3 cursor-pointer hover:bg-muted/50 transition-colors" data-testid="label-upload-signature">
                   <Upload className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm text-muted-foreground">{signatureUploading ? "Uploading..." : "Upload your digital signature (image)"}</span>
+                  <div>
+                    <span className="text-sm text-muted-foreground">{signatureUploading ? "Uploading..." : "Upload your digital signature (image)"}</span>
+                    <p className="text-xs text-muted-foreground mt-0.5">JPG or PNG · max 2 MB · white/transparent background preferred</p>
+                  </div>
                   <input
                     type="file"
                     accept="image/*"
@@ -1018,7 +1025,10 @@ export default function ProfilePage() {
                   ) : (
                     <label className="flex items-center gap-2 rounded-md border border-dashed p-3 cursor-pointer hover:bg-muted/50 transition-colors" data-testid="label-upload-reg-doc">
                       <Upload className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-sm">{regDocUploading ? "Uploading..." : "Upload registration certificate"}</span>
+                      <div>
+                        <span className="text-sm">{regDocUploading ? "Uploading..." : "Upload registration certificate"}</span>
+                        <p className="text-xs text-muted-foreground mt-0.5">PDF, JPG or PNG · max 5 MB</p>
+                      </div>
                       <input type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleRegDocUpload(f); if (e.target) e.target.value = ""; }} />
                     </label>
                   )}
@@ -1229,7 +1239,10 @@ export default function ProfilePage() {
                 ) : (
                   <label className="flex items-center gap-2 rounded-md border border-dashed p-3 cursor-pointer hover:bg-muted/50 transition-colors" data-testid="label-upload-reg-doc">
                     <Upload className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm">{regDocUploading ? "Uploading..." : "Upload registration certificate"}</span>
+                    <div>
+                      <span className="text-sm">{regDocUploading ? "Uploading..." : "Upload registration certificate"}</span>
+                      <p className="text-xs text-muted-foreground mt-0.5">PDF, JPG or PNG · max 5 MB</p>
+                    </div>
                     <input type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleRegDocUpload(f); if (e.target) e.target.value = ""; }} />
                   </label>
                 )}
