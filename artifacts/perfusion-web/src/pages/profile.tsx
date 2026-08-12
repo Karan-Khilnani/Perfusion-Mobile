@@ -85,9 +85,29 @@ function validateUpload(
 }
 
 async function uploadImage(blob: Blob, filename: string): Promise<string> {
-  const formData = new FormData();
-  formData.append("file", blob, filename);
-  const res = await fetch("/api/upload/document", { method: "POST", body: formData, credentials: "include" });
+  // Convert to base64 and send as JSON — same path as all other working API calls,
+  // avoiding FormData/multipart/CORS-preflight issues entirely.
+  const base64 = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      // Strip the data-URL prefix (e.g. "data:image/jpeg;base64,")
+      resolve(result.split(",")[1] ?? result);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+
+  const ext = filename.split(".").pop()?.toLowerCase() ?? "bin";
+  const mimeType = blob.type || `application/${ext}`;
+
+  const res = await fetch("/api/upload/document", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ base64, filename, mimeType }),
+  });
+
   if (!res.ok) {
     let reason = "Upload failed";
     try { const body = await res.json(); reason = body.message || reason; } catch {}
