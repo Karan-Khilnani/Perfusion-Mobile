@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "../storage";
-import { setupAuth, isAuthenticated, isAdmin, isProvider, updateUserRole } from "../auth";
+import { setupAuth, isAuthenticated, isLoggedIn, isAdmin, isProvider, updateUserRole } from "../auth";
 import { registerAuthRoutes } from "../auth/routes";
 import type { BookingStatus, UserRole, ProviderType, ProviderStatus, ServiceStatus } from "@workspace/db";
 import { consultants, bookings } from "@workspace/db";
@@ -3853,41 +3853,62 @@ export async function registerRoutes(
   });
 
   // File upload endpoint for registration documents (used during registration and service addition)
-  app.post("/api/upload/document", isAuthenticated, uploadDocument.single("file"), async (req: any, res) => {
-    try {
-      if (!req.file) {
-        return res.status(400).json({ message: "No file uploaded" });
-      }
-
-      let fileUrl: string;
-
-      // Try Supabase first; fall back to local disk if credentials are not configured
-      if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
-        fileUrl = await supabaseUpload(req.file.buffer, req.file.originalname, "documents", req.file.mimetype);
-      } else {
-        // Local disk fallback — served at /api/uploads/documents/
-        const { default: fsSync } = await import("fs");
-        const { default: pathLib } = await import("path");
-        const ext = pathLib.extname(req.file.originalname) || ".bin";
-        const uniqueName = `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`;
-        const uploadsDir = pathLib.join(process.cwd(), "uploads", "documents");
-        fsSync.mkdirSync(uploadsDir, { recursive: true });
-        fsSync.writeFileSync(pathLib.join(uploadsDir, uniqueName), req.file.buffer);
-        fileUrl = `/api/uploads/documents/${uniqueName}`;
-      }
-
-      res.json({ 
-        success: true, 
-        url: fileUrl,
-        filename: req.file.originalname,
-        size: req.file.size
-      });
-    } catch (error: any) {
-      req.log?.error({ err: error }, "Error uploading document");
-      const reason = error?.message || "Unknown server error";
-      res.status(500).json({ message: `Upload failed: ${reason}` });
+  // Multer error handler — must be a 4-argument Express middleware
+  const handleUploadError = (err: any, _req: any, res: any, next: any) => {
+    if (err?.code === "LIMIT_FILE_SIZE") {
+      return res.status(400).json({ message: "File is too large. Maximum allowed size is 5 MB." });
     }
-  });
+    if (err?.code === "LIMIT_UNEXPECTED_FILE") {
+      return res.status(400).json({ message: "Unexpected file field." });
+    }
+    if (err) {
+      return res.status(400).json({ message: err.message || "File upload error." });
+    }
+    next();
+  };
+
+  app.post(
+    "/api/upload/document",
+    isLoggedIn,
+    (req: any, res: any, next: any) => uploadDocument.single("file")(req, res, (err) => {
+      if (err) return handleUploadError(err, req, res, next);
+      next();
+    }),
+    async (req: any, res: any) => {
+      try {
+        if (!req.file) {
+          return res.status(400).json({ message: "No file received. Please select a file and try again." });
+        }
+
+        let fileUrl: string;
+
+        // Try Supabase first; fall back to local disk if credentials are not configured
+        if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+          fileUrl = await supabaseUpload(req.file.buffer, req.file.originalname, "documents", req.file.mimetype);
+        } else {
+          // Local disk fallback — served at /api/uploads/documents/
+          const { default: fsSync } = await import("fs");
+          const { default: pathLib } = await import("path");
+          const ext = pathLib.extname(req.file.originalname) || ".bin";
+          const uniqueName = `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`;
+          const uploadsDir = pathLib.join(process.cwd(), "uploads", "documents");
+          fsSync.mkdirSync(uploadsDir, { recursive: true });
+          fsSync.writeFileSync(pathLib.join(uploadsDir, uniqueName), req.file.buffer);
+          fileUrl = `/api/uploads/documents/${uniqueName}`;
+        }
+
+        res.json({
+          success: true,
+          url: fileUrl,
+          filename: req.file.originalname,
+          size: req.file.size,
+        });
+      } catch (error: any) {
+        req.log?.error({ err: error }, "Error uploading document");
+        res.status(500).json({ message: "Something went wrong saving the file. Please try again." });
+      }
+    }
+  );
 
   // ===== Admin User Registration Approvals =====
   

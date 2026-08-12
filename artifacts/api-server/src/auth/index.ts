@@ -286,6 +286,16 @@ export const isProvider: RequestHandler = async (req, res, next) => {
   next();
 };
 
+// Lightweight guard — only checks a session exists.
+// Does NOT enforce email verification, approval status, or role.
+// Use this for endpoints (like file upload) that must work for pending users.
+export const isLoggedIn: RequestHandler = (req, res, next) => {
+  if (!req.session?.userId) {
+    return res.status(401).json({ message: "Please log in to upload files." });
+  }
+  next();
+};
+
 export const isUser: RequestHandler = async (req, res, next) => {
   if (!req.session.userId) {
     return res.status(401).json({ message: "Unauthorized" });
