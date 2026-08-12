@@ -392,6 +392,10 @@ export default function ProfilePage() {
   const [regDocUploading, setRegDocUploading] = useState(false);
   const [signatureUploading, setSignatureUploading] = useState(false);
   const [consultantRegDocUploading, setConsultantRegDocUploading] = useState(false);
+  // Holds an uploaded doc/signature URL before the consultant record is created.
+  // These are passed into the form submit so nothing is lost.
+  const [pendingConsultantDocUrl, setPendingConsultantDocUrl] = useState<string | null>(null);
+  const [pendingSignatureDataUrl, setPendingSignatureDataUrl] = useState<string | null>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
 
   const personalForm = useForm<PersonalFormData>({
@@ -531,13 +535,19 @@ export default function ProfilePage() {
     setConsultantRegDocUploading(true);
     try {
       const url = await uploadImage(file, file.name);
-      if (!consultant?.id) throw new Error("No consultant record");
-      const res = await apiRequest("PATCH", `/api/provider/consultants/${consultant.id}`, { registrationDocumentUrl: url });
-      await res.json();
-      queryClient.invalidateQueries({ queryKey: ["/api/provider/my-consultants"] });
-      toast({ title: "Registration document saved" });
-    } catch {
-      toast({ title: "Upload failed", description: "Something went wrong. Please try again.", variant: "destructive" });
+      if (consultant?.id) {
+        // Consultant record exists — save immediately
+        const res = await apiRequest("PATCH", `/api/provider/consultants/${consultant.id}`, { registrationDocumentUrl: url });
+        await res.json();
+        queryClient.invalidateQueries({ queryKey: ["/api/provider/my-consultants"] });
+        toast({ title: "Registration document saved" });
+      } else {
+        // No record yet — hold the URL; it will be submitted with the profile form
+        setPendingConsultantDocUrl(url);
+        toast({ title: "Document uploaded", description: "It will be saved when you click 'Create Profile' below." });
+      }
+    } catch (uploadErr: any) {
+      toast({ title: "Upload failed", description: uploadErr?.message || "Something went wrong. Please try again.", variant: "destructive" });
     } finally {
       setConsultantRegDocUploading(false);
     }
@@ -559,8 +569,8 @@ export default function ProfilePage() {
       const url = await uploadImage(blob, filename);
       setCurrentPhotoUrl(url);
       await updateProfileMutation.mutateAsync({ profileImageUrl: url });
-    } catch {
-      toast({ title: "Upload failed", description: "Something went wrong. Please try again.", variant: "destructive" });
+    } catch (cropErr: any) {
+      toast({ title: "Upload failed", description: cropErr?.message || "Could not upload photo. Please try again.", variant: "destructive" });
     } finally {
       setPhotoUploading(false);
     }
@@ -573,8 +583,8 @@ export default function ProfilePage() {
     try {
       const url = await uploadImage(file, file.name);
       await updateProfileMutation.mutateAsync({ registrationDocumentUrl: url });
-    } catch {
-      toast({ title: "Upload failed", description: "Something went wrong. Please try again.", variant: "destructive" });
+    } catch (docErr: any) {
+      toast({ title: "Upload failed", description: docErr?.message || "Could not upload document. Please try again.", variant: "destructive" });
     } finally {
       setRegDocUploading(false);
       setRegDocFile(null);
@@ -587,9 +597,14 @@ export default function ProfilePage() {
     setSignatureUploading(true);
     try {
       const dataUrl = await fileToDataUrl(file);
-      await updateConsultantMutation.mutateAsync({ digitalSignatureUrl: dataUrl });
-    } catch {
-      toast({ title: "Upload failed", description: "Something went wrong. Please try again.", variant: "destructive" });
+      if (consultant?.id) {
+        await updateConsultantMutation.mutateAsync({ digitalSignatureUrl: dataUrl });
+      } else {
+        setPendingSignatureDataUrl(dataUrl);
+        toast({ title: "Signature uploaded", description: "It will be saved when you click 'Create Profile' below." });
+      }
+    } catch (sigErr: any) {
+      toast({ title: "Upload failed", description: sigErr?.message || "Could not save signature. Please try again.", variant: "destructive" });
     } finally {
       setSignatureUploading(false);
     }
@@ -808,7 +823,7 @@ export default function ProfilePage() {
           <CardContent>
             <Form {...consultantDetailsForm}>
               <form
-                onSubmit={consultantDetailsForm.handleSubmit((d) => saveConsultantDetailsMutation.mutate(d))}
+                onSubmit={consultantDetailsForm.handleSubmit((d) => saveConsultantDetailsMutation.mutate({ ...d, registrationDocumentUrl: pendingConsultantDocUrl ?? undefined, digitalSignatureUrl: pendingSignatureDataUrl ?? undefined }))}
                 className="space-y-4"
               >
                   <div className="grid grid-cols-2 gap-4">
@@ -884,35 +899,33 @@ export default function ProfilePage() {
                     </FormItem>
                   )} />
 
-                  {/* Registration document — only after record exists */}
-                  {consultant ? (
-                    <div className="space-y-2">
-                      <p className="text-sm font-medium">Registration Document</p>
-                      {consultant.registrationDocumentUrl ? (
-                        <div className="flex items-center gap-2 rounded-md border p-2">
-                          <FileText className="h-4 w-4 text-muted-foreground" />
-                          <a href={consultant.registrationDocumentUrl} target="_blank" rel="noopener noreferrer" className="flex-1 text-sm truncate text-primary underline">View Document</a>
-                          <label className="cursor-pointer">
-                            <Button type="button" variant="ghost" size="sm" asChild disabled={consultantRegDocUploading}>
-                              <span>{consultantRegDocUploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Replace"}</span>
-                            </Button>
-                            <input type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleConsultantRegDocUpload(f); if (e.target) e.target.value = ""; }} data-testid="input-replace-consultant-reg-doc" />
-                          </label>
-                        </div>
-                      ) : (
-                        <label className="flex items-center gap-2 rounded-md border border-dashed p-3 cursor-pointer hover:bg-muted/50 transition-colors" data-testid="label-upload-consultant-reg-doc">
-                          <Upload className="h-4 w-4 text-muted-foreground" />
-                          <div>
-                            <span className="text-sm text-muted-foreground">{consultantRegDocUploading ? "Uploading..." : "Upload registration certificate (PDF or image)"}</span>
-                            <p className="text-xs text-muted-foreground mt-0.5">PDF, JPG or PNG · min 10 KB · max 5 MB</p>
-                          </div>
-                          <input type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleConsultantRegDocUpload(f); if (e.target) e.target.value = ""; }} />
+                  {/* Registration document — available immediately, even before consultant record is created */}
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium">Registration Document</p>
+                    {(consultant?.registrationDocumentUrl || pendingConsultantDocUrl) ? (
+                      <div className="flex items-center gap-2 rounded-md border p-2">
+                        <FileText className="h-4 w-4 text-muted-foreground" />
+                        <a href={consultant?.registrationDocumentUrl || pendingConsultantDocUrl!} target="_blank" rel="noopener noreferrer" className="flex-1 text-sm truncate text-primary underline">
+                          {pendingConsultantDocUrl && !consultant?.registrationDocumentUrl ? "Document ready (will save with profile)" : "View Document"}
+                        </a>
+                        <label className="cursor-pointer">
+                          <Button type="button" variant="ghost" size="sm" asChild disabled={consultantRegDocUploading}>
+                            <span>{consultantRegDocUploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Replace"}</span>
+                          </Button>
+                          <input type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleConsultantRegDocUpload(f); if (e.target) e.target.value = ""; }} data-testid="input-replace-consultant-reg-doc" />
                         </label>
-                      )}
-                    </div>
-                  ) : (
-                    <p className="text-xs text-muted-foreground">You can upload your registration certificate after saving the profile above.</p>
-                  )}
+                      </div>
+                    ) : (
+                      <label className="flex items-center gap-2 rounded-md border border-dashed p-3 cursor-pointer hover:bg-muted/50 transition-colors" data-testid="label-upload-consultant-reg-doc">
+                        <Upload className="h-4 w-4 text-muted-foreground" />
+                        <div>
+                          <span className="text-sm text-muted-foreground">{consultantRegDocUploading ? "Uploading..." : "Upload registration certificate (PDF or image)"}</span>
+                          <p className="text-xs text-muted-foreground mt-0.5">PDF, JPG or PNG · min 10 KB · max 5 MB</p>
+                        </div>
+                        <input type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleConsultantRegDocUpload(f); if (e.target) e.target.value = ""; }} />
+                      </label>
+                    )}
+                  </div>
 
                   <Button type="submit" disabled={saveConsultantDetailsMutation.isPending} data-testid="button-save-consultant-details">
                     {saveConsultantDetailsMutation.isPending
@@ -960,11 +973,11 @@ export default function ProfilePage() {
                 <PenLine className="h-4 w-4 text-muted-foreground" />
                 <p className="text-sm font-medium">Digital Signature</p>
               </div>
-              {consultant?.digitalSignatureUrl ? (
+              {(consultant?.digitalSignatureUrl || pendingSignatureDataUrl) ? (
                 <div className="space-y-2">
                   <div className="rounded-lg border p-3 bg-muted/20">
                     <img
-                      src={consultant.digitalSignatureUrl}
+                      src={consultant?.digitalSignatureUrl || pendingSignatureDataUrl!}
                       alt="Digital Signature"
                       className="max-h-16 object-contain"
                     />
