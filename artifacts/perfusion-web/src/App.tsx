@@ -53,6 +53,7 @@ import AdminBillingPage from "@/pages/admin/billing";
 import AdminAnalyticsPage from "@/pages/admin/analytics";
 import AdminDiagnosticsPage from "@/pages/admin/diagnostics";
 import AdminAgreementsPage from "@/pages/admin/agreements";
+import AdminAppointmentsPage from "@/pages/admin/appointments";
 import { AgreementGate } from "@/components/agreement-gate";
 
 function withUserLayout(Component: React.ComponentType) {
@@ -132,6 +133,7 @@ function Router() {
       <Route path="/admin/users" component={withAdminLayout(AdminUsersPage)} />
       <Route path="/admin/diagnostics" component={withAdminLayout(AdminDiagnosticsPage)} />
       <Route path="/admin/agreements" component={withAdminLayout(AdminAgreementsPage)} />
+      <Route path="/admin/appointments" component={withAdminLayout(AdminAppointmentsPage)} />
       
       <Route component={NotFound} />
     </Switch>

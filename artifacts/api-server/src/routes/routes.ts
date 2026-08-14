@@ -3449,13 +3449,93 @@ export async function registerRoutes(
   });
 
   // Admin - Create booking on behalf of user
+  // For consultation type: performs the same business logic as the user flow
+  // (pricing calculation, booking number generation, video room creation, provider linking).
+  // For other types: simple pass-through (existing behaviour preserved).
   app.post("/api/admin/bookings", isAdmin, async (req: any, res) => {
     try {
-      const booking = await storage.createBooking(req.body);
+      const bookingData: any = { ...req.body };
+
+      if (bookingData.bookingType === "consultation") {
+        // ── Validate required fields ──────────────────────────────────────────
+        if (!bookingData.userId)      return res.status(400).json({ message: "userId (Care Seeker) is required" });
+        if (!bookingData.serviceId)   return res.status(400).json({ message: "serviceId (Consultant) is required" });
+        if (!bookingData.patientName?.trim()) return res.status(400).json({ message: "Patient name is required" });
+        if (!bookingData.patientAge)  return res.status(400).json({ message: "Patient age is required" });
+        if (!bookingData.clinicalSummary?.trim()) return res.status(400).json({ message: "Clinical summary is required" });
+
+        // ── Validate seeker ───────────────────────────────────────────────────
+        const seeker = await storage.getUserById(bookingData.userId);
+        if (!seeker) return res.status(400).json({ message: "Care Seeker not found" });
+
+        // ── Resolve consultant → provider ────────────────────────────────────
+        const consultant = await storage.getConsultantById(bookingData.serviceId);
+        if (!consultant) return res.status(400).json({ message: "Consultant not found" });
+
+        bookingData.serviceName = consultant.name;
+        if (consultant.providerId) {
+          bookingData.providerId = consultant.providerId;
+          const provider = await storage.getProviderById(consultant.providerId);
+          if (provider) bookingData.providerName = provider.name;
+        }
+
+        // ── Daily.co video room ───────────────────────────────────────────────
+        try {
+          const roomName = `perfusion-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+          const dailyRoom = await createDailyRoom(roomName);
+          bookingData.videoRoomId = dailyRoom ? dailyRoom.url : null;
+        } catch {
+          bookingData.videoRoomId = null;
+        }
+
+        // ── Pricing ───────────────────────────────────────────────────────────
+        const defaultMarginSetting = await storage.getPlatformSetting("default_margin_percent");
+        const defaultMarginPct = parseFloat(defaultMarginSetting?.settingValue || "15");
+        const providerBaseCost = parseFloat(consultant.consultationFee || "0");
+        const pricing = calculateCustomerPrice(
+          providerBaseCost,
+          consultant.customerPrice || null,
+          consultant.marginOverride || null,
+          defaultMarginPct,
+        );
+        const customerAmount = pricing.customerPrice;
+        const marginAmount = customerAmount - providerBaseCost;
+        const marginPercent = providerBaseCost > 0 ? (marginAmount / providerBaseCost) * 100 : 0;
+
+        bookingData.basePrice     = providerBaseCost.toFixed(2);
+        bookingData.marginPercent = marginPercent.toFixed(2);
+        bookingData.marginAmount  = marginAmount.toFixed(2);
+        bookingData.amount        = customerAmount.toFixed(2);
+
+        // ── Payment ───────────────────────────────────────────────────────────
+        const isPayNow = bookingData.paymentMethod === "pay_now";
+        if (isPayNow) {
+          // Admin confirms payment has been received — mark as paid immediately
+          bookingData.paymentStatus = "paid";
+          bookingData.amountPaid   = customerAmount.toFixed(2);
+          bookingData.paidAt       = new Date();
+          bookingData.dueDate      = new Date();
+          bookingData.paymentMethod = "pay_now";
+        } else {
+          // Pay Later — invoice remains open
+          bookingData.paymentStatus = "pending";
+          bookingData.amountPaid    = "0";
+          const dueDate = new Date();
+          dueDate.setMonth(dueDate.getMonth() + 1);
+          bookingData.dueDate      = dueDate;
+          bookingData.paymentMethod = "pay_later";
+        }
+
+        // ── Booking number & status ───────────────────────────────────────────
+        bookingData.status        = "booked";
+        bookingData.bookingNumber = await generateBookingNumber("consultation");
+      }
+
+      const booking = await storage.createBooking(bookingData);
       res.status(201).json(booking);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating admin booking:", error);
-      res.status(500).json({ message: "Failed to create booking" });
+      res.status(500).json({ message: error?.message || "Failed to create booking" });
     }
   });
 

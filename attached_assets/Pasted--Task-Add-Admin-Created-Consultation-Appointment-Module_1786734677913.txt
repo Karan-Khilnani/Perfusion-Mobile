@@ -1,0 +1,438 @@
+## Task: Add Admin-Created Consultation Appointment Module
+
+You are working on the existing **Perfusion** application. Add a new module inside the **Perfusion Admin account** that allows the admin to directly create a consultation appointment between an existing **Care Seeker** and **Care Provider**.
+
+### IMPORTANT — FIRST INSPECT THE EXISTING SYSTEM
+
+Before writing or modifying code:
+
+1. Inspect the existing Care Seeker, Care Provider and Admin dashboards.
+2. Inspect the existing consultation/appointment workflow.
+3. Inspect the existing appointment database schema/models, APIs, components and status logic.
+4. Inspect the existing **My Orders** section for Care Seekers.
+5. Inspect the existing **Bookings** section for Care Providers.
+6. Inspect the existing payment/order workflow, including the **Pay Later** functionality.
+7. Inspect the previous appointment-related implementation/prompts and follow the same business logic, terminology, UI patterns and status behavior.
+
+**Do NOT create a parallel appointment system.**
+
+The admin-created appointment must use the **same underlying appointment/order/payment system and logic as an appointment created through the existing Care Seeker/Care Provider workflow.**
+
+Reuse existing components, APIs, database tables, validation, status handling and payment logic wherever possible.
+
+---
+
+# 1. Admin: New Appointment Module
+
+Add a new section/module in the Perfusion Admin account called:
+
+**Appointments**
+
+The admin should have a list page showing all appointments that were created/scheduled through the Admin panel.
+
+Add a clear action:
+
+**+ Create Appointment**
+
+---
+
+# 2. Create Appointment
+
+When the admin clicks **Create Appointment**, provide a form to create an appointment between an existing Care Seeker and Care Provider.
+
+The form should allow the admin to select:
+
+* Care Seeker
+* Care Provider
+* Appointment date
+* Appointment time
+* Consultation/appointment type, using the existing appointment types already supported by the application
+* Clinical/reason or consultation information, wherever this already exists in the current appointment workflow
+* Relevant notes/details supported by the existing appointment system
+* Payment option
+
+The Care Seeker and Care Provider must be selected from the existing users/providers in the database.
+
+Do not create duplicate users or duplicate provider records.
+
+---
+
+# 3. Payment
+
+The admin-created appointment must support the existing consultation payment workflow.
+
+The admin should have the option to:
+
+* **Pay Now**
+* **Pay Later**
+
+Use the existing payment/order implementation instead of creating a new payment system.
+
+If **Pay Later** is selected:
+
+* The appointment should still be created successfully.
+* The payment/order should remain in the appropriate unpaid/pending state according to the existing system.
+* The unpaid/pay-later state must be visible to the Care Seeker.
+* It must also be reflected appropriately on the Care Provider side.
+* It must appear in the Care Seeker's **My Orders** section using the existing order/payment UI and logic.
+
+Do not invent a new payment status if the current system already has an appropriate status.
+
+---
+
+# 4. Appointment Status
+
+For this admin-created appointment, the appointment status should only use:
+
+* **Scheduled**
+* **Completed**
+
+Follow the existing application's appointment status logic and UI.
+
+Do not introduce additional appointment statuses such as Cancelled, No-show, Confirmed or In Progress.
+
+If the existing system already determines how/when an appointment changes to Completed, reuse that exact logic.
+
+---
+
+# 5. Care Seeker Experience
+
+An appointment created by Admin must behave exactly like an appointment created through the normal Care Seeker → Care Provider consultation workflow.
+
+The appointment must appear in the Care Seeker's:
+
+### Dashboard
+
+Show the appointment using the existing appointment/dashboard UI.
+
+### My Orders
+
+The corresponding order/payment information must appear in **My Orders**.
+
+The Care Seeker should be able to see the relevant:
+
+* Care Provider
+* Appointment date
+* Appointment time
+* Consultation details
+* Appointment status
+* Payment/order status
+* Any other information that existing appointments currently display
+
+Do not create a separate admin-created appointment UI for the Care Seeker.
+
+It should look and behave like a normal appointment.
+
+---
+
+# 6. Care Provider Experience
+
+The appointment must also behave exactly like a normal booking received by the Care Provider.
+
+It should appear in:
+
+### Provider Dashboard/Home
+
+Show the appointment using the existing dashboard/home appointment component.
+
+### Bookings
+
+The appointment must appear in the provider's existing **Bookings** section.
+
+It should contain the same information and status behavior as an appointment normally booked through the existing system.
+
+Payment status should also be reflected according to the existing booking/payment logic.
+
+---
+
+# 7. Admin Appointment List
+
+Create an Admin appointment listing page showing appointments created through the Admin panel.
+
+The list should include, at minimum:
+
+* Appointment ID/reference
+* Care Seeker
+* Care Provider
+* Appointment date
+* Appointment time
+* Appointment type
+* Appointment status
+* Payment/order status
+* Created date/time
+
+Use the existing application's design system and table/list components wherever available.
+
+### Search
+
+Allow searching by:
+
+* Care Seeker
+* Care Provider
+* Appointment ID/reference
+
+### Filters
+
+Provide filters for:
+
+* Date
+* Appointment status
+* Care Seeker
+* Care Provider
+* Payment/order status
+
+### Sorting
+
+Allow sorting by appointment date/time, with the most relevant/upcoming appointments easily accessible.
+
+---
+
+# 8. Appointment Details
+
+Clicking an appointment from the Admin list should open the appointment details using the application's existing appointment-detail pattern.
+
+Display all relevant information, including:
+
+### Appointment
+
+* Appointment ID
+* Care Seeker
+* Care Provider
+* Date
+* Time
+* Consultation type
+* Reason/details
+* Status
+
+### Payment/Order
+
+* Order ID/reference
+* Amount
+* Payment status
+* Pay Now/Pay Later state
+* Any existing payment information supported by the current system
+
+Do not duplicate existing appointment-detail logic if a reusable component already exists.
+
+---
+
+# 9. Editing / Rescheduling
+
+Use the existing appointment functionality wherever it already supports editing/rescheduling.
+
+If the existing system allows an admin to modify an appointment, the Admin appointment module should expose that functionality.
+
+Any change must automatically reflect everywhere the appointment appears:
+
+* Admin appointment list/details
+* Care Seeker Dashboard
+* Care Seeker My Orders, where applicable
+* Care Provider Dashboard/Home
+* Care Provider Bookings
+
+There must be a single source of truth for the appointment.
+
+---
+
+# 10. Data Consistency
+
+This is critical.
+
+An Admin-created appointment must NOT be stored as an isolated "admin appointment" that is invisible to the existing appointment system.
+
+It must be associated with:
+
+**Care Seeker ↔ Appointment ↔ Care Provider ↔ Order/Payment**
+
+using the same relationships and database structure already used by normal consultations.
+
+The appointment should therefore automatically become visible wherever the existing application expects a normal consultation appointment to appear.
+
+Avoid duplicate database records unless the existing architecture intentionally requires them.
+
+---
+
+# 11. Backend/API
+
+Implement all required backend functionality.
+
+Before adding new APIs:
+
+* Inspect existing appointment APIs.
+* Reuse existing endpoints/services where appropriate.
+* Extend existing APIs if that is cleaner.
+* Follow existing authentication/session patterns.
+* Follow existing validation and error-handling patterns.
+
+The Admin Create Appointment action should perform proper server-side validation.
+
+Validate at minimum:
+
+* Valid Care Seeker
+* Valid Care Provider
+* Valid appointment date
+* Valid appointment time
+* Required consultation information
+* Valid payment option
+* No invalid/malformed appointment relationships
+
+Prevent accidental duplicate submissions.
+
+---
+
+# 12. UI/UX
+
+Follow the existing Perfusion UI exactly.
+
+Do not introduce a completely new design language.
+
+Reuse:
+
+* Existing buttons
+* Forms
+* Modals/drawers
+* Tables
+* Cards
+* Status badges
+* Date/time pickers
+* User/provider selectors
+* Payment components
+* Loading states
+* Empty states
+* Error states
+* Toasts/alerts
+
+The new module should feel like it was part of the application from the beginning.
+
+Make the workflow simple:
+
+**Admin → Appointments → Create Appointment → Select Care Seeker + Care Provider → Select appointment details → Select payment option → Create**
+
+After successful creation, show a clear success state and allow the admin to view the created appointment.
+
+---
+
+# 13. No Notifications
+
+Do **not** implement email, SMS, WhatsApp, push notifications or any other notification system as part of this task.
+
+The appointment should simply appear in the relevant existing dashboards/sections.
+
+---
+
+# 14. Access Control
+
+Do not introduce a new access-control/role-management system as part of this task.
+
+Use the application's existing Admin account/session structure.
+
+---
+
+# 15. Important Development Rules
+
+### Do not rebuild existing functionality.
+
+This is an extension of the existing Perfusion consultation system.
+
+Before coding, identify:
+
+* Existing appointment model/schema
+* Existing booking model/schema
+* Existing order/payment model/schema
+* Existing Care Seeker appointment components
+* Existing Care Provider booking components
+* Existing appointment APIs/services
+* Existing status logic
+* Existing Pay Later logic
+
+Then integrate the Admin functionality into those systems.
+
+### Do not hardcode users/providers.
+
+Care Seekers and Care Providers must come from the database.
+
+### Do not create duplicate business logic.
+
+If a function already exists for creating an appointment/order, call or extend that function instead of creating a second implementation.
+
+### Preserve existing functionality.
+
+Do not break:
+
+* Existing Care Seeker booking flow
+* Existing Care Provider booking flow
+* Existing My Orders
+* Existing Bookings
+* Existing payment flow
+* Existing appointment status handling
+* Existing dashboards
+
+---
+
+# 16. Testing / Verification
+
+After implementation, test the complete flow.
+
+### Test Case 1 — Normal Admin Appointment
+
+Admin creates:
+
+**Care Seeker A → Care Provider B → Appointment X**
+
+Verify that Appointment X appears in:
+
+* Admin Appointments
+* Care Seeker Dashboard
+* Care Seeker My Orders
+* Care Provider Dashboard/Home
+* Care Provider Bookings
+
+### Test Case 2 — Pay Later
+
+Create another appointment using **Pay Later**.
+
+Verify:
+
+* Appointment is created.
+* Appointment status is Scheduled.
+* Payment/order remains in the appropriate unpaid/pending state.
+* Care Seeker can see the order/payment state.
+* Care Provider sees the corresponding payment state.
+* No duplicate order is created.
+
+### Test Case 3 — Appointment Completion
+
+Use the application's existing mechanism for completing an appointment.
+
+Verify that the status changes consistently everywhere.
+
+### Test Case 4 — Search and Filters
+
+Verify Admin can:
+
+* Search by Care Seeker
+* Search by Care Provider
+* Search by appointment ID
+* Filter by date
+* Filter by status
+* Filter by payment/order status
+
+### Test Case 5 — Existing Workflow
+
+Create an appointment through the existing Care Seeker workflow and verify that the new Admin module can display it correctly **if the existing architecture considers it part of the same appointment dataset**.
+
+Do not accidentally restrict the Admin list to a separate dataset if the requirement is for the Admin panel to represent the existing appointment system.
+
+---
+
+# 17. Final Requirement
+
+The end result should be a complete **Admin Appointment Management module** that allows Perfusion Admin to create and manage consultations between existing Care Seekers and Care Providers while using the exact same appointment, booking, order and payment infrastructure already present in the application.
+
+The key principle is:
+
+**One appointment → one source of truth → reflected across Admin, Care Seeker and Care Provider interfaces.**
+
+Before finishing, review the implementation for duplicate logic, broken existing workflows, inconsistent appointment status, inconsistent payment status, and data synchronization issues.
+
+Only consider the task complete when the full end-to-end flow works.
