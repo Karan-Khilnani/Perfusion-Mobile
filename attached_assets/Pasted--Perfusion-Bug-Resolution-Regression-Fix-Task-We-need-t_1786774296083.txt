@@ -1,0 +1,604 @@
+# Perfusion — Bug Resolution & Regression-Fix Task
+
+We need to resolve the following bugs in the existing Perfusion application.
+
+**IMPORTANT: Do not start coding immediately.**
+
+Before making any code or database changes:
+
+1. Inspect the existing implementation related to all issues below.
+2. Review the current appointment, booking, order/payment and video-call architecture.
+3. Check recent Git/version history, especially changes made in the last few days, because the video-call issue was **not occurring 2 days ago** and appears to be a regression.
+4. Trace each issue through the complete frontend → backend/API → database → video-call/session flow.
+5. Ask me any questions that are necessary to remove ambiguity **before coding**.
+6. Wait for my answers before implementing the fix.
+
+Do not make assumptions when the existing codebase can provide the answer.
+
+I have attached a screen recording showing the Admin appointment-form refresh problem. I will also attach a screenshot showing the desired calendar UI.
+
+---
+
+# BUG 1 — Admin → Appointments → New Appointment Form
+
+## Current problem
+
+Path:
+
+**Admin Account → Appointments → New Appointment**
+
+Every time I fill/select a field in the appointment form, the page/form refreshes.
+
+This happens repeatedly while filling the form.
+
+I have attached a screen recording demonstrating the behavior.
+
+### Important observation
+
+Although the form refreshes, **the information already entered is currently not lost**.
+
+However, this behavior is still incorrect and must be fixed.
+
+The form should behave like a normal SPA/form interaction:
+
+* Selecting a Care Seeker should NOT refresh the page.
+* Selecting a Care Provider should NOT refresh the page.
+* Selecting a date should NOT refresh the page.
+* Selecting start time should NOT refresh the page.
+* Selecting end time should NOT refresh the page.
+* Selecting payment option should NOT refresh the page.
+* Entering/editing any text field should NOT refresh the page.
+* Changing any field should NOT trigger a full-page reload.
+
+## Investigation requirements
+
+Do not simply suppress the refresh visually.
+
+Identify the actual cause.
+
+Inspect for issues such as:
+
+* Form submission being triggered unintentionally.
+* `<button>` elements inside the form having incorrect/default `type`.
+* `onSubmit` firing when selecting a field.
+* Select/dropdown components triggering form submission.
+* Date picker triggering submission.
+* React state/form-library reinitialization.
+* Component remounting.
+* Router/navigation being triggered unintentionally.
+* Server actions being invoked on field changes.
+* API calls incorrectly causing navigation/reload.
+* Any recently changed form implementation.
+* Hydration/client-side issues, if applicable.
+
+Fix the underlying cause while preserving the existing form behavior and validation.
+
+---
+
+# BUG 1A — Date Picker
+
+The appointment date field needs to be improved.
+
+The date field should have a **small calendar icon**.
+
+Clicking either:
+
+* the date field, OR
+* the calendar icon
+
+should open a proper calendar/date-picker interface.
+
+I will provide a screenshot showing the desired visual style/layout. Use that screenshot as the UI reference.
+
+### Requirements
+
+* Calendar icon should be visible inside/alongside the date field.
+* Clicking the icon should open the calendar.
+* Clicking the field should also open the calendar.
+* Selecting a date should populate the field without refreshing the page.
+* **Past dates must be disabled.**
+* Today and future dates should remain selectable.
+* Follow the existing Perfusion design system.
+* Do not introduce an unrelated visual style.
+
+Use an existing date-picker component from the application if one already exists.
+
+If the application already has a standard calendar/date-picker component, reuse it rather than creating a second implementation.
+
+---
+
+# BUG 1B — Call Start Time and Call End Time
+
+The appointment form currently needs proper time handling.
+
+Replace the current appointment time behavior with two separate fields:
+
+### Call Start Time
+
+and
+
+### Call End Time
+
+Both must be selectable independently.
+
+Example:
+
+**Call Start Time:** 5:00 PM
+**Call End Time:** 5:30 PM
+
+### Validation
+
+The system must ensure:
+
+**End Time > Start Time**
+
+If the user selects an end time earlier than or equal to the start time:
+
+* Do not allow invalid appointment creation.
+* Show a clear validation message.
+* Do not refresh the page.
+* Preferably prevent invalid end-time selections where practical.
+
+Use the existing Perfusion time format/design conventions.
+
+Do not create a separate duration field.
+
+The appointment should simply store/display:
+
+**Start Time + End Time**
+
+---
+
+# BUG 2 — Video Call Joining Problem
+
+## Current problem
+
+There is currently a problem with appointment video calls.
+
+If one participant has not joined the call, the other participant is unable to join.
+
+For example:
+
+### Scenario A
+
+Care Seeker joins first.
+
+Care Provider has not joined yet.
+
+The Care Seeker should still successfully enter the video-call room and wait for the Care Provider.
+
+### Scenario B
+
+Care Provider joins first.
+
+Care Seeker has not joined yet.
+
+The Care Provider should still successfully enter the video-call room and wait for the Care Seeker.
+
+### Required behavior
+
+Both participants must be able to independently join the same video-call room.
+
+**Participant A must NOT require Participant B to already be present.**
+
+**Participant B must NOT require Participant A to already be present.**
+
+The first participant should be able to enter the room alone.
+
+The second participant should subsequently enter the same room.
+
+---
+
+# BUG 2A — Video Room Availability
+
+The video-call room/session should be created and available for **both parties before the designated appointment start time**.
+
+Example:
+
+Appointment:
+
+**5:00 PM – 5:30 PM**
+
+The video-call room should already exist/be available for both Care Seeker and Care Provider to join before 5:00 PM.
+
+If either participant clicks Join Call before the designated start time, the system should allow them to enter according to the application's existing intended appointment-access rules.
+
+Do not make room creation dependent on the first participant joining.
+
+The appointment should have a stable, shared video-call room/session identifier that both participants use.
+
+---
+
+# BUG 2B — Investigate Recent Regression
+
+This issue did **not occur 2 days ago**.
+
+Therefore, before implementing a workaround:
+
+1. Inspect recent Git commits/version history.
+2. Identify changes made to:
+
+   * Video-call logic
+   * Appointment logic
+   * Room/session creation
+   * Join-call authorization
+   * Provider booking flow
+   * Seeker appointment flow
+   * Authentication
+   * Database schema
+   * Environment/configuration
+3. Determine whether a recent change introduced this regression.
+4. If a specific regression is identified, fix the root cause.
+5. Avoid reverting unrelated recent work.
+
+Do not simply add a second video-call implementation.
+
+Use the existing video-call infrastructure wherever possible.
+
+---
+
+# BUG 2C — Waiting State + Phone Call Fallback
+
+When one participant has successfully joined the video call but the other participant has not joined yet, show a waiting state.
+
+Example:
+
+**Waiting for Care Provider to join...**
+
+or
+
+**Waiting for Care Seeker to join...**
+
+While waiting, display the other participant's registered cellular number.
+
+### Example
+
+If Care Seeker has joined and Care Provider has not:
+
+> Waiting for Care Provider to join
+> Care Provider hasn't joined yet.
+> **Call Care Provider: +91 XXXXX XXXXX**
+
+If Care Provider has joined and Care Seeker has not:
+
+> Waiting for Care Seeker to join
+> Care Seeker hasn't joined yet.
+> **Call Care Seeker: +91 XXXXX XXXXX**
+
+---
+
+# Phone Number Requirements
+
+The phone number should be shown **ONLY while the participant is waiting for the other participant to join.**
+
+Once both participants are in the call, the phone-number fallback does not need to remain visible.
+
+The fallback must work in both directions:
+
+### Care Seeker waiting for Care Provider
+
+Show the Care Provider's registered phone number.
+
+### Care Provider waiting for Care Seeker
+
+Show the Care Seeker's registered phone number.
+
+---
+
+# Phone Number Source
+
+Do NOT create a new phone-number field.
+
+Inspect the existing Supabase database/profile implementation.
+
+Both Care Seeker and Care Provider already have their cellular number stored in their respective profile/user data in Supabase.
+
+Use the existing source of truth.
+
+Before implementing, verify:
+
+* Which Supabase table stores the number.
+* Which field contains the phone number.
+* How the current application retrieves the user's profile.
+* Whether the phone number is already available to the appointment/video-call interface.
+
+Reuse the existing profile/user data architecture.
+
+Do not duplicate phone numbers into the appointment table unless the existing architecture already requires this.
+
+---
+
+# Phone Call Button
+
+The displayed phone number should have a clear **Call** action.
+
+On supported devices, clicking it should open the device's native phone dialer using the `tel:` mechanism.
+
+Example behavior:
+
+**Call Care Provider**
+
+→ opens the device phone dialer with the provider's number populated.
+
+Do not build a separate calling system.
+
+---
+
+# BUG 3 — Cross-System Appointment Integrity
+
+While fixing the above problems, inspect all systems connected to the appointment.
+
+The Admin-created appointment is part of the same existing Perfusion appointment system.
+
+Verify that fixing these bugs does not break or bypass the existing relationships between:
+
+**Care Seeker → Appointment → Care Provider → Order → Payment → Video Call**
+
+The appointment must remain one source of truth.
+
+---
+
+# Areas That Must Be Checked
+
+Trace the affected appointment through all relevant areas:
+
+### Admin
+
+* Admin Dashboard
+* Admin Appointments
+* New Appointment form
+* Appointment list
+* Appointment details
+* Appointment editing/rescheduling
+* Payment/Pay Later state
+
+### Care Seeker
+
+* Dashboard
+* Appointment details
+* My Orders
+* Payment state
+* Pay Later flow
+* Join Call
+* Video-call waiting state
+
+### Care Provider
+
+* Dashboard/Home
+* Bookings
+* Booking details
+* Payment state
+* Join Call
+* Video-call waiting state
+
+### Backend
+
+* Appointment APIs
+* Appointment creation
+* Appointment update/reschedule
+* Appointment status handling
+* Order creation
+* Payment handling
+* Pay Later logic
+* Video-call room/session creation
+* Video-call join/authentication logic
+* User/profile lookup
+* Phone-number retrieval
+
+### Database / Supabase
+
+Inspect all relevant:
+
+* Tables
+* Relationships
+* Foreign keys
+* RLS policies, if applicable
+* Appointment records
+* Booking records
+* Orders
+* Payment status
+* Video-call/session identifiers
+* Care Seeker profiles
+* Care Provider profiles
+
+Do not change database structure unless it is genuinely required.
+
+If a database change is required, explain the reason before implementing it.
+
+---
+
+# DO NOT BREAK EXISTING FUNCTIONALITY
+
+This is a bug-fix task, not a rebuild.
+
+Do NOT unnecessarily modify:
+
+* Existing Care Seeker booking flow
+* Existing Care Provider booking flow
+* Existing appointment status logic
+* Existing order/payment system
+* Existing Pay Later functionality
+* Existing My Orders
+* Existing Provider Bookings
+* Existing dashboard components
+* Existing authentication
+* Existing video-call provider/infrastructure
+
+Only change what is required to resolve the identified problems and their dependencies.
+
+Avoid introducing duplicate logic or parallel implementations.
+
+---
+
+# Technical Investigation Before Coding
+
+Before changing code, identify the root cause of each issue.
+
+For every bug, determine:
+
+1. Where does the behavior originate?
+2. Which frontend component is responsible?
+3. Which API/service is involved?
+4. Which database records are involved?
+5. Is there a recent code change that caused it?
+6. What existing functionality already handles this?
+7. What is the smallest safe change that fixes the issue?
+8. What other components depend on the affected code?
+
+Then ask me any questions that are necessary.
+
+**Do not begin coding until I have answered your questions.**
+
+---
+
+# Testing Requirements
+
+After implementation, test the following end-to-end.
+
+## Test 1 — Admin Form
+
+* Open Admin → Appointments → New Appointment.
+* Fill Care Seeker.
+* Fill Care Provider.
+* Select date.
+* Select start time.
+* Select end time.
+* Select payment option.
+* Fill any other required information.
+
+Verify that **no field interaction causes a page refresh**.
+
+---
+
+## Test 2 — Date Picker
+
+Verify:
+
+* Calendar icon exists.
+* Clicking icon opens calendar.
+* Clicking field opens calendar.
+* Past dates are disabled.
+* Future dates work.
+* Selected date persists correctly.
+* No page refresh occurs.
+
+---
+
+## Test 3 — Time
+
+Verify:
+
+* Start time can be selected.
+* End time can be selected.
+* End time must be later than start time.
+* Invalid time combinations cannot create an appointment.
+* No refresh occurs while selecting times.
+
+---
+
+## Test 4 — Seeker Joins First
+
+Create a valid appointment.
+
+Before/at the appointment time:
+
+1. Care Seeker joins.
+2. Care Provider has not joined.
+
+Verify:
+
+* Care Seeker successfully enters the video call.
+* Care Seeker is not blocked because provider hasn't joined.
+* Waiting state is displayed.
+* Provider's registered phone number is displayed.
+* Call button opens the phone dialer.
+* When Provider joins, both participants can communicate normally.
+
+---
+
+## Test 5 — Provider Joins First
+
+Repeat the reverse:
+
+1. Care Provider joins.
+2. Care Seeker has not joined.
+
+Verify:
+
+* Provider successfully enters the call.
+* Provider is not blocked.
+* Waiting state appears.
+* Care Seeker's registered phone number is displayed.
+* Call button opens the phone dialer.
+* When Seeker joins, both participants can communicate normally.
+
+---
+
+## Test 6 — Video Room Before Start Time
+
+For an appointment scheduled for 5:00 PM:
+
+Verify that the shared video-call room/session is already available before 5:00 PM and that either participant can independently join according to the intended appointment-access rules.
+
+The room must not depend on another participant joining first.
+
+---
+
+## Test 7 — Appointment Data Consistency
+
+After fixing the bugs, verify that the same appointment remains correctly represented across:
+
+**Admin → Care Seeker → My Orders → Care Provider → Bookings → Video Call**
+
+Verify that date, start time, end time, status, payment/order state, participants and video-call association remain consistent.
+
+---
+
+# Regression Testing
+
+Also test an appointment created through the **existing Care Seeker booking workflow**.
+
+The bug fixes must not break the existing workflow.
+
+Test:
+
+* Appointment creation
+* Payment
+* Pay Later
+* Care Seeker dashboard
+* My Orders
+* Provider dashboard
+* Provider Bookings
+* Video-call joining
+* Appointment status
+
+---
+
+# Final Implementation Standard
+
+Do not consider this task complete merely because the visible symptoms disappear.
+
+The final implementation must:
+
+* Fix the underlying causes.
+* Preserve the existing architecture.
+* Reuse existing appointment/video/payment logic.
+* Avoid duplicate systems.
+* Maintain one source of truth.
+* Handle both Care Seeker and Care Provider flows.
+* Work across Admin, Seeker and Provider interfaces.
+* Preserve existing functionality.
+* Be compatible with the current Supabase schema and application architecture.
+* Be checked against recent Git history for regressions.
+
+At the end, provide a concise summary of:
+
+1. Root cause of each bug.
+2. Files/components changed.
+3. Database/API changes, if any.
+4. Video-call changes.
+5. Any migration required.
+6. Tests performed.
+7. Any remaining limitations or issues.
+
+**Again: inspect first, ask questions, wait for my answers, and only then code.**
