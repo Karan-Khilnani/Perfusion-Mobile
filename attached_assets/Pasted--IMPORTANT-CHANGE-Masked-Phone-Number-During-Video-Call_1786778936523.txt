@@ -1,0 +1,78 @@
+## IMPORTANT CHANGE — Masked Phone Number During Video Call
+
+Do **NOT** display the actual cellular/mobile number of either the Care Seeker or Care Provider anywhere in the video-call waiting screen.
+
+The direct phone number must remain private.
+
+### Required behavior
+
+When one participant has joined the video call and the other participant has not yet joined:
+
+* Show the waiting message.
+* Provide an option to call the other participant.
+* **Do not display their actual phone number.**
+* Use **Twilio's masked/proxy calling functionality** so that neither participant sees the other's real phone number.
+
+### Example
+
+If the Care Seeker has joined and the Care Provider has not:
+
+> **Waiting for Care Provider to join**
+> Care Provider hasn't joined yet.
+> **Call Care Provider**
+
+The UI should **not** show:
+
+> +91 XXXXX XXXXX
+
+Instead, clicking **Call Care Provider** should initiate the call through the existing/appropriate **Twilio masked calling implementation**, where the participants' real phone numbers remain hidden.
+
+The same must work in reverse:
+
+**Care Provider waiting for Care Seeker → Twilio masked call**
+
+### Technical requirements
+
+Before implementing:
+
+1. Inspect the existing codebase for any Twilio integration.
+2. Check whether Twilio Voice, Proxy, or another masked-calling implementation already exists.
+3. Reuse the existing Twilio infrastructure if present.
+4. If Twilio masked calling is not currently implemented, inspect the project's existing environment/configuration and determine what is required before adding a new implementation.
+5. Do not expose the actual phone number in:
+
+   * Frontend UI
+   * API response
+   * Client-side state
+   * URL/query parameters
+   * Logs
+   * Browser-visible configuration
+   * Appointment details
+   * Video-call room data
+
+The actual phone number may continue to exist in Supabase as the user's profile information, but it must **never be sent to the other participant's client simply for displaying/calling purposes**.
+
+The server-side Twilio implementation should retrieve/use the number securely.
+
+### Privacy requirement
+
+The architecture must ensure:
+
+**Care Seeker ←→ Twilio masked number ←→ Care Provider**
+
+Neither participant should be able to discover the other's actual cellular number through the application.
+
+If the existing Twilio account/configuration does not support the required masked-calling functionality, **ask me before implementing or changing the Twilio architecture.**
+
+Do not substitute a `tel:+91XXXXXXXXXX` link using the user's real number.
+
+### Update to previous testing requirement
+
+For the video-call waiting-state tests, verify:
+
+* Waiting participant sees only **Call Care Seeker/Call Care Provider**.
+* Actual phone number is never displayed.
+* Clicking Call initiates the Twilio-based masked call.
+* Both directions work.
+* Neither participant receives/exposes the other's real phone number.
+* Existing video-call functionality continues to work normally.

@@ -894,22 +894,20 @@ export async function registerRoutes(
       const isProviderUser = provider?.userId === userId;
       if (!isSeeker && !isProviderUser) return res.status(403).json({ message: "Access denied" });
 
-      // Extend the booking with participant phone numbers for the in-call waiting banner
+      // Extend the booking with participant display names for the in-call waiting banner.
+      // Phone numbers are NEVER sent to the client — calls use the Twilio masked bridge
+      // (POST /api/bookings/:id/call) so neither party sees the other's real number.
       const seekerUser = await storage.getUserById(booking.userId);
-      let providerPhone: string | null = null;
       let providerName: string | null = null;
       if (provider?.userId) {
         const providerUser = await storage.getUserById(provider.userId);
-        providerPhone = (providerUser as any)?.phone ?? null;
         providerName =
           `${(providerUser as any)?.firstName ?? ""} ${(providerUser as any)?.lastName ?? ""}`.trim() || null;
       }
       res.json({
         ...booking,
-        seekerPhone: (seekerUser as any)?.phone ?? null,
         seekerName:
           `${(seekerUser as any)?.firstName ?? ""} ${(seekerUser as any)?.lastName ?? ""}`.trim() || null,
-        providerPhone,
         providerName: providerName || (booking as any).serviceName || null,
       });
     } catch (error) {

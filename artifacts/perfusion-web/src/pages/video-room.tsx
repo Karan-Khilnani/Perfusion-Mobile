@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ArrowLeft, Video, VideoOff, Phone, Maximize2, Minimize2, Stethoscope, ClipboardList, PhoneOff, RefreshCw, PanelRightClose, PanelRightOpen, FileText, ShieldCheck, Clock } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import { useCallEvents, type CallEvent } from "@/hooks/use-call-events";
 import { ClinicalPanel } from "@/components/clinical-panel";
 import { InCallSummaryForm } from "@/components/in-call-summary-form";
@@ -29,6 +30,7 @@ type MobilePanel = "video" | "docs" | "summary";
 export default function VideoRoomPage() {
   const { roomId } = useParams<{ roomId: string }>();
   const [, navigate] = useLocation();
+  const { toast } = useToast();
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -39,6 +41,7 @@ export default function VideoRoomPage() {
   const [inCallDocs, setInCallDocs] = useState<{ url: string; name: string }[]>([]);
   const [phase, setPhase] = useState<CallPhase>("precall");
   const [showWaitingBanner, setShowWaitingBanner] = useState(true);
+  const [isCalling, setIsCalling] = useState(false);
   const [showSummaryDialog, setShowSummaryDialog] = useState(false);
   const [mobilePanel, setMobilePanel] = useState<MobilePanel>("video");
   const mobilePanelRef = useRef<MobilePanel>("video");
@@ -233,6 +236,33 @@ export default function VideoRoomPage() {
   const handleRetry = () => {
     setPhase("precall");
   };
+
+  // Initiate a Twilio masked bridge call to the other party.
+  // The server retrieves both phone numbers server-side — the client never sees them.
+  const handleCallOtherParty = useCallback(async () => {
+    if (!booking || isCalling) return;
+    setIsCalling(true);
+    try {
+      const res = await apiRequest("POST", `/api/bookings/${booking.id}/call`, {});
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        toast({
+          title: "Call failed",
+          description: err.error || "Could not connect the call. Please try again.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Calling…",
+          description: "You will receive a call on your registered phone shortly.",
+        });
+      }
+    } catch {
+      toast({ title: "Call failed", description: "Network error. Please try again.", variant: "destructive" });
+    } finally {
+      setIsCalling(false);
+    }
+  }, [booking, isCalling, toast]);
 
   const hangUp = () => {
     navigate(returnTo);
@@ -524,17 +554,17 @@ export default function VideoRoomPage() {
                         ? ((booking as any).seekerName || "Care Seeker")
                         : ((booking as any).providerName || booking?.serviceName || "Consultant")} to join…
                     </p>
-                    {(() => {
-                      const phone = isProvider ? (booking as any).seekerPhone : (booking as any).providerPhone;
-                      const label = isProvider ? "Care Seeker" : "Consultant";
-                      return phone ? (
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          <a href={`tel:${phone}`} className="text-primary font-medium hover:underline">
-                            Call {label}: {phone}
-                          </a>
-                        </p>
-                      ) : null;
-                    })()}
+                    <Button
+                      type="button"
+                      variant="link"
+                      size="sm"
+                      className="h-auto p-0 mt-0.5 text-xs font-medium"
+                      disabled={isCalling}
+                      onClick={handleCallOtherParty}
+                      data-testid="button-call-other-party"
+                    >
+                      {isCalling ? "Calling…" : `Call ${isProvider ? "Care Seeker" : "Care Provider"}`}
+                    </Button>
                   </div>
                   <Button
                     type="button"
@@ -949,17 +979,17 @@ export default function VideoRoomPage() {
                         ? ((booking as any).seekerName || "Care Seeker")
                         : ((booking as any).providerName || booking?.serviceName || "Consultant")} to join…
                     </p>
-                    {(() => {
-                      const phone = isProvider ? (booking as any).seekerPhone : (booking as any).providerPhone;
-                      const label = isProvider ? "Care Seeker" : "Consultant";
-                      return phone ? (
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          <a href={`tel:${phone}`} className="text-primary font-medium hover:underline">
-                            Call {label}: {phone}
-                          </a>
-                        </p>
-                      ) : null;
-                    })()}
+                    <Button
+                      type="button"
+                      variant="link"
+                      size="sm"
+                      className="h-auto p-0 mt-0.5 text-xs font-medium"
+                      disabled={isCalling}
+                      onClick={handleCallOtherParty}
+                      data-testid="button-call-other-party"
+                    >
+                      {isCalling ? "Calling…" : `Call ${isProvider ? "Care Seeker" : "Care Provider"}`}
+                    </Button>
                   </div>
                   <Button
                     type="button"
