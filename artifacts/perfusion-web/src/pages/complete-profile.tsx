@@ -99,12 +99,9 @@ export default function CompleteProfilePage() {
     if (!file) return;
     setUploading(true);
     try {
-      const formData = new FormData();
-      formData.append("document", file);
-      const res = await fetch("/api/upload/document", { method: "POST", body: formData, credentials: "include" });
-      if (!res.ok) throw new Error("Upload failed");
-      const data = await res.json();
-      setDocumentUrl(data.url);
+      const { uploadFileAsBase64 } = await import("@/lib/uploadFile");
+      const url = await uploadFileAsBase64(file);
+      setDocumentUrl(url);
       toast({ title: "Document uploaded" });
     } catch {
       toast({ title: "Upload failed", description: "Please try again", variant: "destructive" });

@@ -87,15 +87,11 @@ export default function RegisterPage() {
       let registrationDocumentUrl: string | undefined;
       if (documentFile) {
         setIsUploading(true);
-        const formData = new FormData();
-        formData.append("file", documentFile);
-        const uploadRes = await fetch("/api/upload/document", {
-          method: "POST",
-          body: formData,
-        });
-        if (uploadRes.ok) {
-          const uploadResult = await uploadRes.json();
-          registrationDocumentUrl = uploadResult.url;
+        try {
+          const { uploadRegistrationDocument } = await import("@/lib/uploadFile");
+          registrationDocumentUrl = await uploadRegistrationDocument(documentFile);
+        } catch {
+          // non-fatal — proceed without doc URL
         }
         setIsUploading(false);
       }

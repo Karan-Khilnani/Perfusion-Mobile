@@ -3708,7 +3708,19 @@ export async function registerRoutes(
         return res.status(403).json({ message: "Access denied" });
       }
       if (!req.file) return res.status(400).json({ message: "No file uploaded" });
-      const photoUrl = await supabaseUpload(req.file.buffer, req.file.originalname, "consultant-photos", req.file.mimetype);
+      let photoUrl: string;
+      if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+        photoUrl = await supabaseUpload(req.file.buffer, req.file.originalname, "consultant-photos", req.file.mimetype);
+      } else {
+        const fsSync = await import("fs");
+        const pathLib = await import("path");
+        const ext = pathLib.default.extname(req.file.originalname) || ".jpg";
+        const uniqueName = `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`;
+        const uploadsDir = pathLib.default.join(process.cwd(), "uploads", "consultant-photos");
+        fsSync.default.mkdirSync(uploadsDir, { recursive: true });
+        fsSync.default.writeFileSync(pathLib.default.join(uploadsDir, uniqueName), req.file.buffer);
+        photoUrl = `/api/uploads/consultant-photos/${uniqueName}`;
+      }
       const updated = await storage.updateConsultant(req.params.id, { photoUrl } as any);
       if (!updated) return res.status(404).json({ message: "Consultant not found" });
       res.json({ photoUrl, consultant: updated });
@@ -3734,7 +3746,19 @@ export async function registerRoutes(
         return res.status(403).json({ message: "Access denied" });
       }
       if (!req.file) return res.status(400).json({ message: "No file uploaded" });
-      const digitalSignatureUrl = await supabaseUpload(req.file.buffer, req.file.originalname, "consultant-signatures", req.file.mimetype);
+      let digitalSignatureUrl: string;
+      if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+        digitalSignatureUrl = await supabaseUpload(req.file.buffer, req.file.originalname, "consultant-signatures", req.file.mimetype);
+      } else {
+        const fsSync = await import("fs");
+        const pathLib = await import("path");
+        const ext = pathLib.default.extname(req.file.originalname) || ".png";
+        const uniqueName = `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`;
+        const uploadsDir = pathLib.default.join(process.cwd(), "uploads", "consultant-signatures");
+        fsSync.default.mkdirSync(uploadsDir, { recursive: true });
+        fsSync.default.writeFileSync(pathLib.default.join(uploadsDir, uniqueName), req.file.buffer);
+        digitalSignatureUrl = `/api/uploads/consultant-signatures/${uniqueName}`;
+      }
       const updated = await storage.updateConsultant(req.params.id, { digitalSignatureUrl } as any);
       if (!updated) return res.status(404).json({ message: "Consultant not found" });
       res.json({ digitalSignatureUrl, consultant: updated });
@@ -3918,7 +3942,19 @@ export async function registerRoutes(
         return res.status(400).json({ message: "No file uploaded" });
       }
 
-      const fileUrl = await supabaseUpload(req.file.buffer, req.file.originalname, "reports", req.file.mimetype);
+      let fileUrl: string;
+      if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+        fileUrl = await supabaseUpload(req.file.buffer, req.file.originalname, "reports", req.file.mimetype);
+      } else {
+        const fsSync = await import("fs");
+        const pathLib = await import("path");
+        const ext = pathLib.default.extname(req.file.originalname) || ".bin";
+        const uniqueName = `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`;
+        const uploadsDir = pathLib.default.join(process.cwd(), "uploads", "reports");
+        fsSync.default.mkdirSync(uploadsDir, { recursive: true });
+        fsSync.default.writeFileSync(pathLib.default.join(uploadsDir, uniqueName), req.file.buffer);
+        fileUrl = `/api/uploads/reports/${uniqueName}`;
+      }
 
       res.json({ 
         success: true, 
@@ -3929,6 +3965,50 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error uploading report file:", error);
       res.status(500).json({ message: "Failed to upload file" });
+    }
+  });
+
+  // Public upload endpoint for registration documents — used during sign-up before a session exists.
+  // Accepts base64-encoded JSON. Rate exposure is acceptable: the URL is only meaningful if the
+  // caller subsequently completes a valid registration request that references it.
+  app.post("/api/upload/registration-document", async (req: any, res: any) => {
+    try {
+      const { base64, filename, mimeType } = req.body as {
+        base64?: string;
+        filename?: string;
+        mimeType?: string;
+      };
+
+      if (!base64 || !filename) {
+        return res.status(400).json({ message: "No file data received. Please select a file and try again." });
+      }
+
+      const buffer = Buffer.from(base64, "base64");
+      const MAX_BYTES = 5 * 1024 * 1024;
+      if (buffer.length > MAX_BYTES) {
+        const mb = (buffer.length / (1024 * 1024)).toFixed(1);
+        return res.status(400).json({ message: `File is too large (${mb} MB). Maximum allowed size is 5 MB.` });
+      }
+
+      let fileUrl: string;
+
+      if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+        fileUrl = await supabaseUpload(buffer, filename, "documents", mimeType || "application/octet-stream");
+      } else {
+        const { default: fsSync } = await import("fs");
+        const { default: pathLib } = await import("path");
+        const ext = pathLib.extname(filename) || ".bin";
+        const uniqueName = `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`;
+        const uploadsDir = pathLib.join(process.cwd(), "uploads", "documents");
+        fsSync.mkdirSync(uploadsDir, { recursive: true });
+        fsSync.writeFileSync(pathLib.join(uploadsDir, uniqueName), buffer);
+        fileUrl = `/api/uploads/documents/${uniqueName}`;
+      }
+
+      res.json({ success: true, url: fileUrl, filename, size: buffer.length });
+    } catch (error: any) {
+      req.log?.error({ err: error }, "Error uploading registration document");
+      res.status(500).json({ message: "Something went wrong saving the file. Please try again." });
     }
   });
 

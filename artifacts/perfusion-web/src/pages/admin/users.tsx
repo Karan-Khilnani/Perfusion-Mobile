@@ -166,11 +166,8 @@ export default function AdminUsersPage() {
     if (!editingUser) return;
     setRegDocUploading(true);
     try {
-      const formData = new FormData();
-      formData.append("file", file);
-      const res = await fetch("/api/upload/document", { method: "POST", body: formData, credentials: "include" });
-      if (!res.ok) throw new Error("Upload failed");
-      const { url } = await res.json();
+      const { uploadFileAsBase64 } = await import("@/lib/uploadFile");
+      const url = await uploadFileAsBase64(file);
       await apiRequest("PATCH", `/api/admin/users/${editingUser.id}/profile`, { registrationDocumentUrl: url });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
       setEditingUser({ ...editingUser, registrationDocumentUrl: url });
@@ -526,16 +523,14 @@ export default function AdminUsersPage() {
         aspect={1}
         title="Crop Profile Photo"
         onCropComplete={async (blob, filename) => {
-          const formData = new FormData();
-          formData.append("file", blob, filename);
-          const res = await fetch("/api/upload/document", { method: "POST", body: formData, credentials: "include" });
-          if (!res.ok) {
+          try {
+            const { uploadFileAsBase64 } = await import("@/lib/uploadFile");
+            const url = await uploadFileAsBase64(blob, filename);
+            setPendingPhotoUrl(url);
+            toast({ title: "Photo ready", description: "Save the profile to apply the new photo." });
+          } catch {
             toast({ title: "Failed to upload photo", variant: "destructive" });
-            throw new Error("Upload failed");
           }
-          const { url } = await res.json();
-          setPendingPhotoUrl(url);
-          toast({ title: "Photo ready", description: "Save the profile to apply the new photo." });
         }}
       />
     </div>

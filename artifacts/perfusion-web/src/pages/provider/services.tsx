@@ -393,14 +393,12 @@ export default function ProviderServicesPage() {
   });
 
   const uploadDocument = async (file: File): Promise<string | undefined> => {
-    const formData = new FormData();
-    formData.append("file", file);
-    const res = await fetch("/api/upload/document", { method: "POST", body: formData });
-    if (res.ok) {
-      const result = await res.json();
-      return result.url;
+    try {
+      const { uploadFileAsBase64 } = await import("@/lib/uploadFile");
+      return await uploadFileAsBase64(file);
+    } catch {
+      return undefined;
     }
-    return undefined;
   };
 
   const addPredefinedTestMutation = useMutation({

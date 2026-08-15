@@ -232,12 +232,8 @@ export default function ConsultationBookingPage() {
   });
 
   const uploadFile = async (file: File): Promise<string> => {
-    const formData = new FormData();
-    formData.append("file", file);
-    const res = await fetch("/api/upload/document", { method: "POST", body: formData, credentials: "include" });
-    if (!res.ok) throw new Error("Upload failed");
-    const data = await res.json();
-    return data.url;
+    const { uploadFileAsBase64 } = await import("@/lib/uploadFile");
+    return uploadFileAsBase64(file);
   };
 
   const handleReportFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
