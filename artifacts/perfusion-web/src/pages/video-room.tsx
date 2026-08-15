@@ -38,7 +38,7 @@ export default function VideoRoomPage() {
   const [panelOpen, setPanelOpen] = useState(true);
   const [inCallDocs, setInCallDocs] = useState<{ url: string; name: string }[]>([]);
   const [phase, setPhase] = useState<CallPhase>("precall");
-  const [ringingSeconds, setRingingSeconds] = useState(0);
+  const [showWaitingBanner, setShowWaitingBanner] = useState(true);
   const [showSummaryDialog, setShowSummaryDialog] = useState(false);
   const [mobilePanel, setMobilePanel] = useState<MobilePanel>("video");
   const mobilePanelRef = useRef<MobilePanel>("video");
@@ -52,9 +52,6 @@ export default function VideoRoomPage() {
   // Tracks whether we've applied the initial accepted=true jump (avoid re-render loop)
   const joinedAsCalleeApplied = useRef(false);
 
-  // Use refs for timers to avoid stale closures
-  const ringTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const ringingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const phaseRef = useRef<CallPhase>("precall");
   // Stable ref to latest booking so unmount cleanup can access it
   const bookingRef = useRef<Booking | null>(null);
@@ -154,16 +151,8 @@ export default function VideoRoomPage() {
     }
   }, [booking, phase, joinedAsCallee]);
 
-  function clearRingTimer() {
-    if (ringTimeoutRef.current) {
-      clearTimeout(ringTimeoutRef.current);
-      ringTimeoutRef.current = null;
-    }
-    if (ringingIntervalRef.current) {
-      clearInterval(ringingIntervalRef.current);
-      ringingIntervalRef.current = null;
-    }
-  }
+  // Conference-room model: no ring timers needed
+  function clearRingTimer() {}
 
   // Listen for call events (accepted/declined/timeout from the other side).
   // Use bookingRef.current as fallback — on mobile the booking query may not have
@@ -173,18 +162,8 @@ export default function VideoRoomPage() {
     const b = booking ?? bookingRef.current;
     if (!b) return;
     if (event.bookingId !== b.id) return;
-    const currentPhase = phaseRef.current;
 
-    if (event.type === "call_accepted" && currentPhase === "ringing") {
-      clearRingTimer();
-      setPhase("connected");
-    } else if (event.type === "call_declined" && currentPhase === "ringing") {
-      clearRingTimer();
-      setPhase("declined");
-    } else if (event.type === "call_timeout" && currentPhase === "ringing") {
-      clearRingTimer();
-      setPhase("timeout");
-    } else if (event.type === "document_uploaded" && event.url && event.fileName) {
+    if (event.type === "document_uploaded" && event.url && event.fileName) {
       setInCallDocs(prev => {
         if (prev.some(d => d.url === event.url)) return prev;
         return [...prev, { url: event.url!, name: event.fileName! }];
@@ -194,31 +173,7 @@ export default function VideoRoomPage() {
 
   useCallEvents(handleCallEvent);
 
-  // Polling fallback while ringing — SSE events can be silently dropped on mobile
-  // (screen dim, brief network blip, app backgrounded). Every 5 s we ask the server
-  // directly for the call status so we never stay stuck on the ringing screen.
-  useEffect(() => {
-    const b = booking ?? bookingRef.current;
-    if (phase !== "ringing" || !b) return;
-
-    const poll = setInterval(async () => {
-      try {
-        const res = await fetch(`/api/call/status/${b.id}`, { credentials: "include" });
-        if (!res.ok) return;
-        const data = await res.json();
-        if (phaseRef.current !== "ringing") return; // already transitioned via SSE
-        if (data.status === "accepted") {
-          clearRingTimer();
-          setPhase("connected");
-        } else if (data.status === "declined") {
-          clearRingTimer();
-          setPhase("declined");
-        }
-      } catch {}
-    }, 5000);
-
-    return () => clearInterval(poll);
-  }, [phase, booking]);
+  // Conference-room model: no polling needed (no ring/accept handshake).
 
   // Fetch a server-side Daily token when entering the call — this locks in the user's
   // real name and cannot be overridden by browser cache.
@@ -237,10 +192,11 @@ export default function VideoRoomPage() {
     return () => clearTimeout(timer);
   }, [phase]);
 
-  const handleRing = useCallback(async () => {
+  // Conference-room model: enter the room directly (no ring/accept handshake).
+  const handleEnterRoom = useCallback(async () => {
     if (!booking) return;
 
-    // Save on-call doctor info for seeker
+    // Save on-call doctor info for seeker before entering
     if (!isProvider && onCallDoctorName.trim()) {
       try {
         await apiRequest("PATCH", `/api/bookings/${booking.id}/on-call-doctor`, {
@@ -252,44 +208,15 @@ export default function VideoRoomPage() {
       }
     }
 
-    setPhase("ringing");
-    setRingingSeconds(0);
-
-    const interval = setInterval(() => {
-      setRingingSeconds(s => s + 1);
-    }, 1000);
-    ringingIntervalRef.current = interval;
-
-    try {
-      await apiRequest("POST", `/api/call/ring/${booking.id}`, {});
-    } catch (e) {
-      console.error("Failed to ring:", e);
-    }
-
-    const t = setTimeout(() => {
-      clearInterval(interval);
-      ringingIntervalRef.current = null;
-      setPhase("timeout");
-    }, 300000);
-    ringTimeoutRef.current = t;
+    setShowWaitingBanner(true);
+    setPhase("connected");
   }, [booking, isProvider, onCallDoctorName, onCallDoctorDesignation]);
 
-  // Provider skips pre-call form and rings immediately (unless they accepted an incoming call).
-  // First check status — if the call is already accepted (other party in room), go straight
-  // to connected so we don't fire a ghost ring that alerts the recipient again.
+  // Provider enters the room directly — no ring/accept step (conference-room model).
   useEffect(() => {
     if (!isProvider || joinedAsCallee || phase !== "precall" || !booking) return;
-    fetch(`/api/call/status/${booking.id}`, { credentials: "include" })
-      .then(r => r.ok ? r.json() : null)
-      .then(data => {
-        if (phaseRef.current !== "precall") return; // phase changed while fetching
-        if (data?.status === "accepted") {
-          setPhase("connected"); // both already in room — skip ringing
-        } else {
-          handleRing();
-        }
-      })
-      .catch(() => handleRing()); // network error — fall back to ringing normally
+    setShowWaitingBanner(true);
+    setPhase("connected");
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isProvider, joinedAsCallee, booking?.id, phase]);
 
@@ -304,12 +231,10 @@ export default function VideoRoomPage() {
   };
 
   const handleRetry = () => {
-    setRingingSeconds(0);
     setPhase("precall");
   };
 
   const hangUp = () => {
-    clearRingTimer();
     navigate(returnTo);
   };
 
@@ -333,10 +258,7 @@ export default function VideoRoomPage() {
 
   useEffect(() => {
     return () => {
-      clearRingTimer();
-      if (phaseRef.current === "ringing" && bookingRef.current) {
-        apiRequest("POST", `/api/call/cancel/${bookingRef.current.id}`, {}).catch(() => {});
-      }
+      // No ring cleanup needed — conference-room model has no ring/accept state.
     };
   }, []);
 
@@ -482,95 +404,6 @@ export default function VideoRoomPage() {
     );
   }
 
-  // ─── Ringing / Calling Screen ─────────────────────────────────────────────
-  if (phase === "ringing") {
-    return (
-      <div className="flex h-screen flex-col items-center justify-center bg-background gap-8 px-4">
-        <div className="relative">
-          <div className="absolute inset-0 rounded-full bg-primary/20 animate-ping" style={{ animationDuration: "1.2s" }} />
-          <div className="relative flex h-28 w-28 items-center justify-center rounded-full bg-primary/10 border-2 border-primary/30">
-            <Phone className="h-12 w-12 text-primary animate-pulse" />
-          </div>
-        </div>
-
-        <div className="text-center space-y-2">
-          <h2 className="text-2xl font-bold">Calling...</h2>
-          <p className="text-muted-foreground">
-            {booking?.serviceName || "Consultation call"}
-          </p>
-          <p className="text-sm text-muted-foreground tabular-nums">
-            {ringingSeconds}s
-          </p>
-        </div>
-
-        <p className="text-sm text-muted-foreground max-w-xs text-center">
-          The other party is being notified. They will receive a ring even if the app is closed.
-        </p>
-
-        <div className="flex flex-col items-center gap-2">
-          <Button
-            variant="destructive"
-            size="icon"
-            onClick={handleCancelRing}
-            className="rounded-full h-14 w-14"
-            data-testid="button-cancel-ring"
-          >
-            <PhoneOff className="h-6 w-6" />
-          </Button>
-          <span className="text-sm text-muted-foreground">Cancel</span>
-        </div>
-      </div>
-    );
-  }
-
-  // ─── Declined Screen ─────────────────────────────────────────────────────
-  if (phase === "declined") {
-    return (
-      <div className="flex h-screen flex-col items-center justify-center bg-background gap-6 px-4">
-        <div className="flex h-24 w-24 items-center justify-center rounded-full bg-destructive/10">
-          <PhoneOff className="h-10 w-10 text-destructive" />
-        </div>
-        <div className="text-center space-y-2">
-          <h2 className="text-xl font-bold">Call Declined</h2>
-          <p className="text-muted-foreground">The other party is unavailable right now.</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <Button onClick={handleRetry} variant="outline" data-testid="button-retry-ring">
-            <RefreshCw className="mr-2 h-4 w-4" />
-            Try Again
-          </Button>
-          <Button onClick={() => navigate(returnTo)} data-testid="button-go-back">
-            Go Back
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  // ─── Timeout / No Answer Screen ──────────────────────────────────────────
-  if (phase === "timeout") {
-    return (
-      <div className="flex h-screen flex-col items-center justify-center bg-background gap-6 px-4">
-        <div className="flex h-24 w-24 items-center justify-center rounded-full bg-muted">
-          <Phone className="h-10 w-10 text-muted-foreground" />
-        </div>
-        <div className="text-center space-y-2">
-          <h2 className="text-xl font-bold">No Answer</h2>
-          <p className="text-muted-foreground">The other party didn't respond in time.</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <Button onClick={handleRetry} variant="outline" data-testid="button-retry-ring">
-            <RefreshCw className="mr-2 h-4 w-4" />
-            Call Again
-          </Button>
-          <Button onClick={() => navigate(returnTo)} data-testid="button-go-back">
-            Go Back
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
   // ─── Pre-Call Setup (Seeker Only) ─────────────────────────────────────────
   if (phase === "precall") {
     return (
@@ -583,7 +416,7 @@ export default function VideoRoomPage() {
                 <h2 className="text-xl font-semibold">Pre-Consultation Setup</h2>
               </div>
               <p className="text-sm text-muted-foreground">
-                Please provide the on-call doctor details, then we'll ring the consultant.
+                Please provide the on-call doctor details before entering the video room.
               </p>
             </div>
 
@@ -624,13 +457,13 @@ export default function VideoRoomPage() {
                 Cancel
               </Button>
               <Button
-                onClick={handleRing}
+                onClick={handleEnterRoom}
                 disabled={!onCallDoctorName.trim()}
                 className="flex-1"
-                data-testid="button-ring-consultant"
+                data-testid="button-enter-room"
               >
-                <Phone className="mr-2 h-4 w-4" />
-                Call Consultant
+                <Video className="mr-2 h-4 w-4" />
+                Enter Room
               </Button>
             </div>
           </CardContent>
@@ -679,6 +512,43 @@ export default function VideoRoomPage() {
 
         {/* Swipe area — NO touch handlers here; iframe swallows them. Edge strips handle it. */}
         <div className="flex-1 relative overflow-hidden">
+
+          {/* Waiting banner — shown when entering room until dismissed */}
+          {showWaitingBanner && (
+            <div className="absolute top-3 left-1/2 -translate-x-1/2 z-[60] w-[min(360px,90%)]">
+              <div className="rounded-lg border bg-background/95 backdrop-blur-sm shadow-lg px-4 py-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium">
+                      Waiting for {isProvider
+                        ? ((booking as any).seekerName || "Care Seeker")
+                        : ((booking as any).providerName || booking?.serviceName || "Consultant")} to join…
+                    </p>
+                    {(() => {
+                      const phone = isProvider ? (booking as any).seekerPhone : (booking as any).providerPhone;
+                      const label = isProvider ? "Care Seeker" : "Consultant";
+                      return phone ? (
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          <a href={`tel:${phone}`} className="text-primary font-medium hover:underline">
+                            Call {label}: {phone}
+                          </a>
+                        </p>
+                      ) : null;
+                    })()}
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 w-6 p-0 text-muted-foreground shrink-0"
+                    onClick={() => setShowWaitingBanner(false)}
+                  >
+                    ✕
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* ── Video (always rendered; transitions between full-screen and PiP) ── */}
           <div
@@ -1066,6 +936,43 @@ export default function VideoRoomPage() {
               }}
               data-testid="video-container"
             />
+          )}
+
+          {/* Waiting banner — overlay shown while waiting for the other party, dismissible */}
+          {showWaitingBanner && (
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-40 w-[min(380px,90%)]">
+              <div className="rounded-lg border bg-background/95 backdrop-blur-sm shadow-lg px-4 py-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium">
+                      Waiting for {isProvider
+                        ? ((booking as any).seekerName || "Care Seeker")
+                        : ((booking as any).providerName || booking?.serviceName || "Consultant")} to join…
+                    </p>
+                    {(() => {
+                      const phone = isProvider ? (booking as any).seekerPhone : (booking as any).providerPhone;
+                      const label = isProvider ? "Care Seeker" : "Consultant";
+                      return phone ? (
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          <a href={`tel:${phone}`} className="text-primary font-medium hover:underline">
+                            Call {label}: {phone}
+                          </a>
+                        </p>
+                      ) : null;
+                    })()}
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 w-6 p-0 text-muted-foreground shrink-0"
+                    onClick={() => setShowWaitingBanner(false)}
+                  >
+                    ✕
+                  </Button>
+                </div>
+              </div>
+            </div>
           )}
         </div>
 

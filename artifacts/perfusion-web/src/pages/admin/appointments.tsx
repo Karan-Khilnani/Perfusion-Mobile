@@ -1,15 +1,14 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useForm, Controller } from "react-hook-form";
+import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { format } from "date-fns";
+import { format, startOfToday } from "date-fns";
 import {
   Card, CardContent, CardDescription, CardHeader, CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
@@ -23,12 +22,17 @@ import {
 import {
   Form, FormControl, FormField, FormItem, FormLabel, FormMessage,
 } from "@/components/ui/form";
+import {
+  Popover, PopoverContent, PopoverTrigger,
+} from "@/components/ui/popover";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import { cn } from "@/lib/utils";
 import { StatusBadge } from "@/components/status-badge";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
-  Search, Plus, Calendar, Clock, User, Stethoscope, IndianRupee,
-  Loader2, Video, Phone, Eye, CheckCircle2, CircleDot, Filter,
+  Search, Plus, Calendar as CalendarIcon, Stethoscope, IndianRupee,
+  Loader2, Video, Phone, Eye, CheckCircle2, CircleDot,
   CreditCard, ClockIcon,
 } from "lucide-react";
 import type { Booking, BookingStatus, Consultant } from "@shared/schema";
@@ -44,13 +48,35 @@ type AdminUser = {
   hospitalName?: string;
 };
 
+// ── Time helpers ──────────────────────────────────────────────────────────────
+
+const TIME_OPTIONS = Array.from({ length: 48 }, (_, i) => {
+  const hours = Math.floor(i / 2);
+  const minutes = i % 2 === 0 ? "00" : "30";
+  const period = hours < 12 ? "AM" : "PM";
+  const displayHours = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours;
+  return `${displayHours}:${minutes} ${period}`;
+});
+
+function timeToMinutes(t: string): number {
+  const match = t.match(/^(\d+):(\d+)\s+(AM|PM)$/i);
+  if (!match) return 0;
+  let hours = parseInt(match[1]);
+  const minutes = parseInt(match[2]);
+  const period = match[3].toUpperCase();
+  if (period === "PM" && hours !== 12) hours += 12;
+  if (period === "AM" && hours === 12) hours = 0;
+  return hours * 60 + minutes;
+}
+
 // ── Validation schema ─────────────────────────────────────────────────────────
 
 const createSchema = z.object({
   userId: z.string().min(1, "Please select a Care Seeker"),
   serviceId: z.string().min(1, "Please select a Consultant"),
-  appointmentDate: z.string().min(1, "Appointment date is required"),
-  appointmentTime: z.string().min(1, "Appointment time is required"),
+  appointmentDate: z.date({ required_error: "Appointment date is required" }),
+  appointmentStartTime: z.string().min(1, "Start time is required"),
+  appointmentEndTime: z.string().min(1, "End time is required"),
   patientName: z.string().min(2, "Patient name is required"),
   patientAge: z.coerce.number().min(1, "Age must be at least 1").max(150, "Age looks invalid"),
   patientGender: z.enum(["male", "female", "other"], { required_error: "Gender is required" }),
@@ -59,7 +85,16 @@ const createSchema = z.object({
   clinicalSummary: z.string().min(10, "Clinical summary must be at least 10 characters"),
   provisionalDiagnosis: z.string().optional(),
   paymentMethod: z.enum(["pay_now", "pay_later"]),
-});
+}).refine(
+  (data) => {
+    if (!data.appointmentStartTime || !data.appointmentEndTime) return true;
+    return timeToMinutes(data.appointmentEndTime) > timeToMinutes(data.appointmentStartTime);
+  },
+  {
+    message: "End time must be after start time",
+    path: ["appointmentEndTime"],
+  }
+);
 
 type CreateFormData = z.infer<typeof createSchema>;
 
@@ -84,6 +119,422 @@ function PaymentBadge({ status, method }: { status?: string | null; method?: str
     return <Badge variant="destructive">Overdue</Badge>;
   }
   return <Badge variant="secondary">{status ?? "—"}</Badge>;
+}
+
+// ── Create Appointment Dialog ─────────────────────────────────────────────────
+// Defined at module level (outside AdminAppointmentsPage) so React treats it as
+// a stable component identity — preventing unmount/remount on every parent render.
+
+interface CreateAppointmentDialogProps {
+  form: ReturnType<typeof useForm<CreateFormData>>;
+  showCreate: boolean;
+  setShowCreate: (open: boolean) => void;
+  seekers: AdminUser[];
+  consultants: Consultant[];
+  consultantMap: Record<string, Consultant>;
+  createMutation: any;
+}
+
+function CreateAppointmentDialog({
+  form,
+  showCreate,
+  setShowCreate,
+  seekers,
+  consultants,
+  consultantMap,
+  createMutation,
+}: CreateAppointmentDialogProps) {
+  const selectedConsultantId = form.watch("serviceId");
+  const selectedConsultant = consultantMap[selectedConsultantId];
+
+  return (
+    <Dialog open={showCreate} onOpenChange={(open) => { setShowCreate(open); if (!open) form.reset(); }}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Create Appointment</DialogTitle>
+          <DialogDescription>
+            Schedule a consultation between a Care Seeker and a Consultant. The appointment will appear in both their dashboards immediately.
+          </DialogDescription>
+        </DialogHeader>
+
+        <Form {...form}>
+          <form
+            onSubmit={form.handleSubmit((d) => createMutation.mutate(d))}
+            className="space-y-5"
+          >
+            {/* ── Care Seeker ── */}
+            <div className="rounded-lg border p-4 space-y-4">
+              <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Care Seeker</p>
+              <FormField
+                control={form.control}
+                name="userId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Care Seeker *</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-care-seeker">
+                          <SelectValue placeholder="Select a Care Seeker" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {seekers.length === 0 && (
+                          <SelectItem value="__none__" disabled>No seekers found</SelectItem>
+                        )}
+                        {seekers.map((u) => (
+                          <SelectItem key={u.id} value={u.id}>
+                            {`${u.firstName} ${u.lastName}`.trim() || u.email}
+                            {u.hospitalName ? ` — ${u.hospitalName}` : ""}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            {/* ── Consultant ── */}
+            <div className="rounded-lg border p-4 space-y-4">
+              <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Consultant</p>
+              <FormField
+                control={form.control}
+                name="serviceId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Consultant *</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-consultant">
+                          <SelectValue placeholder="Select a Consultant" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {consultants.length === 0 && (
+                          <SelectItem value="__none__" disabled>No consultants found</SelectItem>
+                        )}
+                        {consultants.map((c) => (
+                          <SelectItem key={c.id} value={c.id}>
+                            {c.name} — ₹{c.consultationFee}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              {selectedConsultant && (
+                <div className="rounded-md bg-muted/50 px-3 py-2 text-sm text-muted-foreground flex items-center gap-2">
+                  <IndianRupee className="h-3.5 w-3.5" />
+                  Consultation fee: <span className="font-semibold text-foreground">₹{selectedConsultant.consultationFee}</span>
+                  {selectedConsultant.customerPrice && (
+                    <span>(customer price: ₹{selectedConsultant.customerPrice})</span>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* ── Appointment Slot ── */}
+            <div className="rounded-lg border p-4 space-y-4">
+              <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Appointment</p>
+
+              {/* Date picker with calendar popover */}
+              <FormField
+                control={form.control}
+                name="appointmentDate"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col">
+                    <FormLabel>Date *</FormLabel>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className={cn(
+                              "w-full justify-start text-left font-normal",
+                              !field.value && "text-muted-foreground"
+                            )}
+                            data-testid="button-appointment-date"
+                          >
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {field.value ? format(field.value, "dd MMM yyyy") : "Pick a date"}
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <CalendarComponent
+                          mode="single"
+                          selected={field.value}
+                          onSelect={field.onChange}
+                          disabled={(date) => date < startOfToday()}
+                          initialFocus
+                        />
+                        <div className="border-t flex items-center justify-between px-3 py-2">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => field.onChange(new Date())}
+                          >
+                            Today
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => field.onChange(undefined)}
+                          >
+                            Clear
+                          </Button>
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Separate start + end time selects */}
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="appointmentStartTime"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Start Time *</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-start-time">
+                            <SelectValue placeholder="Select time" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent className="max-h-[200px]">
+                          {TIME_OPTIONS.map((t) => (
+                            <SelectItem key={t} value={t}>{t}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="appointmentEndTime"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>End Time *</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-end-time">
+                            <SelectValue placeholder="Select time" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent className="max-h-[200px]">
+                          {TIME_OPTIONS.map((t) => (
+                            <SelectItem key={t} value={t}>{t}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </div>
+
+            {/* ── Patient Details ── */}
+            <div className="rounded-lg border p-4 space-y-4">
+              <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Patient Details</p>
+              <FormField
+                control={form.control}
+                name="patientName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Patient Name *</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Full name" {...field} data-testid="input-patient-name" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <div className="grid grid-cols-3 gap-4">
+                <FormField
+                  control={form.control}
+                  name="patientAge"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Age *</FormLabel>
+                      <FormControl>
+                        <Input type="number" placeholder="Age" {...field} data-testid="input-patient-age" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="patientGender"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Gender *</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="male">Male</SelectItem>
+                          <SelectItem value="female">Female</SelectItem>
+                          <SelectItem value="other">Other</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="patientContact"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Patient Contact</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Phone" {...field} data-testid="input-patient-contact" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              <FormField
+                control={form.control}
+                name="callbackPhone"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Ward / Callback Phone *</FormLabel>
+                    <FormControl>
+                      <Input placeholder="+91XXXXXXXXXX — nurse / ward contact" {...field} data-testid="input-callback-phone" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            {/* ── Clinical Information ── */}
+            <div className="rounded-lg border p-4 space-y-4">
+              <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Clinical Information</p>
+              <FormField
+                control={form.control}
+                name="clinicalSummary"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Clinical Summary *</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="Brief history, presenting complaint, reason for referral…"
+                        className="min-h-[80px]"
+                        {...field}
+                        data-testid="input-clinical-summary"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="provisionalDiagnosis"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Provisional Diagnosis</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Optional" {...field} data-testid="input-provisional-diagnosis" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            {/* ── Payment ── */}
+            <div className="rounded-lg border p-4 space-y-4">
+              <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Payment</p>
+              <FormField
+                control={form.control}
+                name="paymentMethod"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Payment Option *</FormLabel>
+                    <div className="grid grid-cols-2 gap-3">
+                      {(["pay_now", "pay_later"] as const).map((opt) => (
+                        <button
+                          key={opt}
+                          type="button"
+                          onClick={() => field.onChange(opt)}
+                          className={`flex flex-col items-start rounded-lg border p-3 text-left transition-colors ${
+                            field.value === opt
+                              ? "border-primary bg-primary/5"
+                              : "border-border hover:bg-muted/50"
+                          }`}
+                        >
+                          {opt === "pay_now" ? (
+                            <>
+                              <div className="flex items-center gap-2">
+                                <CreditCard className="h-4 w-4" />
+                                <span className="font-medium text-sm">Pay Now</span>
+                              </div>
+                              <p className="mt-1 text-xs text-muted-foreground">
+                                Mark as paid immediately
+                              </p>
+                            </>
+                          ) : (
+                            <>
+                              <div className="flex items-center gap-2">
+                                <ClockIcon className="h-4 w-4" />
+                                <span className="font-medium text-sm">Pay Later</span>
+                              </div>
+                              <p className="mt-1 text-xs text-muted-foreground">
+                                Invoice stays open — seeker pays later
+                              </p>
+                            </>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => { setShowCreate(false); form.reset(); }}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={createMutation.isPending} data-testid="button-create-appointment-submit">
+                {createMutation.isPending ? (
+                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Creating…</>
+                ) : (
+                  <><Plus className="mr-2 h-4 w-4" />Create Appointment</>
+                )}
+              </Button>
+            </DialogFooter>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
+  );
 }
 
 // ── Main component ─────────────────────────────────────────────────────────────
@@ -113,7 +564,6 @@ export default function AdminAppointmentsPage() {
 
   // ── Derived data ───────────────────────────────────────────────────────────
 
-  // Only consultation bookings for this module
   const appointments = useMemo(
     () => allBookings.filter((b) => b.bookingType === "consultation"),
     [allBookings],
@@ -191,8 +641,9 @@ export default function AdminAppointmentsPage() {
     defaultValues: {
       userId: "",
       serviceId: "",
-      appointmentDate: "",
-      appointmentTime: "",
+      appointmentDate: undefined as any,
+      appointmentStartTime: "",
+      appointmentEndTime: "",
       patientName: "",
       patientAge: undefined as any,
       patientGender: undefined as any,
@@ -204,15 +655,11 @@ export default function AdminAppointmentsPage() {
     },
   });
 
-  const selectedConsultantId = form.watch("serviceId");
-  const selectedConsultant = consultantMap[selectedConsultantId];
-
   const createMutation = useMutation({
     mutationFn: async (data: CreateFormData) => {
-      // Format appointment slot: "15 Aug 2026, 10:00 AM"
-      const dateObj = new Date(data.appointmentDate);
-      const dateStr = format(dateObj, "dd MMM yyyy");
-      const appointmentSlot = `${dateStr}, ${data.appointmentTime}`;
+      // Format: "15 Aug 2026, 10:00 AM – 10:30 AM"
+      const dateStr = format(data.appointmentDate, "dd MMM yyyy");
+      const appointmentSlot = `${dateStr}, ${data.appointmentStartTime} – ${data.appointmentEndTime}`;
 
       const payload = {
         bookingType: "consultation",
@@ -227,7 +674,6 @@ export default function AdminAppointmentsPage() {
         clinicalSummary: data.clinicalSummary,
         provisionalDiagnosis: data.provisionalDiagnosis || null,
         paymentMethod: data.paymentMethod,
-        // amount/serviceName/providerId resolved server-side
         amount: "0",
         serviceName: "",
         status: "booked",
@@ -261,7 +707,6 @@ export default function AdminAppointmentsPage() {
       apiRequest("PATCH", `/api/admin/bookings/${id}`, { status }).then((r) => r.json()),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/bookings"] });
-      // Refresh selected booking
       setSelectedBooking((prev) =>
         prev ? { ...prev, status: "completed" as BookingStatus } : null,
       );
@@ -292,7 +737,6 @@ export default function AdminAppointmentsPage() {
         onClick={() => setSelectedBooking(booking)}
         data-testid={`appointment-row-${booking.id}`}
       >
-        {/* Left: icon + main info */}
         <div className="flex items-start gap-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900/30">
             <Stethoscope className="h-4 w-4 text-blue-600 dark:text-blue-400" />
@@ -319,7 +763,7 @@ export default function AdminAppointmentsPage() {
               <span className="font-mono">{ref}</span>
               {slot !== "—" && (
                 <span className="flex items-center gap-1">
-                  <Calendar className="h-3 w-3" />
+                  <CalendarIcon className="h-3 w-3" />
                   {slot}
                 </span>
               )}
@@ -328,7 +772,6 @@ export default function AdminAppointmentsPage() {
           </div>
         </div>
 
-        {/* Right: badges + amount */}
         <div className="flex flex-wrap items-center gap-2 sm:shrink-0">
           <StatusBadge status={booking.status} />
           <PaymentBadge status={booking.paymentStatus} method={(booking as any).paymentMethod} />
@@ -338,322 +781,6 @@ export default function AdminAppointmentsPage() {
           </Button>
         </div>
       </div>
-    );
-  }
-
-  // ── Create form ─────────────────────────────────────────────────────────────
-
-  function CreateAppointmentDialog() {
-    return (
-      <Dialog open={showCreate} onOpenChange={(open) => { setShowCreate(open); if (!open) form.reset(); }}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Create Appointment</DialogTitle>
-            <DialogDescription>
-              Schedule a consultation between a Care Seeker and a Consultant. The appointment will appear in both their dashboards immediately.
-            </DialogDescription>
-          </DialogHeader>
-
-          <Form {...form}>
-            <form
-              onSubmit={form.handleSubmit((d) => createMutation.mutate(d))}
-              className="space-y-5"
-            >
-              {/* ── Care Seeker ── */}
-              <div className="rounded-lg border p-4 space-y-4">
-                <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Care Seeker</p>
-                <FormField
-                  control={form.control}
-                  name="userId"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Care Seeker *</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger data-testid="select-care-seeker">
-                            <SelectValue placeholder="Select a Care Seeker" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {seekers.length === 0 && (
-                            <SelectItem value="__none__" disabled>No seekers found</SelectItem>
-                          )}
-                          {seekers.map((u) => (
-                            <SelectItem key={u.id} value={u.id}>
-                              {`${u.firstName} ${u.lastName}`.trim() || u.email}
-                              {u.hospitalName ? ` — ${u.hospitalName}` : ""}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              {/* ── Consultant ── */}
-              <div className="rounded-lg border p-4 space-y-4">
-                <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Consultant</p>
-                <FormField
-                  control={form.control}
-                  name="serviceId"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Consultant *</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger data-testid="select-consultant">
-                            <SelectValue placeholder="Select a Consultant" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {consultants.length === 0 && (
-                            <SelectItem value="__none__" disabled>No consultants found</SelectItem>
-                          )}
-                          {consultants.map((c) => (
-                            <SelectItem key={c.id} value={c.id}>
-                              {c.name} — ₹{c.consultationFee}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                {selectedConsultant && (
-                  <div className="rounded-md bg-muted/50 px-3 py-2 text-sm text-muted-foreground flex items-center gap-2">
-                    <IndianRupee className="h-3.5 w-3.5" />
-                    Consultation fee: <span className="font-semibold text-foreground">₹{selectedConsultant.consultationFee}</span>
-                    {selectedConsultant.customerPrice && (
-                      <span>(customer price: ₹{selectedConsultant.customerPrice})</span>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* ── Appointment Slot ── */}
-              <div className="rounded-lg border p-4 space-y-4">
-                <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Appointment</p>
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="appointmentDate"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Date *</FormLabel>
-                        <FormControl>
-                          <Input type="date" {...field} data-testid="input-appointment-date" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="appointmentTime"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Time *</FormLabel>
-                        <FormControl>
-                          <Input placeholder="e.g. 10:00 AM" {...field} data-testid="input-appointment-time" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-              </div>
-
-              {/* ── Patient Details ── */}
-              <div className="rounded-lg border p-4 space-y-4">
-                <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Patient Details</p>
-                <FormField
-                  control={form.control}
-                  name="patientName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Patient Name *</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Full name" {...field} data-testid="input-patient-name" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <div className="grid grid-cols-3 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="patientAge"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Age *</FormLabel>
-                        <FormControl>
-                          <Input type="number" placeholder="Age" {...field} data-testid="input-patient-age" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="patientGender"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Gender *</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="male">Male</SelectItem>
-                            <SelectItem value="female">Female</SelectItem>
-                            <SelectItem value="other">Other</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="patientContact"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Patient Contact</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Phone" {...field} data-testid="input-patient-contact" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-                <FormField
-                  control={form.control}
-                  name="callbackPhone"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Ward / Callback Phone *</FormLabel>
-                      <FormControl>
-                        <Input placeholder="+91XXXXXXXXXX — nurse / ward contact" {...field} data-testid="input-callback-phone" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              {/* ── Clinical Information ── */}
-              <div className="rounded-lg border p-4 space-y-4">
-                <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Clinical Information</p>
-                <FormField
-                  control={form.control}
-                  name="clinicalSummary"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Clinical Summary *</FormLabel>
-                      <FormControl>
-                        <Textarea
-                          placeholder="Brief history, presenting complaint, reason for referral…"
-                          className="min-h-[80px]"
-                          {...field}
-                          data-testid="input-clinical-summary"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="provisionalDiagnosis"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Provisional Diagnosis</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Optional" {...field} data-testid="input-provisional-diagnosis" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              {/* ── Payment ── */}
-              <div className="rounded-lg border p-4 space-y-4">
-                <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Payment</p>
-                <FormField
-                  control={form.control}
-                  name="paymentMethod"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Payment Option *</FormLabel>
-                      <div className="grid grid-cols-2 gap-3">
-                        {(["pay_now", "pay_later"] as const).map((opt) => (
-                          <button
-                            key={opt}
-                            type="button"
-                            onClick={() => field.onChange(opt)}
-                            className={`flex flex-col items-start rounded-lg border p-3 text-left transition-colors ${
-                              field.value === opt
-                                ? "border-primary bg-primary/5"
-                                : "border-border hover:bg-muted/50"
-                            }`}
-                          >
-                            {opt === "pay_now" ? (
-                              <>
-                                <div className="flex items-center gap-2">
-                                  <CreditCard className="h-4 w-4" />
-                                  <span className="font-medium text-sm">Pay Now</span>
-                                </div>
-                                <p className="mt-1 text-xs text-muted-foreground">
-                                  Mark as paid immediately
-                                </p>
-                              </>
-                            ) : (
-                              <>
-                                <div className="flex items-center gap-2">
-                                  <ClockIcon className="h-4 w-4" />
-                                  <span className="font-medium text-sm">Pay Later</span>
-                                </div>
-                                <p className="mt-1 text-xs text-muted-foreground">
-                                  Invoice stays open — seeker pays later
-                                </p>
-                              </>
-                            )}
-                          </button>
-                        ))}
-                      </div>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <DialogFooter>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => { setShowCreate(false); form.reset(); }}
-                >
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={createMutation.isPending} data-testid="button-create-appointment-submit">
-                  {createMutation.isPending ? (
-                    <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Creating…</>
-                  ) : (
-                    <><Plus className="mr-2 h-4 w-4" />Create Appointment</>
-                  )}
-                </Button>
-              </DialogFooter>
-            </form>
-          </Form>
-        </DialogContent>
-      </Dialog>
     );
   }
 
@@ -711,7 +838,7 @@ export default function AdminAppointmentsPage() {
                 value={
                   slot !== "—" ? (
                     <span className="flex items-center gap-1">
-                      <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
+                      <CalendarIcon className="h-3.5 w-3.5 text-muted-foreground" />
                       {slot}
                     </span>
                   ) : "—"
@@ -940,7 +1067,15 @@ export default function AdminAppointmentsPage() {
         </CardContent>
       </Card>
 
-      <CreateAppointmentDialog />
+      <CreateAppointmentDialog
+        form={form}
+        showCreate={showCreate}
+        setShowCreate={setShowCreate}
+        seekers={seekers}
+        consultants={consultants}
+        consultantMap={consultantMap}
+        createMutation={createMutation}
+      />
       <DetailDialog />
     </div>
   );
