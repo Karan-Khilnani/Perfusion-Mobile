@@ -59,16 +59,19 @@ const uploadsDocsDir = path.join(process.cwd(), "uploads", "documents");
 const uploadsPrescriptionsDir = path.join(process.cwd(), "uploads", "prescriptions");
 const uploadsPhotosDir = path.join(process.cwd(), "uploads", "consultant-photos");
 const uploadsSignaturesDir = path.join(process.cwd(), "uploads", "consultant-signatures");
+const uploadsCallDocsDir = path.join(process.cwd(), "uploads", "call-documents");
 fs.mkdirSync(uploadsReportsDir, { recursive: true });
 fs.mkdirSync(uploadsDocsDir, { recursive: true });
 fs.mkdirSync(uploadsPrescriptionsDir, { recursive: true });
 fs.mkdirSync(uploadsPhotosDir, { recursive: true });
 fs.mkdirSync(uploadsSignaturesDir, { recursive: true });
+fs.mkdirSync(uploadsCallDocsDir, { recursive: true });
 app.use("/api/uploads/reports", express.static(uploadsReportsDir));
 app.use("/api/uploads/documents", express.static(uploadsDocsDir));
 app.use("/api/uploads/prescriptions", express.static(uploadsPrescriptionsDir));
 app.use("/api/uploads/consultant-photos", express.static(uploadsPhotosDir));
 app.use("/api/uploads/consultant-signatures", express.static(uploadsSignaturesDir));
+app.use("/api/uploads/call-documents", express.static(uploadsCallDocsDir));
 
 // Setup session-based auth
 await setupAuth(app);

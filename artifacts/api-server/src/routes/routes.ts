@@ -3708,10 +3708,15 @@ export async function registerRoutes(
         return res.status(403).json({ message: "Access denied" });
       }
       if (!req.file) return res.status(400).json({ message: "No file uploaded" });
-      let photoUrl: string;
+      let photoUrl: string | null = null;
       if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
-        photoUrl = await supabaseUpload(req.file.buffer, req.file.originalname, "consultant-photos", req.file.mimetype);
-      } else {
+        try {
+          photoUrl = await supabaseUpload(req.file.buffer, req.file.originalname, "consultant-photos", req.file.mimetype);
+        } catch (supabaseErr) {
+          console.warn("Supabase photo upload failed, using local fallback:", supabaseErr);
+        }
+      }
+      if (!photoUrl) {
         const fsSync = await import("fs");
         const pathLib = await import("path");
         const ext = pathLib.default.extname(req.file.originalname) || ".jpg";
@@ -3746,10 +3751,15 @@ export async function registerRoutes(
         return res.status(403).json({ message: "Access denied" });
       }
       if (!req.file) return res.status(400).json({ message: "No file uploaded" });
-      let digitalSignatureUrl: string;
+      let digitalSignatureUrl: string | null = null;
       if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
-        digitalSignatureUrl = await supabaseUpload(req.file.buffer, req.file.originalname, "consultant-signatures", req.file.mimetype);
-      } else {
+        try {
+          digitalSignatureUrl = await supabaseUpload(req.file.buffer, req.file.originalname, "consultant-signatures", req.file.mimetype);
+        } catch (supabaseErr) {
+          console.warn("Supabase signature upload failed, using local fallback:", supabaseErr);
+        }
+      }
+      if (!digitalSignatureUrl) {
         const fsSync = await import("fs");
         const pathLib = await import("path");
         const ext = pathLib.default.extname(req.file.originalname) || ".png";
@@ -3821,7 +3831,24 @@ export async function registerRoutes(
 
       if (!req.file) return res.status(400).json({ message: "No file uploaded" });
 
-      const fileUrl = await supabaseUpload(req.file.buffer, req.file.originalname, "call-documents", req.file.mimetype);
+      let fileUrl: string | null = null;
+      if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+        try {
+          fileUrl = await supabaseUpload(req.file.buffer, req.file.originalname, "call-documents", req.file.mimetype);
+        } catch (supabaseErr) {
+          console.warn("Supabase call-document upload failed, using local fallback:", supabaseErr);
+        }
+      }
+      if (!fileUrl) {
+        const fsSync = await import("fs");
+        const pathLib = await import("path");
+        const ext = pathLib.default.extname(req.file.originalname) || ".bin";
+        const uniqueName = `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`;
+        const uploadsDir = pathLib.default.join(process.cwd(), "uploads", "call-documents");
+        fsSync.default.mkdirSync(uploadsDir, { recursive: true });
+        fsSync.default.writeFileSync(pathLib.default.join(uploadsDir, uniqueName), req.file.buffer);
+        fileUrl = `/api/uploads/call-documents/${uniqueName}`;
+      }
       const fileName = req.file.originalname;
 
       // Append to documentUrls
@@ -3942,10 +3969,15 @@ export async function registerRoutes(
         return res.status(400).json({ message: "No file uploaded" });
       }
 
-      let fileUrl: string;
+      let fileUrl: string | null = null;
       if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
-        fileUrl = await supabaseUpload(req.file.buffer, req.file.originalname, "reports", req.file.mimetype);
-      } else {
+        try {
+          fileUrl = await supabaseUpload(req.file.buffer, req.file.originalname, "reports", req.file.mimetype);
+        } catch (supabaseErr) {
+          console.warn("Supabase report upload failed, using local fallback:", supabaseErr);
+        }
+      }
+      if (!fileUrl) {
         const fsSync = await import("fs");
         const pathLib = await import("path");
         const ext = pathLib.default.extname(req.file.originalname) || ".bin";
@@ -3990,11 +4022,16 @@ export async function registerRoutes(
         return res.status(400).json({ message: `File is too large (${mb} MB). Maximum allowed size is 5 MB.` });
       }
 
-      let fileUrl: string;
+      let fileUrl: string | null = null;
 
       if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
-        fileUrl = await supabaseUpload(buffer, filename, "documents", mimeType || "application/octet-stream");
-      } else {
+        try {
+          fileUrl = await supabaseUpload(buffer, filename, "documents", mimeType || "application/octet-stream");
+        } catch (supabaseErr) {
+          console.warn("Supabase registration-document upload failed, using local fallback:", supabaseErr);
+        }
+      }
+      if (!fileUrl) {
         const { default: fsSync } = await import("fs");
         const { default: pathLib } = await import("path");
         const ext = pathLib.extname(filename) || ".bin";
@@ -4035,11 +4072,16 @@ export async function registerRoutes(
         return res.status(400).json({ message: `File is too large (${mb} MB). Maximum allowed size is 5 MB.` });
       }
 
-      let fileUrl: string;
+      let fileUrl: string | null = null;
 
       if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
-        fileUrl = await supabaseUpload(buffer, filename, "documents", mimeType || "application/octet-stream");
-      } else {
+        try {
+          fileUrl = await supabaseUpload(buffer, filename, "documents", mimeType || "application/octet-stream");
+        } catch (supabaseErr) {
+          console.warn("Supabase document upload failed, using local fallback:", supabaseErr);
+        }
+      }
+      if (!fileUrl) {
         // Local disk fallback — served at /api/uploads/documents/
         const { default: fsSync } = await import("fs");
         const { default: pathLib } = await import("path");
