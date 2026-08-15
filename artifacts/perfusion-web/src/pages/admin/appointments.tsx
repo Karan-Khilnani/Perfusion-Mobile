@@ -50,23 +50,22 @@ type AdminUser = {
 
 // ── Time helpers ──────────────────────────────────────────────────────────────
 
-const TIME_OPTIONS = Array.from({ length: 48 }, (_, i) => {
-  const hours = Math.floor(i / 2);
-  const minutes = i % 2 === 0 ? "00" : "30";
-  const period = hours < 12 ? "AM" : "PM";
-  const displayHours = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours;
-  return `${displayHours}:${minutes} ${period}`;
-});
-
+// Form fields hold 24-hour "HH:MM" values (from <input type="time">).
 function timeToMinutes(t: string): number {
-  const match = t.match(/^(\d+):(\d+)\s+(AM|PM)$/i);
+  const match = t.match(/^(\d{1,2}):(\d{2})$/);
   if (!match) return 0;
+  return parseInt(match[1]) * 60 + parseInt(match[2]);
+}
+
+// Convert 24-hour "HH:MM" → "h:MM AM/PM" for the stored slot string.
+function to12Hour(t: string): string {
+  const match = t.match(/^(\d{1,2}):(\d{2})$/);
+  if (!match) return t;
   let hours = parseInt(match[1]);
-  const minutes = parseInt(match[2]);
-  const period = match[3].toUpperCase();
-  if (period === "PM" && hours !== 12) hours += 12;
-  if (period === "AM" && hours === 12) hours = 0;
-  return hours * 60 + minutes;
+  const minutes = match[2];
+  const period = hours < 12 ? "AM" : "PM";
+  hours = hours % 12 === 0 ? 12 : hours % 12;
+  return `${hours}:${minutes} ${period}`;
 }
 
 // ── Validation schema ─────────────────────────────────────────────────────────
@@ -75,8 +74,8 @@ const createSchema = z.object({
   userId: z.string().min(1, "Please select a Care Seeker"),
   serviceId: z.string().min(1, "Please select a Consultant"),
   appointmentDate: z.date({ required_error: "Appointment date is required" }),
-  appointmentStartTime: z.string().min(1, "Start time is required"),
-  appointmentEndTime: z.string().min(1, "End time is required"),
+  appointmentStartTime: z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/, "Enter a valid start time"),
+  appointmentEndTime: z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/, "Enter a valid end time"),
   patientName: z.string().min(2, "Patient name is required"),
   patientAge: z.coerce.number().min(1, "Age must be at least 1").max(150, "Age looks invalid"),
   patientGender: z.enum(["male", "female", "other"], { required_error: "Gender is required" }),
@@ -297,7 +296,7 @@ function CreateAppointmentDialog({
                 )}
               />
 
-              {/* Separate start + end time selects */}
+              {/* Free-form start + end time inputs (any clock time; field value is 24h, e.g. "15:35") */}
               <div className="grid grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
@@ -305,18 +304,9 @@ function CreateAppointmentDialog({
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Start Time *</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger data-testid="select-start-time">
-                            <SelectValue placeholder="Select time" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent className="max-h-[200px]">
-                          {TIME_OPTIONS.map((t) => (
-                            <SelectItem key={t} value={t}>{t}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <FormControl>
+                        <Input type="time" data-testid="input-start-time" {...field} />
+                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -327,18 +317,9 @@ function CreateAppointmentDialog({
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>End Time *</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger data-testid="select-end-time">
-                            <SelectValue placeholder="Select time" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent className="max-h-[200px]">
-                          {TIME_OPTIONS.map((t) => (
-                            <SelectItem key={t} value={t}>{t}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <FormControl>
+                        <Input type="time" data-testid="input-end-time" {...field} />
+                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -657,9 +638,9 @@ export default function AdminAppointmentsPage() {
 
   const createMutation = useMutation({
     mutationFn: async (data: CreateFormData) => {
-      // Format: "15 Aug 2026, 10:00 AM – 10:30 AM"
+      // Format: "15 Aug 2026, 3:35 PM – 4:55 PM"
       const dateStr = format(data.appointmentDate, "dd MMM yyyy");
-      const appointmentSlot = `${dateStr}, ${data.appointmentStartTime} – ${data.appointmentEndTime}`;
+      const appointmentSlot = `${dateStr}, ${to12Hour(data.appointmentStartTime)} – ${to12Hour(data.appointmentEndTime)}`;
 
       const payload = {
         bookingType: "consultation",
