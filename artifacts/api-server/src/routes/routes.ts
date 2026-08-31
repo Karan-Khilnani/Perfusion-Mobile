@@ -383,6 +383,15 @@ export async function registerRoutes(
       }
       
       const consultantData = { ...req.body, providerId: provider.id, approvalStatus: "pending" };
+      // An individual consultant uploads their photo on the Profile page, which
+      // stores it on the user account. Copy it to the consultant record when the
+      // professional profile is created so seeker-facing pages can display it.
+      if (provider.type === "consultant" && !consultantData.photoUrl) {
+        const user = await storage.getUserById(userId);
+        if (user?.profileImageUrl) {
+          consultantData.photoUrl = user.profileImageUrl;
+        }
+      }
       const consultant = await storage.createConsultant(consultantData);
       res.status(201).json(consultant);
     } catch (error) {
@@ -711,16 +720,44 @@ export async function registerRoutes(
       const defaultMarginSetting = await storage.getPlatformSetting("default_margin_percent");
       const defaultMargin = parseFloat(defaultMarginSetting?.settingValue || "15");
 
-      const enriched = allConsultants.map(c => {
+      const enriched = await Promise.all(allConsultants.map(async c => {
         const baseCost = parseFloat(c.consultationFee);
         const pricing = calculateCustomerPrice(baseCost, c.customerPrice, c.marginOverride, defaultMargin);
+        let photoUrl = c.photoUrl;
+
+        // Files saved under the server's local uploads directory by older
+        // deployments are not durable and disappear after a restart.
+        if (photoUrl?.startsWith("/api/uploads/") || photoUrl?.startsWith("/uploads/")) {
+          photoUrl = null;
+        }
+
+        // Legacy individual-consultant profiles may have the uploaded image only
+        // on the linked user account. Use it as the public fallback until the
+        // consultant row is next updated.
+        if (!photoUrl && c.providerId) {
+          const provider = await storage.getProviderById(c.providerId);
+          if (provider?.type === "consultant") {
+            const user = await storage.getUserById(provider.userId);
+            const accountPhotoUrl = user?.profileImageUrl;
+            // Local upload URLs from older deployments are not durable and may
+            // point to files that disappeared on restart. Do not expose a known
+            // stale URL as the consultant's public photo.
+            photoUrl = accountPhotoUrl
+              && !accountPhotoUrl.startsWith("/api/uploads/")
+              && !accountPhotoUrl.startsWith("/uploads/")
+              ? accountPhotoUrl
+              : null;
+          }
+        }
+
         return {
           ...c,
+          photoUrl,
           providerBaseCost: baseCost.toFixed(2),
           computedCustomerPrice: pricing.customerPrice.toFixed(2),
           computedMarginPercent: pricing.marginPercent.toFixed(2),
         };
-      });
+      }));
       res.json(enriched);
     } catch (error) {
       console.error("Error fetching consultants:", error);
@@ -738,8 +775,25 @@ export async function registerRoutes(
       const defaultMargin = parseFloat(defaultMarginSetting?.settingValue || "15");
       const baseCost = parseFloat(consultant.consultationFee);
       const pricing = calculateCustomerPrice(baseCost, consultant.customerPrice, consultant.marginOverride, defaultMargin);
+      let photoUrl = consultant.photoUrl;
+      if (photoUrl?.startsWith("/api/uploads/") || photoUrl?.startsWith("/uploads/")) {
+        photoUrl = null;
+      }
+      if (!photoUrl && consultant.providerId) {
+        const provider = await storage.getProviderById(consultant.providerId);
+        if (provider?.type === "consultant") {
+          const user = await storage.getUserById(provider.userId);
+          const accountPhotoUrl = user?.profileImageUrl;
+          photoUrl = accountPhotoUrl
+            && !accountPhotoUrl.startsWith("/api/uploads/")
+            && !accountPhotoUrl.startsWith("/uploads/")
+            ? accountPhotoUrl
+            : null;
+        }
+      }
       res.json({
         ...consultant,
+        photoUrl,
         computedCustomerPrice: pricing.customerPrice.toFixed(2),
       });
     } catch (error) {
@@ -2770,6 +2824,22 @@ export async function registerRoutes(
       }
       const updated = await storage.updateUser(userId, data);
       if (!updated) return res.status(404).json({ message: "User not found" });
+
+      // The Profile page is also the professional profile for individual
+      // consultants. Keep the consultant-service photo used by seeker pages in
+      // sync with the account photo saved above.
+      if (data.profileImageUrl !== undefined) {
+        const provider = await storage.getProviderByUserId(userId);
+        if (provider?.type === "consultant") {
+          const [consultant] = await storage.getConsultantsByProvider(provider.id);
+          if (consultant) {
+            await storage.updateConsultant(consultant.id, {
+              photoUrl: data.profileImageUrl,
+            } as any);
+          }
+        }
+      }
+
       res.json(updated);
     } catch (error) {
       console.error("Error updating own profile:", error);
@@ -3724,24 +3794,18 @@ export async function registerRoutes(
         return res.status(403).json({ message: "Access denied" });
       }
       if (!req.file) return res.status(400).json({ message: "No file uploaded" });
-      let photoUrl: string | null = null;
-      if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
-        try {
-          photoUrl = await supabaseUpload(req.file.buffer, req.file.originalname, "consultant-photos", req.file.mimetype);
-        } catch (supabaseErr) {
-          console.warn("Supabase photo upload failed, using local fallback:", supabaseErr);
-        }
+      if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+        return res.status(503).json({ message: "Photo storage is temporarily unavailable. Please try again later." });
       }
-      if (!photoUrl) {
-        const fsSync = await import("fs");
-        const pathLib = await import("path");
-        const ext = pathLib.default.extname(req.file.originalname) || ".jpg";
-        const uniqueName = `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`;
-        const uploadsDir = pathLib.default.join(process.cwd(), "uploads", "consultant-photos");
-        fsSync.default.mkdirSync(uploadsDir, { recursive: true });
-        fsSync.default.writeFileSync(pathLib.default.join(uploadsDir, uniqueName), req.file.buffer);
-        photoUrl = `/api/uploads/consultant-photos/${uniqueName}`;
+
+      let photoUrl: string;
+      try {
+        photoUrl = await supabaseUpload(req.file.buffer, req.file.originalname, "consultant-photos", req.file.mimetype);
+      } catch (supabaseErr) {
+        console.error("Supabase consultant photo upload failed:", supabaseErr);
+        return res.status(503).json({ message: "Photo storage is temporarily unavailable. Please try again later." });
       }
+
       const updated = await storage.updateConsultant(req.params.id, { photoUrl } as any);
       if (!updated) return res.status(404).json({ message: "Consultant not found" });
       res.json({ photoUrl, consultant: updated });
@@ -4094,10 +4158,15 @@ export async function registerRoutes(
         try {
           fileUrl = await supabaseUpload(buffer, filename, "documents", mimeType || "application/octet-stream");
         } catch (supabaseErr) {
-          console.warn("Supabase document upload failed, using local fallback:", supabaseErr);
+          console.error("Supabase document upload failed:", supabaseErr);
+          return res.status(503).json({ message: "File storage is temporarily unavailable. Please try again later." });
         }
       }
       if (!fileUrl) {
+        if (process.env.NODE_ENV === "production") {
+          return res.status(503).json({ message: "File storage is temporarily unavailable. Please try again later." });
+        }
+
         // Local disk fallback — served at /api/uploads/documents/
         const { default: fsSync } = await import("fs");
         const { default: pathLib } = await import("path");
