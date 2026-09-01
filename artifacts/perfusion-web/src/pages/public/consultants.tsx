@@ -14,6 +14,7 @@ import { Search, Stethoscope, ArrowUpDown, Briefcase, AlertTriangle, Users, Buil
 import { useAuth } from "@/hooks/use-auth";
 import type { Consultant, SlotSeries } from "@shared/schema";
 import PublicLayout from "./layout";
+import ConsultantAvatar from "@/components/consultant-avatar";
 
 // ── Availability smart-label helpers ─────────────────────────────────────────
 function parseTimeMinutes(t: string): number {
@@ -95,13 +96,6 @@ function ConsultantProfileSheet({
 }) {
   if (!consultant) return null;
 
-  const initials = consultant.name
-    .split(" ")
-    .map((w) => w[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
-
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="w-full sm:max-w-lg overflow-y-auto" data-testid="sheet-consultant-profile">
@@ -110,11 +104,13 @@ function ConsultantProfileSheet({
         </SheetHeader>
 
         <div className="flex items-start gap-4 mb-6">
-          {consultant.photoUrl ? (
-            <img src={consultant.photoUrl} alt={consultant.name} className="h-24 w-24 rounded-full object-cover border shrink-0" data-testid="img-consultant-profile-photo" />
-          ) : (
-            <div className="h-24 w-24 rounded-full bg-muted flex items-center justify-center text-muted-foreground text-2xl font-semibold shrink-0">{initials}</div>
-          )}
+          <ConsultantAvatar
+            name={consultant.name}
+            photoUrl={consultant.photoUrl}
+            className="h-24 w-24"
+            fallbackClassName="text-2xl font-semibold"
+            data-testid="img-consultant-profile-photo"
+          />
           <div className="min-w-0">
             <h2 className="text-xl font-semibold leading-tight" data-testid="text-profile-name">{consultant.name}</h2>
             {consultant.specialization && (
@@ -396,13 +392,12 @@ export default function PublicConsultantsPage() {
                     <CardHeader className="pb-3">
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex items-center gap-3">
-                          {consultant.photoUrl ? (
-                            <img src={consultant.photoUrl} alt={consultant.name} className="h-[132px] w-[132px] rounded-full object-cover border shrink-0" />
-                          ) : (
-                            <div className="h-[132px] w-[132px] rounded-full bg-muted flex items-center justify-center text-muted-foreground text-4xl font-medium shrink-0">
-                              {consultant.name.charAt(0)}
-                            </div>
-                          )}
+                          <ConsultantAvatar
+                            name={consultant.name}
+                            photoUrl={consultant.photoUrl}
+                            className="h-[132px] w-[132px]"
+                            fallbackClassName="text-4xl"
+                          />
                           <div>
                             <CardTitle className="text-lg">{consultant.name}</CardTitle>
                             {consultant.specialization && (
