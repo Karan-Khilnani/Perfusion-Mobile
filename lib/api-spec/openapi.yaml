@@ -24,6 +24,50 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /bookings/{id}:
+    get:
+      operationId: getBookingById
+      tags: [calls]
+      summary: Get an authorized booking
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Booking details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookingCallInfo"
+        "403":
+          description: Access denied
+        "404":
+          description: Booking not found
+  /call/status/{bookingId}:
+    get:
+      operationId: getCallStatus
+      tags: [calls]
+      summary: Get the current call-session status
+      parameters:
+        - name: bookingId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Current call status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CallStatus"
+        "403":
+          description: Access denied
+        "404":
+          description: Booking not found
 components:
   schemas:
     HealthStatus:
@@ -31,6 +75,33 @@ components:
       properties:
         status:
           type: string
+      required:
+        - status
+    BookingCallInfo:
+      type: object
+      properties:
+        id:
+          type: string
+        serviceName:
+          type: ["string", "null"]
+        patientName:
+          type: ["string", "null"]
+        videoRoomId:
+          type: ["string", "null"]
+        status:
+          type: string
+      required:
+        - id
+        - status
+    CallStatus:
+      type: object
+      properties:
+        status:
+          type: string
+        videoRoomUrl:
+          type: ["string", "null"]
+        isCaller:
+          type: boolean
       required:
         - status
 

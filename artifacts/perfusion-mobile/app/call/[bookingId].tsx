@@ -23,6 +23,11 @@ interface CallInfo {
   patientName?: string;
 }
 
+interface CallStatus {
+  status: string;
+  isCaller?: boolean;
+}
+
 export default function CallScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -51,14 +56,23 @@ export default function CallScreen() {
     enabled: !!booking?.videoRoomId,
   });
 
+  const { data: callStatus } = useQuery<CallStatus>({
+    queryKey: ["call-status", bookingId],
+    queryFn: async () => {
+      const res = await apiFetch(`/api/call/status/${bookingId}`);
+      if (!res.ok) throw new Error("Call status unavailable");
+      return res.json();
+    },
+    enabled: !!bookingId,
+  });
+
   const handleOpenRoom = async () => {
-    if (!booking?.videoRoomId) return;
+    if (!booking?.videoRoomId || !tokenData?.token) return;
     if (Platform.OS !== "web") {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     }
-    const url = tokenData?.token
-      ? `${booking.videoRoomId}?t=${tokenData.token}`
-      : booking.videoRoomId;
+    const separator = booking.videoRoomId.includes("?") ? "&" : "?";
+    const url = `${booking.videoRoomId}${separator}t=${encodeURIComponent(tokenData.token)}&prejoinUI=false`;
     await WebBrowser.openBrowserAsync(url, {
       presentationStyle:
         WebBrowser.WebBrowserPresentationStyle.FULL_SCREEN,
@@ -67,7 +81,10 @@ export default function CallScreen() {
 
   const handleEndCall = async () => {
     try {
-      await apiFetch(`/api/call/decline/${bookingId}`, { method: "POST" });
+      if (callStatus?.status && callStatus.status !== "none") {
+        const action = callStatus.isCaller ? "cancel" : "decline";
+        await apiFetch(`/api/call/${action}/${bookingId}`, { method: "POST" });
+      }
     } catch {}
     router.back();
   };
@@ -125,11 +142,11 @@ export default function CallScreen() {
       <View style={styles.actions}>
         <Pressable
           onPress={handleOpenRoom}
-          disabled={!booking?.videoRoomId}
+          disabled={!booking?.videoRoomId || !tokenData?.token}
           style={({ pressed }) => [
             styles.joinBtn,
             {
-              backgroundColor: !booking?.videoRoomId
+              backgroundColor: !booking?.videoRoomId || !tokenData?.token
                 ? `${colors.primary}50`
                 : colors.primary,
               opacity: pressed ? 0.9 : 1,
@@ -138,7 +155,9 @@ export default function CallScreen() {
           testID="open-video-room"
         >
           <Ionicons name="videocam" size={22} color="#fff" />
-          <Text style={styles.joinBtnText}>Join Video Call</Text>
+          <Text style={styles.joinBtnText}>
+            {tokenData?.token ? "Join Video Call" : "Preparing Secure Call…"}
+          </Text>
         </Pressable>
 
         <Pressable

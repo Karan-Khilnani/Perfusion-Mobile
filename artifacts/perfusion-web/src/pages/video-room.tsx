@@ -27,6 +27,13 @@ type CallPhase =
 
 type MobilePanel = "video" | "docs" | "summary";
 
+type VideoRoomBooking = Booking & {
+  seekerName?: string | null;
+  providerName?: string | null;
+  participantRole?: "seeker" | "provider";
+  otherParticipantName?: string | null;
+};
+
 export default function VideoRoomPage() {
   const { roomId } = useParams<{ roomId: string }>();
   const [, navigate] = useLocation();
@@ -61,11 +68,11 @@ export default function VideoRoomPage() {
 
   const urlParams = new URLSearchParams(window.location.search);
   const returnTo = urlParams.get("returnTo") || "/user/orders";
-  const isProvider = returnTo.includes("/provider");
+  const returnPathSuggestsProvider = returnTo.includes("/provider");
   // If the user accepted an incoming call, skip precall and go straight to connected
   const joinedAsCallee = urlParams.get("accepted") === "true";
 
-  const { data: booking } = useQuery<Booking>({
+  const { data: booking } = useQuery<VideoRoomBooking>({
     queryKey: ["/api/bookings/room", roomId],
     queryFn: async () => {
       const decoded = decodeURIComponent(roomId || "");
@@ -75,6 +82,14 @@ export default function VideoRoomPage() {
     },
     enabled: !!roomId,
   });
+  const isProvider =
+    booking?.participantRole === "provider" ||
+    (!booking?.participantRole && returnPathSuggestsProvider);
+  const otherParticipantName =
+    booking?.otherParticipantName ||
+    (isProvider
+      ? booking?.seekerName || "Care Seeker"
+      : booking?.providerName || booking?.serviceName || "Consultant");
 
   // Fetch the currently logged-in user so we can show their real name in the call
   const { data: authUser } = useQuery<{ firstName?: string; lastName?: string; email?: string }>({
@@ -96,6 +111,7 @@ export default function VideoRoomPage() {
   // This is the only reliable way: URL params are ignored when prejoinUI=false and
   // Daily caches the last-entered name in browser localStorage across sessions.
   const [dailyToken, setDailyToken] = useState<string | null>(null);
+  const [dailyTokenError, setDailyTokenError] = useState<string | null>(null);
 
   const buildDailyUrl = (url: string) => {
     try {
@@ -182,10 +198,22 @@ export default function VideoRoomPage() {
   // real name and cannot be overridden by browser cache.
   useEffect(() => {
     if (phase === "connected" && dailyUrl) {
+      setDailyToken(null);
+      setDailyTokenError(null);
       fetch(`/api/bookings/room/${encodeURIComponent(dailyUrl)}/daily-token`, { credentials: "include" })
-        .then(r => r.ok ? r.json() : null)
-        .then(data => { if (data?.token) setDailyToken(data.token); })
-        .catch(() => {}); // fall back gracefully — call still works without token
+        .then(async (response) => {
+          const data = await response.json().catch(() => ({}));
+          if (!response.ok || !data?.token) {
+            throw new Error(data?.message || "Could not prepare the secure video room");
+          }
+          setDailyToken(data.token);
+        })
+        .catch((error) => {
+          setDailyTokenError(
+            error instanceof Error ? error.message : "Could not prepare the secure video room",
+          );
+          setIsLoading(false);
+        });
     }
   }, [phase, dailyUrl]);
 
@@ -544,26 +572,24 @@ export default function VideoRoomPage() {
         <div className="flex-1 relative overflow-hidden">
 
           {/* Waiting banner — shown when entering room until dismissed */}
-          {showWaitingBanner && (
+          {showWaitingBanner && !dailyTokenError && (
             <div className="absolute top-3 left-1/2 -translate-x-1/2 z-[60] w-[min(360px,90%)]">
               <div className="rounded-lg border bg-background/95 backdrop-blur-sm shadow-lg px-4 py-3">
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium">
-                      Waiting for {isProvider
-                        ? ((booking as any).seekerName || "Care Seeker")
-                        : ((booking as any).providerName || booking?.serviceName || "Consultant")} to join…
+                      Waiting for {otherParticipantName} to join…
                     </p>
                     <Button
                       type="button"
-                      variant="link"
+                      variant="ghost"
                       size="sm"
                       className="h-auto p-0 mt-0.5 text-xs font-medium"
                       disabled={isCalling}
                       onClick={handleCallOtherParty}
                       data-testid="button-call-other-party"
                     >
-                      {isCalling ? "Calling…" : `Call ${isProvider ? "Care Seeker" : "Care Provider"}`}
+                      {isCalling ? "Calling…" : `Call ${otherParticipantName}`}
                     </Button>
                   </div>
                   <Button
@@ -632,7 +658,7 @@ export default function VideoRoomPage() {
                 </div>
               </div>
             )}
-            {dailyUrl && (
+            {dailyUrl && dailyToken && (
               <iframe
                 ref={iframeRef}
                 src={buildDailyUrl(dailyUrl)}
@@ -658,6 +684,18 @@ export default function VideoRoomPage() {
                 }
                 data-testid="video-container"
               />
+            )}
+            {dailyTokenError && (
+              <div className="absolute inset-0 z-20 flex items-center justify-center bg-background px-6">
+                <div className="max-w-sm text-center space-y-3">
+                  <VideoOff className="mx-auto h-10 w-10 text-destructive" />
+                  <p className="font-medium">Unable to open the secure video room</p>
+                  <p className="text-sm text-muted-foreground">{dailyTokenError}</p>
+                  <Button onClick={() => setPhase("precall")} variant="outline">
+                    Try Again
+                  </Button>
+                </div>
+              </div>
             )}
             {/* Transparent drag-capture overlay — sits above the iframe in PiP mode so
                 touch/pointer events reach React handlers instead of being swallowed by the iframe */}
@@ -951,7 +989,7 @@ export default function VideoRoomPage() {
             </div>
           )}
 
-          {dailyUrl && (
+          {dailyUrl && dailyToken && (
             <iframe
               ref={iframeRef}
               src={buildDailyUrl(dailyUrl)}
@@ -967,28 +1005,38 @@ export default function VideoRoomPage() {
               data-testid="video-container"
             />
           )}
+          {dailyTokenError && (
+            <div className="absolute inset-0 z-30 flex items-center justify-center bg-background px-6">
+              <div className="max-w-sm text-center space-y-3">
+                <VideoOff className="mx-auto h-10 w-10 text-destructive" />
+                <p className="font-medium">Unable to open the secure video room</p>
+                <p className="text-sm text-muted-foreground">{dailyTokenError}</p>
+                <Button onClick={() => setPhase("precall")} variant="outline">
+                  Try Again
+                </Button>
+              </div>
+            </div>
+          )}
 
           {/* Waiting banner — overlay shown while waiting for the other party, dismissible */}
-          {showWaitingBanner && (
+          {showWaitingBanner && !dailyTokenError && (
             <div className="absolute top-4 left-1/2 -translate-x-1/2 z-40 w-[min(380px,90%)]">
               <div className="rounded-lg border bg-background/95 backdrop-blur-sm shadow-lg px-4 py-3">
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium">
-                      Waiting for {isProvider
-                        ? ((booking as any).seekerName || "Care Seeker")
-                        : ((booking as any).providerName || booking?.serviceName || "Consultant")} to join…
+                      Waiting for {otherParticipantName} to join…
                     </p>
                     <Button
                       type="button"
-                      variant="link"
+                      variant="ghost"
                       size="sm"
                       className="h-auto p-0 mt-0.5 text-xs font-medium"
                       disabled={isCalling}
                       onClick={handleCallOtherParty}
                       data-testid="button-call-other-party"
                     >
-                      {isCalling ? "Calling…" : `Call ${isProvider ? "Care Seeker" : "Care Provider"}`}
+                      {isCalling ? "Calling…" : `Call ${otherParticipantName}`}
                     </Button>
                   </div>
                   <Button

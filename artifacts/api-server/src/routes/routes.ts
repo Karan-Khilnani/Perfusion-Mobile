@@ -41,10 +41,12 @@ async function createDailyRoom(roomName: string): Promise<{ url: string; name: s
       },
       body: JSON.stringify({
         name: roomName,
+        privacy: "private",
         properties: {
           enable_chat: true,
           enable_screenshare: true,
           enable_recording: "cloud",
+          enable_cpu_warning_notifications: false,
           exp: Math.floor(Date.now() / 1000) + 30 * 24 * 3600, // Expires in 30 days
         },
       }),
@@ -61,6 +63,34 @@ async function createDailyRoom(roomName: string): Promise<{ url: string; name: s
   } catch (error) {
     console.error("Error creating Daily room:", error);
     return null;
+  }
+}
+
+async function configureDailyRoom(roomUrl: string): Promise<boolean> {
+  const apiKey = process.env.DAILY_API_KEY;
+  if (!apiKey || !roomUrl) return false;
+
+  try {
+    const roomName = new URL(roomUrl).pathname.split("/").filter(Boolean).pop();
+    if (!roomName) return false;
+
+    const response = await fetch(`https://api.daily.co/v1/rooms/${encodeURIComponent(roomName)}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        privacy: "private",
+        properties: {
+          enable_cpu_warning_notifications: false,
+        },
+      }),
+    });
+
+    return response.ok;
+  } catch {
+    return false;
   }
 }
 
@@ -958,11 +988,16 @@ export async function registerRoutes(
         providerName =
           `${(providerUser as any)?.firstName ?? ""} ${(providerUser as any)?.lastName ?? ""}`.trim() || null;
       }
+      const seekerName =
+        `${(seekerUser as any)?.firstName ?? ""} ${(seekerUser as any)?.lastName ?? ""}`.trim() || null;
+      const resolvedProviderName = providerName || (booking as any).serviceName || null;
+      const participantRole = isProviderUser ? "provider" : "seeker";
       res.json({
         ...booking,
-        seekerName:
-          `${(seekerUser as any)?.firstName ?? ""} ${(seekerUser as any)?.lastName ?? ""}`.trim() || null,
-        providerName: providerName || (booking as any).serviceName || null,
+        seekerName,
+        providerName: resolvedProviderName,
+        participantRole,
+        otherParticipantName: participantRole === "provider" ? seekerName : resolvedProviderName,
       });
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch booking" });
@@ -978,6 +1013,22 @@ export async function registerRoutes(
       if (!apiKey) return res.status(503).json({ message: "Daily not configured" });
 
       const roomUrl = decodeURIComponent(req.params.roomUrl);
+      const booking = await storage.getBookingByVideoRoomUrl(roomUrl);
+      if (!booking) return res.status(404).json({ message: "Booking not found" });
+
+      const userId = req.user?.id;
+      const provider = booking.providerId ? await storage.getProviderById(booking.providerId) : null;
+      const isSeeker = booking.userId === userId;
+      const isProviderUser = provider?.userId === userId;
+      if (!isSeeker && !isProviderUser) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const configured = await configureDailyRoom(roomUrl);
+      if (!configured) {
+        return res.status(502).json({ message: "Could not secure the video room" });
+      }
+
       // Extract just the room name from the full URL (last path segment)
       const roomName = roomUrl.split("/").pop();
       if (!roomName) return res.status(400).json({ message: "Invalid room URL" });
@@ -995,6 +1046,7 @@ export async function registerRoutes(
           properties: {
             room_name: roomName,
             user_name: userName,
+            user_id: user.id,
             exp: Math.floor(Date.now() / 1000) + 4 * 3600, // valid 4 hours
           },
         }),
@@ -1006,11 +1058,32 @@ export async function registerRoutes(
         return res.status(500).json({ message: "Failed to generate token" });
       }
 
-      const { token } = await response.json();
-      res.json({ token, userName });
+      const { token } = await response.json() as { token: string };
+      return res.json({ token, userName });
     } catch (error) {
       console.error("[Daily] Token error:", error);
-      res.status(500).json({ message: "Failed to generate token" });
+      return res.status(500).json({ message: "Failed to generate token" });
+    }
+  });
+
+  // Get a single booking for native/mobile call screens.
+  app.get("/api/bookings/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) return res.status(401).json({ message: "Unauthorized" });
+
+      const booking = await storage.getBookingById(req.params.id);
+      if (!booking) return res.status(404).json({ message: "Booking not found" });
+
+      const provider = booking.providerId ? await storage.getProviderById(booking.providerId) : null;
+      const isParticipant = booking.userId === userId || provider?.userId === userId;
+      if (!isParticipant && req.user?.role !== "admin") {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      return res.json(booking);
+    } catch (error) {
+      return res.status(500).json({ message: "Failed to fetch booking" });
     }
   });
 
@@ -3553,6 +3626,9 @@ export async function registerRoutes(
         // ── Validate seeker ───────────────────────────────────────────────────
         const seeker = await storage.getUserById(bookingData.userId);
         if (!seeker) return res.status(400).json({ message: "Care Seeker not found" });
+        if (seeker.role !== "care_seeker") {
+          return res.status(400).json({ message: "Selected account is not a Care Seeker" });
+        }
 
         // ── Resolve consultant → provider ────────────────────────────────────
         const consultant = await storage.getConsultantById(bookingData.serviceId);
@@ -4908,7 +4984,10 @@ export async function registerRoutes(
 
       // Get caller display name
       const callerUser = await storage.getUserById(callerId);
-      const callerName = callerUser?.name || callerUser?.email || "Unknown";
+      const callerName =
+        `${callerUser?.firstName || ""} ${callerUser?.lastName || ""}`.trim() ||
+        callerUser?.email ||
+        "Unknown";
 
       // Build a clean subtitle for the notification/overlay:
       // - Provider calling seeker → "Dr. Name (Specialization)"
@@ -5202,7 +5281,11 @@ export async function registerRoutes(
 
       const session = await storage.getCallSession(bookingId);
       if (!session) return res.json({ status: "none" });
-      res.json({ status: session.status, videoRoomUrl: session.videoRoomUrl });
+      res.json({
+        status: session.status,
+        videoRoomUrl: session.videoRoomUrl,
+        isCaller: session.callerId === userId,
+      });
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch call status" });
     }

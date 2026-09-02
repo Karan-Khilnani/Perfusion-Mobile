@@ -1,2 +1,3 @@
 - [Click-wrap agreement system](agreement-system.md) — server-owned version/text (single source); /api/auth/user returns requiresAgreement; gate redirects to /agreement page; PDF generated async post-response.
 - [Persistent upload fallback](persistent-upload-fallback.md) — deployed uploads must not silently fall back to local disk; return an explicit error when durable storage is unavailable.
+- [Call participant labels](call-participant-labels.md) — waiting prompts use the opposite participant’s account name, resolved by the server; generic role labels are fallbacks only.

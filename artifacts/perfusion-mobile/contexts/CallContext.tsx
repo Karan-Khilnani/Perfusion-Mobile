@@ -56,16 +56,20 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
   }, [checkIncomingCall]);
 
   const acceptCall = async (bookingId: string) => {
-    try {
-      await apiFetch(`/api/call/accept/${bookingId}`, { method: "POST" });
-    } catch {}
+    const response = await apiFetch(`/api/call/accept/${bookingId}`, { method: "POST" });
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      throw new Error(data?.error || "Could not accept call");
+    }
     setIncomingCall(null);
   };
 
   const declineCall = async (bookingId: string) => {
-    try {
-      await apiFetch(`/api/call/decline/${bookingId}`, { method: "POST" });
-    } catch {}
+    const response = await apiFetch(`/api/call/decline/${bookingId}`, { method: "POST" });
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      throw new Error(data?.error || "Could not decline call");
+    }
     setIncomingCall(null);
   };
 

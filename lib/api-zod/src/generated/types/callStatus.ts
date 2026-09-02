@@ -6,6 +6,9 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export * from './bookingCallInfo';
-export * from './callStatus';
-export * from './healthStatus';
+export interface CallStatus {
+  status: string;
+  /** @nullable */
+  videoRoomUrl?: string | null;
+  isCaller?: boolean;
+}

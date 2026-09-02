@@ -5,9 +5,6 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
-export interface HealthStatus {
-  status: string;
-}
 
 export interface BookingCallInfo {
   id: string;
@@ -19,11 +16,3 @@ export interface BookingCallInfo {
   videoRoomId?: string | null;
   status: string;
 }
-
-export interface CallStatus {
-  status: string;
-  /** @nullable */
-  videoRoomUrl?: string | null;
-  isCaller?: boolean;
-}
-

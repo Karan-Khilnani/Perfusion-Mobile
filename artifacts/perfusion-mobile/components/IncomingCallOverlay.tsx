@@ -3,6 +3,7 @@ import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
 import React, { useEffect, useRef } from "react";
 import {
+  Alert,
   Animated,
   Platform,
   Pressable,
@@ -50,15 +51,29 @@ export function IncomingCallOverlay() {
     if (Platform.OS !== "web") {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
-    await acceptCall(incomingCall.bookingId);
-    router.push(`/call/${incomingCall.bookingId}`);
+    try {
+      await acceptCall(incomingCall.bookingId);
+      router.push(`/call/${incomingCall.bookingId}`);
+    } catch (error) {
+      Alert.alert(
+        "Could not accept call",
+        error instanceof Error ? error.message : "Please check your connection and try again.",
+      );
+    }
   };
 
   const handleDecline = async () => {
     if (Platform.OS !== "web") {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     }
-    await declineCall(incomingCall.bookingId);
+    try {
+      await declineCall(incomingCall.bookingId);
+    } catch (error) {
+      Alert.alert(
+        "Could not decline call",
+        error instanceof Error ? error.message : "Please check your connection and try again.",
+      );
+    }
   };
 
   return (
