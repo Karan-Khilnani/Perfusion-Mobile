@@ -1,0 +1,155 @@
+# IMPORTANT — INVESTIGATION FIRST, NO CODE CHANGES YET
+
+Before making **any changes to the codebase**, do a complete investigation of the issues described below.
+
+Do NOT immediately start coding, modifying files, changing database schemas, changing WebRTC configuration, or refactoring components.
+
+Your first task is to **understand the existing system and diagnose the problems**.
+
+## Phase 1 — Understand the Existing Architecture
+
+First inspect the relevant parts of the application, including but not limited to:
+
+* Authentication and account creation flow
+* Care Seeker and Provider user flows
+* Video consultation/call architecture
+* WebRTC implementation and signaling
+* Backend APIs/services involved in calls
+* Real-time communication/presence mechanisms
+* Database/session state related to calls
+* Terms & Conditions/onboarding flow
+* Frontend state management
+* Relevant React components and lifecycle/useEffect logic
+* Error handling and logging
+* Any existing performance monitoring
+* Deployment/runtime environment relevant to video calls
+
+Do not assume how the system works based only on the symptoms described below. **Trace the actual implementation.**
+
+---
+
+# Phase 2 — Diagnose Each Bug
+
+For every bug, determine:
+
+### 1. Exact root cause
+
+What is actually causing the behavior?
+
+### 2. Relevant code
+
+Identify the specific files, components, functions, hooks, APIs, events, or database records involved.
+
+### 3. Why it happens
+
+Explain the technical sequence that produces the bug.
+
+### 4. Dependencies
+
+Identify what other parts of the application depend on the affected code.
+
+### 5. Potential impact of fixing it
+
+Explain what could potentially break or change if we modify this part of the system.
+
+For example:
+
+* Could the fix affect other call states?
+* Could it affect Care Seekers differently from Providers?
+* Could it affect authentication?
+* Could it affect onboarding?
+* Could it affect existing users?
+* Could it affect mobile/desktop?
+* Could it affect call stability?
+* Could it affect billing/payment/session tracking?
+* Could it affect analytics or consultation records?
+
+### 6. Edge cases
+
+Identify scenarios that need to be considered before implementation.
+
+### 7. Recommended solution
+
+Explain the safest and most appropriate solution, including alternatives if there is more than one reasonable approach.
+
+---
+
+# Phase 3 — Tell Me What You Need From Me
+
+After investigating, **STOP before making any changes**.
+
+Give me a structured report containing:
+
+## A. What you discovered
+
+Explain your understanding of the current implementation.
+
+## B. Root cause of each bug
+
+Give me a clear technical explanation for each issue.
+
+## C. What will be affected
+
+Tell me which existing functionality could potentially be affected by each proposed fix.
+
+## D. Information/decisions required from me
+
+Explicitly list anything you need me to clarify, confirm, provide, or decide.
+
+For example:
+
+* Expected behavior that cannot be determined from the existing code
+* Business rules
+* Whether a particular flow is intentional
+* Browser/device requirements
+* Video/audio quality requirements
+* Whether a warning should be fixed, investigated, or suppressed
+* Terms & Conditions acceptance rules
+* Any environment variables, credentials, test accounts, or configuration you need
+* Any external service configuration that needs verification
+* Any product decisions that cannot safely be inferred from the code
+
+**Do not ask generic questions if the answer can be determined by inspecting the existing code.**
+
+Only ask me for information that is genuinely unavailable to you or requires a product/business decision.
+
+---
+
+# Phase 4 — Wait for My Confirmation
+
+After giving me the investigation report and questions:
+
+**STOP. DO NOT MODIFY THE CODE.**
+
+Wait for me to provide the missing information and/or approve the proposed approach.
+
+Do not implement a "quick fix" while waiting.
+
+Do not modify unrelated code.
+
+Do not refactor unrelated parts of the application.
+
+---
+
+# Phase 5 — Implementation Only After Approval
+
+Once I have answered your questions and explicitly approved proceeding:
+
+1. Implement the agreed solution.
+2. Keep the changes as focused as possible.
+3. Do not make unrelated improvements.
+4. Preserve existing functionality.
+5. Test the affected flows.
+6. Test both Care Seeker and Provider journeys wherever applicable.
+7. Check for regressions.
+8. Verify that the original bug is actually resolved rather than merely hidden.
+9. Report exactly what files/code were changed and why.
+10. Report what was tested and any remaining limitations.
+
+## Critical Rule
+
+**Investigation → Impact Analysis → Questions/Requirements → My Confirmation → Implementation → Testing**
+
+Never skip directly from **bug description → code modification**.
+
+If you are uncertain about an architectural or product decision, **ask me before implementing it rather than making an assumption.**
