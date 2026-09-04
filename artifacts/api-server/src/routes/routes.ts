@@ -24,6 +24,47 @@ import { sendPushNotification, getVapidPublicKey, type PushPayload } from "../se
 import { getCallWindow } from "../services/call-window";
 import { Expo, type ExpoPushMessage } from "expo-server-sdk";
 
+function sanitizeUserForClient<T extends Record<string, any> | undefined>(user: T) {
+  if (!user) return user;
+  const {
+    password: _password,
+    verificationCode: _verificationCode,
+    verificationCodeExpiresAt: _verificationCodeExpiresAt,
+    ...safeUser
+  } = user;
+  return safeUser;
+}
+
+function getLoginMethod(user: Record<string, any> | undefined) {
+  if (!user) return "unavailable";
+  if (user.googleId && !user.password) return "google";
+  if (user.password) return "password";
+  return "unavailable";
+}
+
+function enrichAdminBookingsWithAccessDetails(
+  bookingRows: Record<string, any>[],
+  userRows: Record<string, any>[],
+  providerRows: Record<string, any>[],
+) {
+  const usersById = new Map(userRows.map((user) => [user.id, user]));
+  const providersById = new Map(providerRows.map((provider) => [provider.id, provider]));
+
+  return bookingRows.map((booking) => {
+    const seeker = usersById.get(booking.userId);
+    const provider = booking.providerId ? providersById.get(booking.providerId) : undefined;
+    const providerUser = provider?.userId ? usersById.get(provider.userId) : undefined;
+
+    return {
+      ...booking,
+      seekerLoginId: seeker?.email ?? null,
+      seekerLoginMethod: getLoginMethod(seeker),
+      providerLoginId: providerUser?.email ?? null,
+      providerLoginMethod: getLoginMethod(providerUser),
+    };
+  });
+}
+
 // Daily.co API helper
 async function createDailyRoom(roomName: string): Promise<{ url: string; name: string } | null> {
   const apiKey = process.env.DAILY_API_KEY;
@@ -2825,7 +2866,7 @@ export async function registerRoutes(
   app.get("/api/admin/users", isAdmin, async (req, res) => {
     try {
       const users = await storage.getUsers();
-      res.json(users);
+      res.json(users.map(sanitizeUserForClient));
     } catch (error) {
       console.error("Error fetching users:", error);
       res.status(500).json({ message: "Failed to fetch users" });
@@ -2853,7 +2894,7 @@ export async function registerRoutes(
       if (!user) {
         return res.status(404).json({ message: "User not found" });
       }
-      res.json(user);
+      res.json(sanitizeUserForClient(user));
     } catch (error) {
       console.error("Error updating user status:", error);
       res.status(500).json({ message: "Failed to update user status" });
@@ -2874,7 +2915,7 @@ export async function registerRoutes(
       }
       const updated = await storage.updateUser(req.params.id, data);
       if (!updated) return res.status(404).json({ message: "User not found" });
-      res.json(updated);
+      res.json(sanitizeUserForClient(updated));
     } catch (error) {
       console.error("Error updating user profile (admin):", error);
       res.status(500).json({ message: "Failed to update user profile" });
@@ -3530,11 +3571,43 @@ export async function registerRoutes(
   // Admin - Bookings Management (view all platform activity)
   app.get("/api/admin/bookings", isAdmin, async (req, res) => {
     try {
-      const bookings = await storage.getAllBookings();
-      res.json(bookings);
+      const [bookings, users, providers] = await Promise.all([
+        storage.getAllBookings(),
+        storage.getUsers(),
+        storage.getProviders(),
+      ]);
+      res.json(enrichAdminBookingsWithAccessDetails(bookings, users, providers));
     } catch (error) {
       console.error("Error fetching admin bookings:", error);
       res.status(500).json({ message: "Failed to fetch bookings" });
+    }
+  });
+
+  app.post("/api/admin/bookings/:id/access-copy-audit", isAdmin, async (req: any, res) => {
+    try {
+      const booking = await storage.getBookingById(req.params.id);
+      if (!booking) return res.status(404).json({ message: "Booking not found" });
+
+      const allowedSurfaces = new Set(["all_bookings", "dashboard", "appointments"]);
+      const allowedAudiences = new Set(["seeker", "provider", "both"]);
+      const surface = String(req.body?.surface || "");
+      const audience = String(req.body?.audience || "");
+      if (!allowedSurfaces.has(surface) || !allowedAudiences.has(audience)) {
+        return res.status(400).json({ message: "Invalid audit details" });
+      }
+
+      await storage.createAuditLog({
+        userId: req.user.id,
+        action: "export_booking_access_details",
+        entityType: "booking",
+        entityId: booking.id,
+        details: JSON.stringify({ surface, audience }),
+      });
+
+      return res.json({ success: true });
+    } catch (error) {
+      console.error("Error auditing booking access copy:", error);
+      return res.status(500).json({ message: "Failed to authorize access-detail copy" });
     }
   });
 
@@ -3570,7 +3643,7 @@ export async function registerRoutes(
         .reduce((sum, b) => sum + parseFloat(b.amount || "0"), 0);
 
       // Recent bookings (last 10)
-      const recentBookings = bookings
+      const recentBookings = enrichAdminBookingsWithAccessDetails(bookings, users, providers)
         .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
         .slice(0, 10);
 
@@ -4267,7 +4340,7 @@ export async function registerRoutes(
   app.get("/api/admin/pending-registrations", isAdmin, async (req, res) => {
     try {
       const pendingUsers = await storage.getPendingRegistrations();
-      res.json(pendingUsers);
+      res.json(pendingUsers.map(sanitizeUserForClient));
     } catch (error) {
       console.error("Error fetching pending registrations:", error);
       res.status(500).json({ message: "Failed to fetch pending registrations" });
@@ -4282,7 +4355,7 @@ export async function registerRoutes(
       if (!user) {
         return res.status(404).json({ message: "User not found" });
       }
-      res.json(user);
+      res.json(sanitizeUserForClient(user));
     } catch (error) {
       console.error("Error updating user approval:", error);
       res.status(500).json({ message: "Failed to update user approval" });
@@ -4607,7 +4680,7 @@ export async function registerRoutes(
         entityId: req.params.id,
         details: JSON.stringify({ reason }),
       });
-      res.json(updated);
+      res.json(sanitizeUserForClient(updated));
     } catch (error) {
       res.status(500).json({ message: "Failed to update account status" });
     }

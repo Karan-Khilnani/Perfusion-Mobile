@@ -13,6 +13,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { StatusBadge } from "@/components/status-badge";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import {
+  auditBookingAccessCopy,
+  generateAdminBookingMessages,
+  getAdminMessageAudience,
+  type AdminBookingWithAccess,
+} from "@/lib/admin-booking-messages";
 import { format } from "date-fns";
 import { Search, Plus, Edit, Eye, Filter, Stethoscope, FlaskConical, ScanLine, Download, Upload, File, Loader2, ShieldCheck, FileSignature, Clock, TimerReset, Phone, MessageSquare, Copy, Check, Share2 } from "lucide-react";
 import type { Booking, Consultant, LabTest, RadiologyModality, BookingStatus } from "@shared/schema";
@@ -56,120 +62,13 @@ export default function AdminBookingsPage() {
     }
   }
 
-  function generateWhatsAppMessages(booking: any): { label: string; message: string }[] {
-    const bookingRef = booking.bookingNumber || booking.id.substring(0, 12).toUpperCase();
-    const seeker = users.find((u: any) => u.id === booking.userId);
-    const seekerHospital = seeker?.hospitalName || "Referring Hospital";
-    const bookedOn = booking.createdAt ? format(new Date(booking.createdAt), "dd MMM yyyy, h:mm a") : "—";
-    const portalUrl = window.location.origin;
-
-    if (booking.bookingType === "consultation") {
-      const slot = booking.appointmentSlot || "As scheduled";
-      const videoLine = booking.videoRoomId
-        ? `🎥 *Video Call:* Log in to ${portalUrl} and join from My Bookings`
-        : "";
-
-      const seekerMsg = [
-        `*Consultation Booking Confirmed* ✅`,
-        ``,
-        `📋 *Booking Ref:* ${bookingRef}`,
-        `👤 *Patient:* ${booking.patientName} (${booking.patientAge} yrs)`,
-        `🩺 *Consultant:* ${booking.serviceName}`,
-        booking.providerName ? `🏥 *Provider:* ${booking.providerName}` : "",
-        `🕐 *Slot:* ${slot}`,
-        videoLine,
-        ``,
-        `Please ensure the patient is ready at the scheduled time. Join the video call from the Perfusion portal at your appointment time.`,
-        ``,
-        `_Perfusion Healthcare Platform_`,
-      ].filter(Boolean).join("\n");
-
-      const consultantMsg = [
-        `*Consultation Appointment* 📅`,
-        ``,
-        `📋 *Booking Ref:* ${bookingRef}`,
-        `👤 *Patient:* ${booking.patientName} (${booking.patientAge} yrs)`,
-        `🏥 *From:* ${seekerHospital}`,
-        `🕐 *Slot:* ${slot}`,
-        videoLine,
-        ``,
-        `Please log in to the Perfusion portal at ${portalUrl} to join the video call at the scheduled time.`,
-        ``,
-        `_Perfusion Healthcare Platform_`,
-      ].filter(Boolean).join("\n");
-
-      return [
-        { label: "Seeker", message: seekerMsg },
-        { label: "Consultant", message: consultantMsg },
-      ];
-    }
-
-    if (booking.bookingType === "lab") {
-      const urgencyBanner = booking.urgency === "emergency" ? `🚨 *URGENT / EMERGENCY*\n` : "";
-
-      const seekerMsg = [
-        `*Lab Test Booking Confirmed* 🔬`,
-        ``,
-        urgencyBanner,
-        `📋 *Booking Ref:* ${bookingRef}`,
-        `👤 *Patient:* ${booking.patientName} (${booking.patientAge} yrs)`,
-        booking.patientContact ? `📞 *Patient Contact:* ${booking.patientContact}` : "",
-        `🧪 *Test:* ${booking.serviceName}`,
-        booking.providerName ? `🏥 *Processing Lab:* ${booking.providerName}` : "",
-        `📅 *Booked On:* ${bookedOn}`,
-        ``,
-        `A sample collection agent will be in touch shortly. Please keep the patient ready as per the test requirements.`,
-        ``,
-        `_Perfusion Healthcare Platform_`,
-      ].filter(Boolean).join("\n");
-
-      const agentMsg = [
-        `*Sample Pickup Assignment* 🚗`,
-        ``,
-        urgencyBanner,
-        `📋 *Booking Ref:* ${bookingRef}`,
-        `🧪 *Test:* ${booking.serviceName}`,
-        `👤 *Patient:* ${booking.patientName} (${booking.patientAge} yrs)`,
-        booking.patientContact ? `📞 *Patient Contact:* ${booking.patientContact}` : "",
-        booking.callbackPhone
-          ? `📞 *Ward Contact:* ${booking.callbackPhone}${booking.callbackWardName ? ` (${booking.callbackWardName})` : ""}`
-          : "",
-        `🏥 *Pickup From:* ${seekerHospital}`,
-        booking.providerName ? `📦 *Deliver To:* ${booking.providerName}` : "",
-        `📅 *Booked On:* ${bookedOn}`,
-        ``,
-        `Please collect the sample and deliver to the lab at the earliest. Handle with care.`,
-        ``,
-        `_Perfusion Healthcare Platform_`,
-      ].filter(Boolean).join("\n");
-
-      const labMsg = [
-        `*Incoming Sample Alert* 🧪`,
-        ``,
-        urgencyBanner,
-        `📋 *Booking Ref:* ${bookingRef}`,
-        `🔬 *Test:* ${booking.serviceName}`,
-        `👤 *Patient:* ${booking.patientName} (${booking.patientAge} yrs)`,
-        `🏥 *From:* ${seekerHospital}`,
-        `📅 *Booked On:* ${bookedOn}`,
-        ``,
-        `Sample is being dispatched. Please prepare for processing upon arrival.`,
-        ``,
-        `_Perfusion Healthcare Platform_`,
-      ].filter(Boolean).join("\n");
-
-      return [
-        { label: "Seeker", message: seekerMsg },
-        { label: "Delivery Agent", message: agentMsg },
-        { label: "Lab Provider", message: labMsg },
-      ];
-    }
-
-    return [];
-  }
-
   async function copyToClipboard(text: string, tabKey: string) {
     try {
+      if (!waMessageBooking) throw new Error("Booking is unavailable");
+      const audience = getAdminMessageAudience(tabKey);
+      if (audience) {
+        await auditBookingAccessCopy(waMessageBooking.id, "all_bookings", audience);
+      }
       await navigator.clipboard.writeText(text);
       setCopiedTab(tabKey);
       setTimeout(() => setCopiedTab(null), 2000);
@@ -181,6 +80,11 @@ export default function AdminBookingsPage() {
   async function shareMessage(text: string, label: string) {
     if (navigator.share) {
       try {
+        if (!waMessageBooking) throw new Error("Booking is unavailable");
+        const audience = getAdminMessageAudience(label);
+        if (audience) {
+          await auditBookingAccessCopy(waMessageBooking.id, "all_bookings", audience);
+        }
         await navigator.share({ text });
       } catch (err: any) {
         if (err?.name !== "AbortError") {
@@ -225,7 +129,7 @@ export default function AdminBookingsPage() {
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const { data: bookings = [], isLoading } = useQuery<Booking[]>({
+  const { data: bookings = [], isLoading } = useQuery<AdminBookingWithAccess[]>({
     queryKey: ["/api/admin/bookings"],
   });
 
@@ -1147,7 +1051,7 @@ export default function AdminBookingsPage() {
       </Dialog>
       {/* WhatsApp Message Dialog */}
       {waMessageBooking && (() => {
-        const messages = generateWhatsAppMessages(waMessageBooking);
+        const messages = generateAdminBookingMessages(waMessageBooking, users, window.location.origin);
         const defaultTab = messages[0]?.label ?? "";
         return (
           <Dialog open={!!waMessageBooking} onOpenChange={(open) => { if (!open) { setWaMessageBooking(null); setCopiedTab(null); } }}>

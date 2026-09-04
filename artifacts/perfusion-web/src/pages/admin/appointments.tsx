@@ -31,9 +31,15 @@ import { StatusBadge } from "@/components/status-badge";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
+  auditBookingAccessCopy,
+  generateConsultationMeetingDetails,
+  getPasswordGuidance,
+  type AdminBookingWithAccess,
+} from "@/lib/admin-booking-messages";
+import {
   Search, Plus, Calendar as CalendarIcon, Stethoscope, IndianRupee,
   Loader2, Video, Phone, Eye, CheckCircle2, CircleDot,
-  CreditCard, ClockIcon,
+  CreditCard, ClockIcon, Copy, Check,
 } from "lucide-react";
 import type { Booking, BookingStatus, Consultant } from "@shared/schema";
 
@@ -526,12 +532,13 @@ export default function AdminAppointmentsPage() {
   const [statusFilter, setStatusFilter] = useState<"all" | "booked" | "completed">("all");
   const [paymentFilter, setPaymentFilter] = useState<"all" | "pending" | "paid" | "overdue">("all");
   const [dateFilter, setDateFilter] = useState("");
-  const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
+  const [selectedBooking, setSelectedBooking] = useState<AdminBookingWithAccess | null>(null);
   const [showCreate, setShowCreate] = useState(false);
+  const [meetingDetailsCopied, setMeetingDetailsCopied] = useState(false);
 
   // ── Queries ────────────────────────────────────────────────────────────────
 
-  const { data: allBookings = [], isLoading } = useQuery<Booking[]>({
+  const { data: allBookings = [], isLoading } = useQuery<AdminBookingWithAccess[]>({
     queryKey: ["/api/admin/bookings"],
   });
 
@@ -564,6 +571,23 @@ export default function AdminAppointmentsPage() {
     () => Object.fromEntries(consultants.map((c) => [c.id, c])),
     [consultants],
   );
+
+  async function copyMeetingDetails(booking: AdminBookingWithAccess) {
+    try {
+      await auditBookingAccessCopy(booking.id, "appointments", "both");
+      await navigator.clipboard.writeText(
+        generateConsultationMeetingDetails(booking, window.location.origin),
+      );
+      setMeetingDetailsCopied(true);
+      setTimeout(() => setMeetingDetailsCopied(false), 2000);
+    } catch {
+      toast({
+        title: "Copy failed",
+        description: "Could not copy the meeting details.",
+        variant: "destructive",
+      });
+    }
+  }
 
   // ── Filtered + sorted list ─────────────────────────────────────────────────
 
@@ -775,7 +799,15 @@ export default function AdminAppointmentsPage() {
     const slot = b.appointmentSlot || "—";
 
     return (
-      <Dialog open={!!selectedBooking} onOpenChange={(open) => { if (!open) setSelectedBooking(null); }}>
+      <Dialog
+        open={!!selectedBooking}
+        onOpenChange={(open) => {
+          if (!open) {
+            setSelectedBooking(null);
+            setMeetingDetailsCopied(false);
+          }
+        }}
+      >
         <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -859,6 +891,15 @@ export default function AdminAppointmentsPage() {
               ) : (
                 <p className="text-sm text-muted-foreground">User ID: {b.userId}</p>
               )}
+              <Row label="Login ID" value={b.seekerLoginId || "Account login unavailable"} />
+              <Row label="Password" value={getPasswordGuidance(b.seekerLoginMethod)} />
+            </Section>
+
+            <Separator />
+
+            <Section title="Provider Access">
+              <Row label="Login ID" value={b.providerLoginId || "Account login unavailable"} />
+              <Row label="Password" value={getPasswordGuidance(b.providerLoginMethod)} />
             </Section>
 
             <Separator />
@@ -921,6 +962,20 @@ export default function AdminAppointmentsPage() {
               )}
             </Section>
           </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant={meetingDetailsCopied ? "secondary" : "outline"}
+              onClick={() => copyMeetingDetails(b)}
+              data-testid="button-copy-meeting-details"
+            >
+              {meetingDetailsCopied ? (
+                <><Check className="mr-2 h-4 w-4 text-green-600" />Copied!</>
+              ) : (
+                <><Copy className="mr-2 h-4 w-4" />Copy Meeting Details</>
+              )}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     );
