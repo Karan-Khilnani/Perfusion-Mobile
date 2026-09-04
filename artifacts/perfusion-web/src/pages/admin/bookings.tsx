@@ -214,8 +214,12 @@ export default function AdminBookingsPage() {
       setShowCreateDialog(false);
       toast({ title: "Booking Created", description: "Booking has been created successfully." });
     },
-    onError: () => {
-      toast({ title: "Error", description: "Failed to create booking.", variant: "destructive" });
+    onError: (error) => {
+      toast({
+        title: "Booking could not be created",
+        description: error instanceof Error ? error.message : "Please check the booking details and try again.",
+        variant: "destructive",
+      });
     },
   });
 
@@ -257,6 +261,9 @@ export default function AdminBookingsPage() {
     const patientName = formData.get("patientName") as string;
     const patientAge = parseInt(formData.get("patientAge") as string);
     const patientContact = formData.get("patientContact") as string;
+    const clinicalSummary = createType === "consultation"
+      ? (formData.get("clinicalSummary") as string)
+      : undefined;
 
     let serviceName = "";
     let amount = "0";
@@ -283,6 +290,7 @@ export default function AdminBookingsPage() {
       patientName,
       patientAge,
       patientContact,
+      ...(createType === "consultation" ? { clinicalSummary } : {}),
       amount,
       status: "booked",
       paymentStatus: "pending",
@@ -469,6 +477,21 @@ export default function AdminBookingsPage() {
                   <Input name="patientContact" placeholder="Phone" />
                 </div>
               </div>
+              {createType === "consultation" && (
+                <div className="space-y-2">
+                  <Label htmlFor="admin-clinical-summary">Clinical Summary / Reason for Consultation</Label>
+                  <Textarea
+                    id="admin-clinical-summary"
+                    name="clinicalSummary"
+                    required
+                    minLength={10}
+                    placeholder="Describe the patient's symptoms, current condition, and reason for consultation"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Required for the consultant to review before the appointment.
+                  </p>
+                </div>
+              )}
               <DialogFooter>
                 <Button type="submit" disabled={createBookingMutation.isPending}>
                   {createBookingMutation.isPending ? "Creating..." : "Create Booking"}
