@@ -1864,7 +1864,9 @@ export async function registerRoutes(
       const provider = await storage.getProviderByUserId(user.id);
       if (!provider) return res.status(403).json({ message: "Provider profile not found" });
       const consultant = await storage.getConsultantById(booking.serviceId);
-      if (consultant?.providerId && consultant.providerId !== provider.id) {
+      const ownsAssignedBooking = booking.providerId === provider.id;
+      const ownsConsultant = consultant?.providerId === provider.id;
+      if (!ownsAssignedBooking && !ownsConsultant) {
         return res.status(403).json({ message: "You can only add review summaries for your own consultants." });
       }
 
@@ -1879,83 +1881,135 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Diagnosis is required for a review summary." });
       }
 
-      // Determine review number
       const pool = getPool();
-      const countResult = await pool.query(
-        "SELECT COUNT(*) as cnt FROM prescription_reviews WHERE booking_id = $1",
-        [booking.id]
-      );
-      const reviewNumber = parseInt(countResult.rows[0]?.cnt ?? "0", 10) + 1;
-
-      const approvedAt = new Date();
+      let approvedAt!: Date;
       const approverIp = req.ip || req.socket?.remoteAddress || "unknown";
-
       const protocol = req.headers["x-forwarded-proto"] || "https";
       const host = req.headers.host || "localhost:5000";
       const baseUrl = process.env.REPLIT_DEV_DOMAIN
         ? `https://${process.env.REPLIT_DEV_DOMAIN}`
         : `${protocol}://${host}`;
-
       const bookingUser = await storage.getUserById(booking.userId);
+      const client = await pool.connect();
+      let review: any;
+      let reviewNumber = 0;
+      let individualPdfUrl = "";
+      let trailPdfUrl = "";
+      try {
+        await client.query("BEGIN");
+        await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [booking.id]);
+        approvedAt = new Date();
+        const existingReviewsResult = await client.query(
+          "SELECT * FROM prescription_reviews WHERE booking_id = $1 ORDER BY approved_at ASC, review_number ASC, id ASC",
+          [booking.id]
+        );
+        reviewNumber = existingReviewsResult.rows.reduce(
+          (max: number, existing: any) => Math.max(max, Number(existing.review_number) || 0),
+          0
+        ) + 1;
 
-      const pdfData: PrescriptionPdfData = {
-        bookingId: booking.id,
-        bookingNumber: (booking as any).bookingNumber || `PFN-${booking.id.substring(0, 8).toUpperCase()}`,
-        approvedAt,
-        approverIp,
-        reviewNumber,
-        referringFacility: bookingUser?.hospitalName || null,
-        referringPhysician: (booking as any).referringPhysician || null,
-        onCallDoctorName: (booking as any).onCallDoctorName || null,
-        onCallDoctorDesignation: (booking as any).onCallDoctorDesignation || null,
-        patientName: booking.patientName,
-        patientAge: booking.patientAge,
-        patientGender: booking.patientGender,
-        uhidIpNumber: (booking as any).uhidIpNumber || null,
-        patientContact: booking.patientContact,
-        patientWeight: (booking as any).patientWeight || null,
-        patientAllergies: (booking as any).patientAllergyNotSpecified ? null : (booking as any).patientAllergies,
-        patientAllergyNotSpecified: (booking as any).patientAllergyNotSpecified ?? true,
-        consultantName: consultant?.name || booking.serviceName,
-        consultantSpecialization: consultant?.specialization || null,
-        consultantQualification: consultant?.qualification || null,
-        consultantRegistrationNo: consultant?.registrationNumber || null,
-        consultantYearsExperience: consultant?.yearsExperience || null,
-        consultantAffiliation: consultant?.affiliatedInstitution || null,
-        consultantSignatureUrl: consultant?.digitalSignatureUrl || null,
-        clinicalHistory: booking.clinicalSummary || null,
-        examination: booking.examination || null,
-        investigations: booking.investigations || null,
-        diagnosis: diagnosis.trim(),
-        physicianNotes: (physicianNotes || "").trim() || null,
-        treatmentPlan: (medications || "").trim() || null,
-        followUp: (followUp || "").trim() || null,
-      };
-
-      const pdfUrl = await generateAndStorePrescriptionPdf(pdfData, baseUrl);
-
-      const insertResult = await pool.query(
-        `INSERT INTO prescription_reviews
-          (booking_id, provider_id, review_number, diagnosis, medications, physician_notes, follow_up, advice, approved_at, approved_by_user_id, approver_ip, pdf_url)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-         RETURNING *`,
-        [
-          booking.id,
-          provider.id,
-          reviewNumber,
-          diagnosis.trim(),
-          (medications || "").trim() || null,
-          (physicianNotes || "").trim() || null,
-          (followUp || "").trim() || null,
-          (advice || "").trim() || null,
+        const basePdfData: PrescriptionPdfData = {
+          bookingId: booking.id,
+          bookingNumber: (booking as any).bookingNumber || `PFN-${booking.id.substring(0, 8).toUpperCase()}`,
           approvedAt,
-          user.id,
           approverIp,
-          pdfUrl,
-        ]
-      );
+          reviewNumber,
+          referringFacility: bookingUser?.hospitalName || null,
+          referringPhysician: (booking as any).referringPhysician || null,
+          onCallDoctorName: (booking as any).onCallDoctorName || null,
+          onCallDoctorDesignation: (booking as any).onCallDoctorDesignation || null,
+          patientName: booking.patientName,
+          patientAge: booking.patientAge,
+          patientGender: booking.patientGender,
+          uhidIpNumber: (booking as any).uhidIpNumber || null,
+          patientContact: booking.patientContact,
+          patientWeight: (booking as any).patientWeight || null,
+          patientAllergies: (booking as any).patientAllergyNotSpecified ? null : (booking as any).patientAllergies,
+          patientAllergyNotSpecified: (booking as any).patientAllergyNotSpecified ?? true,
+          consultantName: consultant?.name || booking.serviceName,
+          consultantSpecialization: consultant?.specialization || null,
+          consultantQualification: consultant?.qualification || null,
+          consultantRegistrationNo: consultant?.registrationNumber || null,
+          consultantYearsExperience: consultant?.yearsExperience || null,
+          consultantAffiliation: consultant?.affiliatedInstitution || null,
+          consultantSignatureUrl: consultant?.digitalSignatureUrl || null,
+          clinicalHistory: booking.clinicalSummary || null,
+          examination: booking.examination || null,
+          investigations: booking.investigations || null,
+          diagnosis: diagnosis.trim(),
+          physicianNotes: (physicianNotes || "").trim() || null,
+          treatmentPlan: (medications || "").trim() || null,
+          advice: (advice || "").trim() || null,
+          followUp: (followUp || "").trim() || null,
+        };
 
-      const review = insertResult.rows[0];
+        const insertResult = await client.query(
+          `INSERT INTO prescription_reviews
+            (booking_id, provider_id, review_number, diagnosis, medications, physician_notes, follow_up, advice, approved_at, approved_by_user_id, approver_ip)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+           RETURNING *`,
+          [
+            booking.id,
+            provider.id,
+            reviewNumber,
+            diagnosis.trim(),
+            (medications || "").trim() || null,
+            (physicianNotes || "").trim() || null,
+            (followUp || "").trim() || null,
+            (advice || "").trim() || null,
+            approvedAt,
+            user.id,
+            approverIp,
+          ]
+        );
+
+        individualPdfUrl = await generateAndStorePrescriptionPdf(basePdfData, baseUrl);
+        trailPdfUrl = await generateAndStorePrescriptionPdf({
+          ...basePdfData,
+          prescriptionTrail: [
+            {
+              label: "Initial Consultation Summary",
+              approvedAt: new Date((booking as any).prescriptionApprovedAt),
+              diagnosis: (booking as any).prescriptionDiagnosis || null,
+              physicianNotes: (booking as any).prescriptionPhysicianNotes || null,
+              treatmentPlan: (booking as any).prescriptionMedications || null,
+              advice: (booking as any).prescriptionAdvice || null,
+              followUp: (booking as any).prescriptionFollowUp || null,
+            },
+            ...existingReviewsResult.rows.map((existing: any) => ({
+              label: `Review Summary #${existing.review_number}`,
+              approvedAt: new Date(existing.approved_at),
+              diagnosis: existing.diagnosis || null,
+              physicianNotes: existing.physician_notes || null,
+              treatmentPlan: existing.medications || null,
+              advice: existing.advice || null,
+              followUp: existing.follow_up || null,
+            })),
+            {
+              label: `Review Summary #${reviewNumber}`,
+              approvedAt,
+              diagnosis: diagnosis.trim(),
+              physicianNotes: (physicianNotes || "").trim() || null,
+              treatmentPlan: (medications || "").trim() || null,
+              advice: (advice || "").trim() || null,
+              followUp: (followUp || "").trim() || null,
+            },
+          ],
+        }, baseUrl);
+
+        const updateResult = await client.query(
+          "UPDATE prescription_reviews SET pdf_url = $1, trail_pdf_url = $2 WHERE id = $3 RETURNING *",
+          [individualPdfUrl, trailPdfUrl, insertResult.rows[0].id]
+        );
+        review = updateResult.rows[0];
+        await client.query("COMMIT");
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally {
+        client.release();
+      }
+
       await storage.createAuditLog({
         userId: user.id,
         action: "REVIEW_SUMMARY_CONFIRMED",
@@ -1967,7 +2021,8 @@ export async function registerRoutes(
           consultantName: consultant?.name,
           patientName: booking.patientName,
           approverIp,
-          pdfUrl,
+          pdfUrl: individualPdfUrl,
+          trailPdfUrl,
           confirmedAt: approvedAt.toISOString(),
         }),
       });
@@ -2007,7 +2062,7 @@ export async function registerRoutes(
 
       const pool = getPool();
       const result = await pool.query(
-        "SELECT * FROM prescription_reviews WHERE booking_id = $1 ORDER BY review_number ASC",
+        "SELECT * FROM prescription_reviews WHERE booking_id = $1 ORDER BY approved_at ASC, review_number ASC, id ASC",
         [booking.id]
       );
       const reviews = result.rows.map((r: any) => ({
@@ -2024,12 +2079,128 @@ export async function registerRoutes(
         approvedByUserId: r.approved_by_user_id,
         approverIp: r.approver_ip,
         pdfUrl: r.pdf_url,
+        trailPdfUrl: r.trail_pdf_url,
         createdAt: r.created_at,
       }));
       res.json(reviews);
     } catch (error) {
       req.log?.error({ error }, "Error fetching review summaries");
       res.status(500).json({ message: "Failed to fetch review summaries" });
+    }
+  });
+
+  // Download the latest cumulative prescription trail (original + every review to date)
+  app.get("/api/bookings/:id/prescription-trail/download", isAuthenticated, async (req: any, res) => {
+    try {
+      const user = req.user;
+      const booking = await storage.getBookingById(req.params.id);
+      if (!booking) return res.status(404).json({ message: "Booking not found" });
+
+      const isOwner = booking.userId === user.id;
+      const isAdminUser = user.role === "admin";
+      let isProviderUser = false;
+      if (user.role === "provider") {
+        const provider = await storage.getProviderByUserId(user.id);
+        if (provider && booking.providerId === provider.id) isProviderUser = true;
+        if (!isProviderUser && booking.serviceId) {
+          const consultant = await storage.getConsultantById(booking.serviceId);
+          if (provider && consultant?.providerId === provider.id) isProviderUser = true;
+        }
+      }
+      if (!isOwner && !isAdminUser && !isProviderUser) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const pool = getPool();
+      const reviewsResult = await pool.query(
+        "SELECT * FROM prescription_reviews WHERE booking_id = $1 ORDER BY approved_at ASC, review_number ASC, id ASC",
+        [booking.id]
+      );
+      if (!reviewsResult.rows.length) {
+        const originalPdfUrl = (booking as any).prescriptionPdfUrl;
+        if (originalPdfUrl && /^https?:\/\//i.test(originalPdfUrl)) return res.redirect(originalPdfUrl);
+        return res.status(404).json({ message: "PDF not available" });
+      }
+
+      const latestReview = reviewsResult.rows[reviewsResult.rows.length - 1];
+      if (
+        latestReview.trail_pdf_url &&
+        /^https?:\/\//i.test(latestReview.trail_pdf_url)
+      ) {
+        return res.redirect(latestReview.trail_pdf_url);
+      }
+
+      // Reviews created before cumulative PDFs were introduced are upgraded on first download.
+      const bookingUser = await storage.getUserById(booking.userId);
+      const consultant = await storage.getConsultantById(booking.serviceId);
+      const protocol = req.headers["x-forwarded-proto"] || "https";
+      const host = req.headers.host || "localhost:5000";
+      const baseUrl = process.env.REPLIT_DEV_DOMAIN
+        ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+        : `${protocol}://${host}`;
+      const approvedAt = new Date(latestReview.approved_at);
+      const pdfData: PrescriptionPdfData = {
+        bookingId: booking.id,
+        bookingNumber: (booking as any).bookingNumber || `PFN-${booking.id.substring(0, 8).toUpperCase()}`,
+        approvedAt,
+        approverIp: latestReview.approver_ip || "unknown",
+        reviewNumber: latestReview.review_number,
+        referringFacility: bookingUser?.hospitalName || null,
+        referringPhysician: (booking as any).referringPhysician || null,
+        onCallDoctorName: (booking as any).onCallDoctorName || null,
+        onCallDoctorDesignation: (booking as any).onCallDoctorDesignation || null,
+        patientName: booking.patientName,
+        patientAge: booking.patientAge,
+        patientGender: booking.patientGender,
+        uhidIpNumber: (booking as any).uhidIpNumber || null,
+        patientContact: booking.patientContact,
+        patientWeight: (booking as any).patientWeight || null,
+        patientAllergies: (booking as any).patientAllergyNotSpecified ? null : (booking as any).patientAllergies,
+        patientAllergyNotSpecified: (booking as any).patientAllergyNotSpecified ?? true,
+        consultantName: consultant?.name || booking.serviceName,
+        consultantSpecialization: consultant?.specialization || null,
+        consultantQualification: consultant?.qualification || null,
+        consultantRegistrationNo: consultant?.registrationNumber || null,
+        consultantYearsExperience: consultant?.yearsExperience || null,
+        consultantAffiliation: consultant?.affiliatedInstitution || null,
+        consultantSignatureUrl: consultant?.digitalSignatureUrl || null,
+        clinicalHistory: booking.clinicalSummary || null,
+        examination: booking.examination || null,
+        investigations: booking.investigations || null,
+        diagnosis: latestReview.diagnosis || null,
+        physicianNotes: latestReview.physician_notes || null,
+        treatmentPlan: latestReview.medications || null,
+        followUp: latestReview.follow_up || null,
+        prescriptionTrail: [
+          {
+            label: "Initial Consultation Summary",
+            approvedAt: new Date((booking as any).prescriptionApprovedAt),
+            diagnosis: (booking as any).prescriptionDiagnosis || null,
+            physicianNotes: (booking as any).prescriptionPhysicianNotes || null,
+            treatmentPlan: (booking as any).prescriptionMedications || null,
+            advice: (booking as any).prescriptionAdvice || null,
+            followUp: (booking as any).prescriptionFollowUp || null,
+          },
+          ...reviewsResult.rows.map((review: any) => ({
+            label: `Review Summary #${review.review_number}`,
+            approvedAt: new Date(review.approved_at),
+            diagnosis: review.diagnosis || null,
+            physicianNotes: review.physician_notes || null,
+            treatmentPlan: review.medications || null,
+            advice: review.advice || null,
+            followUp: review.follow_up || null,
+          })),
+        ],
+      };
+      const cumulativePdfUrl = await generateAndStorePrescriptionPdf(pdfData, baseUrl);
+      await pool.query("UPDATE prescription_reviews SET trail_pdf_url = $1 WHERE id = $2", [
+        cumulativePdfUrl,
+        latestReview.id,
+      ]);
+      return res.redirect(cumulativePdfUrl);
+    } catch (error) {
+      req.log?.error({ error }, "Error downloading prescription trail");
+      res.status(500).json({ message: "Failed to download prescription trail" });
     }
   });
 

@@ -352,7 +352,7 @@ export default function OrdersPage() {
                 {(booking as any).prescriptionApprovedAt && (
                   <div className="mt-3 space-y-1">
                     <a
-                      href={`/api/bookings/${booking.id}/prescription/download`}
+                      href={`/api/bookings/${booking.id}/prescription-trail/download`}
                       target="_blank"
                       rel="noopener noreferrer"
                       onClick={(e) => e.stopPropagation()}
@@ -364,10 +364,10 @@ export default function OrdersPage() {
                         className="h-7 text-xs border-blue-300 text-blue-700 hover:bg-blue-50 dark:border-blue-700 dark:text-blue-300 dark:hover:bg-blue-900/30 gap-1"
                       >
                         <Download className="h-3 w-3" />
-                        Download Consultation Summary
+                        Download Complete Summary
                       </Button>
                     </a>
-                    <ReviewDownloads bookingId={booking.id} />
+                    <PrescriptionReviewTrail bookingId={booking.id} compact />
                   </div>
                 )}
                 {canFollowUp && (
@@ -399,32 +399,55 @@ export default function OrdersPage() {
     );
   };
 
-  function ReviewDownloads({ bookingId }: { bookingId: string }) {
+  function PrescriptionReviewTrail({ bookingId, compact = false }: { bookingId: string; compact?: boolean }) {
     const { data: reviews = [] } = useQuery<PrescriptionReview[]>({
       queryKey: [`/api/bookings/${bookingId}/prescription-reviews`],
+      staleTime: 0,
+      refetchOnMount: "always",
+      refetchOnWindowFocus: "always",
+      refetchInterval: compact ? false : 15_000,
     });
     if (!reviews.length) return null;
+    if (compact) {
+      return (
+        <p className="text-xs text-indigo-700 dark:text-indigo-300">
+          Includes {reviews.length} follow-up {reviews.length === 1 ? "summary" : "summaries"}
+        </p>
+      );
+    }
     return (
-      <>
-        {reviews.map((r) => (
+      <div className="mt-4 space-y-3">
+        <div className="flex items-center justify-between gap-3">
+          <h4 className="font-medium text-indigo-700 dark:text-indigo-300">Follow-up Summary Trail</h4>
           <a
-            key={r.id}
-            href={`/api/prescription-reviews/${r.id}/download`}
+            href={`/api/bookings/${bookingId}/prescription-trail/download`}
             target="_blank"
             rel="noopener noreferrer"
-            onClick={(e) => e.stopPropagation()}
           >
-            <Button
-              size="sm"
-              variant="outline"
-              className="h-7 text-xs border-indigo-300 text-indigo-700 hover:bg-indigo-50 dark:border-indigo-700 dark:text-indigo-300 dark:hover:bg-indigo-900/30 gap-1"
-            >
-              <Download className="h-3 w-3" />
-              Review Summary #{r.reviewNumber}
+            <Button size="sm" variant="outline" className="h-8 gap-1">
+              <Download className="h-3.5 w-3.5" />
+              Download Complete PDF
             </Button>
           </a>
+        </div>
+        {reviews.map((r) => (
+          <div key={r.id} className="rounded-md border border-indigo-200 bg-indigo-50/50 p-3 dark:border-indigo-900 dark:bg-indigo-950/20">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-sm font-medium">Review Summary #{r.reviewNumber}</p>
+              <p className="text-xs text-muted-foreground">
+                {format(new Date(r.approvedAt), "MMM d, yyyy · h:mm a")}
+              </p>
+            </div>
+            <div className="mt-2 grid gap-2 text-sm">
+              {r.diagnosis && <div><span className="text-xs font-medium text-muted-foreground">Diagnosis</span><p>{r.diagnosis}</p></div>}
+              {r.physicianNotes && <div><span className="text-xs font-medium text-muted-foreground">Physician Notes</span><p className="whitespace-pre-line">{r.physicianNotes}</p></div>}
+              {r.medications && <div><span className="text-xs font-medium text-muted-foreground">Suggested Treatment Plan</span><p className="whitespace-pre-line">{r.medications}</p></div>}
+              {r.advice && <div><span className="text-xs font-medium text-muted-foreground">Advice</span><p className="whitespace-pre-line">{r.advice}</p></div>}
+              {r.followUp && <div><span className="text-xs font-medium text-muted-foreground">Follow-up</span><p>{r.followUp}</p></div>}
+            </div>
+          </div>
         ))}
-      </>
+      </div>
     );
   }
 
@@ -783,7 +806,7 @@ export default function OrdersPage() {
             </div>
             {(booking as any).prescriptionApprovedAt ? (
               <a
-                href={`/api/bookings/${booking.id}/prescription/download`}
+                href={`/api/bookings/${booking.id}/prescription-trail/download`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-block mt-3"
@@ -791,7 +814,7 @@ export default function OrdersPage() {
               >
                 <Button className="gap-2" variant="default">
                   <Download className="h-4 w-4" />
-                  Download Signed Summary
+                  Download Complete Summary
                 </Button>
               </a>
             ) : (
@@ -819,6 +842,7 @@ export default function OrdersPage() {
                 Download Summary PDF
               </Button>
             )}
+            <PrescriptionReviewTrail bookingId={booking.id} />
           </div>
         )}
 
@@ -1163,16 +1187,16 @@ export default function OrdersPage() {
                                     {(b as any).prescriptionApprovedAt ? (
                                       <div className="flex flex-col gap-1 items-start">
                                         <a
-                                          href={`/api/bookings/${b.id}/prescription/download`}
+                                          href={`/api/bookings/${b.id}/prescription-trail/download`}
                                           target="_blank"
                                           rel="noopener noreferrer"
                                           data-testid={`button-download-prescription-${b.id}`}
                                         >
                                           <Button size="sm" variant="default" className="h-7 text-xs gap-1">
-                                            <Download className="h-3 w-3" /> Prescription
+                                            <Download className="h-3 w-3" /> Complete Summary
                                           </Button>
                                         </a>
-                                        <ReviewDownloads bookingId={b.id} />
+                                        <PrescriptionReviewTrail bookingId={b.id} compact />
                                       </div>
                                     ) : (
                                       <span className="text-xs text-muted-foreground">—</span>

@@ -549,5 +549,6 @@ export interface PrescriptionReview {
   approvedByUserId: string | null;
   approverIp: string | null;
   pdfUrl: string | null;
+  trailPdfUrl: string | null;
   createdAt: string;
 }

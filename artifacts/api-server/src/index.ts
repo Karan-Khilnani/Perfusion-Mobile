@@ -86,9 +86,54 @@ async function startServer() {
       approved_by_user_id varchar,
       approver_ip varchar(100),
       pdf_url varchar(500),
+      trail_pdf_url varchar(500),
       created_at timestamptz DEFAULT now()
     )`);
+    await pool.query(`ALTER TABLE prescription_reviews ADD COLUMN IF NOT EXISTS trail_pdf_url varchar(500)`);
     await pool.query(`CREATE INDEX IF NOT EXISTS prescription_reviews_booking_idx ON prescription_reviews(booking_id)`);
+    await pool.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1
+          FROM pg_indexes
+          WHERE schemaname = current_schema()
+            AND indexname = 'prescription_reviews_booking_review_unique'
+        ) THEN
+          WITH ranked AS (
+            SELECT
+              id,
+              booking_id,
+              ROW_NUMBER() OVER (
+                PARTITION BY booking_id
+                ORDER BY approved_at ASC, created_at ASC, id ASC
+              )::integer AS new_review_number
+            FROM prescription_reviews
+          ),
+          affected_bookings AS (
+            SELECT DISTINCT ranked.booking_id
+            FROM ranked
+            JOIN prescription_reviews AS existing ON existing.id = ranked.id
+            WHERE existing.review_number IS DISTINCT FROM ranked.new_review_number
+          )
+          UPDATE prescription_reviews AS review
+          SET
+            review_number = ranked.new_review_number,
+            trail_pdf_url = CASE
+              WHEN affected_bookings.booking_id IS NOT NULL THEN NULL
+              ELSE review.trail_pdf_url
+            END
+          FROM ranked
+          LEFT JOIN affected_bookings ON affected_bookings.booking_id = ranked.booking_id
+          WHERE review.id = ranked.id
+            AND (
+              review.review_number IS DISTINCT FROM ranked.new_review_number
+              OR affected_bookings.booking_id IS NOT NULL
+            );
+        END IF;
+      END $$;
+    `);
+    await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS prescription_reviews_booking_review_unique ON prescription_reviews(booking_id, review_number)`);
 
     // User agreements table (click-wrap)
     await pool.query(`CREATE TABLE IF NOT EXISTS user_agreements (

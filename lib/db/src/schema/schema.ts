@@ -374,6 +374,7 @@ export const prescriptionReviews = pgTable("prescription_reviews", {
   approvedByUserId: varchar("approved_by_user_id"),
   approverIp: varchar("approver_ip", { length: 100 }),
   pdfUrl: varchar("pdf_url", { length: 500 }),
+  trailPdfUrl: varchar("trail_pdf_url", { length: 500 }),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

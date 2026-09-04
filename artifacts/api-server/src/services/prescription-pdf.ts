@@ -36,6 +36,16 @@ export interface PrescriptionPdfData {
   physicianNotes: string | null;
   treatmentPlan: string | null;
   followUp: string | null;
+  advice?: string | null;
+  prescriptionTrail?: Array<{
+    label: string;
+    approvedAt: Date;
+    diagnosis: string | null;
+    physicianNotes: string | null;
+    treatmentPlan: string | null;
+    advice: string | null;
+    followUp: string | null;
+  }>;
 }
 
 const RED = rgb(0.545, 0, 0);
@@ -127,6 +137,33 @@ function drawMultilineText(page: PDFPage, text: string, y: number, font: PDFFont
     y -= 13;
   }
   return y - 4;
+}
+
+function drawPaginatedTrailField(
+  doc: PDFDocument,
+  pages: PDFPage[],
+  page: PDFPage,
+  y: number,
+  title: string,
+  text: string,
+  font: PDFFont,
+  fontBold: PDFFont,
+): [PDFPage, number] {
+  const lines = wrapText(text, font, 9, CONTENT_W - 20);
+  [page, y] = needsNewPage(doc, pages, page, y, 42);
+  y = drawSectionTitle(page, title.toUpperCase(), y, fontBold);
+
+  for (const line of lines) {
+    if (y < 62) {
+      page = doc.addPage([PAGE_W, PAGE_H]);
+      pages.push(page);
+      y = PAGE_H - 40;
+      y = drawSectionTitle(page, `${title.toUpperCase()} (CONTINUED)`, y, fontBold);
+    }
+    page.drawText(line, { x: MARGIN + 10, y, size: 9, font, color: DARK });
+    y -= 13;
+  }
+  return [page, y - 6];
 }
 
 async function loadLogoBytes(): Promise<Uint8Array | null> {
@@ -308,28 +345,66 @@ export async function generateAndStorePrescriptionPdf(data: PrescriptionPdfData,
     y -= 4;
   }
 
-  if (data.diagnosis) {
+  if (data.prescriptionTrail?.length) {
+    [page, y] = needsNewPage(doc, pages, page, y, 55);
+    y = drawSectionTitle(page, "COMPLETE PRESCRIPTION TRAIL", y, fontBold);
+    y -= 2;
+
+    for (const entry of data.prescriptionTrail) {
+      [page, y] = needsNewPage(doc, pages, page, y, 80);
+      const entryDate = entry.approvedAt.toLocaleString("en-IN", {
+        dateStyle: "medium",
+        timeStyle: "short",
+        timeZone: "Asia/Kolkata",
+      });
+      page.drawText(sanitizeOneLine(entry.label), { x: MARGIN + 10, y, size: 10, font: fontBold, color: RED });
+      page.drawText(sanitizeOneLine(entryDate), { x: MARGIN + 10, y: y - 13, size: 7.5, font, color: GREY });
+      y -= 31;
+
+      const fields = [
+        ["Diagnosis", entry.diagnosis],
+        ["Physician Notes", entry.physicianNotes],
+        ["Suggested Treatment Plan", entry.treatmentPlan],
+        ["Advice", entry.advice],
+        ["Follow-up", entry.followUp],
+      ] as const;
+      for (const [label, value] of fields) {
+        if (!value) continue;
+        [page, y] = drawPaginatedTrailField(doc, pages, page, y, label, value, font, fontBold);
+      }
+      y -= 7;
+      drawHLine(page, y);
+      y -= 16;
+    }
+  } else if (data.diagnosis) {
     [page, y] = needsNewPage(doc, pages, page, y, 50);
     y = drawSectionTitle(page, "DIAGNOSIS", y, fontBold);
     y = drawMultilineText(page, data.diagnosis, y, font);
     y -= 4;
   }
 
-  if (data.physicianNotes) {
+  if (!data.prescriptionTrail?.length && data.physicianNotes) {
     [page, y] = needsNewPage(doc, pages, page, y, 50);
     y = drawSectionTitle(page, "PHYSICIAN NOTES", y, fontBold);
     y = drawMultilineText(page, data.physicianNotes, y, font);
     y -= 4;
   }
 
-  if (data.treatmentPlan) {
+  if (!data.prescriptionTrail?.length && data.treatmentPlan) {
     [page, y] = needsNewPage(doc, pages, page, y, 50);
     y = drawSectionTitle(page, "SUGGESTED TREATMENT PLAN", y, fontBold);
     y = drawMultilineText(page, data.treatmentPlan, y, font);
     y -= 4;
   }
 
-  if (data.followUp) {
+  if (!data.prescriptionTrail?.length && data.advice) {
+    [page, y] = needsNewPage(doc, pages, page, y, 50);
+    y = drawSectionTitle(page, "ADVICE", y, fontBold);
+    y = drawMultilineText(page, data.advice, y, font);
+    y -= 4;
+  }
+
+  if (!data.prescriptionTrail?.length && data.followUp) {
     [page, y] = needsNewPage(doc, pages, page, y, 30);
     page.drawText("Follow-up: ", { x: MARGIN + 10, y, size: 9, font: fontBold, color: RED });
     const followLines = wrapText(data.followUp, font, 9, CONTENT_W - 75);
@@ -436,7 +511,9 @@ export async function generateAndStorePrescriptionPdf(data: PrescriptionPdfData,
 
   const pdfBytes = await doc.save();
   const fileName = isReview
-    ? `review-summary-${data.bookingId}-r${data.reviewNumber}-${Date.now()}.pdf`
+    ? data.prescriptionTrail?.length
+      ? `complete-prescription-trail-${data.bookingId}-r${data.reviewNumber}-${Date.now()}.pdf`
+      : `review-summary-${data.bookingId}-r${data.reviewNumber}-${Date.now()}.pdf`
     : `consultation-summary-${data.bookingId}-${Date.now()}.pdf`;
   const buffer = Buffer.from(pdfBytes);
 
