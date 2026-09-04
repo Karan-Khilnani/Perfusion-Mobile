@@ -1,0 +1,186 @@
+I want to modify the Perfusion Healthcare App → Admin Account → All Bookings → Copy Meeting Details functionality.
+
+However, DO NOT make any code changes yet.
+
+First investigate the existing implementation and determine exactly how this feature currently works.
+
+The requested end result is:
+
+When an Admin opens All Bookings and uses Copy Meeting Details, the copied meeting information should also include the relevant login ID and password for both participants:
+
+Care Seeker — Login ID + Password
+Provider — Login ID + Password
+
+Before implementing this, I want you to understand the complete data flow and identify every part of the application that could be affected.
+
+PHASE 1 — INVESTIGATE THE EXISTING SYSTEM
+
+Trace the complete flow of:
+
+Admin Account → All Bookings → Booking → Meeting Details → Copy Meeting Details
+
+Identify:
+
+The Admin All Bookings page/component
+Booking/consultation detail components
+The current "Copy Meeting Details" implementation
+The function/event responsible for generating the copied text
+Where meeting details come from
+How the Care Seeker is identified
+How the Provider is identified
+How their login IDs are stored/retrieved
+How passwords are currently stored/retrieved, if at all
+Backend APIs involved
+Database tables/collections involved
+Authentication system involved
+Any role/permission checks
+Any existing security/privacy controls
+Any logging or audit mechanism related to this information
+
+Do not assume that passwords are directly available in the database. Verify how authentication actually works.
+
+PHASE 2 — SECURITY CHECK BEFORE IMPLEMENTATION
+
+Because this request involves displaying/copying account credentials, investigate the security implications before proposing an implementation.
+
+Determine:
+
+Whether seeker/provider passwords are actually retrievable by the application.
+Whether passwords are stored as plaintext, encrypted, hashed, or managed by an external authentication provider.
+Whether exposing the password to an Admin interface is compatible with the current authentication architecture.
+Whether the requested behavior could create a security vulnerability.
+Whether copying credentials to the clipboard could expose sensitive information unnecessarily.
+Whether the Admin role currently has permission to access this information.
+Whether credentials are currently exposed anywhere else in the Admin application.
+Whether there is a safer implementation that achieves the actual operational requirement.
+
+Do not weaken authentication security merely to make this feature possible.
+
+If passwords are securely hashed and cannot/should not be retrieved, clearly tell me that instead of attempting to reverse, reconstruct, or expose them.
+
+PHASE 3 — IDENTIFY ALL AFFECTED SECTIONS
+
+Before making any changes, give me a list of every section that may be affected.
+
+Separate them into:
+
+Directly affected
+
+For example:
+
+Admin All Bookings UI
+Booking details
+Copy Meeting Details function
+Relevant API/backend endpoint
+Indirectly affected
+
+For example:
+
+Authentication
+User/account management
+Database
+Permissions
+Security controls
+Audit logging
+Clipboard functionality
+Not affected
+
+Explicitly tell me which major systems you inspected and determined do NOT need modification.
+
+PHASE 4 — PROPOSE THE IMPLEMENTATION
+
+After investigation, explain:
+
+Current behavior
+
+What exactly happens today when the Admin clicks "Copy Meeting Details"?
+
+Proposed behavior
+
+Show me an example of what the copied information would look like.
+
+For example, conceptually:
+
+Meeting Details:
+
+Meeting ID: XXXXX
+Date/Time: XXXXX
+Meeting Link: XXXXX
+
+Care Seeker:
+
+Login ID: XXXXX
+Password: XXXXX
+
+Provider:
+
+Login ID: XXXXX
+Password: XXXXX
+
+Do not use real credentials in the example.
+
+Technical approach
+
+Explain exactly where the information would come from and what code/components would need to change.
+
+Security considerations
+
+Explain the risks of putting credentials into the clipboard and whether any additional protection should be implemented.
+
+PHASE 5 — ASK ME FOR CONFIRMATION
+
+After completing the investigation, STOP.
+
+Do not modify any files yet.
+
+Give me:
+
+Your understanding of the requirement.
+Your findings about the existing implementation.
+The root cause/technical considerations, if any.
+All sections/files/functions that would be affected.
+The proposed implementation.
+Any risks or security concerns.
+Any information you need from me.
+Any decisions that require my confirmation.
+
+Then explicitly ask me to confirm the proposed implementation.
+
+CRITICAL
+
+Do not make any code, database, authentication, UI, API, or configuration changes until I have answered your questions and explicitly approved the implementation.
+
+If the requested password functionality conflicts with secure authentication architecture, stop and explain the limitation to me first. Do not create an insecure workaround.
+
+PHASE 6 — IMPLEMENT ONLY AFTER MY APPROVAL
+
+After I provide the required information and explicitly approve the approach:
+
+Implement only the agreed changes.
+Do not modify unrelated functionality.
+Preserve the existing Admin booking workflow.
+Preserve existing authentication and authorization.
+Make the Copy Meeting Details action reliable.
+Ensure the correct seeker credentials are associated with the correct booking.
+Ensure the correct provider credentials are associated with the correct booking.
+Prevent credentials from being accidentally mixed between bookings/users.
+Test the copy functionality.
+Test bookings with different seeker/provider combinations.
+Test that existing meeting information continues to copy correctly.
+Check for regressions in the Admin All Bookings page.
+
+After implementation, report:
+
+Files changed
+Functions/components changed
+Backend/API changes
+Database changes, if any
+Security considerations
+Tests performed
+Final behavior
+Any remaining limitations
+WORKFLOW TO FOLLOW
+
+Investigate → Map data flow → Identify affected sections → Security assessment → Propose solution → Ask me → WAIT → Receive confirmation → Implement → Test → Report
+
+DO NOT skip the WAIT step.
