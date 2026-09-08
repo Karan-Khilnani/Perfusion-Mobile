@@ -1,0 +1,217 @@
+Feature Request: Cellular Call Button Inside Video Call Room
+
+We need to add a feature to the existing video consultation/video call room.
+
+Objective
+
+When one participant is already inside the video call room but the other participant has not joined yet, the participant who is waiting should be able to trigger the existing cellular-call functionality to call and remind the absent participant — without leaving or disconnecting from the video call room.
+
+This should reuse the same cellular calling functionality that already exists on the dashboard, such as:
+
+Call Seeker
+Call Consultant
+
+The goal is simply to make this functionality available inside the video call room as well.
+
+1. First: Inspect Existing Application Before Coding
+
+Before making any changes, inspect the existing codebase and identify:
+
+How the video call room is implemented.
+How participant presence/join status is currently detected.
+How the dashboard's Call Seeker / Call Consultant functionality works.
+Which frontend components currently trigger the cellular call.
+Which backend API/endpoint/service handles the cellular call.
+What authentication, authorization, permissions, rate limits, validations, or logging already exist for cellular calls.
+How the current video-call UI determines which participant is the seeker vs consultant.
+Whether the existing cellular-call functionality can be safely reused directly inside the video room.
+Any existing shared components, hooks, APIs, services, or utilities that should be reused rather than duplicated.
+
+Do not create a parallel implementation if the existing dashboard functionality can be reused.
+
+Before modifying existing software, clearly identify which existing files/components/API endpoints/services will be affected.
+
+If any existing behavior, API contract, database schema, permissions, authentication, calling infrastructure, or other existing functionality needs to be modified, ask for permission before making those changes.
+
+Do not silently alter unrelated existing functionality.
+
+2. Frontend Requirements
+
+Add a contextual cellular-call button inside the video call room.
+
+Waiting state
+
+When:
+
+Participant A is inside the video room
+Participant B has not joined yet
+
+show an appropriate action allowing Participant A to call Participant B.
+
+The wording should dynamically reflect the participant's role.
+
+Possible labels:
+
+"Consultant didn't join yet — Call to remind"
+"Seeker didn't join yet — Call to remind"
+
+Or a shorter equivalent such as:
+
+"Call Consultant"
+"Call Seeker"
+
+The final wording should fit the existing application's UI/UX conventions.
+
+Behavior
+
+When the waiting participant clicks the button:
+
+Trigger the same cellular-call functionality already available from the dashboard.
+Do not disconnect the video call.
+Do not navigate the user away from the video room.
+Keep the video-room UI active.
+Show an appropriate loading/progress state while the call request is being processed.
+Show success/failure feedback using the application's existing notification/toast/error-handling patterns.
+Prevent accidental repeated calls while a call request is being processed.
+If the existing system has cooldown/rate-limit behavior, preserve it.
+Button visibility
+
+The button should only be shown when it makes sense.
+
+For example:
+
+Show it when the other participant has not joined.
+Hide/remove it once the other participant joins.
+Do not show a Call Consultant action to the consultant themselves.
+Do not show a Call Seeker action to the seeker themselves.
+Respect the existing role/permission model.
+
+Do not introduce a new participant-status system if the existing video room already provides this information.
+
+3. Backend Requirements
+
+The backend requirement should be as small as possible.
+
+Preferred implementation
+
+Reuse the existing cellular-call backend endpoint/service used by the dashboard.
+
+Do not create a duplicate calling service if the existing implementation can be called safely from the video room.
+
+The backend should continue to enforce all existing:
+
+Authentication
+Authorization
+Participant-role validation
+Phone-number validation
+Rate limiting/cooldowns
+Call-provider integration
+Error handling
+Logging/auditing
+If backend changes are required
+
+If the existing backend API cannot support this use case directly, first explain:
+
+Why the existing endpoint/service cannot be reused.
+What backend change is required.
+Which files/services will change.
+Whether database/schema changes are required.
+Whether API contract changes are required.
+Whether permissions/security rules need modification.
+
+Ask for approval before making any such changes.
+
+Keep backend changes minimal and backward-compatible.
+
+4. Important: Do Not Duplicate Existing Functionality
+
+This feature should essentially be:
+
+Existing dashboard cellular-call functionality + new entry point inside the video room.
+
+It should NOT become a separate calling system.
+
+Reuse existing:
+
+APIs
+Backend services
+Authentication
+Authorization
+UI components where appropriate
+Error handling
+Call status handling
+Analytics/logging, if already present
+5. Edge Cases to Consider
+
+Please inspect and handle existing application behavior for:
+
+Other participant joins while the call button is visible.
+Cellular call request fails.
+Cellular call provider is unavailable.
+User clicks the button multiple times.
+User leaves the video room while the request is processing.
+Participant has no valid phone number.
+User does not have permission to trigger the call.
+Existing call cooldown/rate limit is active.
+Both participants join at approximately the same time.
+Video connection remains active throughout the cellular call request.
+
+Do not invent new behavior unnecessarily. Follow existing application conventions wherever possible.
+
+6. Impact Analysis Before Implementation
+
+Before writing code, provide a short implementation analysis containing:
+
+Frontend impact
+Files/components that will be modified
+Existing components/hooks/services that can be reused
+How participant presence is currently detected
+Where the new button will appear
+Backend impact
+Existing API/service being reused
+Whether any backend changes are actually necessary
+Any authentication/authorization implications
+Any database changes, if applicable
+Other affected systems
+
+Identify whether this feature affects:
+
+Video calling
+Cellular calling
+Authentication
+Permissions
+Notifications
+Analytics
+Database
+Call provider/integration
+Session/consultation state
+
+Clearly distinguish between:
+
+No change required vs Change required.
+
+7. Permission Gate
+
+Before modifying any existing backend/API/permission/database infrastructure, stop and ask for approval.
+
+You may proceed without additional permission only if the implementation can be achieved through the existing functionality without changing existing contracts or infrastructure.
+
+If only frontend changes are required and the existing cellular-call API can be reused as-is, proceed with the frontend implementation.
+
+8. Acceptance Criteria
+
+The feature is complete when:
+
+A participant can enter the video room and wait for the other participant.
+While waiting, they see an appropriate Call Seeker / Call Consultant action.
+Clicking it triggers the existing cellular-call functionality.
+The video room remains open and connected.
+The user does not need to leave the video room.
+The button disappears or becomes irrelevant once the other participant joins.
+Existing calling permissions and security remain intact.
+Existing dashboard calling functionality continues to work exactly as before.
+No duplicate cellular-call implementation has been created.
+No unrelated application behavior has been changed.
+Most important instruction
+
+Inspect first, explain the impact, reuse existing functionality, and ask for permission before changing existing software infrastructure. Do not make assumptions about the architecture.
