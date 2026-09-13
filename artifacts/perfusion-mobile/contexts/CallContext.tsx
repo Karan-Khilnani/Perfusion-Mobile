@@ -7,6 +7,7 @@ import React, {
   useState,
 } from "react";
 
+import { useAuth } from "@/contexts/AuthContext";
 import { apiFetch } from "@/hooks/useApi";
 
 export interface IncomingCallData {
@@ -28,12 +29,14 @@ interface CallContextType {
 const CallContext = createContext<CallContextType | null>(null);
 
 export function CallProvider({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth();
   const [incomingCall, setIncomingCall] = useState<IncomingCallData | null>(
     null
   );
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const checkIncomingCall = useCallback(async () => {
+    if (!user) return;
     try {
       const res = await apiFetch("/api/call/incoming");
       if (res.ok) {
@@ -45,15 +48,19 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
         }
       }
     } catch {}
-  }, [incomingCall]);
+  }, [incomingCall, user]);
 
   useEffect(() => {
+    if (!user) {
+      setIncomingCall(null);
+      return;
+    }
     checkIncomingCall();
     pollRef.current = setInterval(checkIncomingCall, 5000);
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
     };
-  }, [checkIncomingCall]);
+  }, [checkIncomingCall, user]);
 
   const acceptCall = async (bookingId: string) => {
     const response = await apiFetch(`/api/call/accept/${bookingId}`, { method: "POST" });

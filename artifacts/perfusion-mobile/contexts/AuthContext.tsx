@@ -51,7 +51,37 @@ export interface User {
   name: string;
   role: string;
   approved: boolean;
+  firstName?: string;
+  lastName?: string;
+  approvalStatus?: string;
+  requiresAgreement?: boolean;
   hospitalName?: string;
+}
+
+function normalizeUser(data: Record<string, unknown>): User {
+  const firstName = typeof data.firstName === "string" ? data.firstName : "";
+  const lastName = typeof data.lastName === "string" ? data.lastName : "";
+  const email = typeof data.email === "string" ? data.email : "";
+  const approvalStatus =
+    typeof data.approvalStatus === "string" ? data.approvalStatus : undefined;
+  const fullName = `${firstName} ${lastName}`.trim();
+
+  return {
+    id: String(data.id ?? ""),
+    email,
+    name:
+      (typeof data.name === "string" && data.name.trim()) ||
+      fullName ||
+      email,
+    role: typeof data.role === "string" ? data.role : "care_seeker",
+    approved: data.approved === true || approvalStatus === "approved",
+    firstName: firstName || undefined,
+    lastName: lastName || undefined,
+    approvalStatus,
+    requiresAgreement: data.requiresAgreement === true,
+    hospitalName:
+      typeof data.hospitalName === "string" ? data.hospitalName : undefined,
+  };
 }
 
 interface AuthContextType {
@@ -72,8 +102,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const res = await apiFetch("/api/auth/user");
       if (res.ok) {
-        const data = await res.json();
-        setUser(data);
+        const data = (await res.json()) as Record<string, unknown>;
+        setUser(normalizeUser(data));
       } else {
         setUser(null);
       }
@@ -87,20 +117,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const login = async (email: string, password: string) => {
-    const res = await fetch(`${getBaseUrl()}/api/login`, {
+    const res = await fetch(`${getBaseUrl()}/api/auth/login`, {
       method: "POST",
+      credentials: "include",
       headers: {
         "Content-Type": "application/json",
         "X-Mobile-Client": "1",
       },
-      body: JSON.stringify({ username: email, password }),
+      body: JSON.stringify({ email, password }),
     });
+    const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
     if (!res.ok) {
-      let msg = "Login failed";
-      try {
-        const data = await res.json();
-        msg = data.message || msg;
-      } catch {}
+      const msg =
+        typeof data.message === "string" ? data.message : "Login failed";
       throw new Error(msg);
     }
     const setCookieHeader = res.headers.get("set-cookie");
@@ -110,7 +139,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await storeCookie(match[0]);
       }
     }
-    await refreshUser();
+    setUser(normalizeUser(data));
     // Register Expo push token after successful login (non-blocking)
     registerMobilePushToken().catch(() => {});
   };
@@ -119,7 +148,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Deregister push token before clearing session (non-blocking)
     deregisterMobilePushToken().catch(() => {});
     try {
-      await apiFetch("/api/logout", { method: "POST" });
+      await apiFetch("/api/auth/logout", { method: "POST" });
     } catch {}
     await clearCookie();
     setUser(null);

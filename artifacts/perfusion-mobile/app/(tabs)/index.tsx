@@ -19,15 +19,17 @@ import { useAuth } from "@/contexts/AuthContext";
 import { apiFetch } from "@/hooks/useApi";
 import { useColors } from "@/hooks/useColors";
 
-function useBookings(status?: string) {
+function useBookings(role?: string) {
   return useQuery<Booking[]>({
-    queryKey: ["bookings", status],
+    queryKey: ["bookings", role],
     queryFn: async () => {
-      const qs = status ? `?status=${status}` : "";
-      const res = await apiFetch(`/api/bookings${qs}`);
+      const endpoint =
+        role === "provider" ? "/api/provider/bookings" : "/api/bookings";
+      const res = await apiFetch(endpoint);
       if (!res.ok) throw new Error("Failed to load bookings");
       return res.json();
     },
+    enabled: !!role,
     staleTime: 30_000,
   });
 }
@@ -43,11 +45,15 @@ export default function DashboardScreen() {
     isError,
     refetch,
     isRefetching,
-  } = useBookings("upcoming");
+  } = useBookings(user?.role);
 
-  const upcoming = bookings?.slice(0, 5) ?? [];
+  const activeBookings =
+    bookings?.filter(
+      (booking) => !["completed", "cancelled"].includes(booking.status)
+    ) ?? [];
+  const upcoming = activeBookings.slice(0, 5);
   const todayBookings =
-    bookings?.filter((b) => {
+    activeBookings.filter((b) => {
       if (!b.scheduledDate) return false;
       const d = new Date(b.scheduledDate);
       const today = new Date();
@@ -56,7 +62,8 @@ export default function DashboardScreen() {
         d.getMonth() === today.getMonth() &&
         d.getFullYear() === today.getFullYear()
       );
-    }) ?? [];
+    });
+  const isProvider = user?.role === "provider";
 
   const greeting = () => {
     const h = new Date().getHours();
@@ -91,7 +98,7 @@ export default function DashboardScreen() {
             {greeting()},
           </Text>
           <Text style={[styles.userName, { color: colors.foreground }]}>
-            {user?.name || user?.email || "Doctor"}
+            {user?.name || user?.email || "User"}
           </Text>
         </View>
         <View
@@ -113,7 +120,8 @@ export default function DashboardScreen() {
         >
           <Ionicons name="today-outline" size={18} color={colors.primary} />
           <Text style={[styles.todayText, { color: colors.primary }]}>
-            {todayBookings.length} appointment{todayBookings.length > 1 ? "s" : ""} today
+            {todayBookings.length} {isProvider ? "assigned " : ""}
+            appointment{todayBookings.length > 1 ? "s" : ""} today
           </Text>
         </View>
       )}
@@ -121,8 +129,8 @@ export default function DashboardScreen() {
       <View style={styles.statsRow}>
         <StatCard
           icon="calendar"
-          label="Upcoming"
-          value={String(bookings?.length ?? "—")}
+          label={isProvider ? "Assigned" : "Upcoming"}
+          value={String(activeBookings.length)}
           colors={colors}
         />
         <StatCard
@@ -137,7 +145,7 @@ export default function DashboardScreen() {
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
           <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
-            Upcoming Appointments
+             {isProvider ? "Assigned Appointments" : "Upcoming Appointments"}
           </Text>
           <Pressable onPress={() => router.push("/(tabs)/bookings")}>
             <Text style={[styles.seeAll, { color: colors.primary }]}>
@@ -183,7 +191,9 @@ export default function DashboardScreen() {
               color={colors.mutedForeground}
             />
             <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
-              No upcoming appointments
+               {isProvider
+                 ? "No assigned appointments"
+                 : "No upcoming appointments"}
             </Text>
           </View>
         )}

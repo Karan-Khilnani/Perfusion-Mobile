@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Platform,
@@ -14,6 +14,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { BookingCard, type Booking } from "@/components/BookingCard";
+import { useAuth } from "@/contexts/AuthContext";
 import { apiFetch } from "@/hooks/useApi";
 import { useColors } from "@/hooks/useColors";
 
@@ -28,20 +29,36 @@ const FILTERS = [
 export default function BookingsScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const { user } = useAuth();
   const [filter, setFilter] = useState("all");
 
   const { data, isLoading, isError, refetch, isRefetching } = useQuery<
     Booking[]
   >({
-    queryKey: ["bookings", filter],
+    queryKey: ["bookings", user?.role],
     queryFn: async () => {
-      const qs = filter !== "all" ? `?status=${filter}` : "";
-      const res = await apiFetch(`/api/bookings${qs}`);
+      const endpoint =
+        user?.role === "provider"
+          ? "/api/provider/bookings"
+          : "/api/bookings";
+      const res = await apiFetch(endpoint);
       if (!res.ok) throw new Error("Failed to load bookings");
       return res.json();
     },
+    enabled: !!user?.role,
     staleTime: 30_000,
   });
+
+  const visibleBookings = useMemo(() => {
+    if (!data) return [];
+    if (filter === "all") return data;
+    if (filter === "upcoming") {
+      return data.filter(
+        (booking) => !["completed", "cancelled"].includes(booking.status)
+      );
+    }
+    return data.filter((booking) => booking.status === filter);
+  }, [data, filter]);
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -137,7 +154,7 @@ export default function BookingsScreen() {
           </View>
         )}
 
-        {!isLoading && !isError && (!data || data.length === 0) && (
+        {!isLoading && !isError && visibleBookings.length === 0 && (
           <View style={styles.center}>
             <Ionicons
               name="calendar-outline"
@@ -152,12 +169,14 @@ export default function BookingsScreen() {
             >
               {filter !== "all"
                 ? `No ${filter} bookings`
-                : "Your bookings will appear here"}
+                : user?.role === "provider"
+                  ? "Assigned bookings will appear here"
+                  : "Your bookings will appear here"}
             </Text>
           </View>
         )}
 
-        {data?.map((booking) => (
+        {visibleBookings.map((booking) => (
           <BookingCard key={booking.id} booking={booking} />
         ))}
       </ScrollView>

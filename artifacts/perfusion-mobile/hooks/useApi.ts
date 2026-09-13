@@ -52,6 +52,7 @@ export async function apiFetch(
   }
   return fetch(`${getBaseUrl()}${path}`, {
     ...options,
+    credentials: "include",
     headers,
   });
 }
