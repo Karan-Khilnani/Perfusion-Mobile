@@ -19,3 +19,17 @@ mtime_ms = 1789285798833
 storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:034c0c6d-c25b-491b-98e9-0bb19624165f/6c707e95-54a7-461e-a350-d92389ffe980/c73ee64e-d67c-49be-8fbb-d2a6b45d5c27"
 storage_version_token = "1789285819092151"
 content_type = "application/octet-stream"
+
+[[outputs]]
+id = "HKo4edL_wHudc_n6LpGh-"
+uri = "file://back/perfusion-code-backup-20260913T074957Z.zip"
+type = "unspecified"
+title = "Perfusion Health code backup — ZIP"
+description = "Standard ZIP version of the verified current code backup. Includes source, configuration, and project assets; excludes secrets, uploaded user files, dependencies, Git metadata, and historical migration backups."
+logical_id = "060ec4b7-e3ab-4e93-9442-4b0fbb8a6c55"
+content_hash = "sha256:7cd6ade81a56332a9a4838e4935a680d4bec2680f0f4b25a3dc782e1070371f0"
+size = 42543858
+mtime_ms = 1789286014086
+storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:034c0c6d-c25b-491b-98e9-0bb19624165f/060ec4b7-e3ab-4e93-9442-4b0fbb8a6c55/39d27331-241e-4b3f-993b-4402f8871d8c"
+storage_version_token = "1789286024448493"
+content_type = "application/octet-stream"
