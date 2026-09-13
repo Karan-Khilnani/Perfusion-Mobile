@@ -1,8 +1,21 @@
 uploads = []
-outputs = []
 
 [[generated]]
 id = "VZDLgiWFUOpe8U-TpHPZI"
 uri = "file://artifacts/perfusion-mobile/assets/images/icon.png"
 type = "image"
 title = "perfusion app icon"
+
+[[outputs]]
+id = "Gx4eyIl2QRpNb2GgZTh0c"
+uri = "file://back/perfusion-code-backup-20260913T074957Z.tar.gz"
+type = "unspecified"
+title = "Perfusion Health code backup"
+description = "Verified current checked-in code snapshot. Includes source, configuration, and project assets; excludes live secrets, uploaded user files, dependency folders, Git metadata, historical migration backups, and nested backup output."
+logical_id = "6c707e95-54a7-461e-a350-d92389ffe980"
+content_hash = "sha256:3676c830f9883d8e6dd5224c814d518f3b367f9e5eb7e523173ceb0bfcb0522d"
+size = 42371642
+mtime_ms = 1789285798833
+storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:034c0c6d-c25b-491b-98e9-0bb19624165f/6c707e95-54a7-461e-a350-d92389ffe980/c73ee64e-d67c-49be-8fbb-d2a6b45d5c27"
+storage_version_token = "1789285819092151"
+content_type = "application/octet-stream"
