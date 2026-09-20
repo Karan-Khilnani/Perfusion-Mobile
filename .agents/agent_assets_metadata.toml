@@ -47,3 +47,17 @@ mtime_ms = 1789286234777
 storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:034c0c6d-c25b-491b-98e9-0bb19624165f/9fbe78e2-ae6c-404e-bf93-fd62889c9eae/12d77292-af03-4684-ba12-1ac4f1520dd4"
 storage_version_token = "1789286246444425"
 content_type = "application/octet-stream"
+
+[[outputs]]
+id = "vGo_qLte8L1vSG3-I-AvU"
+uri = "file://deliverables/perfusion-web-wireframe.html"
+type = "html"
+title = "Perfusion Web — Current Application Wireframe"
+description = "Downloadable, self-contained HTML wireframe covering the public/authentication, Care Seeker, Care Provider, and Administrator screens and their navigation flow. Open it in a browser; use Print / Save PDF for a PDF copy."
+logical_id = "a5442bab-662d-40f1-bcae-aaa64e2fb8f1"
+content_hash = "sha256:881cb4126b6c1593ae6d7299877ddac7318e38eb6d27966801ef44c7355a54f7"
+size = 36136
+mtime_ms = 1789901159947
+storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:034c0c6d-c25b-491b-98e9-0bb19624165f/a5442bab-662d-40f1-bcae-aaa64e2fb8f1/b47e4cee-827e-47bb-9c74-13e887bc68bd"
+storage_version_token = "1789901171030830"
+content_type = "text/html"

@@ -1,0 +1,768 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Perfusion Web — Current Implementation Wireframe</title>
+  <style>
+    :root {
+      --ink: #202124;
+      --muted: #6f7277;
+      --line: #cfd2d6;
+      --soft: #f5f5f3;
+      --paper: #ffffff;
+      --red: #b92f33;
+      --red-soft: #f8e9e9;
+      --blue: #315c84;
+      --blue-soft: #eaf1f7;
+      --green: #3f6d58;
+      --green-soft: #eaf3ee;
+      --gold: #8b662c;
+      --gold-soft: #f6f0e4;
+      --shadow: 0 8px 28px rgba(32, 33, 36, 0.08);
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: #ececea;
+      font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.45;
+    }
+
+    .toolbar {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 12px 24px;
+      color: white;
+      background: #222325;
+      box-shadow: 0 2px 12px rgba(0,0,0,.18);
+    }
+
+    .toolbar strong { letter-spacing: .01em; }
+    .toolbar nav { display: flex; flex-wrap: wrap; gap: 6px; }
+    .toolbar a, .toolbar button {
+      border: 1px solid rgba(255,255,255,.28);
+      border-radius: 7px;
+      padding: 7px 10px;
+      color: white;
+      background: transparent;
+      font: inherit;
+      font-size: 12px;
+      text-decoration: none;
+      cursor: pointer;
+    }
+    .toolbar a:hover, .toolbar button:hover { background: rgba(255,255,255,.12); }
+
+    main {
+      width: min(1580px, calc(100% - 40px));
+      margin: 24px auto 64px;
+    }
+
+    .cover, .section {
+      margin-bottom: 24px;
+      border: 1px solid #d6d6d3;
+      border-radius: 18px;
+      background: var(--paper);
+      box-shadow: var(--shadow);
+    }
+
+    .cover {
+      display: grid;
+      grid-template-columns: 1.4fr .9fr;
+      min-height: 360px;
+      overflow: hidden;
+    }
+
+    .cover-copy { padding: 48px; }
+    .eyebrow {
+      margin: 0 0 12px;
+      color: var(--red);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+    }
+    h1 { margin: 0 0 16px; font-size: clamp(34px, 5vw, 64px); line-height: 1.02; }
+    .lead { max-width: 760px; color: var(--muted); font-size: 17px; }
+    .meta { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 24px; }
+    .tag {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 6px 10px;
+      color: #505258;
+      background: #fafafa;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .cover-map {
+      display: grid;
+      place-items: center;
+      padding: 36px;
+      color: white;
+      background:
+        linear-gradient(145deg, rgba(185,47,51,.93), rgba(90,21,24,.98)),
+        repeating-linear-gradient(45deg, transparent 0 14px, rgba(255,255,255,.04) 14px 15px);
+    }
+    .mini-map { width: 100%; }
+    .mini-node {
+      margin: 10px auto;
+      max-width: 280px;
+      border: 1px solid rgba(255,255,255,.38);
+      border-radius: 10px;
+      padding: 12px 16px;
+      background: rgba(255,255,255,.09);
+      text-align: center;
+      font-weight: 750;
+    }
+    .mini-arrow { text-align: center; opacity: .65; }
+
+    .section { padding: 34px; }
+    .section-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 24px;
+      margin-bottom: 24px;
+      padding-bottom: 18px;
+      border-bottom: 1px solid #e3e3e0;
+    }
+    .section h2 { margin: 0 0 6px; font-size: 28px; }
+    .section-note { margin: 0; max-width: 780px; color: var(--muted); }
+    .role-label {
+      flex: 0 0 auto;
+      border-radius: 999px;
+      padding: 7px 12px;
+      font-size: 11px;
+      font-weight: 850;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+    .public .role-label { color: var(--red); background: var(--red-soft); }
+    .seeker .role-label { color: var(--blue); background: var(--blue-soft); }
+    .provider .role-label { color: var(--green); background: var(--green-soft); }
+    .admin .role-label { color: var(--gold); background: var(--gold-soft); }
+
+    .flow {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(230px, 1fr));
+      gap: 42px 28px;
+    }
+
+    .screen {
+      position: relative;
+      min-height: 300px;
+      border: 2px solid #2f3033;
+      border-radius: 13px;
+      background: white;
+      overflow: visible;
+    }
+
+    .screen:not(.no-arrow)::after {
+      content: "→";
+      position: absolute;
+      top: 46%;
+      right: -23px;
+      color: #9a9ca1;
+      font-size: 25px;
+      font-weight: 400;
+    }
+
+    .screen-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      min-height: 44px;
+      padding: 9px 12px;
+      border-bottom: 1px solid #bbbdbf;
+      background: #f4f4f2;
+      border-radius: 11px 11px 0 0;
+    }
+    .screen-title { font-size: 13px; font-weight: 850; }
+    .route {
+      color: #66696e;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 9px;
+      white-space: nowrap;
+    }
+    .screen-body { padding: 13px; }
+    .purpose { min-height: 42px; margin: 0 0 12px; color: #55585d; font-size: 12px; }
+    .wire-header, .wire-line, .wire-button, .wire-card, .wire-sidebar {
+      border-radius: 5px;
+      background: #dfe1e3;
+    }
+    .wire-header { height: 18px; width: 54%; margin-bottom: 10px; background: #9da1a5; }
+    .wire-line { height: 8px; margin: 6px 0; }
+    .wire-line.short { width: 65%; }
+    .wire-card {
+      height: 42px;
+      margin: 9px 0;
+      border: 1px solid #c8cacc;
+      background: #f1f1ef;
+    }
+    .wire-button { height: 25px; width: 46%; margin-top: 11px; background: #aeb1b4; }
+    .actions {
+      margin: 14px 0 0;
+      padding: 12px 0 0 17px;
+      border-top: 1px dashed #d4d5d6;
+      color: #34363a;
+      font-size: 11px;
+    }
+    .actions li { margin: 3px 0; }
+    .screen.branch::before {
+      content: "BRANCH";
+      position: absolute;
+      top: -10px;
+      right: 10px;
+      border-radius: 999px;
+      padding: 3px 7px;
+      color: white;
+      background: #5f6267;
+      font-size: 8px;
+      font-weight: 900;
+      letter-spacing: .08em;
+    }
+
+    .subflow {
+      grid-column: 1 / -1;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: -14px;
+      padding: 13px 15px;
+      border: 1px dashed #b8babd;
+      border-radius: 9px;
+      color: #595c61;
+      background: #fafaf8;
+      font-size: 12px;
+    }
+    .subflow strong { color: #292b2f; }
+
+    .nav-shell {
+      display: grid;
+      grid-template-columns: 210px 1fr;
+      min-height: 500px;
+      border: 2px solid #303136;
+      border-radius: 14px;
+      overflow: hidden;
+    }
+    .nav-column {
+      padding: 18px;
+      color: white;
+      background: #2c2e32;
+    }
+    .nav-column h3 { margin: 0 0 18px; font-size: 16px; }
+    .nav-item {
+      margin: 7px 0;
+      border-radius: 6px;
+      padding: 8px 10px;
+      background: rgba(255,255,255,.07);
+      font-size: 11px;
+    }
+    .nav-item.active { color: #25272a; background: white; font-weight: 800; }
+    .admin-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+      padding: 20px;
+      background: #f6f6f4;
+    }
+    .admin-card {
+      min-height: 128px;
+      border: 1px solid #c7c9cb;
+      border-radius: 9px;
+      padding: 13px;
+      background: white;
+    }
+    .admin-card h4 { margin: 0 0 5px; font-size: 12px; }
+    .admin-card p { margin: 0 0 9px; color: var(--muted); font-size: 10px; }
+
+    .legend {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+    }
+    .legend-item {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 14px;
+      font-size: 12px;
+    }
+    .legend-item strong { display: block; margin-bottom: 3px; }
+
+    .footnote {
+      color: #65686d;
+      font-size: 12px;
+    }
+
+    @media (max-width: 1120px) {
+      .flow { grid-template-columns: repeat(2, minmax(230px, 1fr)); }
+      .screen:nth-child(even)::after { display: none; }
+      .cover { grid-template-columns: 1fr; }
+      .cover-map { min-height: 280px; }
+      .admin-grid { grid-template-columns: repeat(2, 1fr); }
+      .legend { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    @media (max-width: 680px) {
+      main { width: min(100% - 20px, 1580px); }
+      .toolbar { align-items: flex-start; padding: 10px 12px; }
+      .toolbar nav { display: none; }
+      .cover-copy, .section { padding: 24px; }
+      .flow { grid-template-columns: 1fr; }
+      .screen::after { display: none; }
+      .nav-shell { grid-template-columns: 1fr; }
+      .nav-column { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; }
+      .nav-column h3 { grid-column: 1 / -1; }
+      .nav-item { margin: 0; }
+      .admin-grid, .legend { grid-template-columns: 1fr; }
+    }
+
+    @media print {
+      @page { size: A3 landscape; margin: 10mm; }
+      body { background: white; }
+      .toolbar { display: none; }
+      main { width: 100%; margin: 0; }
+      .cover, .section {
+        box-shadow: none;
+        break-inside: avoid;
+        page-break-inside: avoid;
+        margin-bottom: 10mm;
+      }
+      .section { break-before: page; page-break-before: always; }
+    }
+  </style>
+</head>
+<body>
+  <header class="toolbar">
+    <strong>Perfusion Web Wireframe</strong>
+    <nav aria-label="Wireframe sections">
+      <a href="#overview">Overview</a>
+      <a href="#public">Public & Auth</a>
+      <a href="#seeker">Care Seeker</a>
+      <a href="#provider">Provider</a>
+      <a href="#admin">Admin</a>
+      <button onclick="window.print()">Print / Save PDF</button>
+    </nav>
+  </header>
+
+  <main>
+    <section class="cover" id="overview">
+      <div class="cover-copy">
+        <p class="eyebrow">Current implementation · information architecture</p>
+        <h1>Perfusion Web<br />Screen Wireframe</h1>
+        <p class="lead">
+          A route-level wireframe of the existing application. It maps the principal screens,
+          their purpose, primary actions, role boundaries, and the navigation paths currently
+          represented in the web codebase.
+        </p>
+        <div class="meta">
+          <span class="tag">Public discovery</span>
+          <span class="tag">Authentication and onboarding</span>
+          <span class="tag">Care Seeker</span>
+          <span class="tag">Care Provider</span>
+          <span class="tag">Administrator</span>
+          <span class="tag">Read-only analysis</span>
+        </div>
+      </div>
+      <div class="cover-map">
+        <div class="mini-map" aria-label="High-level navigation flow">
+          <div class="mini-node">Public discovery</div>
+          <div class="mini-arrow">↓</div>
+          <div class="mini-node">Authentication · role · verification · agreement</div>
+          <div class="mini-arrow">↓</div>
+          <div class="mini-node">Role-protected application</div>
+          <div class="mini-arrow">↙ &nbsp;&nbsp;&nbsp;&nbsp; ↓ &nbsp;&nbsp;&nbsp;&nbsp; ↘</div>
+          <div class="mini-node">Care Seeker · Provider · Admin</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div>
+          <h2>Navigation model</h2>
+          <p class="section-note">Solid screen frames represent registered pages. Arrows show the principal forward journey; users may navigate backward or jump through role navigation.</p>
+        </div>
+      </div>
+      <div class="legend">
+        <div class="legend-item"><strong>Public routes</strong>Accessible before authentication and used for discovery.</div>
+        <div class="legend-item"><strong>State gates</strong>Email verification, approval, and agreement may interrupt the normal route.</div>
+        <div class="legend-item"><strong>Role layouts</strong>User, provider, and admin pages are protected by role-aware layouts.</div>
+        <div class="legend-item"><strong>Shared live route</strong>Eligible seeker and provider bookings can open the shared video room.</div>
+      </div>
+    </section>
+
+    <section class="section public" id="public">
+      <div class="section-head">
+        <div>
+          <h2>Public discovery, authentication, and onboarding</h2>
+          <p class="section-note">The entry journey introduces services, starts bookings, authenticates users, and resolves required account state before role dashboards.</p>
+        </div>
+        <span class="role-label">Public / shared</span>
+      </div>
+
+      <div class="flow">
+        <article class="screen">
+          <div class="screen-top"><span class="screen-title">Landing</span><span class="route">/</span></div>
+          <div class="screen-body">
+            <p class="purpose">Primary marketing and service-discovery entry point.</p>
+            <div class="wire-header"></div><div class="wire-card"></div><div class="wire-card"></div><div class="wire-button"></div>
+            <ul class="actions"><li>Explore services</li><li>Browse consultants</li><li>Browse lab tests</li><li>Log in or register</li></ul>
+          </div>
+        </article>
+
+        <article class="screen branch">
+          <div class="screen-top"><span class="screen-title">Consultants</span><span class="route">/consultants</span></div>
+          <div class="screen-body">
+            <p class="purpose">Public specialist discovery and booking entry.</p>
+            <div class="wire-line"></div><div class="wire-card"></div><div class="wire-card"></div><div class="wire-button"></div>
+            <ul class="actions"><li>Browse consultants</li><li>View public profiles</li><li>Start booking</li><li>Redirect to login if needed</li></ul>
+          </div>
+        </article>
+
+        <article class="screen branch">
+          <div class="screen-top"><span class="screen-title">Lab Tests</span><span class="route">/lab-tests</span></div>
+          <div class="screen-body">
+            <p class="purpose">Public diagnostic-test catalog and booking entry.</p>
+            <div class="wire-line short"></div><div class="wire-card"></div><div class="wire-card"></div><div class="wire-button"></div>
+            <ul class="actions"><li>Browse available tests</li><li>View test details</li><li>Start a booking</li><li>Log in or register</li></ul>
+          </div>
+        </article>
+
+        <article class="screen">
+          <div class="screen-top"><span class="screen-title">Login</span><span class="route">/login</span></div>
+          <div class="screen-body">
+            <p class="purpose">Authenticate an existing Perfusion account.</p>
+            <div class="wire-header"></div><div class="wire-line"></div><div class="wire-line"></div><div class="wire-button"></div>
+            <ul class="actions"><li>Enter credentials</li><li>Sign in</li><li>Continue to registration</li><li>Resolve account state</li></ul>
+          </div>
+        </article>
+
+        <article class="screen">
+          <div class="screen-top"><span class="screen-title">Register</span><span class="route">/register</span></div>
+          <div class="screen-body">
+            <p class="purpose">Create a new account using the current registration flow.</p>
+            <div class="wire-header"></div><div class="wire-line"></div><div class="wire-line"></div><div class="wire-line short"></div><div class="wire-button"></div>
+            <ul class="actions"><li>Enter account details</li><li>Create account</li><li>Continue to role selection</li></ul>
+          </div>
+        </article>
+
+        <article class="screen">
+          <div class="screen-top"><span class="screen-title">Select Role</span><span class="route">/select-role</span></div>
+          <div class="screen-body">
+            <p class="purpose">Assign the account’s intended application role.</p>
+            <div class="wire-header"></div><div class="wire-card"></div><div class="wire-card"></div><div class="wire-button"></div>
+            <ul class="actions"><li>Choose account role</li><li>Continue to profile setup</li></ul>
+          </div>
+        </article>
+
+        <article class="screen">
+          <div class="screen-top"><span class="screen-title">Complete Profile</span><span class="route">/complete-profile</span></div>
+          <div class="screen-body">
+            <p class="purpose">Collect additional identity and role-specific profile data.</p>
+            <div class="wire-line"></div><div class="wire-line"></div><div class="wire-line"></div><div class="wire-line short"></div><div class="wire-button"></div>
+            <ul class="actions"><li>Enter profile details</li><li>Submit profile</li><li>Continue verification</li></ul>
+          </div>
+        </article>
+
+        <article class="screen">
+          <div class="screen-top"><span class="screen-title">Verify Email</span><span class="route">/verify-email</span></div>
+          <div class="screen-body">
+            <p class="purpose">Verify account ownership before protected access.</p>
+            <div class="wire-header"></div><div class="wire-line short"></div><div class="wire-button"></div>
+            <ul class="actions"><li>Enter verification value</li><li>Confirm email</li><li>Retry verification</li></ul>
+          </div>
+        </article>
+
+        <article class="screen branch">
+          <div class="screen-top"><span class="screen-title">Pending Approval</span><span class="route">/pending-approval</span></div>
+          <div class="screen-body">
+            <p class="purpose">Explain that a provider account is awaiting administrative review.</p>
+            <div class="wire-header"></div><div class="wire-card"></div><div class="wire-line short"></div>
+            <ul class="actions"><li>Review approval status</li><li>Wait for activation</li><li>Sign out if needed</li></ul>
+          </div>
+        </article>
+
+        <article class="screen branch">
+          <div class="screen-top"><span class="screen-title">Agreement</span><span class="route">/agreement</span></div>
+          <div class="screen-body">
+            <p class="purpose">Present and capture the required current platform agreement.</p>
+            <div class="wire-header"></div><div class="wire-card"></div><div class="wire-line"></div><div class="wire-button"></div>
+            <ul class="actions"><li>Read agreement</li><li>Accept current version</li><li>Continue to role dashboard</li></ul>
+          </div>
+        </article>
+
+        <article class="screen branch">
+          <div class="screen-top"><span class="screen-title">Prescription Verification</span><span class="route">/verify/prescription/:bookingId</span></div>
+          <div class="screen-body">
+            <p class="purpose">Publicly verify a prescription associated with a booking.</p>
+            <div class="wire-header"></div><div class="wire-card"></div><div class="wire-line short"></div>
+            <ul class="actions"><li>Review verification result</li><li>Inspect prescription metadata</li></ul>
+          </div>
+        </article>
+
+        <article class="screen no-arrow">
+          <div class="screen-top"><span class="screen-title">Role Dashboard</span><span class="route">/user · /provider · /admin</span></div>
+          <div class="screen-body">
+            <p class="purpose">Route authenticated users into the interface authorized for their role.</p>
+            <div class="wire-card"></div><div class="wire-card"></div><div class="wire-card"></div>
+            <ul class="actions"><li>Enter protected application</li><li>Use role navigation</li></ul>
+          </div>
+        </article>
+
+        <div class="subflow"><strong>Alternate public route:</strong> <code>/home</code> is a smaller secondary home screen. Unmatched URLs render the Not Found page.</div>
+      </div>
+    </section>
+
+    <section class="section seeker" id="seeker">
+      <div class="section-head">
+        <div>
+          <h2>Care Seeker journey</h2>
+          <p class="section-note">The user layout provides Dashboard, Lab Tests, Consultation, Teleradiology, Orders, Billing, and Profile navigation.</p>
+        </div>
+        <span class="role-label">Care Seeker</span>
+      </div>
+
+      <div class="flow">
+        <article class="screen">
+          <div class="screen-top"><span class="screen-title">User Dashboard</span><span class="route">/user</span></div>
+          <div class="screen-body">
+            <p class="purpose">Overview of upcoming and recent healthcare activity.</p>
+            <div class="wire-header"></div><div class="wire-card"></div><div class="wire-card"></div><div class="wire-button"></div>
+            <ul class="actions"><li>Review bookings</li><li>Join eligible video consultation</li><li>Open reports and prescriptions</li></ul>
+          </div>
+        </article>
+
+        <article class="screen">
+          <div class="screen-top"><span class="screen-title">Consultations</span><span class="route">/user/consultation</span></div>
+          <div class="screen-body">
+            <p class="purpose">Browse consultants and begin a consultation booking.</p>
+            <div class="wire-line"></div><div class="wire-card"></div><div class="wire-card"></div><div class="wire-button"></div>
+            <ul class="actions"><li>Browse and filter consultants</li><li>View consultant information</li><li>Select Book</li></ul>
+          </div>
+        </article>
+
+        <article class="screen">
+          <div class="screen-top"><span class="screen-title">Consultation Booking</span><span class="route">/user/consultation/:id/book</span></div>
+          <div class="screen-body">
+            <p class="purpose">Collect booking details, select a slot, and confirm.</p>
+            <div class="wire-line"></div><div class="wire-line"></div><div class="wire-card"></div><div class="wire-button"></div>
+            <ul class="actions"><li>Select time slot</li><li>Enter patient details</li><li>Complete payment where required</li><li>Confirm booking</li></ul>
+          </div>
+        </article>
+
+        <article class="screen">
+          <div class="screen-top"><span class="screen-title">Orders</span><span class="route">/user/orders</span></div>
+          <div class="screen-body">
+            <p class="purpose">Track bookings, consultation outcomes, and clinical documents.</p>
+            <div class="wire-card"></div><div class="wire-card"></div><div class="wire-card"></div>
+            <ul class="actions"><li>Review status</li><li>Join consultation room</li><li>View/download reports and prescriptions</li><li>Book again</li></ul>
+          </div>
+        </article>
+
+        <article class="screen branch">
+          <div class="screen-top"><span class="screen-title">Lab Tests</span><span class="route">/user/labs</span></div>
+          <div class="screen-body">
+            <p class="purpose">Browse the authenticated diagnostic-test catalog.</p>
+            <div class="wire-line"></div><div class="wire-card"></div><div class="wire-card"></div><div class="wire-button"></div>
+            <ul class="actions"><li>Browse tests</li><li>Select a test</li><li>Open lab booking</li></ul>
+          </div>
+        </article>
+
+        <article class="screen branch">
+          <div class="screen-top"><span class="screen-title">Lab Booking</span><span class="route">/user/labs/:id/book</span></div>
+          <div class="screen-body">
+            <p class="purpose">Submit patient and scheduling information for a selected test.</p>
+            <div class="wire-line"></div><div class="wire-line"></div><div class="wire-line short"></div><div class="wire-button"></div>
+            <ul class="actions"><li>Enter patient information</li><li>Enter booking details</li><li>Confirm request</li></ul>
+          </div>
+        </article>
+
+        <article class="screen branch">
+          <div class="screen-top"><span class="screen-title">Teleradiology</span><span class="route">/user/teleradiology</span></div>
+          <div class="screen-body">
+            <p class="purpose">Access the currently implemented radiology-service flow.</p>
+            <div class="wire-header"></div><div class="wire-card"></div><div class="wire-button"></div>
+            <ul class="actions"><li>Review service information</li><li>Initiate applicable request</li></ul>
+          </div>
+        </article>
+
+        <article class="screen branch">
+          <div class="screen-top"><span class="screen-title">Billing</span><span class="route">/user/billing</span></div>
+          <div class="screen-body">
+            <p class="purpose">Review seeker billing and payment records.</p>
+            <div class="wire-card"></div><div class="wire-card"></div><div class="wire-line short"></div>
+            <ul class="actions"><li>View charges</li><li>Review payment records</li><li>Inspect billing history</li></ul>
+          </div>
+        </article>
+
+        <article class="screen branch">
+          <div class="screen-top"><span class="screen-title">Profile</span><span class="route">/user/profile</span></div>
+          <div class="screen-body">
+            <p class="purpose">Maintain the Care Seeker account and personal information.</p>
+            <div class="wire-header"></div><div class="wire-line"></div><div class="wire-line"></div><div class="wire-button"></div>
+            <ul class="actions"><li>View details</li><li>Edit personal information</li><li>Save changes</li><li>Log out</li></ul>
+          </div>
+        </article>
+
+        <article class="screen no-arrow">
+          <div class="screen-top"><span class="screen-title">Video Room</span><span class="route">/video/:roomId</span></div>
+          <div class="screen-body">
+            <p class="purpose">Shared live consultation room opened from an eligible booking.</p>
+            <div class="wire-card" style="height:100px"></div><div class="wire-button"></div>
+            <ul class="actions"><li>Join consultation</li><li>Use live communication controls</li><li>Leave room</li></ul>
+          </div>
+        </article>
+
+        <div class="subflow"><strong>Primary seeker flow:</strong> Dashboard → Consultant discovery → Booking → Orders → Video room / clinical documents. Lab, radiology, billing, and profile are parallel navigation destinations.</div>
+      </div>
+    </section>
+
+    <section class="section provider" id="provider">
+      <div class="section-head">
+        <div>
+          <h2>Care Provider journey</h2>
+          <p class="section-note">The provider layout supplies Dashboard, Bookings, Services where eligible, Billing, and Profile. Consultant and teleradiology provider types do not receive Services navigation.</p>
+        </div>
+        <span class="role-label">Care Provider</span>
+      </div>
+
+      <div class="flow">
+        <article class="screen branch">
+          <div class="screen-top"><span class="screen-title">Provider Onboarding</span><span class="route">/provider/onboarding</span></div>
+          <div class="screen-body">
+            <p class="purpose">Create or complete a provider’s professional profile.</p>
+            <div class="wire-header"></div><div class="wire-line"></div><div class="wire-line"></div><div class="wire-button"></div>
+            <ul class="actions"><li>Enter professional details</li><li>Submit provider profile</li><li>Continue approval workflow</li></ul>
+          </div>
+        </article>
+
+        <article class="screen">
+          <div class="screen-top"><span class="screen-title">Provider Dashboard</span><span class="route">/provider</span></div>
+          <div class="screen-body">
+            <p class="purpose">Operational overview of recent bookings and provider activity.</p>
+            <div class="wire-header"></div><div class="wire-card"></div><div class="wire-card"></div><div class="wire-card"></div>
+            <ul class="actions"><li>Review recent activity</li><li>Open assigned bookings</li><li>Access provider operations</li></ul>
+          </div>
+        </article>
+
+        <article class="screen">
+          <div class="screen-top"><span class="screen-title">Provider Bookings</span><span class="route">/provider/bookings</span></div>
+          <div class="screen-body">
+            <p class="purpose">Process assigned consultations and other supported bookings.</p>
+            <div class="wire-line"></div><div class="wire-card"></div><div class="wire-card"></div><div class="wire-button"></div>
+            <ul class="actions"><li>Filter and inspect bookings</li><li>Review patient documents</li><li>Update status</li><li>Join video room</li><li>Create reports/prescriptions</li></ul>
+          </div>
+        </article>
+
+        <article class="screen branch">
+          <div class="screen-top"><span class="screen-title">Provider Services</span><span class="route">/provider/services</span></div>
+          <div class="screen-body">
+            <p class="purpose">Configure offered services and availability for eligible provider types.</p>
+            <div class="wire-header"></div><div class="wire-card"></div><div class="wire-card"></div><div class="wire-button"></div>
+            <ul class="actions"><li>Manage services</li><li>Configure pricing</li><li>Manage availability</li></ul>
+          </div>
+        </article>
+
+        <article class="screen branch">
+          <div class="screen-top"><span class="screen-title">Provider Billing</span><span class="route">/provider/billing</span></div>
+          <div class="screen-body">
+            <p class="purpose">Review provider earnings and billing-related information.</p>
+            <div class="wire-card"></div><div class="wire-card"></div><div class="wire-line short"></div>
+            <ul class="actions"><li>Review billing records</li><li>Inspect payment information</li></ul>
+          </div>
+        </article>
+
+        <article class="screen branch">
+          <div class="screen-top"><span class="screen-title">Provider Profile</span><span class="route">/provider/profile</span></div>
+          <div class="screen-body">
+            <p class="purpose">Maintain provider account and professional profile information.</p>
+            <div class="wire-header"></div><div class="wire-line"></div><div class="wire-line"></div><div class="wire-button"></div>
+            <ul class="actions"><li>View account details</li><li>Edit profile</li><li>Save changes</li><li>Log out</li></ul>
+          </div>
+        </article>
+
+        <article class="screen no-arrow">
+          <div class="screen-top"><span class="screen-title">Video Room</span><span class="route">/video/:roomId</span></div>
+          <div class="screen-body">
+            <p class="purpose">Shared live consultation room opened from an eligible provider booking.</p>
+            <div class="wire-card" style="height:100px"></div><div class="wire-button"></div>
+            <ul class="actions"><li>Join consultation</li><li>Use live communication controls</li><li>Leave room</li></ul>
+          </div>
+        </article>
+
+        <div class="subflow"><strong>Primary provider flow:</strong> Onboarding/approval → Dashboard → Assigned booking → Patient material and documentation → Video room → Booking completion. Services, billing, and profile are parallel destinations.</div>
+      </div>
+    </section>
+
+    <section class="section admin" id="admin">
+      <div class="section-head">
+        <div>
+          <h2>Administrator workspace</h2>
+          <p class="section-note">Authenticated administrators use a persistent management sidebar. The cards below represent the current registered admin destinations.</p>
+        </div>
+        <span class="role-label">Administrator</span>
+      </div>
+
+      <div class="nav-shell">
+        <aside class="nav-column" aria-label="Admin sidebar wireframe">
+          <h3>Perfusion Admin</h3>
+          <div class="nav-item active">Dashboard</div>
+          <div class="nav-item">Appointments</div>
+          <div class="nav-item">Bookings</div>
+          <div class="nav-item">Consultants</div>
+          <div class="nav-item">Providers</div>
+          <div class="nav-item">Users</div>
+          <div class="nav-item">Approvals</div>
+          <div class="nav-item">Lab Tests</div>
+          <div class="nav-item">Radiology</div>
+          <div class="nav-item">Suggestions</div>
+          <div class="nav-item">Billing</div>
+          <div class="nav-item">Analytics</div>
+          <div class="nav-item">Agreements</div>
+          <div class="nav-item">Diagnostics</div>
+        </aside>
+
+        <div class="admin-grid">
+          <article class="admin-card"><h4>Dashboard · /admin</h4><p>Platform-wide operational overview.</p><div class="wire-line"></div><div class="wire-card"></div></article>
+          <article class="admin-card"><h4>Appointments · /admin/appointments</h4><p>Schedule and manage seeker-consultant appointments.</p><div class="wire-line"></div><div class="wire-button"></div></article>
+          <article class="admin-card"><h4>Bookings · /admin/bookings</h4><p>Inspect and manage all platform bookings.</p><div class="wire-line"></div><div class="wire-card"></div></article>
+          <article class="admin-card"><h4>Consultants · /admin/consultants</h4><p>Manage consultant records and profiles.</p><div class="wire-line"></div><div class="wire-card"></div></article>
+          <article class="admin-card"><h4>Providers · /admin/providers</h4><p>Manage provider organizations and accounts.</p><div class="wire-line"></div><div class="wire-button"></div></article>
+          <article class="admin-card"><h4>Users · /admin/users</h4><p>Review and administer user accounts.</p><div class="wire-line"></div><div class="wire-card"></div></article>
+          <article class="admin-card"><h4>Approvals · /admin/approvals</h4><p>Review provider applications and approval state.</p><div class="wire-line"></div><div class="wire-button"></div></article>
+          <article class="admin-card"><h4>Lab Tests · /admin/lab-tests</h4><p>Maintain diagnostic tests and pricing.</p><div class="wire-line"></div><div class="wire-button"></div></article>
+          <article class="admin-card"><h4>Radiology · /admin/radiology</h4><p>Maintain radiology modalities and services.</p><div class="wire-line"></div><div class="wire-button"></div></article>
+          <article class="admin-card"><h4>Suggestions · /admin/suggestions</h4><p>Review provider-submitted catalog suggestions.</p><div class="wire-line"></div><div class="wire-card"></div></article>
+          <article class="admin-card"><h4>Billing · /admin/billing</h4><p>Administer financial and payment records.</p><div class="wire-line"></div><div class="wire-card"></div></article>
+          <article class="admin-card"><h4>Analytics · /admin/analytics</h4><p>Review platform performance metrics.</p><div class="wire-line"></div><div class="wire-card"></div></article>
+          <article class="admin-card"><h4>Agreements · /admin/agreements</h4><p>Review accepted platform agreements.</p><div class="wire-line"></div><div class="wire-card"></div></article>
+          <article class="admin-card"><h4>Diagnostics · /admin/diagnostics</h4><p>Inspect system health and diagnostic output.</p><div class="wire-line"></div><div class="wire-card"></div></article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div>
+          <h2>Implementation boundaries</h2>
+          <p class="section-note">This document reflects currently registered web routes and observed page responsibilities. It does not represent proposed backlog items as implemented behavior.</p>
+        </div>
+      </div>
+      <p class="footnote">
+        Critical-care page files exist in the source tree but are not currently registered in the application router, so they are excluded from the active navigation flow. Exact redirects after registration may vary based on role, verification, approval, and agreement state.
+      </p>
+    </section>
+  </main>
+</body>
+</html>
