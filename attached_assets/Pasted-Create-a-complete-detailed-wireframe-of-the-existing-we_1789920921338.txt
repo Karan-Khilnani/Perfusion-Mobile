@@ -1,0 +1,128 @@
+Create a complete, detailed wireframe of the existing web application based strictly on the current implementation in this Replit project.
+
+IMPORTANT:
+- This is an analysis/documentation task only.
+- Do NOT modify, redesign, refactor, delete, or overwrite any existing application code.
+- Do NOT change the UI or functionality of the actual web application.
+- Inspect the existing routes, pages, components, navigation, layouts, and available user flows to understand the current application.
+- The wireframe must represent what currently exists in the web application, not what you think the application should look like.
+- If something exists in the code but is not currently accessible through an active route/navigation flow, clearly mark it as "inactive/not currently accessible" rather than including it as an active screen.
+
+I need this wireframe for a QA comparison between the existing web application and a separately developed mobile application.
+
+Create a screen-by-screen wireframe covering the complete active web application.
+
+For every screen/page, include:
+
+1. Screen/page name
+2. User role that can access it
+3. Purpose of the screen
+4. Main layout/structure
+5. Header/navigation elements
+6. Main content sections
+7. Buttons and clickable elements
+8. Forms and input fields
+9. Tabs, dropdowns, filters, menus, cards, icons, or other interactive elements
+10. Important labels, titles, headings, and descriptions
+11. Navigation destination or action for each major interaction
+12. Important success, error, loading, empty, confirmation, or approval states where identifiable
+13. Authentication/permission requirements
+14. Relationship to the previous and next screen in the user journey
+
+Organize the wireframe into these major sections where applicable:
+
+A. PUBLIC / AUTHENTICATION
+- Landing page
+- Consultants
+- Consultant profile/details
+- Lab Tests
+- Login
+- Registration
+- Role selection
+- Profile completion
+- Email verification
+- Agreement
+- Pending approval
+
+B. CARE SEEKER
+- Dashboard
+- Consultations
+- Consultant search/filtering
+- Consultant details
+- Consultation booking
+- Slot selection
+- Patient/consultation details
+- Payment
+- Booking confirmation
+- Orders
+- Booking details
+- Prescriptions
+- Reports
+- Lab Tests
+- Lab test details
+- Lab booking
+- Teleradiology
+- Billing
+- Profile
+- Video consultation room
+
+C. CARE PROVIDER
+- Provider onboarding
+- Provider dashboard
+- Provider bookings
+- Booking/patient details
+- Documents/reports
+- Video consultation
+- Prescription/consultation summary
+- Provider services
+- Service/pricing/availability management
+- Provider billing
+- Provider profile
+
+D. ADMINISTRATOR
+- Admin dashboard
+- Appointments
+- Appointment details
+- Bookings
+- Booking details
+- Consultants/providers
+- Users
+- User/provider details
+- Approvals
+- Lab tests
+- Radiology
+- Suggestions
+- Billing
+- Analytics
+- Agreements
+- Diagnostics
+
+For each screen, show the approximate visual hierarchy and placement of elements using a clean low-fidelity wireframe style. Focus on structure and functionality rather than visual styling.
+
+The wireframe should make it easy for someone to compare the web application with a mobile application screen by screen.
+
+Also create a clear navigation/user-flow diagram showing how users move between screens for each role:
+
+PUBLIC/AUTHENTICATION
+→ CARE SEEKER FLOW
+→ CARE PROVIDER FLOW
+→ ADMIN FLOW
+
+Where there are conditional flows, such as login requirements, role-based access, email verification, provider approval, agreements, payment, or booking status, show those conditions in the flow.
+
+At the end, include:
+
+1. A complete list of active screens/pages.
+2. A list of inactive/unregistered screens found in the code, if any.
+3. A list of major interactive elements that should be manually tested.
+4. A list of role-based differences.
+5. A list of important conditional states.
+6. A concise end-to-end user journey for each role.
+
+OUTPUT REQUIREMENTS:
+- Produce the wireframe as a professional, easy-to-read document.
+- Use clear screen names and consistent numbering.
+- Keep the wireframe faithful to the existing application.
+- Include enough detail that another person can use it as a reference when checking the mobile application.
+- Make the final wireframe downloadable, preferably as a PDF.
+- Do not make any changes to the existing web application code.

@@ -61,3 +61,31 @@ mtime_ms = 1789901159947
 storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:034c0c6d-c25b-491b-98e9-0bb19624165f/a5442bab-662d-40f1-bcae-aaa64e2fb8f1/b47e4cee-827e-47bb-9c74-13e887bc68bd"
 storage_version_token = "1789901171030830"
 content_type = "text/html"
+
+[[outputs]]
+id = "Y9qYElKI7kOblhmOm8EEk"
+uri = "file://deliverables/perfusion-web-complete-qa-wireframe.pdf"
+type = "pdf"
+title = "Perfusion Web — Complete QA Wireframe (PDF)"
+description = "53-page screen-by-screen wireframe of the current web implementation, including role flows, route and subflow details, states, permissions, inactive screens, manual QA checklist, role differences, and end-to-end journeys."
+logical_id = "cc559eb8-b7dc-412e-81ea-6eaba9a9d8ff"
+content_hash = "sha256:050e8baff8e50e678f74106bd4b7a56911046235218db7e775fb939d5e4544cb"
+size = 890624
+mtime_ms = 1789921271544
+storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:034c0c6d-c25b-491b-98e9-0bb19624165f/cc559eb8-b7dc-412e-81ea-6eaba9a9d8ff/7ed76f19-5821-4530-b82a-0b910a35ab9c"
+storage_version_token = "1789921288638137"
+content_type = "application/pdf"
+
+[[outputs]]
+id = "pm2MsAlocxKNT-rNEn_Oy"
+uri = "file://deliverables/perfusion-web-complete-qa-wireframe.html"
+type = "html"
+title = "Perfusion Web — Complete QA Wireframe (Interactive HTML)"
+description = "Searchable browser version of the complete QA wireframe with section navigation and a Print / Save PDF control."
+logical_id = "afe4149a-51b8-427f-8f36-08a00aa0a42c"
+content_hash = "sha256:3d45dbbc795d5dc0d5ab2ec1898c1409cc804ea6223da2e6a1ab0147431c8b64"
+size = 94327
+mtime_ms = 1789921256904
+storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:034c0c6d-c25b-491b-98e9-0bb19624165f/afe4149a-51b8-427f-8f36-08a00aa0a42c/62d3d9f7-1972-45fb-b191-49e4d8c49412"
+storage_version_token = "1789921290185965"
+content_type = "text/html"
