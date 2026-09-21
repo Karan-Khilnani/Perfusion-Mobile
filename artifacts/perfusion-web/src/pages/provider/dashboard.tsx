@@ -98,7 +98,6 @@ function PatientDetailsDialog({
     { label: "Age", value: booking.patientAge != null ? `${booking.patientAge} years` : null },
     { label: "Gender", value: booking.patientGender },
     { label: "Contact", value: booking.patientContact },
-    { label: "Call-back Number", value: (booking as any).callbackPhone ? `${(booking as any).callbackPhone}${(booking as any).callbackWardName ? ` (${(booking as any).callbackWardName})` : ""}` : null },
     { label: "Weight", value: booking.patientWeight },
     { label: "UHID / IP No.", value: booking.uhidIpNumber },
     { label: "IPD No.", value: booking.ipdNumber },
@@ -301,23 +300,19 @@ function RevenueSection({ revenue, isLoading, label = "All earnings" }: { revenu
 
 function CallSeekerButton({ booking }: { booking: ActiveConsultation }) {
   const { toast } = useToast();
+  const [, navigate] = useLocation();
   const prescriptionApprovedAt = (booking as any).prescriptionApprovedAt;
   const rxStatus = getPostRxStatus(booking as any);
   const win = getCallWindow(booking as any);
-  const callbackPhone = (booking as any).callbackPhone as string | null | undefined;
   const canCall = prescriptionApprovedAt
-    ? !!callbackPhone && rxStatus.callsEnabled
-    : (booking as any).status === "booked" && !!callbackPhone && win.open;
+    ? rxStatus.callsEnabled
+    : (booking as any).status === "booked" && win.open;
   const disabledReason = prescriptionApprovedAt
-    ? !callbackPhone
-      ? "No callback number on this booking — ask admin to update it"
-      : !rxStatus.inWindow
+    ? !rxStatus.inWindow
         ? "Post-consultation 24-hour window has expired"
         : !rxStatus.callsEnabled
           ? "Calls are disabled — toggle on from the post-consultation controls below"
           : undefined
-    : !callbackPhone
-    ? "No callback number on this booking — ask admin to update it"
     : (booking as any).status !== "booked"
     ? "Only available for active (booked) consultations"
     : win.reason === "before_window" && win.windowStart
@@ -326,9 +321,10 @@ function CallSeekerButton({ booking }: { booking: ActiveConsultation }) {
     ? "Slot has ended — contact admin to extend if needed"
     : undefined;
   const callMutation = useMutation({
-    mutationFn: () => apiRequest("POST", `/api/bookings/${booking.id}/call`),
+    mutationFn: () => apiRequest("POST", `/api/call/ring/${booking.id}`, { callType: "voice" }),
     onSuccess: () => {
-      toast({ title: "Call initiated", description: "Connecting you with the patient's ward — numbers are masked for privacy." });
+      if (!booking.videoRoomId) return;
+      navigate(`/video/${encodeURIComponent(booking.videoRoomId)}?returnTo=/provider&voice=true&initiated=true`);
     },
     onError: async (err: any) => {
       let msg = "Failed to initiate call.";
@@ -349,7 +345,7 @@ function CallSeekerButton({ booking }: { booking: ActiveConsultation }) {
       data-testid={`button-call-seeker-${booking.id}`}
     >
       <Phone className="h-4 w-4 shrink-0" />
-      <span className="truncate">{callMutation.isPending ? "Connecting…" : "Call Seeker"}</span>
+      <span className="truncate">{callMutation.isPending ? "Ringing…" : "Call Seeker"}</span>
     </Button>
   );
 }

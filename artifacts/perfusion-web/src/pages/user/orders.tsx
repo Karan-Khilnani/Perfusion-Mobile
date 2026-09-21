@@ -451,17 +451,19 @@ export default function OrdersPage() {
     );
   }
 
-  const CallConsultantButton = ({ bookingId, status, callbackPhone, appointmentSlot, callWindowExtendedUntil, prescriptionApprovedAt, postRxExpiresAt, postRxCallsEnabled }: { bookingId: string; status: string; callbackPhone?: string; appointmentSlot?: string | null; callWindowExtendedUntil?: string | null; prescriptionApprovedAt?: string | null; postRxExpiresAt?: string | null; postRxCallsEnabled?: boolean | null }) => {
+  const CallConsultantButton = ({ bookingId, videoRoomId, status, appointmentSlot, callWindowExtendedUntil, prescriptionApprovedAt, postRxExpiresAt, postRxCallsEnabled }: { bookingId: string; videoRoomId?: string | null; status: string; appointmentSlot?: string | null; callWindowExtendedUntil?: string | null; prescriptionApprovedAt?: string | null; postRxExpiresAt?: string | null; postRxCallsEnabled?: boolean | null }) => {
     const { toast } = useToast();
+    const [, navigate] = useLocation();
     const rxStatus = getPostRxStatus({ prescriptionApprovedAt, postRxExpiresAt, postRxCallsEnabled });
     const win = getCallWindow({ appointmentSlot, callWindowExtendedUntil });
     const canCall = prescriptionApprovedAt
-      ? !!callbackPhone && rxStatus.callsEnabled
-      : status === "booked" && !!callbackPhone && win.open;
+      ? rxStatus.callsEnabled
+      : status === "booked" && win.open;
     const callMutation = useMutation({
-      mutationFn: () => apiRequest("POST", `/api/bookings/${bookingId}/call`),
+      mutationFn: () => apiRequest("POST", `/api/call/ring/${bookingId}`, { callType: "voice" }),
       onSuccess: () => {
-        toast({ title: "Call initiated", description: "You will receive a call on your registered ward number shortly — numbers are masked for privacy." });
+        if (!videoRoomId) return;
+        navigate(`/video/${encodeURIComponent(videoRoomId)}?returnTo=/user/orders&voice=true&initiated=true`);
       },
       onError: async (err: any) => {
         let msg = "Failed to initiate call.";
@@ -474,28 +476,24 @@ export default function OrdersPage() {
     });
 
     const description = prescriptionApprovedAt
-      ? !callbackPhone
-        ? "Add a call-back number to this booking to enable phone consultation"
-        : !rxStatus.inWindow
+      ? !rxStatus.inWindow
           ? "Post-consultation 24-hour window has expired"
           : !rxStatus.callsEnabled
-            ? "Phone calls are currently disabled for this consultation"
-            : "Exotel will call your registered ward number and bridge you with the consultant — both numbers are masked"
-      : !callbackPhone
-      ? "Add a call-back number to this booking to enable phone consultation"
+            ? "Voice calls are currently disabled for this consultation"
+            : "Start a secure in-app voice call with your consultant"
       : status !== "booked"
-      ? "Phone calls are only available for active (booked) consultations"
+      ? "Voice calls are only available for active consultations"
       : win.reason === "before_window" && win.windowStart
       ? `Call window opens at ${toISTTimeString(win.windowStart)} IST — same window as video call`
       : win.reason === "expired"
       ? "Slot has ended — contact admin to extend if needed"
-      : "Exotel will call your registered ward number and bridge you with the consultant — both numbers are masked";
+      : "Start a secure in-app voice call with your consultant";
 
     return (
       <div className="rounded-lg border border-green-500/20 bg-green-500/5 p-4">
         <div className="flex items-center gap-2 text-green-700 dark:text-green-400">
           <Phone className="h-5 w-5" />
-          <span className="font-medium">Phone Consultation</span>
+          <span className="font-medium">In-app Voice Call</span>
         </div>
         <p className="mt-1 text-sm text-muted-foreground">{description}</p>
         <Button
@@ -507,7 +505,7 @@ export default function OrdersPage() {
           title={!canCall ? description : undefined}
         >
           {callMutation.isPending ? (
-            <><Phone className="h-4 w-4 animate-pulse" />Connecting…</>
+            <><Phone className="h-4 w-4 animate-pulse" />Ringing…</>
           ) : (
             <><Phone className="h-4 w-4" />Call Consultant</>
           )}
@@ -589,17 +587,6 @@ export default function OrdersPage() {
             <dt className="text-muted-foreground">Age</dt>
             <dd>{booking.patientAge} years</dd>
           </div>
-          {booking.bookingType === "consultation" && (booking as any).callbackPhone && (
-            <div className="flex justify-between border-b pb-2">
-              <dt className="text-muted-foreground">Call-back Number</dt>
-              <dd>
-                {(booking as any).callbackPhone}
-                {(booking as any).callbackWardName && (
-                  <span className="ml-1 text-xs text-muted-foreground">({(booking as any).callbackWardName})</span>
-                )}
-              </dd>
-            </div>
-          )}
           {booking.appointmentSlot && (
             <div className="flex justify-between border-b pb-2">
               <dt className="text-muted-foreground">Appointment</dt>
@@ -675,8 +662,8 @@ export default function OrdersPage() {
         {booking.bookingType === "consultation" && (
           <CallConsultantButton
             bookingId={booking.id}
+            videoRoomId={booking.videoRoomId}
             status={booking.status}
-            callbackPhone={(booking as any).callbackPhone}
             appointmentSlot={(booking as any).appointmentSlot}
             callWindowExtendedUntil={(booking as any).callWindowExtendedUntil}
             prescriptionApprovedAt={(booking as any).prescriptionApprovedAt}

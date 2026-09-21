@@ -141,6 +141,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
         videoRoomUrl: event.data.videoRoomUrl,
         serviceName: event.data.serviceName,
         subtitle: event.data.subtitle,
+        callType: event.data.callType,
       };
 
       if (document.hidden) {

@@ -1165,13 +1165,6 @@ export async function registerRoutes(
         bookingData.uhidIpNumber = parentBooking.uhidIpNumber || null;
       }
       
-      // Consultation bookings require a callback phone number (unless it's a follow-up — callback is inherited)
-      if (bookingData.bookingType === "consultation" && !bookingData.isFollowUp) {
-        if (!bookingData.callbackPhone?.trim()) {
-          return res.status(400).json({ message: "A call-back phone number is required for consultation bookings." });
-        }
-      }
-
       // For consultation bookings, link to the provider who owns the consultant
       if (bookingData.bookingType === "consultation" && bookingData.serviceId) {
         const consultant = await storage.getConsultantById(bookingData.serviceId);
@@ -5190,6 +5183,7 @@ export async function registerRoutes(
       if (!callerId) return res.status(401).json({ error: "Not authenticated" });
 
       const { bookingId } = req.params;
+      const callType: "voice" | "video" = req.body?.callType === "voice" ? "voice" : "video";
       const booking = await storage.getBookingById(bookingId);
       if (!booking) return res.status(404).json({ error: "Booking not found" });
 
@@ -5206,11 +5200,13 @@ export async function registerRoutes(
       if (prescriptionApprovedAtRing) {
         const expiresAt = (booking as any).postRxExpiresAt ? new Date((booking as any).postRxExpiresAt) : null;
         const inWindow = !!(expiresAt && new Date() < expiresAt);
-        const videoEnabled = !!(booking as any).postRxVideoEnabled;
-        if (!inWindow || !videoEnabled) {
+        const channelEnabled = callType === "voice"
+          ? !!(booking as any).postRxCallsEnabled
+          : !!(booking as any).postRxVideoEnabled;
+        if (!inWindow || !channelEnabled) {
           return res.status(403).json({
             error: inWindow
-              ? "Video calls are currently disabled for this consultation"
+              ? `${callType === "voice" ? "Voice" : "Video"} calls are currently disabled for this consultation`
               : "Post-consultation 24-hour window has expired",
           });
         }
@@ -5314,6 +5310,7 @@ export async function registerRoutes(
         videoRoomUrl,
         serviceName: booking.serviceName,
         subtitle,
+        callType,
       });
 
       // Send push notification to recipient (even if browser closed)

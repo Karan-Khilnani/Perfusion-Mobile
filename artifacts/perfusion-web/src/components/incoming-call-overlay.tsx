@@ -41,7 +41,8 @@ export function IncomingCallOverlay({ callEvent, onDismiss }: Props) {
       // Use videoRoomUrl from accept response if available (more up-to-date), fall back to event
       const roomUrl = data?.videoRoomUrl || callEvent.videoRoomUrl || "";
       // accepted=true tells video-room to skip precall and go straight to connected
-      navigate(`/video/${encodeURIComponent(roomUrl)}?returnTo=${returnTo}&accepted=true`);
+      const voiceParam = callEvent.callType === "voice" ? "&voice=true" : "";
+      navigate(`/video/${encodeURIComponent(roomUrl)}?returnTo=${returnTo}&accepted=true${voiceParam}`);
     } catch (err: any) {
       setAccepting(false);
       const msg = err?.message || "";

@@ -47,8 +47,6 @@ export default function VideoRoomPage() {
   const [panelOpen, setPanelOpen] = useState(true);
   const [inCallDocs, setInCallDocs] = useState<{ url: string; name: string }[]>([]);
   const [phase, setPhase] = useState<CallPhase>("precall");
-  const [showWaitingBanner, setShowWaitingBanner] = useState(true);
-  const [isCalling, setIsCalling] = useState(false);
   const [showSummaryDialog, setShowSummaryDialog] = useState(false);
   const [mobilePanel, setMobilePanel] = useState<MobilePanel>("video");
   const mobilePanelRef = useRef<MobilePanel>("video");
@@ -61,6 +59,7 @@ export default function VideoRoomPage() {
 
   // Tracks whether we've applied the initial accepted=true jump (avoid re-render loop)
   const joinedAsCalleeApplied = useRef(false);
+  const ringStartedRef = useRef(false);
 
   const phaseRef = useRef<CallPhase>("precall");
   // Stable ref to latest booking so unmount cleanup can access it
@@ -71,6 +70,8 @@ export default function VideoRoomPage() {
   const returnPathSuggestsProvider = returnTo.includes("/provider");
   // If the user accepted an incoming call, skip precall and go straight to connected
   const joinedAsCallee = urlParams.get("accepted") === "true";
+  const isVoiceCall = urlParams.get("voice") === "true";
+  const ringAlreadyStarted = urlParams.get("initiated") === "true";
 
   const { data: booking } = useQuery<VideoRoomBooking>({
     queryKey: ["/api/bookings/room", roomId],
@@ -117,6 +118,7 @@ export default function VideoRoomPage() {
     try {
       const u = new URL(url);
       u.searchParams.set("prejoinUI", "false");
+      if (isVoiceCall) u.searchParams.set("startVideoOff", "true");
       if (dailyToken) u.searchParams.set("t", dailyToken);
       return u.toString();
     } catch {
@@ -192,7 +194,21 @@ export default function VideoRoomPage() {
 
   useCallEvents(handleCallEvent);
 
-  // Conference-room model: no polling needed (no ring/accept handshake).
+  const ringOtherParticipant = useCallback(async () => {
+    if (!booking || joinedAsCallee || ringAlreadyStarted || ringStartedRef.current) return;
+    ringStartedRef.current = true;
+    try {
+      await apiRequest("POST", `/api/call/ring/${booking.id}`, { callType: "video" });
+    } catch (error) {
+      ringStartedRef.current = false;
+      toast({
+        title: "Could not ring the other participant",
+        description: "Check your connection and try again.",
+        variant: "destructive",
+      });
+      throw error;
+    }
+  }, [booking, joinedAsCallee, ringAlreadyStarted, toast]);
 
   // Fetch a server-side Daily token when entering the call — this locks in the user's
   // real name and cannot be overridden by browser cache.
@@ -226,6 +242,7 @@ export default function VideoRoomPage() {
   // Conference-room model: enter the room directly (no ring/accept handshake).
   const handleEnterRoom = useCallback(async () => {
     if (!booking) return;
+    await ringOtherParticipant();
 
     // Save on-call doctor info for seeker before entering
     if (!isProvider && onCallDoctorName.trim()) {
@@ -239,17 +256,15 @@ export default function VideoRoomPage() {
       }
     }
 
-    setShowWaitingBanner(true);
     setPhase("connected");
-  }, [booking, isProvider, onCallDoctorName, onCallDoctorDesignation]);
+  }, [booking, isProvider, onCallDoctorName, onCallDoctorDesignation, ringOtherParticipant]);
 
   // Provider enters the room directly — no ring/accept step (conference-room model).
   useEffect(() => {
     if (!isProvider || joinedAsCallee || phase !== "precall" || !booking) return;
-    setShowWaitingBanner(true);
-    setPhase("connected");
+    void ringOtherParticipant().then(() => setPhase("connected"));
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isProvider, joinedAsCallee, booking?.id, phase]);
+  }, [isProvider, joinedAsCallee, booking?.id, phase, ringOtherParticipant]);
 
   const handleCancelRing = async () => {
     clearRingTimer();
@@ -264,33 +279,6 @@ export default function VideoRoomPage() {
   const handleRetry = () => {
     setPhase("precall");
   };
-
-  // Initiate a Twilio masked bridge call to the other party.
-  // The server retrieves both phone numbers server-side — the client never sees them.
-  const handleCallOtherParty = useCallback(async () => {
-    if (!booking || isCalling) return;
-    setIsCalling(true);
-    try {
-      const res = await apiRequest("POST", `/api/bookings/${booking.id}/call`, {});
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        toast({
-          title: "Call failed",
-          description: err.error || "Could not connect the call. Please try again.",
-          variant: "destructive",
-        });
-      } else {
-        toast({
-          title: "Calling…",
-          description: "You will receive a call on your registered phone shortly.",
-        });
-      }
-    } catch {
-      toast({ title: "Call failed", description: "Network error. Please try again.", variant: "destructive" });
-    } finally {
-      setIsCalling(false);
-    }
-  }, [booking, isCalling, toast]);
 
   const hangUp = () => {
     navigate(returnTo);
@@ -571,40 +559,6 @@ export default function VideoRoomPage() {
         {/* Swipe area — NO touch handlers here; iframe swallows them. Edge strips handle it. */}
         <div className="flex-1 relative overflow-hidden">
 
-          {/* Waiting banner — shown when entering room until dismissed */}
-          {showWaitingBanner && !dailyTokenError && (
-            <div className="absolute top-3 left-1/2 -translate-x-1/2 z-[60] w-[min(360px,90%)]">
-              <div className="rounded-lg border bg-background/95 backdrop-blur-sm shadow-lg px-4 py-3">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium">
-                      Waiting for {otherParticipantName} to join…
-                    </p>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="h-auto p-0 mt-0.5 text-xs font-medium"
-                      disabled={isCalling}
-                      onClick={handleCallOtherParty}
-                      data-testid="button-call-other-party"
-                    >
-                      {isCalling ? "Calling…" : `Call ${otherParticipantName}`}
-                    </Button>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 w-6 p-0 text-muted-foreground shrink-0"
-                    onClick={() => setShowWaitingBanner(false)}
-                  >
-                    ✕
-                  </Button>
-                </div>
-              </div>
-            </div>
-          )}
 
           {/* ── Video (always rendered; transitions between full-screen and PiP) ── */}
           <div
@@ -1018,40 +972,6 @@ export default function VideoRoomPage() {
             </div>
           )}
 
-          {/* Waiting banner — overlay shown while waiting for the other party, dismissible */}
-          {showWaitingBanner && !dailyTokenError && (
-            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-40 w-[min(380px,90%)]">
-              <div className="rounded-lg border bg-background/95 backdrop-blur-sm shadow-lg px-4 py-3">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium">
-                      Waiting for {otherParticipantName} to join…
-                    </p>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="h-auto p-0 mt-0.5 text-xs font-medium"
-                      disabled={isCalling}
-                      onClick={handleCallOtherParty}
-                      data-testid="button-call-other-party"
-                    >
-                      {isCalling ? "Calling…" : `Call ${otherParticipantName}`}
-                    </Button>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 w-6 p-0 text-muted-foreground shrink-0"
-                    onClick={() => setShowWaitingBanner(false)}
-                  >
-                    ✕
-                  </Button>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Clinical panel */}

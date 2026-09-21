@@ -17,6 +17,7 @@ export interface CallEvent {
   videoRoomUrl?: string;
   serviceName?: string;
   subtitle?: string;
+  callType?: "voice" | "video";
   url?: string;
   fileName?: string;
 }

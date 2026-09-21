@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { format } from "date-fns";
 import {
@@ -72,25 +72,22 @@ function ReviewDownloads({ bookingId }: { bookingId: string }) {
   );
 }
 
-function DashboardCallButton({ bookingId, callbackPhone, status, appointmentSlot, callWindowExtendedUntil, prescriptionApprovedAt, postRxExpiresAt, postRxCallsEnabled }: { bookingId: string; callbackPhone?: string; status: string; appointmentSlot?: string | null; callWindowExtendedUntil?: string | null; prescriptionApprovedAt?: string | null; postRxExpiresAt?: string | null; postRxCallsEnabled?: boolean | null }) {
+function DashboardCallButton({ bookingId, videoRoomId, status, appointmentSlot, callWindowExtendedUntil, prescriptionApprovedAt, postRxExpiresAt, postRxCallsEnabled }: { bookingId: string; videoRoomId?: string | null; status: string; appointmentSlot?: string | null; callWindowExtendedUntil?: string | null; prescriptionApprovedAt?: string | null; postRxExpiresAt?: string | null; postRxCallsEnabled?: boolean | null }) {
   const { toast } = useToast();
+  const [, navigate] = useLocation();
   const rxStatus = getPostRxStatus({ prescriptionApprovedAt, postRxExpiresAt, postRxCallsEnabled });
   const win = getCallWindow({ appointmentSlot, callWindowExtendedUntil });
 
   const canCall = prescriptionApprovedAt
-    ? !!callbackPhone && rxStatus.callsEnabled
-    : status === "booked" && !!callbackPhone && win.open;
+    ? rxStatus.callsEnabled
+    : status === "booked" && win.open;
 
   const disabledTitle = prescriptionApprovedAt
-    ? !callbackPhone
-      ? "No call-back number on this booking"
-      : !rxStatus.inWindow
+    ? !rxStatus.inWindow
         ? "Post-consultation 24-hour window has expired"
         : !rxStatus.callsEnabled
           ? "Phone calls are currently disabled — ask the consultant to re-enable them"
           : undefined
-    : !callbackPhone
-    ? "No call-back number on this booking"
     : status !== "booked"
     ? "Only available for active bookings"
     : win.reason === "before_window" && win.windowStart
@@ -99,9 +96,10 @@ function DashboardCallButton({ bookingId, callbackPhone, status, appointmentSlot
     ? "Slot has ended"
     : undefined;
   const callMutation = useMutation({
-    mutationFn: () => apiRequest("POST", `/api/bookings/${bookingId}/call`),
+    mutationFn: () => apiRequest("POST", `/api/call/ring/${bookingId}`, { callType: "voice" }),
     onSuccess: () => {
-      toast({ title: "Call initiated", description: "You will receive a call on your ward number shortly — numbers are masked for privacy." });
+      if (!videoRoomId) return;
+      navigate(`/video/${encodeURIComponent(videoRoomId)}?returnTo=/user&voice=true&initiated=true`);
     },
     onError: async (err: any) => {
       let msg = "Failed to initiate call.";
@@ -120,7 +118,7 @@ function DashboardCallButton({ bookingId, callbackPhone, status, appointmentSlot
       data-testid={`button-call-consultant-${bookingId}`}
     >
       {callMutation.isPending
-        ? <><Phone className="h-4 w-4 animate-pulse" />Connecting…</>
+        ? <><Phone className="h-4 w-4 animate-pulse" />Ringing…</>
         : <><Phone className="h-4 w-4" />Call Consultant</>}
     </Button>
   );
@@ -579,7 +577,7 @@ export default function UserDashboard() {
 
                           <DashboardCallButton
                             bookingId={booking.id}
-                            callbackPhone={(booking as any).callbackPhone}
+                            videoRoomId={booking.videoRoomId}
                             status={booking.status}
                             appointmentSlot={(booking as any).appointmentSlot}
                             callWindowExtendedUntil={(booking as any).callWindowExtendedUntil}

@@ -5,3 +5,4 @@
 - [Clinical Advisory history](prescription-history.md) — user-facing records use advisory terminology; signed follow-ups stay immutable and cumulative PDFs show the complete chronological trail.
 - [Code backup scope](code-backup-policy.md) — code snapshots include source and project assets, but exclude runtime uploads, historical backups, dependencies, secrets, and Git metadata.
 - [Shared mobile backend](shared-mobile-backend.md) — web and mobile use one API and database; clients never connect directly to PostgreSQL or maintain parallel user/booking data.
+- [Consultation call routing](consultation-call-routing.md) — web voice/video calls use the in-app ring and Daily room flow; Ward Contacts and cellular bridge remain dormant fallback data.
