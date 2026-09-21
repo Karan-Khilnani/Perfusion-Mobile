@@ -1,0 +1,20 @@
+Got it — resolved, no more forks. Here's the single consolidated prompt.
+
+---
+
+**Prompt for Replit:**
+
+> **1. Calling UX — final, no waiting screen:**
+> Remove the video-room waiting banner and its "Call [participant]" / "Ring [participant]" action entirely — no relabel, no secondary nudge button, nothing. Calling is WhatsApp-simple: tap Call or Video, the existing in-app ring system (`/api/call/ring`, accept/decline/cancel, push notifications) fires automatically, the other side gets a native incoming-call experience and answers or doesn't. No manual "waiting room" concept anywhere in the product.
+>
+> **2. Callback Device is the only routing mechanism, both platforms:**
+> Ward Contact selection is fully removed from booking on web (already scoped) and was never in mobile's booking flow to begin with — mobile's own spec is being corrected to drop it too. Instead: **at first login, on both web and mobile**, prompt the user once for a Callback Device name and a personal mobile number, together, in one step. The device name becomes the sole call-routing target from that point forward — remembered permanently per (device, account) pairing, never re-asked on ordinary re-login. The mobile number is stored purely as an emergency-contact record for Perfusion admin use — it does not route calls, does not trigger anything automatically, it's just on file if a human at Perfusion ever needs it.
+>
+> **3. Mobile app: full rewrite, not an iteration.**
+> Disregard the existing Expo mobile build entirely — incoming-call overlay, call screen, ring/accept/decline flow, all of it. It was built mimicking the web app's structure and is not the target design. The mobile app is being built from scratch against `Perfusion_Mobile_Reconciled_Spec.docx` and its accompanying HTML reference screens as the sole source of truth. Treat the shared backend (auth, bookings, `/api/call/*`, Daily video, push) as reusable infrastructure — the UI and screen architecture on top of it starts over completely.
+>
+> Confirm you're rebuilding on the shared backend without touching `artifacts/api-server` or `artifacts/perfusion-web`, then proceed.
+
+---
+
+Two small things I'm updating on our side to stay consistent with this, not asking you, just telling you: **Section 7.7's "Call-back Number (Ward)" field comes out of the booking flow** (Callback Device replaces it), and **Section 4.11 gets corrected to say the device-name-plus-mobile-number prompt fires at first login, not at some later moment.** I'll make both edits now.
