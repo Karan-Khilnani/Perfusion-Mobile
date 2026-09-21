@@ -18,6 +18,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { Camera, Loader2, Save, Building, User, Upload, FileText, X, Clock, PenLine, AlertCircle, CheckCircle2, Info, Phone, Plus, Pencil, Trash2, KeyRound } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ConsultantSlotEditor } from "@/components/consultant-slot-editor";
+import type { SlotSeries } from "@shared/schema";
 
 const personalSchema = z.object({
   firstName: z.string().min(1, "First name is required"),
@@ -396,6 +397,7 @@ export default function ProfilePage() {
   // These are passed into the form submit so nothing is lost.
   const [pendingConsultantDocUrl, setPendingConsultantDocUrl] = useState<string | null>(null);
   const [pendingSignatureDataUrl, setPendingSignatureDataUrl] = useState<string | null>(null);
+  const [pendingSlotSeries, setPendingSlotSeries] = useState<SlotSeries[]>([]);
   const photoInputRef = useRef<HTMLInputElement>(null);
 
   const personalForm = useForm<PersonalFormData>({
@@ -509,8 +511,19 @@ export default function ProfilePage() {
   });
 
   const saveConsultantDetailsMutation = useMutation({
-    mutationFn: async (data: ConsultantDetailsFormData & { registrationDocumentUrl?: string }) => {
-      const payload = { ...data, consultationFee: String(data.consultationFee) };
+    mutationFn: async (data: ConsultantDetailsFormData & {
+      registrationDocumentUrl?: string;
+      digitalSignatureUrl?: string;
+      slotSeries?: SlotSeries[];
+    }) => {
+      const firstSlot = data.slotSeries?.[0];
+      const payload = {
+        ...data,
+        consultationFee: String(data.consultationFee),
+        availabilityFrom: firstSlot?.from,
+        availabilityTo: firstSlot?.to,
+        availableDays: firstSlot?.days,
+      };
       if (consultant?.id) {
         const res = await apiRequest("PATCH", `/api/provider/consultants/${consultant.id}`, payload);
         return res.json();
@@ -823,7 +836,12 @@ export default function ProfilePage() {
           <CardContent>
             <Form {...consultantDetailsForm}>
               <form
-                onSubmit={consultantDetailsForm.handleSubmit((d) => saveConsultantDetailsMutation.mutate({ ...d, registrationDocumentUrl: pendingConsultantDocUrl ?? undefined, digitalSignatureUrl: pendingSignatureDataUrl ?? undefined }))}
+                onSubmit={consultantDetailsForm.handleSubmit((d) => saveConsultantDetailsMutation.mutate({
+                  ...d,
+                  registrationDocumentUrl: pendingConsultantDocUrl ?? undefined,
+                  digitalSignatureUrl: pendingSignatureDataUrl ?? undefined,
+                  slotSeries: consultant ? undefined : pendingSlotSeries,
+                }))}
                 className="space-y-4"
               >
                   <div className="grid grid-cols-2 gap-4">
@@ -953,15 +971,19 @@ export default function ProfilePage() {
                 <Clock className="h-4 w-4 text-muted-foreground" />
                 <p className="text-sm font-medium">Availability</p>
               </div>
-              {consultant && (
-                <ConsultantSlotEditor
-                  consultantId={consultant.id}
-                  initialFrom={consultant.availabilityFrom}
-                  initialTo={consultant.availabilityTo}
-                  initialDays={consultant.availableDays ?? undefined}
-                  initialSlotSeries={(consultant as any).slotSeries ?? undefined}
-                  invalidateKeys={[["/api/provider/my-consultants"], ["/api/provider/dashboard"]]}
-                />
+              <ConsultantSlotEditor
+                consultantId={consultant?.id}
+                initialFrom={consultant?.availabilityFrom}
+                initialTo={consultant?.availabilityTo}
+                initialDays={consultant?.availableDays ?? undefined}
+                initialSlotSeries={consultant ? (consultant as any).slotSeries ?? undefined : pendingSlotSeries}
+                invalidateKeys={[["/api/provider/my-consultants"], ["/api/provider/dashboard"]]}
+                onDraftChange={({ slotSeries }) => setPendingSlotSeries(slotSeries)}
+              />
+              {!consultant && (
+                <p className="text-xs text-muted-foreground">
+                  Set your weekly availability now. It will be saved with your new profile.
+                </p>
               )}
             </div>
 

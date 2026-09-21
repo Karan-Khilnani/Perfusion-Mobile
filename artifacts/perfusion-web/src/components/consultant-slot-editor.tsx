@@ -27,7 +27,7 @@ const TIMES = [
 const DAYS_OF_WEEK = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 interface ConsultantSlotEditorProps {
-  consultantId: string;
+  consultantId?: string;
   consultantName?: string;
   initialFrom?: string | null;
   initialTo?: string | null;
@@ -35,6 +35,12 @@ interface ConsultantSlotEditorProps {
   initialSlotSeries?: SlotSeries[] | null;
   invalidateKeys?: string[][];
   onSaved?: () => void;
+  onDraftChange?: (schedule: {
+    slotSeries: SlotSeries[];
+    availabilityFrom?: string;
+    availabilityTo?: string;
+    availableDays?: string[];
+  }) => void;
 }
 
 function seriesSummary(s: SlotSeries): string {
@@ -51,8 +57,10 @@ export function ConsultantSlotEditor({
   initialSlotSeries,
   invalidateKeys = [],
   onSaved,
+  onDraftChange,
 }: ConsultantSlotEditorProps) {
   const { toast } = useToast();
+  const isDraftMode = !consultantId;
 
   const [open, setOpen] = useState(false);
 
@@ -91,6 +99,7 @@ export function ConsultantSlotEditor({
 
   const updateSlotsMutation = useMutation({
     mutationFn: async (payload: { slotSeries: SlotSeries[]; availabilityFrom?: string; availabilityTo?: string; availableDays?: string[] }) => {
+      if (!consultantId) throw new Error("Consultant profile has not been created");
       const res = await apiRequest("PATCH", `/api/consultants/${consultantId}/slots`, payload);
       return res.json();
     },
@@ -145,12 +154,22 @@ export function ConsultantSlotEditor({
 
   const handleSaveSchedule = () => {
     const first = series[0];
-    updateSlotsMutation.mutate({
+    const schedule = {
       slotSeries: series,
       availabilityFrom: first?.from,
       availabilityTo: first?.to,
       availableDays: first?.days,
-    });
+    };
+    if (isDraftMode) {
+      onDraftChange?.(schedule);
+      toast({
+        title: "Availability ready",
+        description: "Your schedule will be saved when you create your profile.",
+      });
+      setOpen(false);
+      return;
+    }
+    updateSlotsMutation.mutate(schedule);
   };
 
   // Calendar helpers
@@ -273,7 +292,9 @@ export function ConsultantSlotEditor({
         <Tabs defaultValue="schedule" className="w-full">
           <TabsList className="w-full">
             <TabsTrigger value="schedule" className="flex-1" data-testid="tab-default-schedule">Default Schedule</TabsTrigger>
-            <TabsTrigger value="calendar" className="flex-1" data-testid="tab-calendar">Calendar</TabsTrigger>
+            {!isDraftMode && (
+              <TabsTrigger value="calendar" className="flex-1" data-testid="tab-calendar">Calendar</TabsTrigger>
+            )}
           </TabsList>
 
           {/* ── Default Schedule tab ── */}
@@ -389,12 +410,12 @@ export function ConsultantSlotEditor({
               data-testid="button-save-schedule"
             >
               {updateSlotsMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              Save Schedule
+              {isDraftMode ? "Use This Schedule" : "Save Schedule"}
             </Button>
           </TabsContent>
 
           {/* ── Calendar tab ── */}
-          <TabsContent value="calendar" className="space-y-3 pt-3">
+          {!isDraftMode && <TabsContent value="calendar" className="space-y-3 pt-3">
             {/* Instructions */}
             <div className="flex items-start gap-2 rounded-md bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
               <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
@@ -502,7 +523,7 @@ export function ConsultantSlotEditor({
                 </div>
               </div>
             )}
-          </TabsContent>
+          </TabsContent>}
         </Tabs>
       </div>
     </div>
