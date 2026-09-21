@@ -89,3 +89,17 @@ mtime_ms = 1789921256904
 storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:034c0c6d-c25b-491b-98e9-0bb19624165f/afe4149a-51b8-427f-8f36-08a00aa0a42c/62d3d9f7-1972-45fb-b191-49e4d8c49412"
 storage_version_token = "1789921290185965"
 content_type = "text/html"
+
+[[outputs]]
+id = "2qgc84PRSwJtHtqn263Vp"
+uri = "file://deliverables/perfusion-mobile-api-inventory.md"
+type = "text"
+title = "Perfusion Mobile — Existing API Inventory"
+description = "Read-only inventory of the confirmed shared Perfusion endpoints, authorization clues, source boundaries, and missing chat/notification capabilities for mobile planning."
+logical_id = "e925826b-3861-4998-af35-86daf0265c7e"
+content_hash = "sha256:4db41d430a079cd8a50fd92dacfdf4c8a4e55cfeba7c7f8ee4757915241eae29"
+size = 11015
+mtime_ms = 1789977926003
+storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:034c0c6d-c25b-491b-98e9-0bb19624165f/e925826b-3861-4998-af35-86daf0265c7e/67c1b787-9b73-400a-a558-a14dd8d3339f"
+storage_version_token = "1789977989624138"
+content_type = "text/markdown"
