@@ -444,7 +444,7 @@ export default function ProviderBookingsPage() {
       setShowPostRxDialog(true);
       toast({
         title: "Summary Confirmed & Signed",
-        description: "Consultation locked. You can re-enable video, calls, or uploads for up to 24 hours.",
+        description: "Clinical advisory locked. You can re-enable video, calls, or uploads for up to 24 hours.",
       });
     },
     onError: (error: any) => {
@@ -614,7 +614,7 @@ export default function ProviderBookingsPage() {
                     onClick={async () => {
                       try {
                         const response = await fetch(`/api/bookings/${booking.id}/prescription-pdf`, { credentials: "include" });
-                        if (!response.ok) throw new Error("Failed to fetch prescription data");
+                        if (!response.ok) throw new Error("Failed to fetch clinical advisory data");
                         const prescriptionData = await response.json();
                         const { generatePrescriptionPDF } = await import("@/lib/prescription-pdf");
                         await generatePrescriptionPDF(prescriptionData);
@@ -1000,7 +1000,7 @@ export default function ProviderBookingsPage() {
                 </div>
                 {prescriptionBooking?.prescriptionMedications && (
                   <div className="text-sm">
-                    <p className="text-xs text-muted-foreground">Treatment Plan</p>
+                    <p className="text-xs text-muted-foreground">Clinical Advisory</p>
                     <p className="font-medium mt-0.5 whitespace-pre-wrap">{prescriptionBooking.prescriptionMedications}</p>
                   </div>
                 )}
@@ -1043,9 +1043,9 @@ export default function ProviderBookingsPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Suggested Treatment Plan</Label>
+                  <Label>Clinical Advisory</Label>
                   <Textarea
-                    placeholder="List medications with dosage and frequency, procedures, therapy...&#10;e.g., Tab. Paracetamol 500mg - 1 tablet twice daily after meals for 5 days"
+                    placeholder="Add neutral clinical observations, recommendations, or care considerations..."
                     value={prescriptionMedications}
                     onChange={(e) => setPrescriptionMedications(e.target.value)}
                     rows={5}
@@ -1145,7 +1145,7 @@ export default function ProviderBookingsPage() {
               Add Review Summary
             </DialogTitle>
             <DialogDescription>
-              {reviewBooking?.patientName} · Additional prescription based on new reports or follow-up assessment.
+              {reviewBooking?.patientName} · Additional clinical advisory based on new reports or follow-up assessment.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
@@ -1154,8 +1154,8 @@ export default function ProviderBookingsPage() {
               <Textarea placeholder="Updated or confirmed diagnosis..." value={reviewDiagnosis} onChange={(e) => setReviewDiagnosis(e.target.value)} className="min-h-[80px]" />
             </div>
             <div>
-              <label className="text-sm font-medium mb-1 block">Treatment / Medications</label>
-              <Textarea placeholder="Revised treatment plan or medications..." value={reviewMedications} onChange={(e) => setReviewMedications(e.target.value)} className="min-h-[80px]" />
+                  <label className="text-sm font-medium mb-1 block">Clinical Advisory</label>
+                  <Textarea placeholder="Add neutral clinical observations, recommendations, or care considerations..." value={reviewMedications} onChange={(e) => setReviewMedications(e.target.value)} className="min-h-[80px]" />
             </div>
             <div>
               <label className="text-sm font-medium mb-1 block">Physician Notes</label>

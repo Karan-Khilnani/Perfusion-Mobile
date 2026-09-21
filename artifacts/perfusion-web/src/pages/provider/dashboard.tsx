@@ -781,7 +781,7 @@ export default function ProviderDashboard() {
       setSummaryBooking(null);
       setPostRxBooking(data as ActiveConsultation);
       setShowPostRxDialog(true);
-      toast({ title: "Summary Confirmed & Signed", description: "Consultation locked. You can re-enable video, calls, or uploads for up to 24 hours." });
+      toast({ title: "Summary Confirmed & Signed", description: "Clinical advisory locked. You can re-enable video, calls, or uploads for up to 24 hours." });
     },
     onError: (error: any) => {
       toast({ title: "Confirmation Failed", description: error?.message || "Failed to confirm consultation summary.", variant: "destructive" });
@@ -998,7 +998,7 @@ export default function ProviderDashboard() {
                 Add Review Summary
               </DialogTitle>
               <DialogDescription>
-                {reviewBooking?.patientName} · Additional prescription based on new reports or follow-up assessment.
+                {reviewBooking?.patientName} · Additional clinical advisory based on new reports or follow-up assessment.
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-2">
@@ -1007,8 +1007,8 @@ export default function ProviderDashboard() {
                 <Textarea placeholder="Updated or confirmed diagnosis..." value={reviewDiagnosis} onChange={(e) => setReviewDiagnosis(e.target.value)} className="min-h-[80px]" />
               </div>
               <div>
-                <label className="text-sm font-medium mb-1 block">Treatment / Medications</label>
-                <Textarea placeholder="Revised treatment plan or medications..." value={reviewMedications} onChange={(e) => setReviewMedications(e.target.value)} className="min-h-[80px]" />
+                <label className="text-sm font-medium mb-1 block">Clinical Advisory</label>
+                <Textarea placeholder="Add neutral clinical observations, recommendations, or care considerations..." value={reviewMedications} onChange={(e) => setReviewMedications(e.target.value)} className="min-h-[80px]" />
               </div>
               <div>
                 <label className="text-sm font-medium mb-1 block">Physician Notes</label>
@@ -1121,7 +1121,7 @@ export default function ProviderDashboard() {
               Add Review Summary
             </DialogTitle>
             <DialogDescription>
-              {reviewBooking?.patientName} · Additional prescription based on new reports or follow-up assessment.
+              {reviewBooking?.patientName} · Additional clinical advisory based on new reports or follow-up assessment.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
@@ -1130,8 +1130,8 @@ export default function ProviderDashboard() {
               <Textarea placeholder="Updated or confirmed diagnosis..." value={reviewDiagnosis} onChange={(e) => setReviewDiagnosis(e.target.value)} className="min-h-[80px]" />
             </div>
             <div>
-              <label className="text-sm font-medium mb-1 block">Treatment / Medications</label>
-              <Textarea placeholder="Revised treatment plan or medications..." value={reviewMedications} onChange={(e) => setReviewMedications(e.target.value)} className="min-h-[80px]" />
+              <label className="text-sm font-medium mb-1 block">Clinical Advisory</label>
+              <Textarea placeholder="Add neutral clinical observations, recommendations, or care considerations..." value={reviewMedications} onChange={(e) => setReviewMedications(e.target.value)} className="min-h-[80px]" />
             </div>
             <div>
               <label className="text-sm font-medium mb-1 block">Physician Notes</label>
@@ -1230,7 +1230,7 @@ function SummaryDialogContent({
             </div>
             {summaryBooking?.prescriptionMedications && (
               <div className="text-sm">
-                <p className="text-xs text-muted-foreground">Treatment Plan</p>
+                <p className="text-xs text-muted-foreground">Clinical Advisory</p>
                 <p className="font-medium mt-0.5 whitespace-pre-wrap">{summaryBooking.prescriptionMedications}</p>
               </div>
             )}
@@ -1273,9 +1273,9 @@ function SummaryDialogContent({
               />
             </div>
             <div className="space-y-2">
-              <Label>Suggested Treatment Plan</Label>
+              <Label>Clinical Advisory</Label>
               <Textarea
-                placeholder={"List medications with dosage and frequency, procedures, therapy...\ne.g., Tab. Paracetamol 500mg - 1 tablet twice daily after meals for 5 days"}
+                placeholder={"Add neutral clinical observations, recommendations, or care considerations..."}
                 value={medications}
                 onChange={(e) => setMedications(e.target.value)}
                 rows={5}

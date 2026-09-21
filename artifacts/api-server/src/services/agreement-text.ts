@@ -26,7 +26,7 @@ This acceptance constitutes an electronic record and a valid, binding contract u
 
 1.6 "Acceptance Record" means the electronic log maintained by the Platform capturing the Healthcare Partner's name, authorised representative's name and designation, date and time (IST) of Electronic Acceptance, and IP address of the device used.
 
-1.7 "Consultation Summary" means the written specialist opinion delivered through the Platform following a tele-consultation session, which is advisory in nature and does not constitute a prescription or treatment order.
+1.7 "Clinical Advisory" means the written specialist opinion delivered through the Platform following a tele-consultation session, which is advisory in nature and does not constitute a prescription or treatment order.
 
 1.8 "Effective Date" means the date on which the Healthcare Partner completes Electronic Acceptance of this Agreement.
 
@@ -52,7 +52,7 @@ This acceptance constitutes an electronic record and a valid, binding contract u
 
 4. TELE-CONSULTATION - TERMS OF USE
 
-4.1 Nature of Consultation: All Consultation Summaries and specialist opinions delivered through the Platform are advisory in nature only. They do not constitute direct prescriptions, treatment orders, or binding clinical directives. The ultimate clinical responsibility for acceptance, modification, or rejection of any specialist opinion shall rest with the primary/attending consultant at the Seeker Partner's facility.
+4.1 Nature of Consultation: All Clinical Advisories and specialist opinions delivered through the Platform are advisory in nature only. They do not constitute direct prescriptions, treatment orders, or binding clinical directives. The ultimate clinical responsibility for acceptance, modification, or rejection of any specialist opinion shall rest with the primary/attending consultant at the Seeker Partner's facility.
 
 4.2 Consultant Liability Carve-Out: The Provider Partner's opinion is based solely on the clinical information, investigations, and data submitted by the Seeker Partner at the time of consultation. The Provider Partner shall not be held liable for adverse outcomes arising from incomplete, inaccurate, delayed, or misleading information furnished by the Seeker Partner.
 
@@ -102,7 +102,7 @@ By completing Electronic Acceptance, the Healthcare Partner represents and warra
 
 8.3 It shall not make any false, misleading, or exaggerated claims through the Platform.
 
-8.4 It shall be solely responsible for medical advice, diagnoses, consultation summaries, test reports, treatment decisions, and clinical outcomes.
+8.4 It shall be solely responsible for medical advice, diagnoses, Clinical Advisories, test reports, treatment decisions, and clinical outcomes.
 
 8.5 It shall comply with all applicable NMC guidelines, Telemedicine Practice Guidelines of India 2020, and all professional, ethical, statutory, and regulatory standards.
 

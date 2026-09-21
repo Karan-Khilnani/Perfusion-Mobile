@@ -156,7 +156,7 @@ export default function VideoRoomPage() {
     }
   }, [joinedAsCallee, phase]);
 
-  // Call window check — after prescription use post-rx gate; before prescription use slot window
+  // Call window check — after advisory confirmation use post-rx gate; before confirmation use slot window
   useEffect(() => {
     if (booking && phase === "precall" && !joinedAsCallee) {
       const prescriptionApprovedAt = (booking as any).prescriptionApprovedAt;

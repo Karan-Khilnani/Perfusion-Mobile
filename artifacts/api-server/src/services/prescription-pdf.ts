@@ -255,7 +255,7 @@ export async function generateAndStorePrescriptionPdf(data: PrescriptionPdfData,
 
   // Title text block — vertically centred in the taller header (right of logo, left of QR)
   const titleTextX = PAGE_W - MARGIN - QR_SIZE - 14;
-  const titleText = isReview ? `Review Summary #${data.reviewNumber}` : "Digital Speciality Consultation Summary";
+  const titleText = isReview ? `Clinical Advisory Review #${data.reviewNumber}` : "Digital Clinical Advisory";
   const titleW = fontBold.widthOfTextAtSize(titleText, 9.5);
   page.drawText(titleText, { x: titleTextX - titleW, y: PAGE_H - 68, size: 9.5, font: fontBold, color: DARK });
   const idText = sanitizeOneLine(`Summary ID: ${summaryId}`);
@@ -347,7 +347,7 @@ export async function generateAndStorePrescriptionPdf(data: PrescriptionPdfData,
 
   if (data.prescriptionTrail?.length) {
     [page, y] = needsNewPage(doc, pages, page, y, 55);
-    y = drawSectionTitle(page, "COMPLETE PRESCRIPTION TRAIL", y, fontBold);
+    y = drawSectionTitle(page, "COMPLETE CLINICAL ADVISORY TRAIL", y, fontBold);
     y -= 2;
 
     for (const entry of data.prescriptionTrail) {
@@ -417,7 +417,7 @@ export async function generateAndStorePrescriptionPdf(data: PrescriptionPdfData,
   // ── Legal disclaimer ──────────────────────────────────────────────────────────
   [page, y] = needsNewPage(doc, pages, page, y, 60);
   y -= 6;
-  const legalText = "This consultation is based on information provided digitally and available records. Treatment advice is given in good faith and does not replace emergency care where indicated. Patient/referring team advised to seek immediate medical attention if condition worsens.";
+  const legalText = "This document is a specialist clinical opinion based on information provided digitally and available records. It is advisory only and is not a prescription or treatment order. Treating hospital physicians retain responsibility for prescribing and treatment decisions. It does not replace emergency care where indicated; seek immediate medical attention if the condition worsens.";
   const legalLines = wrapText(legalText, fontItalic, 7.5, CONTENT_W - 20);
   const legalH = legalLines.length * 11 + 24;
   page.drawRectangle({ x: MARGIN, y: y - legalH, width: CONTENT_W, height: legalH, color: rgb(0.97, 0.97, 0.97) });
@@ -434,8 +434,8 @@ export async function generateAndStorePrescriptionPdf(data: PrescriptionPdfData,
   const SEAL_H = 50;
   page.drawRectangle({ x: MARGIN, y: y - SEAL_H, width: CONTENT_W, height: SEAL_H, color: GREEN_BG });
   page.drawLine({ start: { x: MARGIN, y }, end: { x: MARGIN + CONTENT_W, y }, thickness: 1.5, color: GREEN });
-  page.drawText(isReview ? `REVIEW SUMMARY #${data.reviewNumber} SIGNED` : "CONFIRMED & SIGNED", { x: MARGIN + 12, y: y - 14, size: 11, font: fontBold, color: GREEN });
-  page.drawText(isReview ? `Consultant signed this review summary on:` : "Consultant confirmed this consultation summary on:", { x: MARGIN + 12, y: y - 28, size: 8, font, color: GREY });
+  page.drawText(isReview ? `CLINICAL ADVISORY REVIEW #${data.reviewNumber} SIGNED` : "CONFIRMED & SIGNED", { x: MARGIN + 12, y: y - 14, size: 11, font: fontBold, color: GREEN });
+  page.drawText(isReview ? `Consultant signed this Clinical Advisory review on:` : "Consultant confirmed this Clinical Advisory on:", { x: MARGIN + 12, y: y - 28, size: 8, font, color: GREY });
   page.drawText(approvalDateStr, { x: MARGIN + 12, y: y - 40, size: 9, font: fontBold, color: DARK });
   y -= SEAL_H + 18;
 
@@ -501,18 +501,18 @@ export async function generateAndStorePrescriptionPdf(data: PrescriptionPdfData,
   for (let i = 0; i < total; i++) {
     const p = pages[i];
     p.drawLine({ start: { x: MARGIN, y: 38 }, end: { x: PAGE_W - MARGIN, y: 38 }, thickness: 0.5, color: RED });
-    p.drawText("Perfusion Health Pvt Ltd | Digital Speciality Consultation Platform", { x: MARGIN, y: 26, size: 7, font, color: LIGHT_GREY });
+    p.drawText("Perfusion Health Pvt Ltd | Digital Clinical Advisory Platform", { x: MARGIN, y: 26, size: 7, font, color: LIGHT_GREY });
     const pageNumText = `Page ${i + 1} of ${total}`;
     const pw = font.widthOfTextAtSize(pageNumText, 7);
     p.drawText(pageNumText, { x: PAGE_W - MARGIN - pw, y: 26, size: 7, font, color: LIGHT_GREY });
-    p.drawText("This is a digitally confirmed consultation summary. Scan QR on page 1 to verify.", { x: MARGIN, y: 16, size: 7, font: fontItalic, color: LIGHT_GREY });
+    p.drawText("This is a digitally confirmed Clinical Advisory. Scan QR on page 1 to verify.", { x: MARGIN, y: 16, size: 7, font: fontItalic, color: LIGHT_GREY });
     p.drawText(sanitizeOneLine(`Verification: ${verificationUrl}`), { x: MARGIN, y: 6, size: 6.5, font, color: LIGHT_GREY });
   }
 
   const pdfBytes = await doc.save();
   const fileName = isReview
     ? data.prescriptionTrail?.length
-      ? `complete-prescription-trail-${data.bookingId}-r${data.reviewNumber}-${Date.now()}.pdf`
+      ? `complete-clinical-advisory-trail-${data.bookingId}-r${data.reviewNumber}-${Date.now()}.pdf`
       : `review-summary-${data.bookingId}-r${data.reviewNumber}-${Date.now()}.pdf`
     : `consultation-summary-${data.bookingId}-${Date.now()}.pdf`;
   const buffer = Buffer.from(pdfBytes);

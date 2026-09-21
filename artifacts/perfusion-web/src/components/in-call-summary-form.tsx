@@ -94,7 +94,7 @@ export function InCallSummaryForm({ booking }: Props) {
           )}
           {(booking as any).prescriptionMedications && (
             <div className="text-sm">
-              <p className="text-xs text-muted-foreground">Treatment Plan</p>
+              <p className="text-xs text-muted-foreground">Clinical Advisory</p>
               <p className="font-medium mt-0.5 whitespace-pre-wrap">{(booking as any).prescriptionMedications}</p>
             </div>
           )}
@@ -162,9 +162,9 @@ export function InCallSummaryForm({ booking }: Props) {
       </div>
 
       <div className="space-y-2">
-        <Label className="text-sm">Suggested Treatment Plan</Label>
+        <Label className="text-sm">Clinical Advisory</Label>
         <Textarea
-          placeholder={"List medications, procedures, therapy…\ne.g., Tab. Paracetamol 500mg – twice daily after meals"}
+          placeholder="Add neutral clinical observations, recommendations, or care considerations…"
           value={medications}
           onChange={(e) => setMedications(e.target.value)}
           rows={4}

@@ -954,7 +954,7 @@ export async function registerRoutes(
       // Filter out items the user has dismissed from dashboard
       const visibleBookings = allBookings.filter((b) => !(b as any).dashboardHiddenAt);
 
-      // Consultations: all consultation bookings (active + those with signed prescriptions)
+      // Consultations: all consultation bookings (active + those with signed Clinical Advisories)
       const consultationBookings = visibleBookings.filter(
         (b) => b.bookingType === "consultation" &&
           !["cancelled"].includes(b.status)
@@ -1425,7 +1425,7 @@ export async function registerRoutes(
     }
   });
 
-  // Generate/update prescription for consultation bookings
+  // Generate/update Clinical Advisory for consultation bookings
   app.patch("/api/bookings/:id/prescription", isAuthenticated, async (req: any, res) => {
     try {
       const user = req.user;
@@ -1435,9 +1435,9 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Booking not found" });
       }
       
-      // Only allow providers and admins to generate prescriptions
+      // Only allow providers and admins to generate Clinical Advisories
       if (user.role !== "provider" && user.role !== "admin") {
-        return res.status(403).json({ message: "Only providers can generate prescriptions" });
+        return res.status(403).json({ message: "Only providers can generate Clinical Advisories" });
       }
       
       // For providers, verify they own this booking (via consultant ownership)
@@ -1452,18 +1452,18 @@ export async function registerRoutes(
           return res.status(404).json({ message: "Consultant not found for this booking" });
         }
         if (consultant.providerId && consultant.providerId !== provider.id) {
-          return res.status(403).json({ message: "You can only generate prescriptions for your own consultations" });
+          return res.status(403).json({ message: "You can only generate Clinical Advisories for your own consultations" });
         }
       }
       
       // Only for consultation bookings
       if (booking.bookingType !== "consultation") {
-        return res.status(400).json({ message: "Prescriptions can only be generated for consultations" });
+        return res.status(400).json({ message: "Clinical Advisories can only be generated for consultations" });
       }
 
-      // Reject edits on approved (signed & locked) prescriptions
+      // Reject edits on approved (signed & locked) Clinical Advisories
       if ((booking as any).prescriptionApprovedAt) {
-        return res.status(409).json({ message: "This prescription has been confirmed and is permanently locked. It cannot be edited." });
+        return res.status(409).json({ message: "This Clinical Advisory has been confirmed and is permanently locked. It cannot be edited." });
       }
       
       const { diagnosis, medications, advice, followUp, physicianNotes } = req.body as {
@@ -1489,12 +1489,12 @@ export async function registerRoutes(
       
       res.json(updated);
     } catch (error) {
-      console.error("Error generating prescription:", error);
-      res.status(500).json({ message: "Failed to generate prescription" });
+      console.error("Error generating Clinical Advisory:", error);
+      res.status(500).json({ message: "Failed to generate Clinical Advisory" });
     }
   });
 
-  // Generate prescription PDF
+  // Generate Clinical Advisory PDF
   app.get("/api/bookings/:id/prescription-pdf", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user?.id;
@@ -1519,19 +1519,19 @@ export async function registerRoutes(
       }
       
       if (!booking.prescriptionGeneratedAt) {
-        return res.status(404).json({ message: "No prescription generated yet" });
+        return res.status(404).json({ message: "No Clinical Advisory generated yet" });
       }
 
-      // For confirmed (signed & locked) prescriptions, serve only the frozen stored PDF
+      // For confirmed (signed & locked) Clinical Advisories, serve only the frozen stored PDF
       if ((booking as any).prescriptionApprovedAt && (booking as any).prescriptionPdfUrl) {
         return res.json({
           locked: true,
           prescriptionPdfUrl: (booking as any).prescriptionPdfUrl,
-          message: "This prescription has been confirmed and is available as a signed PDF.",
+          message: "This Clinical Advisory has been confirmed and is available as a signed PDF.",
         });
       }
       
-      // Fetch consultant details for the prescription
+      // Fetch consultant details for the Clinical Advisory
       let consultant: any = null;
       if (booking.serviceId) {
         consultant = await storage.getConsultantById(booking.serviceId);
@@ -1540,7 +1540,7 @@ export async function registerRoutes(
       // Fetch care seeker (user) details for referring facility info
       const bookingUser = await storage.getUserById(booking.userId);
       
-      // Build prescription data object for PDF generation
+      // Build Clinical Advisory data object for PDF generation
       const prescriptionData = {
         prescriptionId: booking.bookingNumber || `PFN-${booking.id.substring(0, 8).toUpperCase()}`,
         dateTime: booking.prescriptionGeneratedAt ? new Date(booking.prescriptionGeneratedAt).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" }) : new Date().toLocaleString("en-IN"),
@@ -1576,24 +1576,24 @@ export async function registerRoutes(
 
       res.json(prescriptionData);
     } catch (error) {
-      console.error("Error generating prescription PDF data:", error);
-      res.status(500).json({ message: "Failed to generate prescription" });
+      console.error("Error generating Clinical Advisory PDF data:", error);
+      res.status(500).json({ message: "Failed to generate Clinical Advisory" });
     }
   });
 
-  // Confirm & Sign prescription (provider-only: locks + atomically saves current draft + generates server-side frozen PDF + audit log)
+  // Confirm & Sign Clinical Advisory (provider-only: locks + atomically saves current draft + generates server-side frozen PDF + audit log)
   app.post("/api/bookings/:id/prescription/confirm", isAuthenticated, async (req: any, res) => {
     try {
       const user = req.user;
 
       // Only providers (assigned consultant's owner) may digitally sign — not admins
       if (user.role !== "provider") {
-        return res.status(403).json({ message: "Only the assigned provider may confirm and sign a prescription." });
+        return res.status(403).json({ message: "Only the assigned provider may confirm and sign a Clinical Advisory." });
       }
 
       const booking = await storage.getBookingById(req.params.id);
       if (!booking) return res.status(404).json({ message: "Booking not found" });
-      if (booking.bookingType !== "consultation") return res.status(400).json({ message: "Only consultation bookings can have prescriptions confirmed" });
+      if (booking.bookingType !== "consultation") return res.status(400).json({ message: "Only consultation bookings can have Clinical Advisories confirmed" });
 
       // Ownership: verify the consultant belongs to this provider (only enforced when the consultant has a provider assigned)
       const provider = await storage.getProviderByUserId(user.id);
@@ -1604,14 +1604,14 @@ export async function registerRoutes(
       }
       // If the consultant has a provider assigned, enforce ownership. If not (e.g. admin-seeded), allow any provider.
       if (consultant.providerId && consultant.providerId !== provider.id) {
-        return res.status(403).json({ message: "You can only sign prescriptions for your own consultants" });
+        return res.status(403).json({ message: "You can only sign Clinical Advisories for your own consultants" });
       }
 
       if ((booking as any).prescriptionApprovedAt) {
-        return res.status(409).json({ message: "Prescription is already confirmed and permanently locked." });
+        return res.status(409).json({ message: "Clinical Advisory is already confirmed and permanently locked." });
       }
 
-      // Accept current prescription content from request body (atomic save+confirm)
+      // Accept current Clinical Advisory content from request body (atomic save+confirm)
       const { diagnosis, medications, physicianNotes, followUp } = req.body as {
         diagnosis?: string;
         medications?: string;
@@ -1621,10 +1621,10 @@ export async function registerRoutes(
 
       const finalDiagnosis = (diagnosis || "").trim() || booking.prescriptionDiagnosis || null;
       if (!finalDiagnosis) {
-        return res.status(400).json({ message: "Diagnosis is required before confirming a prescription." });
+         return res.status(400).json({ message: "Diagnosis is required before confirming a Clinical Advisory." });
       }
 
-      // Atomically update prescription content before confirming
+      // Atomically update Clinical Advisory content before confirming
       if (diagnosis !== undefined || medications !== undefined || physicianNotes !== undefined || followUp !== undefined) {
         await storage.updateBooking(booking.id, {
           prescriptionDiagnosis: finalDiagnosis,
@@ -1688,7 +1688,7 @@ export async function registerRoutes(
 
       const prescriptionPdfUrl = await generateAndStorePrescriptionPdf(pdfData, baseUrl);
 
-      // Lock the prescription with approval metadata and reset all post-rx feature toggles
+      // Lock the Clinical Advisory with approval metadata and reset all post-rx feature toggles
       const postRxExpiresAt = new Date(approvedAt.getTime() + 24 * 60 * 60 * 1000);
       const updated = await storage.updateBooking(freshBooking.id, {
         prescriptionApprovedAt: approvedAt,
@@ -1723,12 +1723,12 @@ export async function registerRoutes(
 
       res.json({ ...updated, prescriptionPdfUrl });
     } catch (error) {
-      console.error("Error confirming prescription:", error);
-      res.status(500).json({ message: "Failed to confirm prescription" });
+      console.error("Error confirming Clinical Advisory:", error);
+      res.status(500).json({ message: "Failed to confirm Clinical Advisory" });
     }
   });
 
-  // Download a signed prescription PDF — streams the file directly (regenerates if missing on disk)
+  // Download a signed Clinical Advisory PDF — streams the file directly (regenerates if missing on disk)
   app.get("/api/bookings/:id/prescription/download", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user?.id;
@@ -1750,7 +1750,7 @@ export async function registerRoutes(
       }
 
       if (!(booking as any).prescriptionApprovedAt) {
-        return res.status(404).json({ message: "Prescription has not been confirmed yet" });
+        return res.status(404).json({ message: "Clinical Advisory has not been confirmed yet" });
       }
 
       // Try to serve the existing stored file first
@@ -1762,7 +1762,7 @@ export async function registerRoutes(
         }
         const absPath = path.join(process.cwd(), storedRelPath);
         if (fs.existsSync(absPath)) {
-          const safeName = `prescription-${(booking as any).bookingNumber || booking.id}.pdf`;
+          const safeName = `clinical-advisory-${(booking as any).bookingNumber || booking.id}.pdf`;
           res.setHeader("Content-Type", "application/pdf");
           res.setHeader("Content-Disposition", `attachment; filename="${safeName}"`);
           return fs.createReadStream(absPath).pipe(res);
@@ -1825,17 +1825,17 @@ export async function registerRoutes(
       }
 
       const newAbsPath = path.join(process.cwd(), newPdfUrl);
-      const safeName = `prescription-${(booking as any).bookingNumber || booking.id}.pdf`;
+      const safeName = `clinical-advisory-${(booking as any).bookingNumber || booking.id}.pdf`;
       res.setHeader("Content-Type", "application/pdf");
       res.setHeader("Content-Disposition", `attachment; filename="${safeName}"`);
       fs.createReadStream(newAbsPath).pipe(res);
     } catch (error) {
-      console.error("Error downloading prescription PDF:", error);
-      res.status(500).json({ message: "Failed to download prescription PDF" });
+      console.error("Error downloading Clinical Advisory PDF:", error);
+      res.status(500).json({ message: "Failed to download Clinical Advisory PDF" });
     }
   });
 
-  // ── Prescription Review Summaries ──────────────────────────────────────────────
+  // ── Clinical Advisory Review Summaries ─────────────────────────────────────────
 
   // Create + confirm a review summary (within 24h post-rx window)
   app.post("/api/bookings/:id/prescription-reviews", isAuthenticated, async (req: any, res) => {
@@ -1851,7 +1851,7 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Review summaries are only for consultation bookings." });
       }
       if (!(booking as any).prescriptionApprovedAt) {
-        return res.status(409).json({ message: "The initial prescription must be confirmed before adding review summaries." });
+        return res.status(409).json({ message: "The initial Clinical Advisory must be confirmed before adding review summaries." });
       }
 
       // Gating: must be within the 24h post-rx window
@@ -1968,7 +1968,7 @@ export async function registerRoutes(
           ...basePdfData,
           prescriptionTrail: [
             {
-              label: "Initial Consultation Summary",
+              label: "Initial Clinical Advisory",
               approvedAt: new Date((booking as any).prescriptionApprovedAt),
               diagnosis: (booking as any).prescriptionDiagnosis || null,
               physicianNotes: (booking as any).prescriptionPhysicianNotes || null,
@@ -2089,7 +2089,7 @@ export async function registerRoutes(
     }
   });
 
-  // Download the latest cumulative prescription trail (original + every review to date)
+  // Download the latest cumulative Clinical Advisory trail (original + every review to date)
   app.get("/api/bookings/:id/prescription-trail/download", isAuthenticated, async (req: any, res) => {
     try {
       const user = req.user;
@@ -2173,7 +2173,7 @@ export async function registerRoutes(
         followUp: latestReview.follow_up || null,
         prescriptionTrail: [
           {
-            label: "Initial Consultation Summary",
+            label: "Initial Clinical Advisory",
             approvedAt: new Date((booking as any).prescriptionApprovedAt),
             diagnosis: (booking as any).prescriptionDiagnosis || null,
             physicianNotes: (booking as any).prescriptionPhysicianNotes || null,
@@ -2199,8 +2199,8 @@ export async function registerRoutes(
       ]);
       return res.redirect(cumulativePdfUrl);
     } catch (error) {
-      req.log?.error({ error }, "Error downloading prescription trail");
-      res.status(500).json({ message: "Failed to download prescription trail" });
+      req.log?.error({ error }, "Error downloading Clinical Advisory trail");
+      res.status(500).json({ message: "Failed to download Clinical Advisory trail" });
     }
   });
 
@@ -2252,10 +2252,10 @@ export async function registerRoutes(
     try {
       const booking = await storage.getBookingById(req.params.bookingId);
       if (!booking || booking.bookingType !== "consultation") {
-        return res.status(404).json({ message: "Prescription not found" });
+        return res.status(404).json({ message: "Clinical Advisory not found" });
       }
       if (!(booking as any).prescriptionApprovedAt) {
-        return res.status(404).json({ message: "This prescription has not been confirmed yet" });
+        return res.status(404).json({ message: "This Clinical Advisory has not been confirmed yet" });
       }
 
       let consultant: any = null;
@@ -2277,8 +2277,8 @@ export async function registerRoutes(
         isVerified: true,
       });
     } catch (error) {
-      console.error("Error verifying prescription:", error);
-      res.status(500).json({ message: "Failed to verify prescription" });
+      console.error("Error verifying Clinical Advisory:", error);
+      res.status(500).json({ message: "Failed to verify Clinical Advisory" });
     }
   });
 
@@ -4288,7 +4288,7 @@ export async function registerRoutes(
         return res.status(403).json({ message: "Access denied. You can only upload documents to your own bookings." });
       }
 
-      // After prescription: uploads only allowed while in 24h window AND uploads toggle is on
+      // After Clinical Advisory: uploads only allowed while in 24h window AND uploads toggle is on
       if ((booking as any).prescriptionApprovedAt) {
         const expiresAt = (booking as any).postRxExpiresAt ? new Date((booking as any).postRxExpiresAt) : null;
         const inWindow = !!(expiresAt && new Date() < expiresAt);
@@ -4329,7 +4329,7 @@ export async function registerRoutes(
         return res.status(403).json({ message: "Access denied." });
       }
 
-      // After prescription: uploads only allowed while in 24h window AND uploads toggle is on
+      // After Clinical Advisory: uploads only allowed while in 24h window AND uploads toggle is on
       if ((booking as any).prescriptionApprovedAt) {
         const expiresAt = (booking as any).postRxExpiresAt ? new Date((booking as any).postRxExpiresAt) : null;
         const inWindow = !!(expiresAt && new Date() < expiresAt);
@@ -5201,7 +5201,7 @@ export async function registerRoutes(
 
       const callerRole: "seeker" | "provider" = isSeeker ? "seeker" : "provider";
 
-      // Enforce access gate — post-prescription uses post-rx toggles; pre-prescription uses slot window
+      // Enforce access gate — post-advisory uses post-rx toggles; pre-advisory uses slot window
       const prescriptionApprovedAtRing = (booking as any).prescriptionApprovedAt;
       if (prescriptionApprovedAtRing) {
         const expiresAt = (booking as any).postRxExpiresAt ? new Date((booking as any).postRxExpiresAt) : null;
@@ -5587,21 +5587,21 @@ export async function registerRoutes(
     }
   });
 
-  // PATCH /api/bookings/:id/post-rx-features — provider toggles post-prescription feature access
+  // PATCH /api/bookings/:id/post-rx-features — provider toggles post-advisory feature access
   app.patch("/api/bookings/:id/post-rx-features", isAuthenticated, async (req: any, res) => {
     try {
       const user = req.user;
       if (user.role !== "provider") {
-        return res.status(403).json({ error: "Only providers can update post-prescription features" });
+        return res.status(403).json({ error: "Only providers can update post-advisory features" });
       }
       const booking = await storage.getBookingById(req.params.id);
       if (!booking) return res.status(404).json({ error: "Booking not found" });
       if (!(booking as any).prescriptionApprovedAt) {
-        return res.status(400).json({ error: "Prescription must be confirmed before toggling post-prescription features" });
+        return res.status(400).json({ error: "Clinical Advisory must be confirmed before toggling post-advisory features" });
       }
       const expiresAt = (booking as any).postRxExpiresAt ? new Date((booking as any).postRxExpiresAt) : null;
       if (!expiresAt || new Date() > expiresAt) {
-        return res.status(400).json({ error: "The 24-hour post-prescription feature window has expired" });
+        return res.status(400).json({ error: "The 24-hour post-advisory feature window has expired" });
       }
       const provider = await storage.getProviderByUserId(user.id);
       if (!provider) return res.status(403).json({ error: "Provider profile not found" });
@@ -5629,7 +5629,7 @@ export async function registerRoutes(
       const updated = await storage.updateBooking(booking.id, patch as any);
       res.json(updated);
     } catch (error) {
-      res.status(500).json({ error: "Failed to update post-prescription features" });
+      res.status(500).json({ error: "Failed to update post-advisory features" });
     }
   });
 
@@ -5741,7 +5741,7 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Calls are only available for active (booked) consultations" });
       }
 
-      // After prescription: gate on post-rx calls toggle within 24h window
+      // After Clinical Advisory: gate on post-rx calls toggle within 24h window
       const prescriptionApprovedAtCall = (booking as any).prescriptionApprovedAt;
       if (prescriptionApprovedAtCall) {
         const expiresAt = (booking as any).postRxExpiresAt ? new Date((booking as any).postRxExpiresAt) : null;
@@ -5754,7 +5754,7 @@ export async function registerRoutes(
           return res.status(403).json({ error: "Phone calls are currently disabled for this consultation" });
         }
       } else {
-        // Before prescription: check slot window
+        // Before Clinical Advisory: check slot window
         const win = getCallWindow(booking);
         if (!win.open) {
           return res.status(403).json({ error: "Call window is not active", reason: win.reason });

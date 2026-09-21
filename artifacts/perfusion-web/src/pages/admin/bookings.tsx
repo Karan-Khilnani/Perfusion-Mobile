@@ -651,7 +651,7 @@ export default function AdminBookingsPage() {
                         <div className="mt-1 flex flex-wrap items-center gap-2">
                           <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400">
                             <ShieldCheck className="h-3 w-3" />
-                            Rx Signed &amp; Locked
+                            Advisory Signed &amp; Locked
                           </span>
                           <span className="text-xs text-muted-foreground">
                             {format(new Date((booking as any).prescriptionApprovedAt), "PPp")}
@@ -672,7 +672,7 @@ export default function AdminBookingsPage() {
                         <div className="mt-1 flex items-center gap-1">
                           <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
                             <FileSignature className="h-3 w-3" />
-                            Rx Draft (unsigned)
+                            Advisory Draft (unsigned)
                           </span>
                         </div>
                       )}
@@ -755,7 +755,7 @@ export default function AdminBookingsPage() {
                       <a href={(booking as any).prescriptionPdfUrl} target="_blank" rel="noopener noreferrer">
                         <Button size="sm" variant="outline" className="text-green-700 dark:text-green-400" data-testid={`button-view-signed-rx-${booking.id}`}>
                           <Download className="mr-1 h-3.5 w-3.5" />
-                          Signed Rx
+                          Signed Advisory
                         </Button>
                       </a>
                     )}

@@ -408,7 +408,7 @@ export default function LandingPage() {
                 </Link>
                 
                 <p className="text-xl md:text-2xl lg:text-3xl font-light text-gray-600 dark:text-white/70 italic mb-8">
-                  "Prescribe what you need, Perfusion will move it"
+                  "Share what you need, Perfusion will move it"
                 </p>
                 
                 <p className="text-lg text-gray-600 dark:text-white/60 mb-8 leading-relaxed">

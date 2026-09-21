@@ -70,7 +70,7 @@ function drawPageFooter(doc: jsPDF, pageNum: number) {
   doc.setTextColor(...COLORS.light);
   doc.text("Perfusion Health Pvt Ltd | Digital Super Speciality Consultation Platform", MARGIN_LEFT, PAGE_HEIGHT - 12);
   doc.text(`Page ${pageNum} of ${totalPages}`, PAGE_WIDTH - MARGIN_RIGHT, PAGE_HEIGHT - 12, { align: "right" });
-  doc.text("This is a digitally generated e-prescription.", MARGIN_LEFT, PAGE_HEIGHT - 7);
+  doc.text("This is a digitally generated clinical advisory.", MARGIN_LEFT, PAGE_HEIGHT - 7);
 }
 
 function drawSectionHeader(doc: jsPDF, y: number, title: string): number {
@@ -149,7 +149,7 @@ export async function generatePrescriptionPDF(data: PrescriptionData): Promise<v
   doc.setFont("helvetica", "normal");
   doc.setFontSize(7.5);
   doc.setTextColor(255, 230, 230);
-  doc.text(`E-Prescription ID: ${data.prescriptionId}`, MARGIN_LEFT + 4, y + 20);
+  doc.text(`Clinical Advisory ID: ${data.prescriptionId}`, MARGIN_LEFT + 4, y + 20);
   doc.text(`Date & Time: ${data.dateTime}`, PAGE_WIDTH - MARGIN_RIGHT - 4, y + 20, { align: "right" });
   doc.text(`Mode: ${data.mode}`, MARGIN_LEFT + 4, y + 25);
 
@@ -251,7 +251,7 @@ export async function generatePrescriptionPDF(data: PrescriptionData): Promise<v
   }
 
   if (data.treatmentPlan) {
-    y = drawSectionHeader(doc, y, "Suggested Treatment Plan");
+    y = drawSectionHeader(doc, y, "Clinical Advisory");
     y = drawMultilineContent(doc, y, data.treatmentPlan);
     y += 2;
   }
@@ -284,7 +284,7 @@ export async function generatePrescriptionPDF(data: PrescriptionData): Promise<v
   doc.setFontSize(7);
   doc.setTextColor(...COLORS.medium);
   const legalLines = doc.splitTextToSize(
-    "This consultation is based on information provided digitally and available records. Treatment advice is given in good faith and does not replace emergency care where indicated. Patient/referring team advised to seek immediate medical attention if condition worsens.",
+    "This document is a specialist clinical opinion, not a prescription or treatment order. Treating hospital physicians retain responsibility for prescribing and treatment decisions. It is based on information provided digitally and available records and does not replace emergency care where indicated.",
     CONTENT_WIDTH - 8
   );
   doc.text(legalLines, MARGIN_LEFT + 4, y + 10);
@@ -338,5 +338,5 @@ export async function generatePrescriptionPDF(data: PrescriptionData): Promise<v
     drawPageFooter(doc, i);
   }
 
-  doc.save(`Prescription_${data.prescriptionId}.pdf`);
+  doc.save(`Clinical_Advisory_${data.prescriptionId}.pdf`);
 }

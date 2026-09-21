@@ -944,7 +944,7 @@ export default function ProfilePage() {
               <Building className="h-4 w-4" />
               Account Details
             </CardTitle>
-            <CardDescription>Your availability window and digital signature for prescriptions.</CardDescription>
+            <CardDescription>Your availability window and digital signature for clinical advisories.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             {/* Availability */}

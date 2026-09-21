@@ -441,7 +441,7 @@ export default function OrdersPage() {
             <div className="mt-2 grid gap-2 text-sm">
               {r.diagnosis && <div><span className="text-xs font-medium text-muted-foreground">Diagnosis</span><p>{r.diagnosis}</p></div>}
               {r.physicianNotes && <div><span className="text-xs font-medium text-muted-foreground">Physician Notes</span><p className="whitespace-pre-line">{r.physicianNotes}</p></div>}
-              {r.medications && <div><span className="text-xs font-medium text-muted-foreground">Suggested Treatment Plan</span><p className="whitespace-pre-line">{r.medications}</p></div>}
+              {r.medications && <div><span className="text-xs font-medium text-muted-foreground">Clinical Advisory</span><p className="whitespace-pre-line">{r.medications}</p></div>}
               {r.advice && <div><span className="text-xs font-medium text-muted-foreground">Advice</span><p className="whitespace-pre-line">{r.advice}</p></div>}
               {r.followUp && <div><span className="text-xs font-medium text-muted-foreground">Follow-up</span><p>{r.followUp}</p></div>}
             </div>
@@ -793,7 +793,7 @@ export default function OrdersPage() {
               )}
               {(booking as any).prescriptionMedications && (
                 <div>
-                  <p className="text-xs font-medium text-muted-foreground">Suggested Treatment Plan</p>
+                  <p className="text-xs font-medium text-muted-foreground">Clinical Advisory</p>
                   <p className="text-sm whitespace-pre-line">{(booking as any).prescriptionMedications}</p>
                 </div>
               )}
@@ -829,7 +829,7 @@ export default function OrdersPage() {
                       window.open(data.prescriptionPdfUrl, "_blank");
                       return;
                     }
-                    if (!response.ok) throw new Error("Failed to fetch prescription data");
+                    if (!response.ok) throw new Error("Failed to fetch clinical advisory data");
                     const { generatePrescriptionPDF } = await import("@/lib/prescription-pdf");
                     await generatePrescriptionPDF(data);
                   } catch (error) {
@@ -1159,7 +1159,7 @@ export default function OrdersPage() {
                                 <th className="px-3 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">Department</th>
                                 <th className="px-3 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">Booked Slot</th>
                                 <th className="px-3 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">Status</th>
-                                <th className="px-3 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">Prescription</th>
+                                <th className="px-3 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">Clinical Advisory</th>
                               </tr>
                             </thead>
                             <tbody>
