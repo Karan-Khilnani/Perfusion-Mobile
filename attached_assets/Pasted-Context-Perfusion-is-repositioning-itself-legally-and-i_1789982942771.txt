@@ -1,0 +1,21 @@
+Context: Perfusion is repositioning itself legally and in-product as a clinical advisory/second-opinion platform, not a prescriber of record. The consulting physician gives clinical opinion to the treating team; prescribing and treatment responsibility stays with the treating hospital's own physicians. This is a deliberate liability-positioning decision, not a cosmetic one.
+
+What must change — terminology, everywhere a user or the public can see it:
+
+"Prescription" → "Clinical Advisory" (or "Advisory")
+"Rx" and any "prescribe/prescribed/prescription" language → "advise/advised/advisory"
+This applies to: the generated PDF template, the public verification page at /api/verify/prescription/:bookingId (route path itself doesn't need to change, but everything the page displays to a visitor does), any in-app labels/buttons on the website that currently say Prescription/Rx, and the "prescription-trail" download's visible framing.
+
+What must be preserved exactly as-is — do not touch the mechanism, only the language:
+
+Draft → edit → sign/lock (/confirm) → immutable after locking
+Timestamp on every entry
+PDF generation
+Public verification capability (the link still works, still proves authenticity — it just needs to say "Clinical Advisory," not "Prescription")
+The cumulative multi-entry trail per booking (prescription-trail/download) — this is exactly the "permanent record" behavior we want, keep it fully intact
+
+Content format — needs your confirmation, not just a rename: Going forward, advisory content should be free-text clinical narrative only — no mandatory structured Drug/Dose/Route/Frequency fields, since a structured field set visually reads as a prescription pad regardless of what it's labeled. Before changing anything: does the current PATCH /api/bookings/:id/prescription schema require structured fields, or does it already accept free text? If it requires structured fields, tell me what changing that would actually touch (schema, PDF template logic, any downstream consumer of those fields) before making the change — I don't want this done blindly.
+
+Scope boundary: This is web/backend/shared-API work only. Do not touch anything under artifacts/perfusion-mobile/. Mobile work is paused until this is resolved, since the mobile Clinical Advisory composer needs to point at whatever this schema ends up being.
+
+Before changing anything: give me an audit of exactly what's affected — PDF template file(s), the verification page's actual displayed content, the schema, and any other place "prescription"/"Rx" appears user-facing — and a proposed plan. I'll approve the plan before you implement it.
