@@ -1,0 +1,17 @@
+**Prompt for Replit (web + backend scope):**
+
+> **Context:** Perfusion is moving from Twilio-based cellular calling to in-app VoIP calling — voice and video both happening natively inside the Perfusion app, exactly like WhatsApp calling, including working with the phone screen locked. This applies to both the web app and the upcoming mobile app, and to both Provider and Seeker sides.
+>
+> **What must change, user-facing, on both web and mobile:**
+> - The current behavior where tapping "Voice Call" triggers a Twilio cellular call to a saved Ward Contact number must be removed from the frontend entirely. Voice calls must go through the same in-app VoIP mechanism as video calls.
+> - Twilio-based calling between Seeker and Provider must not be visible or reachable anywhere in either frontend, effective immediately.
+>
+> **What must NOT happen — this is explicitly a pause, not a deletion:**
+> - Do not delete or dismantle the Twilio calling backend, the Ward Contacts data, or the integration code. Disable/hide it from the calling flow, but keep it fully intact and re-enableable.
+> - We may reintroduce Twilio-to-real-number calling later as a fallback tier for connectivity failures — do not build this scenario now, just don't destroy the ability to bring it back.
+>
+> **Ward Contacts specifically:** the data (MICU number, resident number, etc.) stays exactly as-is in the Seeker profile. It simply stops being the mechanism that fires when someone taps to call — it becomes dormant, not deleted, pending a future decision on if/how it gets reconnected as a fallback.
+>
+> **Scope boundary:** this is a web + shared-backend change. Confirm separately whether any of this requires touching `artifacts/perfusion-mobile/` right now, or whether mobile simply inherits VoIP-only calling by default once it's built, since mobile hasn't implemented calling yet.
+>
+> **Before implementing:** give an audit of every place Twilio-triggered calling currently surfaces in the frontend (provider dashboard, seeker dashboard, in-call UI, any button/icon tied to it) so the full change surface is visible before anything is touched, same format as the Clinical Advisory audit.
