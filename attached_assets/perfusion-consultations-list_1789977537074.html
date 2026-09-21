@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Perfusion — Consultations, Search & Filters (CP-03/04/05, CS equiv.)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --red:#DB2841; --charcoal:#2A2A2A; --canvas:#F7F7F9; --card:#FFFFFF;
+    --hairline:#ECEDF0; --muted:#7A7F8A; --muted-2:#A6ABB4; --blue:#2F6FED; --blue-tint:#EAF1FE;
+    --green:#17A672; --grey:#9AA0AC; --grey-tint:#F0F1F3;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{ background:#E8E6E2; font-family:'Inter', sans-serif; display:flex; flex-direction:column; align-items:center; gap:16px; padding:40px 16px 80px; min-height:100vh; }
+  .review-bar{ display:flex; align-items:center; gap:6px; background:#fff; border:1px solid var(--hairline); border-radius:999px; padding:8px 16px; font-size:12px; color:var(--muted-2); }
+  .review-bar button{ font-size:12px; font-weight:600; color:var(--muted); background:transparent; border:none; border-radius:999px; padding:6px 12px; cursor:pointer; }
+  .review-bar button.active{ background:var(--charcoal); color:#fff; }
+
+  .device{ width:390px; max-width:100%; height:844px; background:#000; border-radius:46px; padding:14px; box-shadow:0 30px 60px -20px rgba(0,0,0,.35), 0 10px 20px -10px rgba(0,0,0,.2); }
+  .screen{ width:100%; height:100%; background:var(--canvas); border-radius:34px; overflow:hidden; position:relative; display:flex; flex-direction:column; }
+  .notch{ position:absolute; top:14px; left:50%; transform:translateX(-50%); width:120px; height:28px; background:#000; border-radius:20px; z-index:50; }
+  .statusbar{ display:flex; justify-content:space-between; align-items:center; padding:16px 26px 4px; font-size:13px; font-weight:600; color:var(--charcoal); background:var(--card); flex-shrink:0; }
+
+  .page-header{ background:var(--card); border-bottom:1px solid var(--hairline); flex-shrink:0; }
+  .page-header-top{ display:flex; align-items:center; gap:10px; padding:12px 16px 10px; }
+  .back-btn{ width:30px; height:30px; border-radius:50%; display:flex; align-items:center; justify-content:center; color:var(--charcoal); }
+  .back-btn svg{ width:17px; height:17px; }
+  .page-title{ font-family:'Sora',sans-serif; font-weight:600; font-size:16px; color:var(--charcoal); }
+
+  .search-row{ padding:0 16px 10px; }
+  .search-input{ display:flex; align-items:center; gap:9px; background:var(--grey-tint); border-radius:12px; padding:10px 13px; }
+  .search-input svg{ width:16px; height:16px; color:var(--muted-2); flex-shrink:0; }
+  .search-input input{ border:none; outline:none; background:transparent; font-size:13px; color:var(--charcoal); flex:1; font-family:'Inter',sans-serif; }
+  .search-input input::placeholder{ color:var(--muted-2); }
+  .search-clear{ color:var(--muted-2); font-size:13px; cursor:pointer; }
+
+  .quick-filter-row{ display:flex; gap:8px; padding:0 16px 10px; overflow-x:auto; }
+  .quick-filter{ flex-shrink:0; font-size:12px; font-weight:600; padding:7px 13px; border-radius:999px; background:#fff; border:1px solid var(--hairline); color:var(--muted); white-space:nowrap; cursor:pointer; display:flex; align-items:center; gap:5px; }
+  .quick-filter.active{ background:var(--charcoal); color:#fff; border-color:var(--charcoal); }
+  .quick-filter svg{ width:12px; height:12px; }
+  .filter-badge-count{ background:var(--red); color:#fff; border-radius:999px; font-size:10px; font-weight:700; padding:1px 6px; margin-left:2px; }
+
+  .results-count{ padding:10px 16px 4px; font-size:12px; color:var(--muted-2); font-weight:600; }
+
+  .log{ flex:1; overflow-y:auto; background:var(--card); }
+  .date-group{ padding:12px 16px 6px; font-size:12.5px; font-weight:600; color:var(--muted-2); }
+
+  .log-row{ position:relative; display:flex; flex-wrap:wrap; align-items:flex-start; gap:12px; padding:13px 16px; cursor:pointer; }
+  .log-row:not(:last-child)::after{ content:''; position:absolute; left:70px; right:16px; bottom:0; height:1px; background:var(--hairline); }
+  .row-badge{ width:42px; height:42px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:10.5px; letter-spacing:-0.2px; flex-shrink:0; margin-top:1px; }
+  .row-block{ flex:1; min-width:0; }
+  .row-title{ font-size:14.5px; font-weight:700; color:var(--charcoal); line-height:1.35; }
+  .row-hospital-line{ margin-top:4px; display:flex; align-items:baseline; justify-content:space-between; gap:8px; }
+  .row-hospital{ font-size:12px; color:var(--muted); line-height:1.35; }
+  .row-hospital .place{ color:var(--charcoal); font-weight:700; }
+  .row-time{ font-size:12px; color:var(--muted-2); font-weight:500; flex-shrink:0; }
+  .row-bottom{ margin-top:5px; display:flex; align-items:center; justify-content:space-between; gap:10px; }
+  .row-patient{ font-size:12.5px; color:var(--muted); display:flex; align-items:center; gap:5px; min-width:0; }
+  .row-patient svg{ width:12px; height:12px; color:var(--muted-2); flex-shrink:0; }
+  .row-patient span{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .row-status{ display:flex; align-items:center; gap:4px; font-size:12px; font-weight:600; white-space:nowrap; }
+  .status-dot{ width:6px; height:6px; border-radius:50%; background:currentColor; }
+  .status-scheduled{ color:var(--blue); }
+  .status-ongoing{ color:var(--red); }
+  .status-completed{ color:var(--green); }
+  .status-missed{ color:var(--red); }
+  .status-closed{ color:var(--grey); }
+  .row-conid{ margin-top:4px; font-size:11px; color:var(--muted-2); font-weight:500; }
+
+  /* ---------- Consultation Detail page ---------- */
+  .detail-page{ display:none; flex-direction:column; height:100%; background:var(--canvas); }
+  .detail-page.active{ display:flex; }
+  .detail-scroll{ flex:1; overflow-y:auto; }
+  .detail-hero{ background:#fff; border-bottom:1px solid var(--hairline); padding:18px 20px; }
+  .detail-badge-row{ display:flex; align-items:center; gap:12px; margin-bottom:14px; }
+  .detail-badge{ width:48px; height:48px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:13px; flex-shrink:0; }
+  .detail-title{ font-family:'Sora',sans-serif; font-weight:600; font-size:17px; color:var(--charcoal); }
+  .detail-subtitle{ font-size:12.5px; color:var(--muted); margin-top:2px; }
+  .detail-meta-grid{ display:flex; flex-wrap:wrap; gap:10px 22px; }
+  .detail-meta-item{ min-width:100px; }
+  .detail-meta-label{ font-size:9.5px; font-weight:700; color:var(--muted-2); letter-spacing:.3px; }
+  .detail-meta-value{ font-size:13px; font-weight:700; color:var(--charcoal); margin-top:2px; }
+  .detail-meta-value.status-ongoing, .detail-meta-value.status-completed, .detail-meta-value.status-scheduled, .detail-meta-value.status-missed, .detail-meta-value.status-closed{ display:flex; align-items:center; gap:5px; }
+
+  .detail-section{ background:#fff; padding:16px 20px; border-bottom:1px solid var(--hairline); }
+  .detail-section-title{ font-size:11.5px; font-weight:700; color:var(--muted-2); letter-spacing:.3px; margin-bottom:10px; }
+  .detail-text{ font-size:13px; color:var(--charcoal); line-height:1.6; }
+  .detail-link-row{ display:flex; align-items:center; justify-content:space-between; padding:10px 12px; background:var(--canvas); border-radius:10px; cursor:pointer; margin-top:4px; }
+  .detail-link-row span{ font-size:12.5px; font-weight:600; color:var(--charcoal); }
+  .detail-link-row svg{ width:14px; height:14px; color:var(--muted-2); }
+
+  .advisory-entry{ position:relative; padding-left:16px; margin-bottom:14px; }
+  .advisory-entry::before{ content:''; position:absolute; left:0; top:5px; width:7px; height:7px; border-radius:50%; background:var(--blue); }
+  .advisory-entry::after{ content:''; position:absolute; left:3px; top:14px; bottom:-14px; width:1px; background:var(--hairline); }
+  .advisory-entry:last-child::after{ display:none; }
+  .advisory-entry-head{ display:flex; align-items:center; gap:6px; margin-bottom:3px; }
+  .advisory-entry-time{ font-size:11.5px; font-weight:700; color:var(--charcoal); }
+  .advisory-entry-author{ font-size:11px; color:var(--muted-2); }
+  .advisory-entry-text{ font-size:12.5px; color:var(--charcoal); line-height:1.5; }
+  .advisory-forever-note{ display:flex; align-items:center; gap:7px; margin-top:12px; padding:9px 11px; background:var(--canvas); border-radius:9px; font-size:11px; color:var(--muted); line-height:1.4; }
+  .advisory-forever-note svg{ width:14px; height:14px; color:var(--muted-2); flex-shrink:0; }
+
+  .attach-mini-row{ display:flex; align-items:center; gap:9px; padding:9px 0; border-bottom:1px solid var(--hairline); }
+  .attach-mini-row:last-child{ border-bottom:none; }
+  .attach-mini-icon{ width:28px; height:28px; border-radius:7px; background:var(--grey-tint); display:flex; align-items:center; justify-content:center; color:var(--charcoal); flex-shrink:0; }
+  .attach-mini-icon svg{ width:13px; height:13px; }
+  .attach-mini-name{ font-size:12px; font-weight:600; color:var(--charcoal); }
+  .attach-mini-sub{ font-size:10.5px; color:var(--muted-2); margin-top:1px; }
+
+  .detail-cta-row{ padding:16px 20px 24px; }
+  .detail-cta{ width:100%; height:46px; border-radius:23px; background:var(--red); color:#fff; border:none; font-weight:700; font-size:13.5px; font-family:'Inter',sans-serif; }
+
+  .empty-state{ flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:40px; text-align:center; display:none; }
+  .empty-state.show{ display:flex; }
+  .empty-icon{ width:56px; height:56px; border-radius:50%; background:var(--grey-tint); display:flex; align-items:center; justify-content:center; margin-bottom:14px; color:var(--muted-2); }
+  .empty-icon svg{ width:24px; height:24px; }
+  .empty-title{ font-size:14px; font-weight:700; color:var(--charcoal); }
+  .empty-sub{ font-size:12px; color:var(--muted); margin-top:5px; line-height:1.5; max-width:220px; }
+
+  /* filter sheet */
+  .sheet-backdrop{ position:absolute; inset:0; background:rgba(20,20,25,.42); z-index:80; display:none; align-items:flex-end; }
+  .sheet-backdrop.open{ display:flex; }
+  .filter-sheet{ width:100%; background:#fff; border-radius:20px 20px 0 0; max-height:80%; display:flex; flex-direction:column; }
+  .filter-sheet-header{ display:flex; align-items:center; justify-content:space-between; padding:14px 18px 10px; border-bottom:1px solid var(--hairline); flex-shrink:0; }
+  .filter-sheet-title{ font-family:'Sora',sans-serif; font-weight:600; font-size:16px; color:var(--charcoal); }
+  .filter-reset{ font-size:12.5px; font-weight:700; color:var(--red); cursor:pointer; }
+  .filter-body{ flex:1; overflow-y:auto; padding:14px 18px; }
+  .filter-section-title{ font-size:11px; font-weight:700; color:var(--muted-2); letter-spacing:.3px; margin-bottom:9px; margin-top:18px; }
+  .filter-section-title:first-child{ margin-top:0; }
+  .filter-chip-grid{ display:flex; flex-wrap:wrap; gap:8px; }
+  .filter-chip{ font-size:12.5px; font-weight:600; padding:8px 14px; border-radius:10px; background:var(--grey-tint); color:var(--muted); cursor:pointer; }
+  .filter-chip.active{ background:var(--red); color:#fff; }
+  .date-range-row{ display:flex; gap:10px; }
+  .date-range-input{ flex:1; height:42px; border:1px solid var(--hairline); border-radius:10px; padding:0 12px; font-size:12.5px; color:var(--muted-2); display:flex; align-items:center; background:#fff; }
+  .filter-footer{ padding:12px 18px 20px; border-top:1px solid var(--hairline); flex-shrink:0; }
+  .filter-apply-btn{ width:100%; height:46px; border-radius:23px; background:var(--red); color:#fff; border:none; font-weight:700; font-size:13.5px; font-family:'Inter',sans-serif; }
+  .list-view{ display:flex; flex-direction:column; height:100%; }
+  .list-view.hidden{ display:none; }
+</style>
+</head>
+<body>
+
+  <div class="review-bar">
+    <span>Role</span>
+    <button class="active" onclick="setRole('provider', this)">Provider</button>
+    <button onclick="setRole('seeker', this)">Seeker</button>
+  </div>
+
+  <div class="device">
+    <div class="screen">
+      <div class="notch"></div>
+      <div class="statusbar">
+        <span>9:41</span>
+        <span style="display:flex; gap:4px; align-items:center;">
+          <svg width="16" height="12" viewBox="0 0 16 12" fill="none"><path d="M1 4.5C4.5 1.5 11.5 1.5 15 4.5" stroke="#2A2A2A" stroke-width="1.4" stroke-linecap="round"/><path d="M3.2 7C5.5 5 10.5 5 12.8 7" stroke="#2A2A2A" stroke-width="1.4" stroke-linecap="round"/><circle cx="8" cy="9.5" r="1" fill="#2A2A2A"/></svg>
+          <svg width="18" height="11" viewBox="0 0 18 11" fill="none"><rect x="0.5" y="0.5" width="15" height="10" rx="2.5" stroke="#2A2A2A"/><rect x="2" y="2" width="10" height="7" rx="1" fill="#2A2A2A"/><rect x="16.5" y="3.5" width="1.5" height="4" rx="0.7" fill="#2A2A2A"/></svg>
+        </span>
+      </div>
+
+      <div class="list-view" id="list-view">
+      <div class="page-header">
+        <div class="page-header-top">
+          <div class="back-btn"><svg viewBox="0 0 24 24" fill="none"><path d="M15 5l-7 7 7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="page-title">Consultations</div>
+        </div>
+        <div class="search-row">
+          <div class="search-input">
+            <svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="1.8"/><path d="M20 20l-4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+            <input id="search-box" placeholder="Search patient by name…" oninput="onSearch(this.value)">
+            <span class="search-clear" id="search-clear" style="display:none;" onclick="clearSearch()">&times;</span>
+          </div>
+        </div>
+        <div class="quick-filter-row">
+          <div class="quick-filter" onclick="toggleQuick(this,'24h')">Last 24 Hours</div>
+          <div class="quick-filter" onclick="toggleQuick(this,'closed')">Closed</div>
+          <div class="quick-filter" onclick="openFilterSheet()">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M4 6h16M7 12h10M10 18h4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+            Filters <span class="filter-badge-count" id="filter-count" style="display:none;">0</span>
+          </div>
+        </div>
+        <div class="results-count" id="results-count">18 consultations</div>
+      </div>
+
+      <div class="log" id="log-container">
+
+        <div class="date-group">Today</div>
+
+        <!-- PROVIDER ROWS -->
+        <div class="log-row provider-row" onclick="openDetail()">
+          <div class="row-badge" style="background:#E1F0FF; color:#1D5DA6;">27F</div>
+          <div class="row-block">
+            <div class="row-title">Priya Singh</div>
+            <div class="row-hospital-line"><div class="row-hospital">City Hospital, <span class="place">Bemetara</span></div><span class="row-time">5:10 PM</span></div>
+            <div class="row-bottom"><div class="row-patient">Cardiology consult</div><span class="row-status status-ongoing"><span class="status-dot"></span>Ongoing</span></div>
+            <div class="row-conid">CON-20260915-000231</div>
+          </div>
+        </div>
+        <div class="log-row provider-row" onclick="openDetail()">
+          <div class="row-badge" style="background:#EFE3FB; color:#5B3A87;">34M</div>
+          <div class="row-block">
+            <div class="row-title">Rahul Sharma</div>
+            <div class="row-hospital-line"><div class="row-hospital">City Hospital, <span class="place">Bemetara</span></div><span class="row-time">5:00 PM</span></div>
+            <div class="row-bottom"><div class="row-patient">Cardiology consult</div><span class="row-status status-scheduled"><span class="status-dot"></span>Scheduled</span></div>
+            <div class="row-conid">CON-20260915-000230</div>
+          </div>
+        </div>
+        <div class="log-row provider-row closed-row missed-row" onclick="openDetail()">
+          <div class="row-badge" style="background:#FFF1DC; color:#A6620B;">58M</div>
+          <div class="row-block">
+            <div class="row-title">Ibrahim Rahman</div>
+            <div class="row-hospital-line"><div class="row-hospital">Apex Care Clinic, <span class="place">Kanker</span></div><span class="row-time">3:00 PM</span></div>
+            <div class="row-bottom"><div class="row-patient">Neurology consult</div><span class="row-status status-missed"><span class="status-dot"></span>Missed</span></div>
+            <div class="row-conid">CON-20260915-000228</div>
+          </div>
+        </div>
+
+        <div class="date-group">Yesterday</div>
+        <div class="log-row provider-row closed-row completed-row" onclick="openDetail()">
+          <div class="row-badge" style="background:#EFE3FB; color:#5B3A87;">34M</div>
+          <div class="row-block">
+            <div class="row-title">Rahul Sharma</div>
+            <div class="row-hospital-line"><div class="row-hospital">City Hospital, <span class="place">Bemetara</span></div><span class="row-time">4:30 PM</span></div>
+            <div class="row-bottom"><div class="row-patient">Cardiology consult</div><span class="row-status status-completed"><span class="status-dot"></span>Completed</span></div>
+            <div class="row-conid">CON-20260914-000229</div>
+          </div>
+        </div>
+        <div class="log-row provider-row closed-row cancelled-row" onclick="openDetail()">
+          <div class="row-badge" style="background:#F0F1F3; color:#7A7F8A;">45F</div>
+          <div class="row-block">
+            <div class="row-title">Sarah Khan</div>
+            <div class="row-hospital-line"><div class="row-hospital">City Hospital, <span class="place">Bemetara</span></div><span class="row-time">6:30 PM</span></div>
+            <div class="row-bottom"><div class="row-patient">Cardiology consult</div><span class="row-status status-closed"><span class="status-dot"></span>Cancelled</span></div>
+            <div class="row-conid">CON-20260914-000227</div>
+          </div>
+        </div>
+
+        <!-- SEEKER ROWS (hidden by default) -->
+        <div class="log-row seeker-row" style="display:none;" onclick="openDetail()">
+          <div class="row-badge" style="background:#E1F0FF; color:#1D5DA6;">HYD</div>
+          <div class="row-block">
+            <div class="row-title">Cardiology · Dr. S. Sharma</div>
+            <div class="row-hospital-line"><div class="row-hospital">Apollo Hospitals, <span class="place">Hyderabad</span></div><span class="row-time">5:10 PM</span></div>
+            <div class="row-bottom"><div class="row-patient"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3.2" stroke="currentColor" stroke-width="1.6"/><path d="M5.5 19c0-3.6 2.9-5.6 6.5-5.6s6.5 2 6.5 5.6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg><span>Rahul Sharma</span></div><span class="row-status status-ongoing"><span class="status-dot"></span>Ongoing</span></div>
+            <div class="row-conid">CON-20260915-000231</div>
+          </div>
+        </div>
+        <div class="log-row seeker-row" style="display:none;" onclick="openDetail()">
+          <div class="row-badge" style="background:#EFE3FB; color:#5B3A87;">RAI</div>
+          <div class="row-block">
+            <div class="row-title">Neurology · Dr. A. Rao</div>
+            <div class="row-hospital-line"><div class="row-hospital">Narayana Health, <span class="place">Raipur</span></div><span class="row-time">5:00 PM</span></div>
+            <div class="row-bottom"><div class="row-patient"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3.2" stroke="currentColor" stroke-width="1.6"/><path d="M5.5 19c0-3.6 2.9-5.6 6.5-5.6s6.5 2 6.5 5.6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg><span>Priya Singh</span></div><span class="row-status status-scheduled"><span class="status-dot"></span>Scheduled</span></div>
+            <div class="row-conid">CON-20260915-000230</div>
+          </div>
+        </div>
+        <div class="log-row seeker-row closed-row missed-row" style="display:none;" onclick="openDetail()">
+          <div class="row-badge" style="background:#EFE3FB; color:#5B3A87;">RAI</div>
+          <div class="row-block">
+            <div class="row-title">Neurology · Dr. A. Rao</div>
+            <div class="row-hospital-line"><div class="row-hospital">Narayana Health, <span class="place">Raipur</span></div><span class="row-time">3:00 PM</span></div>
+            <div class="row-bottom"><div class="row-patient"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3.2" stroke="currentColor" stroke-width="1.6"/><path d="M5.5 19c0-3.6 2.9-5.6 6.5-5.6s6.5 2 6.5 5.6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg><span>Ibrahim Rahman</span></div><span class="row-status status-missed"><span class="status-dot"></span>Missed</span></div>
+            <div class="row-conid">CON-20260915-000228</div>
+          </div>
+        </div>
+        <div class="log-row seeker-row closed-row completed-row" style="display:none;" onclick="openDetail()">
+          <div class="row-badge" style="background:#E1F0FF; color:#1D5DA6;">HYD</div>
+          <div class="row-block">
+            <div class="row-title">Cardiology · Dr. S. Sharma</div>
+            <div class="row-hospital-line"><div class="row-hospital">Apollo Hospitals, <span class="place">Hyderabad</span></div><span class="row-time">4:30 PM</span></div>
+            <div class="row-bottom"><div class="row-patient"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3.2" stroke="currentColor" stroke-width="1.6"/><path d="M5.5 19c0-3.6 2.9-5.6 6.5-5.6s6.5 2 6.5 5.6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg><span>Rahul Sharma</span></div><span class="row-status status-completed"><span class="status-dot"></span>Completed</span></div>
+            <div class="row-conid">CON-20260914-000229</div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- search results dropdown demo -->
+      <div class="empty-state" id="empty-state">
+        <div class="empty-icon"><svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="1.8"/><path d="M20 20l-4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></div>
+        <div class="empty-title">No patients found</div>
+        <div class="empty-sub">Try a different name, or check your filters.</div>
+      </div>
+
+      <div class="sheet-backdrop" id="filter-backdrop" onclick="closeFilterSheet(event)">
+        <div class="filter-sheet" onclick="event.stopPropagation()">
+          <div class="filter-sheet-header">
+            <span class="filter-sheet-title">Filters</span>
+            <span class="filter-reset" onclick="resetFilters()">Reset</span>
+          </div>
+          <div class="filter-body">
+            <div class="filter-section-title">STATUS</div>
+            <div class="filter-chip-grid" id="status-chips">
+              <div class="filter-chip" data-status="scheduled">Scheduled</div>
+              <div class="filter-chip" data-status="ongoing">Ongoing</div>
+              <div class="filter-chip" data-status="completed">Completed</div>
+              <div class="filter-chip" data-status="cancelled">Cancelled</div>
+              <div class="filter-chip" data-status="rejected">Rejected</div>
+              <div class="filter-chip" data-status="missed">Missed</div>
+              <div class="filter-chip" data-status="expired">Expired</div>
+            </div>
+            <div class="filter-section-title">DATE RANGE</div>
+            <div class="date-range-row">
+              <div class="date-range-input">From</div>
+              <div class="date-range-input">To</div>
+            </div>
+          </div>
+          <div class="filter-footer"><button class="filter-apply-btn" onclick="applyFilters()">Show Results</button></div>
+        </div>
+      </div>
+      </div><!-- /list-view -->
+
+      <!-- ================= CONSULTATION DETAIL PAGE ================= -->
+      <div class="detail-page" id="detail-page">
+        <div class="page-header" style="border-bottom:1px solid var(--hairline);">
+          <div class="page-header-top">
+            <div class="back-btn" onclick="closeDetail()"><svg viewBox="0 0 24 24" fill="none"><path d="M15 5l-7 7 7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div class="page-title">Consultation Detail</div>
+          </div>
+        </div>
+        <div class="detail-scroll">
+
+          <div class="detail-hero">
+            <div class="detail-badge-row">
+              <div class="detail-badge" style="background:#E1F0FF; color:#1D5DA6;">27F</div>
+              <div>
+                <div class="detail-title">Priya Singh</div>
+                <div class="detail-subtitle">City Hospital, Bemetara · CON-20260915-000231</div>
+              </div>
+            </div>
+            <div class="detail-meta-grid">
+              <div class="detail-meta-item"><div class="detail-meta-label">STATUS</div><div class="detail-meta-value status-ongoing"><span class="status-dot"></span>Ongoing</div></div>
+              <div class="detail-meta-item"><div class="detail-meta-label">DATE</div><div class="detail-meta-value">15 Sep 2026</div></div>
+              <div class="detail-meta-item"><div class="detail-meta-label">TIME</div><div class="detail-meta-value">5:10 PM</div></div>
+              <div class="detail-meta-item"><div class="detail-meta-label">DURATION</div><div class="detail-meta-value">24m (ongoing)</div></div>
+            </div>
+          </div>
+
+          <div class="detail-section">
+            <div class="detail-section-title">PRESENTING COMPLAINT</div>
+            <div class="detail-text">Acute chest pain radiating to the left arm, associated breathlessness. Onset 2 days prior to consult.</div>
+            <div class="detail-link-row" onclick="alert('Opens full Clinical Summary')"><span>View full Clinical Summary</span><svg viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          </div>
+
+          <div class="detail-section">
+            <div class="detail-section-title">LATEST VITALS · I/O · GCS</div>
+            <div class="detail-text">128/82 · HR 96 · RR 18 &nbsp;·&nbsp; GCS 14/15 &nbsp;·&nbsp; recorded 4:10 PM</div>
+            <div class="detail-link-row" onclick="alert('Opens full Vitals flowsheet')"><span>View full vitals history</span><svg viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          </div>
+
+          <div class="detail-section">
+            <div class="detail-section-title">CLINICAL ADVISORY — PERMANENT RECORD</div>
+            <div class="advisory-entry">
+              <div class="advisory-entry-head"><span class="advisory-entry-time">9:28 AM, 15 Sep</span><span class="advisory-entry-author">· Dr. S. Sharma</span></div>
+              <div class="advisory-entry-text">BP dropping to 88/54, patient drowsy, GCS down to 14. Start Noradrenaline at 0.05 mcg/kg/min, titrate to MAP &gt;65. Recheck BP in 15 min.</div>
+            </div>
+            <div class="advisory-entry">
+              <div class="advisory-entry-head"><span class="advisory-entry-time">11:40 AM, 15 Sep</span><span class="advisory-entry-author">· Dr. S. Sharma</span></div>
+              <div class="advisory-entry-text">BP stable at 118/76 on current titration. Continue present rate, recheck in 2 hours.</div>
+            </div>
+            <div class="advisory-forever-note">
+              <svg viewBox="0 0 24 24" fill="none"><path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6l8-4Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+              This advisory trail remains permanently attached to this consultation record, even after the engagement window closes.
+            </div>
+          </div>
+
+          <div class="detail-section">
+            <div class="detail-section-title">REPORTS &amp; TREATMENT CHART</div>
+            <div class="attach-mini-row">
+              <div class="attach-mini-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M6 3.5h8l4 4v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-16a1 1 0 0 1 1-1Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg></div>
+              <div><div class="attach-mini-name">ABG_Report_9AM.pdf</div><div class="attach-mini-sub">Lab · uploaded 9:22 AM</div></div>
+            </div>
+            <div class="attach-mini-row">
+              <div class="attach-mini-icon"><svg viewBox="0 0 24 24" fill="none"><rect x="4" y="3" width="16" height="18" rx="1.6" stroke="currentColor" stroke-width="1.6"/><path d="M7.5 8h9M7.5 12h9M7.5 16h5.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></div>
+              <div><div class="attach-mini-name">Treatment_Chart_4PM.pdf</div><div class="attach-mini-sub">Treatment chart · uploaded 4:12 PM</div></div>
+            </div>
+          </div>
+
+          <div class="detail-section" style="border-bottom:none;">
+            <div class="detail-section-title">PATIENT PROFILE</div>
+            <div class="detail-link-row" onclick="alert('Opens Patient Profile')"><span>View Patient Profile &amp; Past Records</span><svg viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          </div>
+
+        </div>
+        <div class="detail-cta-row"><button class="detail-cta" onclick="alert('Opens Case File / Chat for this consultation')">Open Chat</button></div>
+      </div>
+
+    </div>
+  </div>
+
+<script>
+  function openDetail(){
+    document.getElementById('list-view').classList.add('hidden');
+    document.getElementById('detail-page').classList.add('active');
+  }
+  function closeDetail(){
+    document.getElementById('detail-page').classList.remove('active');
+    document.getElementById('list-view').classList.remove('hidden');
+  }
+
+  function setRole(role, btn){
+    document.querySelectorAll('.review-bar button').forEach(b => { if(b.textContent==='Provider'||b.textContent==='Seeker') b.classList.remove('active'); });
+    btn.classList.add('active');
+    document.querySelectorAll('.provider-row').forEach(r => r.style.display = role==='provider' ? 'flex' : 'none');
+    document.querySelectorAll('.seeker-row').forEach(r => r.style.display = role==='seeker' ? 'flex' : 'none');
+    updateResultsCount();
+  }
+
+  let activeStatuses = new Set();
+  let quickFilters = new Set();
+
+  function onSearch(val){
+    document.getElementById('search-clear').style.display = val ? 'block' : 'none';
+    const rows = document.querySelectorAll('.log-row');
+    let anyMatch = false;
+    rows.forEach(r => {
+      if(r.style.display === 'none' && !r.classList.contains('provider-row') && !r.classList.contains('seeker-row')) return;
+    });
+    const nameEls = document.querySelectorAll('.row-title, .row-patient span');
+    let matchCount = 0;
+    document.querySelectorAll('.log-row').forEach(row => {
+      const roleVisible = row.classList.contains('provider-row') ? document.querySelector('.review-bar button.active').textContent==='Provider' : true;
+      if(!roleVisible && row.classList.contains('provider-row')) { return; }
+    });
+    // simple demo filter: hide rows whose visible text doesn't include the query
+    const query = val.toLowerCase().trim();
+    document.querySelectorAll('.log-row').forEach(row => {
+      const isProviderRole = document.querySelector('.review-bar button.active').textContent==='Provider';
+      const belongsToRole = isProviderRole ? row.classList.contains('provider-row') : row.classList.contains('seeker-row');
+      if(!belongsToRole){ return; }
+      const text = row.textContent.toLowerCase();
+      const matches = query.length < 3 || text.includes(query);
+      row.style.display = matches ? 'flex' : 'none';
+      if(matches) matchCount++;
+    });
+    document.getElementById('empty-state').classList.toggle('show', query.length >= 3 && matchCount === 0);
+    document.getElementById('log-container').style.display = (query.length >= 3 && matchCount === 0) ? 'none' : 'block';
+    updateResultsCount();
+  }
+  function clearSearch(){
+    document.getElementById('search-box').value = '';
+    onSearch('');
+  }
+
+  function toggleQuick(el, kind){
+    el.classList.toggle('active');
+    if(el.classList.contains('active')) quickFilters.add(kind); else quickFilters.delete(kind);
+    applyAllFilters();
+  }
+
+  function openFilterSheet(){ document.getElementById('filter-backdrop').classList.add('open'); }
+  function closeFilterSheet(e){ document.getElementById('filter-backdrop').classList.remove('open'); }
+  document.querySelectorAll('.filter-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      chip.classList.toggle('active');
+      const s = chip.dataset.status;
+      if(chip.classList.contains('active')) activeStatuses.add(s); else activeStatuses.delete(s);
+    });
+  });
+  function resetFilters(){
+    activeStatuses.clear();
+    document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+  }
+  function applyFilters(){
+    closeFilterSheet();
+    applyAllFilters();
+  }
+  function applyAllFilters(){
+    const isProviderRole = document.querySelector('.review-bar button.active').textContent==='Provider';
+    let count = 0;
+    document.querySelectorAll('.log-row').forEach(row => {
+      const belongsToRole = isProviderRole ? row.classList.contains('provider-row') : row.classList.contains('seeker-row');
+      if(!belongsToRole) return;
+      let visible = true;
+      if(quickFilters.has('24h')){
+        // demo: treat only "Today" group rows as within-24h (simplified)
+        const group = row.previousElementSibling && row.previousElementSibling.classList.contains('date-group') ? row.previousElementSibling.textContent : null;
+      }
+      if(quickFilters.has('closed') && !row.classList.contains('closed-row')) visible = false;
+      if(activeStatuses.size > 0){
+        const rowStatuses = [];
+        if(row.classList.contains('missed-row')) rowStatuses.push('missed');
+        if(row.classList.contains('completed-row')) rowStatuses.push('completed');
+        if(row.classList.contains('cancelled-row')) rowStatuses.push('cancelled');
+        const rowText = row.querySelector('.row-status').textContent.toLowerCase();
+        let matched = false;
+        activeStatuses.forEach(s => { if(rowText.includes(s)) matched = true; });
+        if(!matched) visible = false;
+      }
+      row.style.display = visible ? 'flex' : 'none';
+      if(visible) count++;
+    });
+    document.getElementById('filter-count').style.display = (quickFilters.size + activeStatuses.size) > 0 ? 'inline-block' : 'none';
+    document.getElementById('filter-count').textContent = quickFilters.size + activeStatuses.size;
+    document.getElementById('empty-state').classList.toggle('show', count === 0);
+    document.getElementById('log-container').style.display = count === 0 ? 'none' : 'block';
+    updateResultsCount(count);
+  }
+  function updateResultsCount(explicitCount){
+    const isProviderRole = document.querySelector('.review-bar button.active').textContent==='Provider';
+    let count = explicitCount;
+    if(count === undefined){
+      count = 0;
+      document.querySelectorAll('.log-row').forEach(row => {
+        const belongsToRole = isProviderRole ? row.classList.contains('provider-row') : row.classList.contains('seeker-row');
+        if(belongsToRole && row.style.display !== 'none') count++;
+      });
+    }
+    document.getElementById('results-count').textContent = count + ' consultation' + (count===1?'':'s');
+  }
+</script>
+
+</body>
+</html>

@@ -1,0 +1,968 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Perfusion — Provider Dashboard (CP-01)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --red: #DB2841;
+    --red-dim: #F6DDE1;
+    --charcoal: #2A2A2A;
+    --canvas: #F7F7F9;
+    --card: #FFFFFF;
+    --hairline: #ECEDF0;
+    --muted: #7A7F8A;
+    --muted-2: #A6ABB4;
+    --blue: #2F6FED;
+    --blue-tint: #EAF1FE;
+    --green: #17A672;
+    --green-tint: #E7F7F1;
+    --amber: #E08A2E;
+    --amber-tint: #FCF1E3;
+    --grey: #9AA0AC;
+    --grey-tint: #F0F1F3;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{
+    background: #E8E6E2;
+    font-family: 'Inter', sans-serif;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:20px;
+    padding:40px 16px 80px;
+    min-height:100vh;
+  }
+
+  /* ---------- Demo-only review controls (not part of the app) ---------- */
+  .review-bar{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    background:#fff;
+    border:1px solid var(--hairline);
+    border-radius:999px;
+    padding:6px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.06);
+  }
+  .review-bar span.rlabel{
+    font-size:12px;
+    color:var(--muted-2);
+    padding-left:10px;
+    letter-spacing:.2px;
+  }
+  .review-bar button{
+    font-family:'Inter',sans-serif;
+    font-size:13px;
+    font-weight:600;
+    color:var(--muted);
+    background:transparent;
+    border:none;
+    border-radius:999px;
+    padding:8px 16px;
+    cursor:pointer;
+    transition: background .15s ease, color .15s ease;
+  }
+  .review-bar button.active{
+    background:var(--charcoal);
+    color:#fff;
+  }
+
+  /* ---------- Phone frame ---------- */
+  .device{
+    width:390px;
+    max-width:100%;
+    height:844px;
+    background:#000;
+    border-radius:46px;
+    padding:14px;
+    box-shadow: 0 30px 60px -20px rgba(0,0,0,.35), 0 10px 20px -10px rgba(0,0,0,.2);
+  }
+  .screen{
+    width:100%;
+    height:100%;
+    background:var(--canvas);
+    border-radius:34px;
+    overflow:hidden;
+    position:relative;
+    display:flex;
+    flex-direction:column;
+  }
+  .notch{
+    position:absolute;
+    top:14px;
+    left:50%;
+    transform:translateX(-50%);
+    width:120px;
+    height:28px;
+    background:#000;
+    border-radius:20px;
+    z-index:50;
+  }
+  .statusbar{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:16px 26px 4px;
+    font-size:13px;
+    font-weight:600;
+    color:var(--charcoal);
+  }
+
+  /* ---------- App header ---------- */
+  .app-header{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:14px 20px 14px;
+    background:var(--card);
+    border-bottom:1px solid var(--hairline);
+  }
+  .brand{
+    display:flex;
+    align-items:center;
+    gap:9px;
+  }
+  .brand-mark{
+    width:26px;
+    height:26px;
+    border-radius:8px;
+    background: var(--charcoal);
+    position:relative;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+  .brand-mark svg{ width:15px; height:15px; }
+  .brand-name{
+    font-family:'Sora', sans-serif;
+    font-weight:600;
+    font-size:16px;
+    color:var(--charcoal);
+    letter-spacing:-0.2px;
+  }
+  .header-actions{
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  .icon-btn{
+    width:36px;
+    height:36px;
+    border-radius:50%;
+    border:1px solid var(--hairline);
+    background:#fff;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    position:relative;
+    cursor:pointer;
+    color:var(--charcoal);
+  }
+  .icon-btn svg{ width:18px; height:18px; }
+  .unread-dot{
+    position:absolute;
+    top:7px;
+    right:7px;
+    width:7px;
+    height:7px;
+    border-radius:50%;
+    background:var(--red);
+    border:1.5px solid #fff;
+  }
+
+  /* ---------- Scroll body ---------- */
+  .scroll{
+    flex:1;
+    overflow-y:auto;
+    -webkit-overflow-scrolling:touch;
+  }
+  .scroll::-webkit-scrollbar{ display:none; }
+
+  .greeting-block{
+    padding:22px 20px 6px;
+  }
+  .greeting-title{
+    font-family:'Sora', sans-serif;
+    font-weight:600;
+    font-size:21px;
+    color:var(--charcoal);
+    letter-spacing:-0.3px;
+  }
+  .greeting-date{
+    margin-top:3px;
+    font-size:13px;
+    color:var(--muted);
+    font-weight:500;
+  }
+
+  .live-banner{
+    margin:16px 20px 4px;
+    background: linear-gradient(180deg, #FFFFFF 0%, #FFF6F7 100%);
+    border:1px solid #F5D3D8;
+    border-radius:14px;
+    padding:12px 14px;
+    display:flex;
+    align-items:center;
+    gap:10px;
+  }
+  .pulse-dot{
+    width:9px;
+    height:9px;
+    border-radius:50%;
+    background:var(--red);
+    flex-shrink:0;
+    position:relative;
+  }
+  .pulse-dot::after{
+    content:'';
+    position:absolute;
+    inset:-6px;
+    border-radius:50%;
+    border:1.5px solid var(--red);
+    animation: pulse 1.8s ease-out infinite;
+  }
+  @keyframes pulse{
+    0%{ transform:scale(0.6); opacity:.9; }
+    100%{ transform:scale(1.8); opacity:0; }
+  }
+  .live-banner-text{
+    font-size:13px;
+    font-weight:600;
+    color:var(--charcoal);
+  }
+  .live-banner-text span{
+    font-weight:400;
+    color:var(--muted);
+  }
+
+  .section-head{
+    display:flex;
+    align-items:baseline;
+    justify-content:space-between;
+    padding:20px 20px 6px;
+  }
+  .section-title{
+    font-size:15px;
+    font-weight:700;
+    color:var(--charcoal);
+    letter-spacing:-0.1px;
+  }
+  .section-count{
+    font-size:12.5px;
+    color:var(--muted-2);
+    font-weight:500;
+  }
+
+  /* ---------- Call-log style list ---------- */
+  .log{
+    background:var(--card);
+    border-top:1px solid var(--hairline);
+    border-bottom:1px solid var(--hairline);
+  }
+  .date-group{
+    padding:14px 20px 6px;
+    font-size:12.5px;
+    font-weight:600;
+    color:var(--muted-2);
+  }
+
+  .log-row{
+    position:relative;
+    display:flex;
+    flex-wrap:wrap;
+    align-items:flex-start;
+    gap:12px;
+    padding:11px 16px 11px 16px;
+    cursor:pointer;
+  }
+  .log-row:not(:last-child)::after{
+    content:'';
+    position:absolute;
+    left:70px;
+    right:16px;
+    bottom:0;
+    height:1px;
+    background:var(--hairline);
+  }
+  .row-expand{ flex-basis:100%; }
+
+  .row-badge{
+    width:42px;
+    height:42px;
+    border-radius:50%;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-family:'Inter',sans-serif;
+    font-weight:700;
+    font-size:12.5px;
+    letter-spacing:-0.2px;
+    flex-shrink:0;
+    margin-top:2px;
+  }
+
+  .row-content{
+    flex:1;
+    min-width:0;
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:10px;
+  }
+  .row-left{ min-width:0; flex:1; }
+  .row-right{
+    flex-shrink:0;
+    display:flex;
+    flex-direction:column;
+    align-items:flex-end;
+    gap:5px;
+    margin-top:1px;
+  }
+
+  .row-name{
+    font-size:15px;
+    font-weight:500;
+    color:var(--charcoal);
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  .row-name.attn{ font-weight:700; }
+  .row-name.muted{ color:var(--muted); font-weight:500; }
+  .row-name.danger{ color:var(--red); font-weight:700; }
+
+  .row-time{
+    font-size:12.5px;
+    color:var(--muted-2);
+    font-weight:500;
+    white-space:nowrap;
+  }
+
+  .row-place-line{
+    margin-top:5px;
+    display:flex;
+    align-items:center;
+    gap:5px;
+    font-size:12.5px;
+    color:var(--muted);
+    min-width:0;
+  }
+  .row-place-line svg{ width:13px; height:13px; flex-shrink:0; color:var(--muted-2); }
+  .row-place-line span{
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  .place-strong{ color:var(--charcoal); font-weight:700; }
+
+  .row-status{
+    display:flex;
+    align-items:center;
+    gap:5px;
+    font-size:12px;
+    font-weight:600;
+    white-space:nowrap;
+  }
+  .status-dot{ width:6px; height:6px; border-radius:50%; background:currentColor; flex-shrink:0; }
+  .status-scheduled{ color:var(--blue); }
+  .status-ongoing{ color:var(--red); }
+  .status-ongoing .status-dot{ position:relative; }
+  .status-ongoing .status-dot::after{
+    content:'';
+    position:absolute; inset:-5px;
+    border-radius:50%;
+    border:1px solid var(--red);
+    animation: pulse 1.6s ease-out infinite;
+  }
+  .status-completed{ color:var(--green); }
+  .status-missed{ color:var(--red); }
+  .status-closed{ color:var(--grey); }
+
+  /* ---------- expand panel: labeled actions revealed on tap ---------- */
+  .row-expand{
+    max-height:0;
+    overflow:hidden;
+    transition: max-height .28s ease;
+  }
+  .log-row.open .row-expand{ max-height:170px; }
+  .row-expand-inner{
+    margin-top:10px;
+    padding-top:14px;
+    border-top:1px solid var(--hairline);
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-around;
+  }
+  .expand-item{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:6px;
+  }
+  .expand-btn{
+    width:46px; height:46px;
+    border-radius:50%;
+    background:var(--grey-tint);
+    display:flex; align-items:center; justify-content:center;
+    color:var(--charcoal);
+  }
+  .expand-btn svg{ width:22px; height:22px; }
+  .expand-btn.disabled{ background:#F4F4F5; color:#C7CAD1; }
+  .expand-btn.urgent{ background:var(--red); color:#fff; }
+  .case-file-btn.green{ background:#E8F5EE; color:#2F7D5C; }
+  .case-file-btn.mauve{ background:#F4E9EC; color:#8C5B6E; }
+
+  /* ---------- Ongoing sub-states: live call vs quiet open window vs paused ---------- */
+  /* live: unchanged pulsing red (existing .status-ongoing already handles this) */
+  .status-ongoing-quiet{ color:#8C5B6E; }
+  .status-ongoing-quiet .status-dot{ background:#8C5B6E; }
+
+  /* ---------- mini toggle switch: controls whether the SEEKER can call/video the provider ---------- */
+  .status-ongoing-quiet{ color:#8C5B6E; cursor:pointer; }
+  .status-ongoing-quiet .status-dot{ background:#8C5B6E; }
+  .status-ongoing-paused{ color:var(--grey); cursor:pointer; }
+  .status-ongoing-paused .status-dot{ background:var(--grey); }
+  .status-suffix{ font-weight:500; color:var(--muted-2); }
+
+  /* ---------- lightweight toast (replaces modal for a quick toggle) ---------- */
+  .toast{
+    position:fixed; left:50%; bottom:120px; transform:translateX(-50%) translateY(20px);
+    background:var(--charcoal); color:#fff; font-size:12.5px; font-weight:600;
+    padding:10px 16px; border-radius:999px; display:flex; align-items:center; gap:10px;
+    box-shadow:0 8px 20px rgba(0,0,0,.25); opacity:0; pointer-events:none;
+    transition:opacity .2s ease, transform .2s ease; z-index:200; white-space:nowrap;
+  }
+  .toast.show{ opacity:1; transform:translateX(-50%) translateY(0); pointer-events:auto; }
+  .toast a{ color:#FFD1D9; font-weight:700; text-decoration:none; }
+  .expand-label{ font-size:11px; font-weight:600; color:var(--muted); }
+
+  .view-all{
+    margin:14px 20px 4px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:6px;
+    padding:14px;
+    color:var(--charcoal);
+    font-size:13.5px;
+    font-weight:600;
+    border-radius:14px;
+    border:1px solid var(--hairline);
+    background:#fff;
+  }
+  .view-all svg{ width:14px; height:14px; }
+
+  .bottom-spacer{ height:14px; }
+
+  /* ---------- Bottom nav ---------- */
+  .bottom-nav{
+    display:flex;
+    background:var(--card);
+    border-top:1px solid var(--hairline);
+    padding:10px 6px 22px;
+  }
+  .nav-item{
+    flex:1;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:4px;
+    color:var(--muted-2);
+  }
+  .nav-item svg{ width:22px; height:22px; }
+  .nav-item span{ font-size:10.5px; font-weight:600; }
+  .nav-item.active{ color:var(--red); }
+
+  .skeleton-row{
+    display:flex; align-items:center; gap:12px;
+    padding:11px 16px;
+  }
+  .skel-avatar{ width:42px; height:42px; border-radius:50%; background:#EFEFF1; flex-shrink:0; }
+  .skel-lines{ flex:1; display:flex; flex-direction:column; gap:7px; }
+  .skel-line{ height:10px; border-radius:5px; background:#EFEFF1; }
+  .skel-shimmer{
+    background: linear-gradient(100deg, #EFEFF1 30%, #F7F7F8 50%, #EFEFF1 70%);
+    background-size: 200% 100%;
+    animation: shimmer 1.4s ease-in-out infinite;
+  }
+  @keyframes shimmer{
+    0%{ background-position: 150% 0; }
+    100%{ background-position: -50% 0; }
+  }
+</style>
+</head>
+<body>
+
+  <div class="review-bar">
+    <span class="rlabel">Preview state</span>
+    <button class="active" data-state="populated" onclick="setState('populated', this)">Populated</button>
+    <button data-state="loading" onclick="setState('loading', this)">Loading</button>
+    <button data-state="empty" onclick="setState('empty', this)">Empty</button>
+  </div>
+
+  <div class="review-bar">
+    <span class="rlabel">Case File color</span>
+    <button data-color="neutral" onclick="setCaseColor('neutral', this)">Neutral</button>
+    <button class="active" data-color="green" onclick="setCaseColor('green', this)">Green</button>
+    <button data-color="mauve" onclick="setCaseColor('mauve', this)">Mauve</button>
+  </div>
+
+  <div class="device">
+    <div class="screen">
+      <div class="notch"></div>
+      <div class="statusbar">
+        <span>9:41</span>
+        <span style="display:flex; gap:4px; align-items:center;">
+          <svg width="16" height="12" viewBox="0 0 16 12" fill="none"><path d="M1 4.5C4.5 1.5 11.5 1.5 15 4.5" stroke="#2A2A2A" stroke-width="1.4" stroke-linecap="round"/><path d="M3.2 7C5.5 5 10.5 5 12.8 7" stroke="#2A2A2A" stroke-width="1.4" stroke-linecap="round"/><circle cx="8" cy="9.5" r="1" fill="#2A2A2A"/></svg>
+          <svg width="18" height="11" viewBox="0 0 18 11" fill="none"><rect x="0.5" y="0.5" width="15" height="10" rx="2.5" stroke="#2A2A2A"/><rect x="2" y="2" width="10" height="7" rx="1" fill="#2A2A2A"/><rect x="16.5" y="3.5" width="1.5" height="4" rx="0.7" fill="#2A2A2A"/></svg>
+        </span>
+      </div>
+
+      <div class="app-header">
+        <div class="brand">
+          <div class="brand-mark">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M4 15c3 0 4.5-9 8-9s3 6 5.5 6 2.5-3 2.5-3" stroke="#DB2841" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="20" cy="9" r="1.3" fill="#DB2841"/></svg>
+          </div>
+          <span class="brand-name">Perfusion</span>
+        </div>
+        <div class="header-actions">
+          <div class="icon-btn">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M18 8.5C18 6.5 16.2 4 12 4s-6 2.5-6 4.5S5 14 4 16h16c-1-2-2-5.5-2-7.5Z" stroke="#2A2A2A" stroke-width="1.6" stroke-linejoin="round"/><path d="M9.5 19a2.5 2.5 0 0 0 5 0" stroke="#2A2A2A" stroke-width="1.6" stroke-linecap="round"/></svg>
+            <span class="unread-dot"></span>
+          </div>
+          <div class="icon-btn">
+            <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8.5" stroke="#2A2A2A" stroke-width="1.6"/><path d="M9.8 9.3a2.3 2.3 0 1 1 3.4 2c-.9.6-1.2 1-1.2 2" stroke="#2A2A2A" stroke-width="1.6" stroke-linecap="round"/><circle cx="12" cy="16.3" r="0.9" fill="#2A2A2A"/></svg>
+          </div>
+        </div>
+      </div>
+
+      <div class="scroll" id="scrollBody">
+
+        <!-- ============ POPULATED STATE ============ -->
+        <div id="state-populated">
+          <div class="greeting-block">
+            <div class="greeting-title">Good morning, Dr. Sharma</div>
+            <div class="greeting-date">Tuesday, 15 September</div>
+          </div>
+
+          <div class="live-banner">
+            <span class="pulse-dot"></span>
+            <div class="live-banner-text">1 consultation ongoing <span>— Priya Singh is waiting in the queue</span></div>
+          </div>
+
+          <div class="section-head">
+            <span class="section-title">Recent consultations</span>
+            <span class="section-count">7 of 7</span>
+          </div>
+
+          <div class="log">
+
+            <div class="date-group">Today</div>
+
+            <!-- Ongoing -->
+            <div class="log-row open" onclick="toggleRow(this)">
+              <div class="row-badge" style="background:#E1F0FF; color:#1D5DA6;">27F</div>
+              <div class="row-content">
+                <div class="row-left">
+                  <div class="row-name danger">Priya Singh</div>
+                  <div class="row-place-line">
+                    <svg viewBox="0 0 24 24" fill="none"><path d="M12 21s-6.5-5.8-6.5-11A6.5 6.5 0 0 1 18.5 10c0 5.2-6.5 11-6.5 11Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><circle cx="12" cy="10" r="2" stroke="currentColor" stroke-width="1.6"/></svg>
+                    <span>City Hospital, <span class="place-strong">Bemetara</span></span>
+                  </div>
+                </div>
+                <div class="row-right">
+                  <span class="row-time">5:10 PM</span>
+                  <span class="row-status status-ongoing"><span class="status-dot pulse-dot" style="width:6px;height:6px;"></span>Ongoing</span>
+                </div>
+              </div>
+              <div class="row-expand">
+                <div class="row-expand-inner">
+                  <div class="expand-item">
+                    <div class="expand-btn urgent" onclick="event.stopPropagation()"><svg viewBox="0 0 24 24" fill="none"><path d="M6 3h3l2 5-2.5 1.5a11 11 0 0 0 5 5L15 12l5 2v3a2 2 0 0 1-2 2C10.5 19 5 13.5 5 6a2 2 0 0 1 1-3Z" fill="currentColor"/></svg></div>
+                    <span class="expand-label">Call</span>
+                  </div>
+                  <div class="expand-item">
+                    <div class="expand-btn urgent" onclick="event.stopPropagation()"><svg viewBox="0 0 24 24" fill="none"><path d="M4 7.5A1.5 1.5 0 0 1 5.5 6h8A1.5 1.5 0 0 1 15 7.5v9A1.5 1.5 0 0 1 13.5 18h-8A1.5 1.5 0 0 1 4 16.5v-9Z" stroke="currentColor" stroke-width="1.6"/><path d="M15 10.5 20 8v8l-5-2.5" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg></div>
+                    <span class="expand-label">Video</span>
+                  </div>
+                  <div class="expand-item">
+                    <div class="expand-btn case-file-btn green" onclick="event.stopPropagation()"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3.6" stroke="currentColor" stroke-width="1.7"/><path d="M4.8 20c0-4.4 3.2-6.8 7.2-6.8s7.2 2.4 7.2 6.8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+                    <span class="expand-label">Case File</span>
+                  </div>
+                  <div class="expand-item">
+                    <div class="expand-btn" onclick="event.stopPropagation()"><svg viewBox="0 0 24 24" fill="none"><path d="M4 20l1-4.2L15.8 5a1.5 1.5 0 0 1 2.1 0l1.1 1.1a1.5 1.5 0 0 1 0 2.1L8.2 19l-4.2 1Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M14 6.8l3.2 3.2" stroke="currentColor" stroke-width="1.6"/></svg></div>
+                    <span class="expand-label">Advise</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Scheduled -->
+            <div class="log-row" onclick="toggleRow(this)">
+              <div class="row-badge" style="background:#EFE3FB; color:#5B3A87;">34M</div>
+              <div class="row-content">
+                <div class="row-left">
+                  <div class="row-name attn">Rahul Sharma</div>
+                  <div class="row-place-line">
+                    <svg viewBox="0 0 24 24" fill="none"><path d="M12 21s-6.5-5.8-6.5-11A6.5 6.5 0 0 1 18.5 10c0 5.2-6.5 11-6.5 11Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><circle cx="12" cy="10" r="2" stroke="currentColor" stroke-width="1.6"/></svg>
+                    <span>City Hospital, <span class="place-strong">Bemetara</span></span>
+                  </div>
+                </div>
+                <div class="row-right">
+                  <span class="row-time">5:00 PM</span>
+                  <span class="row-status status-scheduled"><span class="status-dot"></span>Scheduled</span>
+                </div>
+              </div>
+              <div class="row-expand">
+                <div class="row-expand-inner">
+                  <div class="expand-item">
+                    <div class="expand-btn" onclick="event.stopPropagation()"><svg viewBox="0 0 24 24" fill="none"><path d="M6 3h3l2 5-2.5 1.5a11 11 0 0 0 5 5L15 12l5 2v3a2 2 0 0 1-2 2C10.5 19 5 13.5 5 6a2 2 0 0 1 1-3Z" fill="currentColor"/></svg></div>
+                    <span class="expand-label">Call</span>
+                  </div>
+                  <div class="expand-item">
+                    <div class="expand-btn" onclick="event.stopPropagation()"><svg viewBox="0 0 24 24" fill="none"><path d="M4 7.5A1.5 1.5 0 0 1 5.5 6h8A1.5 1.5 0 0 1 15 7.5v9A1.5 1.5 0 0 1 13.5 18h-8A1.5 1.5 0 0 1 4 16.5v-9Z" stroke="currentColor" stroke-width="1.6"/><path d="M15 10.5 20 8v8l-5-2.5" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg></div>
+                    <span class="expand-label">Video</span>
+                  </div>
+                  <div class="expand-item">
+                    <div class="expand-btn case-file-btn green" onclick="event.stopPropagation()"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3.6" stroke="currentColor" stroke-width="1.7"/><path d="M4.8 20c0-4.4 3.2-6.8 7.2-6.8s7.2 2.4 7.2 6.8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+                    <span class="expand-label">Case File</span>
+                  </div>
+                  <div class="expand-item">
+                    <div class="expand-btn" onclick="event.stopPropagation()"><svg viewBox="0 0 24 24" fill="none"><path d="M4 20l1-4.2L15.8 5a1.5 1.5 0 0 1 2.1 0l1.1 1.1a1.5 1.5 0 0 1 0 2.1L8.2 19l-4.2 1Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M14 6.8l3.2 3.2" stroke="currentColor" stroke-width="1.6"/></svg></div>
+                    <span class="expand-label">Advise</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Completed -->
+            <div class="log-row" onclick="toggleRow(this)">
+              <div class="row-badge" style="background:#EFE3FB; color:#5B3A87;">34M</div>
+              <div class="row-content">
+                <div class="row-left">
+                  <div class="row-name muted">Rahul Sharma</div>
+                  <div class="row-place-line">
+                    <svg viewBox="0 0 24 24" fill="none"><path d="M12 21s-6.5-5.8-6.5-11A6.5 6.5 0 0 1 18.5 10c0 5.2-6.5 11-6.5 11Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><circle cx="12" cy="10" r="2" stroke="currentColor" stroke-width="1.6"/></svg>
+                    <span>City Hospital, <span class="place-strong">Bemetara</span></span>
+                  </div>
+                </div>
+                <div class="row-right">
+                  <span class="row-time">4:30 PM</span>
+                  <span class="row-status status-completed"><span class="status-dot"></span>Completed</span>
+                </div>
+              </div>
+              <div class="row-expand">
+                <div class="row-expand-inner">
+                  <div class="expand-item">
+                    <div class="expand-btn disabled"><svg viewBox="0 0 24 24" fill="none"><path d="M6 3h3l2 5-2.5 1.5a11 11 0 0 0 5 5L15 12l5 2v3a2 2 0 0 1-2 2C10.5 19 5 13.5 5 6a2 2 0 0 1 1-3Z" fill="currentColor"/></svg></div>
+                    <span class="expand-label">Call</span>
+                  </div>
+                  <div class="expand-item">
+                    <div class="expand-btn disabled"><svg viewBox="0 0 24 24" fill="none"><path d="M4 7.5A1.5 1.5 0 0 1 5.5 6h8A1.5 1.5 0 0 1 15 7.5v9A1.5 1.5 0 0 1 13.5 18h-8A1.5 1.5 0 0 1 4 16.5v-9Z" stroke="currentColor" stroke-width="1.6"/><path d="M15 10.5 20 8v8l-5-2.5" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg></div>
+                    <span class="expand-label">Video</span>
+                  </div>
+                  <div class="expand-item">
+                    <div class="expand-btn case-file-btn green" onclick="event.stopPropagation()"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3.6" stroke="currentColor" stroke-width="1.7"/><path d="M4.8 20c0-4.4 3.2-6.8 7.2-6.8s7.2 2.4 7.2 6.8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+                    <span class="expand-label">Case File</span>
+                  </div>
+                  <div class="expand-item">
+                    <div class="expand-btn disabled"><svg viewBox="0 0 24 24" fill="none"><path d="M4 20l1-4.2L15.8 5a1.5 1.5 0 0 1 2.1 0l1.1 1.1a1.5 1.5 0 0 1 0 2.1L8.2 19l-4.2 1Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M14 6.8l3.2 3.2" stroke="currentColor" stroke-width="1.6"/></svg></div>
+                    <span class="expand-label">Advise</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Missed -->
+            <div class="log-row" onclick="toggleRow(this)">
+              <div class="row-badge" style="background:#FFF1DC; color:#A6620B;">58M</div>
+              <div class="row-content">
+                <div class="row-left">
+                  <div class="row-name danger">Ibrahim Rahman</div>
+                  <div class="row-place-line">
+                    <svg viewBox="0 0 24 24" fill="none"><path d="M12 21s-6.5-5.8-6.5-11A6.5 6.5 0 0 1 18.5 10c0 5.2-6.5 11-6.5 11Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><circle cx="12" cy="10" r="2" stroke="currentColor" stroke-width="1.6"/></svg>
+                    <span>Apex Care Clinic, <span class="place-strong">Kanker</span></span>
+                  </div>
+                </div>
+                <div class="row-right">
+                  <span class="row-time">3:00 PM</span>
+                  <span class="row-status status-missed"><span class="status-dot"></span>Missed</span>
+                </div>
+              </div>
+              <div class="row-expand">
+                <div class="row-expand-inner">
+                  <div class="expand-item">
+                    <div class="expand-btn disabled"><svg viewBox="0 0 24 24" fill="none"><path d="M6 3h3l2 5-2.5 1.5a11 11 0 0 0 5 5L15 12l5 2v3a2 2 0 0 1-2 2C10.5 19 5 13.5 5 6a2 2 0 0 1 1-3Z" fill="currentColor"/></svg></div>
+                    <span class="expand-label">Call</span>
+                  </div>
+                  <div class="expand-item">
+                    <div class="expand-btn disabled"><svg viewBox="0 0 24 24" fill="none"><path d="M4 7.5A1.5 1.5 0 0 1 5.5 6h8A1.5 1.5 0 0 1 15 7.5v9A1.5 1.5 0 0 1 13.5 18h-8A1.5 1.5 0 0 1 4 16.5v-9Z" stroke="currentColor" stroke-width="1.6"/><path d="M15 10.5 20 8v8l-5-2.5" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg></div>
+                    <span class="expand-label">Video</span>
+                  </div>
+                  <div class="expand-item">
+                    <div class="expand-btn case-file-btn green" onclick="event.stopPropagation()"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3.6" stroke="currentColor" stroke-width="1.7"/><path d="M4.8 20c0-4.4 3.2-6.8 7.2-6.8s7.2 2.4 7.2 6.8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+                    <span class="expand-label">Case File</span>
+                  </div>
+                  <div class="expand-item">
+                    <div class="expand-btn" onclick="event.stopPropagation()"><svg viewBox="0 0 24 24" fill="none"><path d="M4 20l1-4.2L15.8 5a1.5 1.5 0 0 1 2.1 0l1.1 1.1a1.5 1.5 0 0 1 0 2.1L8.2 19l-4.2 1Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M14 6.8l3.2 3.2" stroke="currentColor" stroke-width="1.6"/></svg></div>
+                    <span class="expand-label">Advise</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Ongoing, quiet window (no live call right now) -->
+            <div class="log-row" onclick="toggleRow(this)">
+              <div class="row-badge" style="background:#FFF1DC; color:#A6620B;">45F</div>
+              <div class="row-content">
+                <div class="row-left">
+                  <div class="row-name">Anita Verma</div>
+                  <div class="row-place-line">
+                    <svg viewBox="0 0 24 24" fill="none"><path d="M12 21s-6.5-5.8-6.5-11A6.5 6.5 0 0 1 18.5 10c0 5.2-6.5 11-6.5 11Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><circle cx="12" cy="10" r="2" stroke="currentColor" stroke-width="1.6"/></svg>
+                    <span>Apex Care Clinic, <span class="place-strong">Kanker</span></span>
+                  </div>
+                </div>
+                <div class="row-right">
+                  <span class="row-time">7:20 AM</span>
+                  <span class="row-status status-ongoing-quiet" id="anita-status" onclick="event.stopPropagation(); toggleSeekerCall(this, 'Anita Verma')">
+                    <span class="status-dot"></span><span id="anita-word">Ongoing</span> <span class="status-suffix">· 14h left</span>
+                  </span>
+                </div>
+              </div>
+              <div class="row-expand">
+                <div class="row-expand-inner">
+                  <div class="expand-item">
+                    <div class="expand-btn" onclick="event.stopPropagation()"><svg viewBox="0 0 24 24" fill="none"><path d="M6 3h3l2 5-2.5 1.5a11 11 0 0 0 5 5L15 12l5 2v3a2 2 0 0 1-2 2C10.5 19 5 13.5 5 6a2 2 0 0 1 1-3Z" fill="currentColor"/></svg></div>
+                    <span class="expand-label">Call</span>
+                  </div>
+                  <div class="expand-item">
+                    <div class="expand-btn" onclick="event.stopPropagation()"><svg viewBox="0 0 24 24" fill="none"><path d="M4 7.5A1.5 1.5 0 0 1 5.5 6h8A1.5 1.5 0 0 1 15 7.5v9A1.5 1.5 0 0 1 13.5 18h-8A1.5 1.5 0 0 1 4 16.5v-9Z" stroke="currentColor" stroke-width="1.6"/><path d="M15 10.5 20 8v8l-5-2.5" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg></div>
+                    <span class="expand-label">Video</span>
+                  </div>
+                  <div class="expand-item">
+                    <div class="expand-btn case-file-btn green" onclick="event.stopPropagation()"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3.6" stroke="currentColor" stroke-width="1.7"/><path d="M4.8 20c0-4.4 3.2-6.8 7.2-6.8s7.2 2.4 7.2 6.8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+                    <span class="expand-label">Case File</span>
+                  </div>
+                  <div class="expand-item">
+                    <div class="expand-btn" onclick="event.stopPropagation()"><svg viewBox="0 0 24 24" fill="none"><path d="M4 20l1-4.2L15.8 5a1.5 1.5 0 0 1 2.1 0l1.1 1.1a1.5 1.5 0 0 1 0 2.1L8.2 19l-4.2 1Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M14 6.8l3.2 3.2" stroke="currentColor" stroke-width="1.6"/></svg></div>
+                    <span class="expand-label">Advise</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="date-group">Yesterday</div>
+
+            <!-- Cancelled -->
+            <div class="log-row" onclick="toggleRow(this)">
+              <div class="row-badge" style="background:#F0F1F3; color:#7A7F8A;">45F</div>
+              <div class="row-content">
+                <div class="row-left">
+                  <div class="row-name muted">Sarah Khan</div>
+                  <div class="row-place-line">
+                    <svg viewBox="0 0 24 24" fill="none"><path d="M12 21s-6.5-5.8-6.5-11A6.5 6.5 0 0 1 18.5 10c0 5.2-6.5 11-6.5 11Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><circle cx="12" cy="10" r="2" stroke="currentColor" stroke-width="1.6"/></svg>
+                    <span>City Hospital, <span class="place-strong">Bemetara</span></span>
+                  </div>
+                </div>
+                <div class="row-right">
+                  <span class="row-time">6:30 PM</span>
+                  <span class="row-status status-closed"><span class="status-dot"></span>Cancelled</span>
+                </div>
+              </div>
+              <div class="row-expand">
+                <div class="row-expand-inner">
+                  <div class="expand-item">
+                    <div class="expand-btn disabled"><svg viewBox="0 0 24 24" fill="none"><path d="M6 3h3l2 5-2.5 1.5a11 11 0 0 0 5 5L15 12l5 2v3a2 2 0 0 1-2 2C10.5 19 5 13.5 5 6a2 2 0 0 1 1-3Z" fill="currentColor"/></svg></div>
+                    <span class="expand-label">Call</span>
+                  </div>
+                  <div class="expand-item">
+                    <div class="expand-btn disabled"><svg viewBox="0 0 24 24" fill="none"><path d="M4 7.5A1.5 1.5 0 0 1 5.5 6h8A1.5 1.5 0 0 1 15 7.5v9A1.5 1.5 0 0 1 13.5 18h-8A1.5 1.5 0 0 1 4 16.5v-9Z" stroke="currentColor" stroke-width="1.6"/><path d="M15 10.5 20 8v8l-5-2.5" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg></div>
+                    <span class="expand-label">Video</span>
+                  </div>
+                  <div class="expand-item">
+                    <div class="expand-btn case-file-btn green" onclick="event.stopPropagation()"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3.6" stroke="currentColor" stroke-width="1.7"/><path d="M4.8 20c0-4.4 3.2-6.8 7.2-6.8s7.2 2.4 7.2 6.8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+                    <span class="expand-label">Case File</span>
+                  </div>
+                  <div class="expand-item">
+                    <div class="expand-btn" onclick="event.stopPropagation()"><svg viewBox="0 0 24 24" fill="none"><path d="M4 20l1-4.2L15.8 5a1.5 1.5 0 0 1 2.1 0l1.1 1.1a1.5 1.5 0 0 1 0 2.1L8.2 19l-4.2 1Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M14 6.8l3.2 3.2" stroke="currentColor" stroke-width="1.6"/></svg></div>
+                    <span class="expand-label">Advise</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Expired -->
+            <div class="log-row" onclick="toggleRow(this)">
+              <div class="row-badge" style="background:#E3F5EA; color:#1F7A4C;">63F</div>
+              <div class="row-content">
+                <div class="row-left">
+                  <div class="row-name muted">Meera Joshi</div>
+                  <div class="row-place-line">
+                    <svg viewBox="0 0 24 24" fill="none"><path d="M12 21s-6.5-5.8-6.5-11A6.5 6.5 0 0 1 18.5 10c0 5.2-6.5 11-6.5 11Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><circle cx="12" cy="10" r="2" stroke="currentColor" stroke-width="1.6"/></svg>
+                    <span>Sunrise Diagnostics, <span class="place-strong">Mahasamund</span></span>
+                  </div>
+                </div>
+                <div class="row-right">
+                  <span class="row-time">11:15 AM</span>
+                  <span class="row-status status-closed"><span class="status-dot"></span>Expired</span>
+                </div>
+              </div>
+              <div class="row-expand">
+                <div class="row-expand-inner">
+                  <div class="expand-item">
+                    <div class="expand-btn disabled"><svg viewBox="0 0 24 24" fill="none"><path d="M6 3h3l2 5-2.5 1.5a11 11 0 0 0 5 5L15 12l5 2v3a2 2 0 0 1-2 2C10.5 19 5 13.5 5 6a2 2 0 0 1 1-3Z" fill="currentColor"/></svg></div>
+                    <span class="expand-label">Call</span>
+                  </div>
+                  <div class="expand-item">
+                    <div class="expand-btn disabled"><svg viewBox="0 0 24 24" fill="none"><path d="M4 7.5A1.5 1.5 0 0 1 5.5 6h8A1.5 1.5 0 0 1 15 7.5v9A1.5 1.5 0 0 1 13.5 18h-8A1.5 1.5 0 0 1 4 16.5v-9Z" stroke="currentColor" stroke-width="1.6"/><path d="M15 10.5 20 8v8l-5-2.5" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg></div>
+                    <span class="expand-label">Video</span>
+                  </div>
+                  <div class="expand-item">
+                    <div class="expand-btn case-file-btn green" onclick="event.stopPropagation()"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3.6" stroke="currentColor" stroke-width="1.7"/><path d="M4.8 20c0-4.4 3.2-6.8 7.2-6.8s7.2 2.4 7.2 6.8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+                    <span class="expand-label">Case File</span>
+                  </div>
+                  <div class="expand-item">
+                    <div class="expand-btn" onclick="event.stopPropagation()"><svg viewBox="0 0 24 24" fill="none"><path d="M4 20l1-4.2L15.8 5a1.5 1.5 0 0 1 2.1 0l1.1 1.1a1.5 1.5 0 0 1 0 2.1L8.2 19l-4.2 1Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M14 6.8l3.2 3.2" stroke="currentColor" stroke-width="1.6"/></svg></div>
+                    <span class="expand-label">Advise</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          <div class="view-all">
+            View all consultations
+            <svg viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+          <div class="bottom-spacer"></div>
+        </div>
+
+        <!-- ============ LOADING STATE ============ -->
+        <div id="state-loading" style="display:none;">
+          <div class="greeting-block">
+            <div class="greeting-title">Good morning, Dr. Sharma</div>
+            <div class="greeting-date">Tuesday, 15 September</div>
+          </div>
+          <div class="section-head">
+            <span class="section-title">Recent consultations</span>
+          </div>
+          <div class="log">
+            <div class="skeleton-row"><div class="skel-avatar skel-shimmer"></div><div class="skel-lines"><div class="skel-line skel-shimmer" style="width:55%;"></div><div class="skel-line skel-shimmer" style="width:75%;"></div></div></div>
+            <div class="skeleton-row"><div class="skel-avatar skel-shimmer"></div><div class="skel-lines"><div class="skel-line skel-shimmer" style="width:45%;"></div><div class="skel-line skel-shimmer" style="width:65%;"></div></div></div>
+            <div class="skeleton-row"><div class="skel-avatar skel-shimmer"></div><div class="skel-lines"><div class="skel-line skel-shimmer" style="width:60%;"></div><div class="skel-line skel-shimmer" style="width:40%;"></div></div></div>
+            <div class="skeleton-row"><div class="skel-avatar skel-shimmer"></div><div class="skel-lines"><div class="skel-line skel-shimmer" style="width:50%;"></div><div class="skel-line skel-shimmer" style="width:70%;"></div></div></div>
+          </div>
+        </div>
+
+        <!-- ============ EMPTY STATE ============ -->
+        <div id="state-empty" style="display:none;">
+          <div class="greeting-block">
+            <div class="greeting-title">Good morning, Dr. Sharma</div>
+            <div class="greeting-date">Tuesday, 15 September</div>
+          </div>
+          <div class="section-head">
+            <span class="section-title">Recent consultations</span>
+          </div>
+          <div style="display:flex; flex-direction:column; align-items:center; text-align:center; padding:50px 40px 20px;">
+            <div style="width:64px; height:64px; border-radius:50%; background:var(--grey-tint); display:flex; align-items:center; justify-content:center; margin-bottom:18px;">
+              <svg viewBox="0 0 24 24" fill="none" width="28" height="28"><path d="M4 21V8l8-5 8 5v13" stroke="#9AA0AC" stroke-width="1.6" stroke-linejoin="round"/><path d="M9 21v-6h6v6" stroke="#9AA0AC" stroke-width="1.6"/></svg>
+            </div>
+            <div style="font-size:15px; font-weight:700; color:var(--charcoal); margin-bottom:6px;">No consultations yet</div>
+            <div style="font-size:13px; color:var(--muted); line-height:1.5;">Your consultation history will appear here once patients are booked in.</div>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="bottom-nav">
+        <div class="nav-item active">
+          <svg viewBox="0 0 24 24" fill="none"><rect x="3.5" y="3.5" width="7.5" height="7.5" rx="1.8" stroke="currentColor" stroke-width="1.7"/><rect x="13" y="3.5" width="7.5" height="7.5" rx="1.8" stroke="currentColor" stroke-width="1.7"/><rect x="3.5" y="13" width="7.5" height="7.5" rx="1.8" stroke="currentColor" stroke-width="1.7"/><rect x="13" y="13" width="7.5" height="7.5" rx="1.8" stroke="currentColor" stroke-width="1.7"/></svg>
+          <span>Dashboard</span>
+        </div>
+        <div class="nav-item">
+          <svg viewBox="0 0 24 24" fill="none"><rect x="4" y="5" width="16" height="15" rx="2.2" stroke="currentColor" stroke-width="1.7"/><path d="M4 9.5h16" stroke="currentColor" stroke-width="1.7"/><path d="M8 3v3.2M16 3v3.2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M8.5 14l2 2 4-4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span>Consultations</span>
+        </div>
+        <div class="nav-item">
+          <svg viewBox="0 0 24 24" fill="none"><rect x="3.5" y="6" width="17" height="12.5" rx="2.2" stroke="currentColor" stroke-width="1.7"/><path d="M3.5 10.2h17" stroke="currentColor" stroke-width="1.7"/><circle cx="16.5" cy="14.3" r="1.1" fill="currentColor"/></svg>
+          <span>Billing</span>
+        </div>
+        <div class="nav-item">
+          <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8.2" r="3.4" stroke="currentColor" stroke-width="1.7"/><path d="M4.8 19.5c1-3.6 4-5.4 7.2-5.4s6.2 1.8 7.2 5.4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+          <span>My Profile</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="toast" id="toast">
+    <span id="toast-text"></span>
+    <a href="#" onclick="event.preventDefault(); undoToggle()">Undo</a>
+  </div>
+
+<script>
+  function toggleRow(el){
+    el.classList.toggle('open');
+  }
+
+  let toastTimer = null;
+  let lastSwitchEl = null;
+  function showToast(text){
+    const toast = document.getElementById('toast');
+    document.getElementById('toast-text').textContent = text;
+    toast.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toast.classList.remove('show'), 3200);
+  }
+  function undoToggle(){
+    if(lastSwitchEl){ applySwitchState(lastSwitchEl, lastSwitchEl.dataset.name); }
+    document.getElementById('toast').classList.remove('show');
+  }
+  function toggleSeekerCall(el, name){
+    lastSwitchEl = el;
+    el.dataset.name = name;
+    applySwitchState(el, name);
+  }
+  function applySwitchState(el, name){
+    const isPaused = el.classList.contains('status-ongoing-paused');
+    const wordEl = el.querySelector('span[id$="-word"]') || el.children[1];
+    if(isPaused){
+      el.classList.remove('status-ongoing-paused');
+      el.classList.add('status-ongoing-quiet');
+      wordEl.textContent = 'Ongoing';
+      showToast(name + ' can call and video call you again');
+    } else {
+      el.classList.remove('status-ongoing-quiet');
+      el.classList.add('status-ongoing-paused');
+      wordEl.textContent = 'Paused';
+      showToast(name + ' can no longer call or video call you');
+    }
+  }
+
+  function setCaseColor(color, btn){
+    document.querySelectorAll('.review-bar button[data-color]').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.case-file-btn').forEach(el => {
+      el.classList.remove('green', 'mauve');
+      if (color !== 'neutral') el.classList.add(color);
+    });
+  }
+  function setState(state, btn){
+    document.querySelectorAll('.review-bar button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('state-populated').style.display = state === 'populated' ? 'block' : 'none';
+    document.getElementById('state-loading').style.display = state === 'loading' ? 'block' : 'none';
+    document.getElementById('state-empty').style.display = state === 'empty' ? 'block' : 'none';
+    document.getElementById('scrollBody').scrollTop = 0;
+  }
+</script>
+
+</body>
+</html>

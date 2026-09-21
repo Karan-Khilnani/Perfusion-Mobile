@@ -1,0 +1,1031 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Perfusion — Care Seeker Case File (CS-18/19, Tele-ICU)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --red: #DB2841;
+    --red-dim: #F6DDE1;
+    --charcoal: #2A2A2A;
+    --canvas: #F7F7F9;
+    --card: #FFFFFF;
+    --hairline: #ECEDF0;
+    --muted: #7A7F8A;
+    --muted-2: #A6ABB4;
+    --blue: #2F6FED;
+    --blue-tint: #EAF1FE;
+    --green: #17A672;
+    --green-tint: #E7F7F1;
+    --amber: #E08A2E;
+    --amber-tint: #FCF1E3;
+    --grey: #9AA0AC;
+    --grey-tint: #F0F1F3;
+    --bubble-out: #EFEDE9;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{
+    background:#E8E6E2;
+    font-family:'Inter', sans-serif;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:20px;
+    padding:40px 16px 80px;
+    min-height:100vh;
+  }
+  .review-bar{
+    display:flex; align-items:center; gap:10px;
+    background:#fff; border:1px solid var(--hairline);
+    border-radius:999px; padding:6px;
+    box-shadow:0 1px 3px rgba(0,0,0,.06);
+  }
+  .review-bar span.rlabel{ font-size:12px; color:var(--muted-2); padding-left:10px; }
+
+  .device{
+    width:390px; max-width:100%; height:844px;
+    background:#000; border-radius:46px; padding:14px;
+    box-shadow:0 30px 60px -20px rgba(0,0,0,.35), 0 10px 20px -10px rgba(0,0,0,.2);
+  }
+  .screen{
+    width:100%; height:100%; background:var(--canvas);
+    border-radius:34px; overflow:hidden; position:relative;
+    display:flex; flex-direction:column;
+  }
+  .notch{
+    position:absolute; top:14px; left:50%; transform:translateX(-50%);
+    width:120px; height:28px; background:#000; border-radius:20px; z-index:50;
+  }
+  .statusbar{
+    display:flex; justify-content:space-between; align-items:center;
+    padding:16px 26px 4px; font-size:13px; font-weight:600; color:var(--charcoal);
+    background:var(--card); flex-shrink:0;
+  }
+
+  .page-container{ flex:1; position:relative; overflow:hidden; }
+  .page{
+    position:absolute; inset:0;
+    display:none;
+    flex-direction:column;
+    background:var(--canvas);
+  }
+  .page.active{ display:flex; }
+
+  .scroll{
+    flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch;
+    display:flex; flex-direction:column;
+  }
+  .scroll::-webkit-scrollbar{ display:none; }
+
+  /* ---------- sticky top bar (chat page) ---------- */
+  .top-bar{
+    position:sticky; top:0; z-index:30;
+    background:var(--card);
+    border-bottom:1px solid var(--hairline);
+    padding:10px 14px 12px;
+    display:flex; align-items:flex-start; gap:10px;
+  }
+  .back-btn{
+    width:32px; height:32px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    color:var(--charcoal); flex-shrink:0; margin-top:2px;
+  }
+  .back-btn svg{ width:19px; height:19px; }
+  .top-bar-id{
+    display:flex; align-items:center; gap:8px; flex:1; min-width:0; cursor:pointer;
+    padding:2px 4px; margin:-2px -4px; border-radius:10px;
+  }
+  .top-bar-id:active{ background:var(--grey-tint); }
+  .badge-sm{
+    width:34px; height:34px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    font-size:11px; font-weight:700; flex-shrink:0;
+    background:#E1F0FF; color:#1D5DA6;
+  }
+  .top-bar-text{ min-width:0; }
+  .top-bar-name{
+    font-family:'Sora', sans-serif; font-weight:600; font-size:15.5px;
+    color:var(--charcoal); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .top-bar-name-row{ display:flex; align-items:center; gap:4px; }
+  .top-bar-name-row svg{ width:12px; height:12px; color:var(--muted-2); flex-shrink:0; }
+  .top-bar-sub{
+    font-size:11.5px; color:var(--muted); margin-top:1px;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .top-bar-actions{ display:flex; align-items:center; gap:7px; flex-shrink:0; margin-top:1px; }
+  .tb-icon{
+    width:32px; height:32px; border-radius:50%;
+    background:var(--grey-tint); display:flex; align-items:center; justify-content:center;
+    color:var(--charcoal);
+  }
+  .tb-icon svg{ width:14.5px; height:14.5px; }
+  .tb-icon.disabled{ background:#F4F4F5; color:#D2D5DB; }
+
+  .header-status{
+    font-size:10px; font-weight:700; white-space:nowrap;
+    color:#8C5B6E; padding:4px 2px;
+  }
+  .header-status.paused{ color:var(--grey); }
+
+  /* ---------- lightweight toast (replaces modal for a quick toggle) ---------- */
+  .toast{
+    position:absolute; left:50%; bottom:90px; transform:translateX(-50%) translateY(20px);
+    background:var(--charcoal); color:#fff; font-size:12px; font-weight:600;
+    padding:9px 15px; border-radius:999px; display:flex; align-items:center; gap:9px;
+    box-shadow:0 8px 20px rgba(0,0,0,.25); opacity:0; pointer-events:none;
+    transition:opacity .2s ease, transform .2s ease; z-index:100; white-space:nowrap;
+  }
+  .toast.show{ opacity:1; transform:translateX(-50%) translateY(0); pointer-events:auto; }
+  .toast a{ color:#FFD1D9; font-weight:700; text-decoration:none; }
+
+  /* ---------- static safety strip (scrolls away, not sticky) ---------- */
+  .safety-strip{
+    padding:10px 14px;
+    background:#FFF8F5;
+    border-bottom:1px solid #F5E2D8;
+    display:flex; flex-wrap:wrap; gap:6px;
+    align-items:center;
+  }
+  .chip{
+    display:flex; align-items:center; gap:4px;
+    font-size:11px; font-weight:600;
+    padding:4px 9px; border-radius:999px;
+    background:#fff; border:1px solid var(--hairline);
+    color:var(--muted);
+  }
+  .chip.allergy{ background:var(--red-dim); color:var(--red); border-color:transparent; }
+  .chip svg{ width:11px; height:11px; }
+
+  .callback-row{
+    display:flex; align-items:center; gap:10px; padding:10px 14px;
+    background:var(--card); border-bottom:1px solid var(--hairline); cursor:pointer;
+    transition:background .4s ease;
+  }
+  .callback-icon{ width:28px; height:28px; border-radius:8px; background:var(--blue-tint); color:var(--blue); display:flex; align-items:center; justify-content:center; flex-shrink:0; transition:background .4s ease, color .4s ease; }
+  .callback-icon svg{ width:14px; height:14px; }
+  .callback-text{ flex:1; min-width:0; }
+  .callback-label{ font-size:9.5px; font-weight:700; color:var(--muted-2); letter-spacing:.2px; }
+  .callback-value{ font-size:12.5px; font-weight:700; color:var(--charcoal); margin-top:1px; }
+  .callback-change{ font-size:11.5px; font-weight:700; color:var(--red); flex-shrink:0; }
+
+  /* due-for-reconfirmation state: the row itself blinks, no separate banner */
+  .callback-row.due{ background:#FFF3E9; animation:callback-blink 1.6s ease-in-out infinite; }
+  .callback-row.due .callback-icon{ background:var(--amber,#E08A2E); color:#fff; }
+  .callback-row.due .callback-label{ color:#B36A1E; }
+  @keyframes callback-blink{
+    0%, 100%{ background:#FFF3E9; }
+    50%{ background:#FDE3C8; }
+  }
+
+  .device-option{
+    display:flex; align-items:center; gap:11px; padding:12px 4px; border-bottom:1px solid var(--hairline); cursor:pointer;
+  }
+  .device-option:last-of-type{ border-bottom:none; }
+  .device-radio{ width:19px; height:19px; border-radius:50%; border:2px solid var(--hairline); flex-shrink:0; display:flex; align-items:center; justify-content:center; }
+  .device-radio.selected{ border-color:var(--red); }
+  .device-radio.selected::after{ content:''; width:10px; height:10px; border-radius:50%; background:var(--red); }
+  .device-option-text{ flex:1; }
+  .device-option-name{ font-size:13.5px; font-weight:600; color:var(--charcoal); }
+  .device-option-sub{ font-size:11px; color:var(--muted-2); margin-top:1px; }
+  .add-device-row{
+    display:flex; align-items:center; gap:10px; padding:12px 4px; color:var(--red); font-weight:700; font-size:13px; cursor:pointer;
+  }
+  .add-device-row svg{ width:16px; height:16px; }
+
+  /* ---------- docked vitals / IO / GCS strip (sticky, survives scroll, whole bar tappable) ---------- */
+  .vitals-dock{
+    position:sticky; top:64px; z-index:20;
+    background:var(--card);
+    border-bottom:1px solid var(--hairline);
+    padding:10px 14px;
+    cursor:pointer;
+  }
+  .vitals-dock:active{ background:var(--grey-tint); }
+  .vitals-dock-head{
+    display:flex; align-items:center; justify-content:space-between;
+    margin-bottom:8px;
+  }
+  .vitals-dock-title{ font-size:10.5px; font-weight:700; color:var(--muted-2); letter-spacing:0.2px; }
+  .vitals-dock-chevron{ color:var(--muted-2); display:flex; align-items:center; gap:3px; font-size:10.5px; font-weight:600; }
+  .vitals-dock-chevron svg{ width:11px; height:11px; }
+  .vitals-add-btn{
+    width:22px; height:22px; border-radius:50%; background:var(--red);
+    display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0;
+  }
+  .vitals-add-btn svg{ width:12px; height:12px; }
+  .vitals-cols{ display:flex; }
+  .vitals-col{ flex:1; min-width:0; padding-right:8px; border-right:1px solid var(--hairline); }
+  .vitals-col:last-child{ border-right:none; padding-right:0; padding-left:8px; }
+  .vitals-col:first-child{ padding-left:0; }
+  .vitals-label{ font-size:10px; font-weight:600; color:var(--muted-2); margin-bottom:3px; }
+  .vitals-value{ font-size:13.5px; font-weight:700; color:var(--charcoal); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .vitals-value-sub{ font-size:10.5px; font-weight:600; color:var(--muted); margin-top:1px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .vitals-time{ margin-top:3px; display:flex; align-items:center; gap:4px; font-size:10px; font-weight:600; color:var(--muted); }
+  .stale-dot{ width:6px; height:6px; border-radius:50%; flex-shrink:0; }
+  .stale-fresh{ background:var(--green); }
+  .stale-aging{ background:var(--amber); }
+  .stale-stale{ background:var(--red); }
+
+  /* ---------- chat feed ---------- */
+  .chat-feed{ flex:1; padding:16px 14px 8px; display:flex; flex-direction:column; gap:10px; }
+  .date-chip{
+    align-self:center; font-size:11px; font-weight:600; color:var(--muted-2);
+    background:#fff; border:1px solid var(--hairline); padding:4px 12px; border-radius:999px; margin:4px 0 6px;
+  }
+  .msg-row{ display:flex; flex-direction:column; max-width:82%; }
+  .msg-row.in{ align-self:flex-start; align-items:flex-start; }
+  .msg-row.out{ align-self:flex-end; align-items:flex-end; }
+  .msg-sender{ font-size:10.5px; font-weight:600; color:var(--muted-2); margin-bottom:3px; padding:0 4px; }
+  .bubble{ padding:9px 12px; border-radius:14px; font-size:13.5px; line-height:1.4; color:var(--charcoal); }
+  .msg-row.in .bubble{ background:#fff; border:1px solid var(--hairline); border-top-left-radius:4px; }
+  .msg-row.out .bubble{ background:var(--bubble-out); border-top-right-radius:4px; }
+  .msg-meta{ display:flex; align-items:center; gap:3px; font-size:10px; color:var(--muted-2); margin-top:3px; padding:0 4px; }
+  .msg-meta svg{ width:12px; height:12px; }
+  .file-bubble{ display:flex; align-items:center; gap:9px; padding:9px 10px; }
+  .file-icon{ width:34px; height:34px; border-radius:9px; flex-shrink:0; background:var(--grey-tint); display:flex; align-items:center; justify-content:center; color:var(--charcoal); }
+  .file-icon svg{ width:16px; height:16px; }
+  .file-text{ min-width:0; }
+  .file-name{ font-size:12.5px; font-weight:600; color:var(--charcoal); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .file-sub{ font-size:10.5px; color:var(--muted-2); margin-top:1px; }
+  .rx-card{ border:1px solid var(--blue-tint); background:#F7FAFF; border-radius:14px; padding:10px 12px; min-width:210px; }
+  .rx-head{ display:flex; align-items:center; gap:7px; margin-bottom:6px; }
+  .rx-icon{ width:26px; height:26px; border-radius:50%; background:var(--blue-tint); color:var(--blue); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .rx-icon svg{ width:13px; height:13px; }
+  .rx-title{ font-size:12px; font-weight:700; color:var(--blue); }
+  .rx-body{ font-size:12.5px; color:var(--charcoal); line-height:1.45; }
+  .rx-link{ margin-top:7px; font-size:11.5px; font-weight:700; color:var(--blue); display:flex; align-items:center; gap:2px; cursor:pointer; }
+  .rx-link svg{ width:11px; height:11px; }
+
+  .input-bar{ display:flex; align-items:center; gap:8px; padding:10px 12px 20px; background:var(--card); border-top:1px solid var(--hairline); flex-shrink:0; }
+  .attach-btn{ width:36px; height:36px; border-radius:50%; flex-shrink:0; background:var(--grey-tint); display:flex; align-items:center; justify-content:center; color:var(--charcoal); }
+  .attach-btn svg{ width:17px; height:17px; }
+
+  .attach-option-list{ display:flex; flex-direction:column; gap:2px; margin:6px 0 14px; }
+  .attach-option{
+    display:flex; align-items:center; gap:14px; padding:12px 4px; cursor:pointer;
+    border-bottom:1px solid var(--hairline);
+  }
+  .attach-option:last-child{ border-bottom:none; }
+  .attach-option-icon{
+    width:38px; height:38px; border-radius:50%; background:var(--grey-tint);
+    display:flex; align-items:center; justify-content:center; color:var(--charcoal); flex-shrink:0;
+  }
+  .attach-option-icon svg{ width:18px; height:18px; }
+  .attach-option span{ font-size:14px; font-weight:600; color:var(--charcoal); }
+  .advise-btn{ width:36px; height:36px; border-radius:50%; flex-shrink:0; background:var(--blue-tint); display:flex; align-items:center; justify-content:center; color:var(--blue); }
+  .advise-btn svg{ width:16px; height:16px; }
+
+  /* ---------- flag bar: floats above the input, appears only while attaching ---------- */
+  .flag-bar{
+    max-height:0; overflow:hidden; opacity:0;
+    transition:max-height .22s ease, opacity .18s ease;
+    background:var(--card); border-top:1px solid var(--hairline);
+    padding:0 12px;
+  }
+  .flag-bar.open{ max-height:110px; opacity:1; padding:12px 12px 10px; }
+  .flag-bar-file{ display:flex; align-items:center; gap:9px; margin-bottom:10px; }
+  .flag-bar-file-icon{
+    width:30px; height:30px; border-radius:8px; background:var(--grey-tint);
+    display:flex; align-items:center; justify-content:center; color:var(--charcoal); flex-shrink:0;
+  }
+  .flag-bar-file-icon svg{ width:14px; height:14px; }
+  .flag-bar-file-name{ flex:1; min-width:0; font-size:12.5px; font-weight:600; color:var(--charcoal); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .flag-bar-close{ width:24px; height:24px; border-radius:50%; background:var(--grey-tint); display:flex; align-items:center; justify-content:center; color:var(--muted); flex-shrink:0; cursor:pointer; }
+  .flag-bar-close svg{ width:11px; height:11px; }
+  .flag-chip-row{ display:flex; gap:7px; overflow-x:auto; padding-bottom:2px; }
+  .flag-chip{
+    flex-shrink:0; font-size:12px; font-weight:600; color:var(--muted);
+    background:var(--grey-tint); padding:7px 13px; border-radius:999px; cursor:pointer;
+    white-space:nowrap; transition:background .15s ease, color .15s ease;
+  }
+  .flag-chip.active{ background:var(--red); color:#fff; }
+  .input-pill{ flex:1; height:38px; border-radius:19px; background:var(--grey-tint); display:flex; align-items:center; padding:0 14px; font-size:13px; color:var(--muted-2); }
+  .send-btn{ width:36px; height:36px; border-radius:50%; flex-shrink:0; background:var(--red); display:flex; align-items:center; justify-content:center; color:#fff; }
+  .send-btn svg{ width:15px; height:15px; }
+
+  /* ---------- advisory composer sheet ---------- */
+  .sheet-backdrop{
+    position:absolute; inset:0; background:rgba(20,20,25,.42);
+    z-index:80; display:none; align-items:flex-end;
+  }
+  .sheet-backdrop.open{ display:flex; }
+  .composer-sheet{
+    width:100%; background:var(--card);
+    border-radius:22px 22px 0 0;
+    padding:10px 18px 18px;
+    max-height:78%;
+    display:flex; flex-direction:column;
+  }
+  .sheet-handle{ width:36px; height:4px; border-radius:2px; background:var(--hairline); align-self:center; margin-bottom:12px; }
+  .sheet-title{ font-family:'Sora', sans-serif; font-weight:600; font-size:16px; color:var(--charcoal); margin-bottom:2px; }
+  .sheet-subtitle{ font-size:12px; color:var(--muted); margin-bottom:16px; }
+  .sheet-label{ font-size:11.5px; font-weight:700; color:var(--muted-2); margin-bottom:6px; letter-spacing:0.2px; }
+  .sheet-input{
+    width:100%; border:1px solid var(--hairline); border-radius:11px;
+    padding:9px 12px; font-size:13px; font-family:'Inter',sans-serif; color:var(--charcoal);
+    margin-bottom:14px; background:var(--canvas);
+  }
+  .sheet-textarea{
+    width:100%; min-height:90px; border:1px solid var(--hairline); border-radius:11px;
+    padding:10px 12px; font-size:13.5px; font-family:'Inter',sans-serif; color:var(--charcoal);
+    margin-bottom:10px; background:var(--canvas); resize:none; line-height:1.5;
+  }
+  .sheet-note{ font-size:11px; color:var(--muted-2); margin-bottom:16px; line-height:1.4; }
+  .sheet-submit{
+    width:100%; height:46px; border-radius:23px;
+    background:var(--red); color:#fff; border:none;
+    font-family:'Inter',sans-serif; font-weight:700; font-size:14px;
+  }
+
+  /* ---------- clinical advisory trail page ---------- */
+  .advisory-scroll{ flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; }
+  .advisory-scroll::-webkit-scrollbar{ display:none; }
+  .advisory-header{
+    padding:16px 20px; background:var(--card); border-bottom:1px solid var(--hairline);
+  }
+  .advisory-header-row{ display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px; }
+  .advisory-patient-name{ font-family:'Sora', sans-serif; font-weight:600; font-size:15px; color:var(--charcoal); }
+  .advisory-patient-sub{ font-size:11.5px; color:var(--muted); margin-top:1px; }
+  .advisory-disclaimer{
+    font-size:10.5px; color:var(--muted); line-height:1.5;
+    background:var(--canvas); border:1px solid var(--hairline); border-radius:10px; padding:9px 11px;
+  }
+  .advisory-entries{ padding:14px 20px 24px; display:flex; flex-direction:column; gap:14px; }
+  .advisory-entry{ position:relative; padding-left:16px; }
+  .advisory-entry::before{
+    content:''; position:absolute; left:0; top:5px; width:7px; height:7px; border-radius:50%; background:var(--blue);
+  }
+  .advisory-entry::after{
+    content:''; position:absolute; left:3px; top:14px; bottom:-14px; width:1px; background:var(--hairline);
+  }
+  .advisory-entry:last-child::after{ display:none; }
+  .advisory-entry-head{ display:flex; align-items:center; gap:6px; margin-bottom:4px; }
+  .advisory-entry-time{ font-size:11.5px; font-weight:700; color:var(--charcoal); }
+  .advisory-entry-author{ font-size:11px; color:var(--muted-2); }
+  .advisory-entry-status{ font-size:12px; color:var(--muted); font-style:italic; margin-bottom:3px; }
+  .advisory-entry-text{ font-size:13px; color:var(--charcoal); line-height:1.5; }
+
+  /* ---------- shared sub-page header (profile / vitals) ---------- */
+  .sub-header{
+    flex-shrink:0; background:var(--card); border-bottom:1px solid var(--hairline);
+    padding:10px 14px 12px; display:flex; align-items:center; gap:10px;
+  }
+  .sub-header-text{ flex:1; min-width:0; }
+  .sub-header-title{ font-family:'Sora', sans-serif; font-weight:600; font-size:15.5px; color:var(--charcoal); }
+  .sub-header-sub{ font-size:11.5px; color:var(--muted); margin-top:1px; }
+
+  /* ---------- patient profile page ---------- */
+  .profile-scroll{ flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; }
+  .profile-scroll::-webkit-scrollbar{ display:none; }
+  .profile-hero{
+    padding:22px 20px 18px; display:flex; flex-direction:column; align-items:center; text-align:center;
+    background:var(--card); border-bottom:1px solid var(--hairline);
+  }
+  .profile-badge{
+    width:56px; height:56px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+    font-size:16px; font-weight:700; background:#E1F0FF; color:#1D5DA6; margin-bottom:10px;
+  }
+  .profile-name{ font-family:'Sora', sans-serif; font-weight:600; font-size:18px; color:var(--charcoal); }
+  .profile-meta{ font-size:12.5px; color:var(--muted); margin-top:3px; }
+  .profile-meta b{ color:var(--charcoal); font-weight:700; }
+
+  .p-section{ padding:16px 20px; border-bottom:1px solid var(--hairline); }
+  .p-section-title{ font-size:12px; font-weight:700; color:var(--muted-2); letter-spacing:0.3px; margin-bottom:10px; }
+  .p-chip-row{ display:flex; flex-wrap:wrap; gap:6px; }
+  .p-list{ display:flex; flex-direction:column; gap:9px; }
+  .p-row{ display:flex; justify-content:space-between; gap:10px; }
+  .p-row-label{ font-size:12.5px; color:var(--muted); flex-shrink:0; }
+  .p-row-value{ font-size:12.5px; color:var(--charcoal); font-weight:600; text-align:right; }
+  .p-history-item{ padding:10px 12px; background:var(--card); border:1px solid var(--hairline); border-radius:12px; }
+  .p-history-date{ font-size:11px; font-weight:700; color:var(--charcoal); }
+  .p-history-desc{ font-size:12px; color:var(--muted); margin-top:2px; }
+
+  /* ---------- vitals flowsheet page ---------- */
+  .flow-scroll{ flex:1; overflow:auto; -webkit-overflow-scrolling:touch; }
+  .flow-scroll::-webkit-scrollbar{ display:none; }
+  .flow-table{ min-width:560px; }
+  .flow-head-row, .flow-row{
+    display:grid;
+    grid-template-columns: 72px 66px 44px 40px 52px 44px 78px;
+    align-items:center;
+  }
+  .flow-head-row{
+    position:sticky; top:0; z-index:10;
+    background:var(--card); border-bottom:1px solid var(--hairline);
+    padding:10px 10px;
+  }
+  .flow-head-cell{ font-size:10px; font-weight:700; color:var(--muted-2); letter-spacing:0.2px; }
+  .flow-date-row{
+    padding:8px 14px; font-size:11px; font-weight:600; color:var(--muted-2);
+    background:var(--canvas); border-bottom:1px solid var(--hairline);
+  }
+  .flow-row{ padding:10px 10px; border-bottom:1px solid var(--hairline); background:var(--card); }
+  .flow-row:nth-child(even){ background:#FBFBFC; }
+  .flow-cell{ font-size:12px; font-weight:600; color:var(--charcoal); }
+  .flow-cell.time{ font-weight:700; color:var(--muted); font-size:11px; }
+  .flow-cell.flag{ color:var(--red); }
+  .flow-cell.empty{ color:var(--muted-2); font-weight:400; }
+  .flow-cell.io-cell{ line-height:1.3; }
+  .flow-cell.io-sub{ font-size:10px; font-weight:600; color:var(--muted); margin-top:1px; }
+
+  .flow-legend{
+    display:flex; align-items:center; gap:14px;
+    padding:9px 14px; background:#fff; border-bottom:1px solid var(--hairline);
+    font-size:10.5px; color:var(--muted); flex-shrink:0;
+  }
+  .flow-legend span{ display:flex; align-items:center; gap:4px; }
+  .flow-legend .dot{ width:7px; height:7px; border-radius:50%; }
+</style>
+</head>
+<body>
+
+  <div class="review-bar">
+    <span class="rlabel">Tap the header or the vitals strip to navigate — try it</span>
+  </div>
+
+  <div class="device">
+    <div class="screen">
+      <div class="notch"></div>
+      <div class="statusbar">
+        <span>9:41</span>
+        <span style="display:flex; gap:4px; align-items:center;">
+          <svg width="16" height="12" viewBox="0 0 16 12" fill="none"><path d="M1 4.5C4.5 1.5 11.5 1.5 15 4.5" stroke="#2A2A2A" stroke-width="1.4" stroke-linecap="round"/><path d="M3.2 7C5.5 5 10.5 5 12.8 7" stroke="#2A2A2A" stroke-width="1.4" stroke-linecap="round"/><circle cx="8" cy="9.5" r="1" fill="#2A2A2A"/></svg>
+          <svg width="18" height="11" viewBox="0 0 18 11" fill="none"><rect x="0.5" y="0.5" width="15" height="10" rx="2.5" stroke="#2A2A2A"/><rect x="2" y="2" width="10" height="7" rx="1" fill="#2A2A2A"/><rect x="16.5" y="3.5" width="1.5" height="4" rx="0.7" fill="#2A2A2A"/></svg>
+        </span>
+      </div>
+
+      <div class="page-container">
+
+        <!-- ============ PAGE 1: CASE FILE / CHAT ============ -->
+        <div class="page active" id="page-chat">
+          <div class="scroll">
+
+            <div class="top-bar">
+              <div class="back-btn"><svg viewBox="0 0 24 24" fill="none"><path d="M15 5l-7 7 7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+              <div class="top-bar-id" onclick="goTo('profile')">
+                <div class="badge-sm">27F</div>
+                <div class="top-bar-text">
+                  <div class="top-bar-name-row">
+                    <span class="top-bar-name">Priya Singh</span>
+                    <svg viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  </div>
+                  <div class="top-bar-sub">City Hospital, Bemetara · PAT-00001234</div>
+                </div>
+              </div>
+              <div class="top-bar-actions">
+                <span class="header-status" id="header-status">Ongoing</span>
+                <div class="tb-icon" id="call-icon" onclick="event.stopPropagation()"><svg viewBox="0 0 24 24" fill="none"><path d="M6 3h3l2 5-2.5 1.5a11 11 0 0 0 5 5L15 12l5 2v3a2 2 0 0 1-2 2C10.5 19 5 13.5 5 6a2 2 0 0 1 1-3Z" fill="currentColor"/></svg></div>
+                <div class="tb-icon" id="video-icon" onclick="event.stopPropagation()"><svg viewBox="0 0 24 24" fill="none"><path d="M4 7.5A1.5 1.5 0 0 1 5.5 6h8A1.5 1.5 0 0 1 15 7.5v9A1.5 1.5 0 0 1 13.5 18h-8A1.5 1.5 0 0 1 4 16.5v-9Z" stroke="currentColor" stroke-width="1.6"/><path d="M15 10.5 20 8v8l-5-2.5" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg></div>
+              </div>
+            </div>
+
+            <div class="callback-row" id="callback-row" onclick="openDeviceSheet()">
+              <div class="callback-icon"><svg viewBox="0 0 24 24" fill="none"><rect x="7" y="3" width="10" height="18" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M10.5 18h3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></div>
+              <div class="callback-text">
+                <div class="callback-label">CALLBACK DEVICE</div>
+                <div class="callback-value" id="callback-device-name">Dr. Rohan's S24 Ultra</div>
+              </div>
+              <div class="callback-change">Change</div>
+            </div>
+
+            <div class="safety-strip">
+              <div class="chip allergy"><svg viewBox="0 0 24 24" fill="none"><path d="M12 3l9 16H3L12 3Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M12 10v4M12 17h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Penicillin allergy</div>
+              <div class="chip">Type 2 Diabetes</div>
+              <div class="chip">Hypertension</div>
+            </div>
+
+            <div class="vitals-dock" onclick="goTo('vitals')">
+              <div class="vitals-dock-head">
+                <span class="vitals-dock-title">LATEST VITALS · I/O · GCS</span>
+                <div style="display:flex; align-items:center; gap:8px;">
+                  <span class="vitals-dock-chevron">Full chart <svg viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                  <div class="vitals-add-btn" onclick="event.stopPropagation(); openAddVitals()">
+                    <svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/></svg>
+                  </div>
+                </div>
+              </div>
+              <div class="vitals-cols">
+                <div class="vitals-col">
+                  <div class="vitals-label">Vitals</div>
+                  <div class="vitals-value" id="dock-vitals-value">128/82</div>
+                  <div class="vitals-value-sub" id="dock-vitals-sub">HR 96 · RR 18</div>
+                  <div class="vitals-time"><span class="stale-dot stale-fresh"></span>4:10 PM</div>
+                </div>
+                <div class="vitals-col">
+                  <div class="vitals-label">Intake / Output</div>
+                  <div class="vitals-value" id="dock-io-value">+320 mL</div>
+                  <div class="vitals-value-sub">UO 40 mL/hr</div>
+                  <div class="vitals-time"><span class="stale-dot stale-aging"></span>1:00 PM</div>
+                </div>
+                <div class="vitals-col">
+                  <div class="vitals-label">GCS</div>
+                  <div class="vitals-value" id="dock-gcs-value">14 / 15</div>
+                  <div class="vitals-time"><span class="stale-dot stale-stale"></span>9:20 AM</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="chat-feed">
+              <div class="date-chip">Today</div>
+
+              <div class="msg-row in">
+                <span class="msg-sender">Resident · City Hospital</span>
+                <div class="bubble file-bubble">
+                  <div class="file-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M6 3.5h8l4 4v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-16a1 1 0 0 1 1-1Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M14 3.5V7a1 1 0 0 0 1 1h3.5" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg></div>
+                  <div class="file-text"><div class="file-name">ABG_Report_9AM.pdf</div><div class="file-sub">1.2 MB · Report</div></div>
+                </div>
+                <div class="msg-meta">9:22 AM</div>
+              </div>
+
+              <div class="msg-row in">
+                <span class="msg-sender">Resident · City Hospital</span>
+                <div class="bubble">BP dropping to 88/54, patient looks drowsy. GCS down to 14. Advise?</div>
+                <div class="msg-meta">9:25 AM</div>
+              </div>
+
+              <div class="msg-row out">
+                <div class="bubble">Start Noradrenaline 0.05 mcg/kg/min, recheck BP in 15 min. Keep GCS on hourly watch.</div>
+                <div class="msg-meta">9:27 AM · Seen</div>
+              </div>
+
+              <div class="msg-row out">
+                <div class="rx-card">
+                  <div class="rx-head">
+                    <div class="rx-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M4 20l1-4.2L15.8 5a1.5 1.5 0 0 1 2.1 0l1.1 1.1a1.5 1.5 0 0 1 0 2.1L8.2 19l-4.2 1Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M14 6.8l3.2 3.2" stroke="currentColor" stroke-width="1.7"/></svg></div>
+                    <span class="rx-title">Clinical Advisory</span>
+                  </div>
+                  <div class="rx-body">Start Noradrenaline at 0.05 mcg/kg/min, titrate to MAP &gt;65. Recheck BP in 15 min, keep GCS on hourly watch.</div>
+                  <div class="rx-link" onclick="goTo('advisory')">View full advisory <svg viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+                </div>
+                <div class="msg-meta">9:28 AM · Sent</div>
+              </div>
+
+              <div class="msg-row in">
+                <span class="msg-sender">Resident · City Hospital</span>
+                <div class="bubble">Started. BP now 102/68 at 15 min recheck. Patient more alert.</div>
+                <div class="msg-meta">9:44 AM</div>
+              </div>
+
+              <div class="date-chip">Now</div>
+
+              <div class="msg-row in">
+                <span class="msg-sender">Resident · City Hospital</span>
+                <div class="bubble file-bubble">
+                  <div class="file-icon"><svg viewBox="0 0 24 24" fill="none"><rect x="4" y="3" width="16" height="18" rx="1.6" stroke="currentColor" stroke-width="1.6"/><path d="M7.5 8h9M7.5 12h9M7.5 16h5.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></div>
+                  <div class="file-text"><div class="file-name">Treatment_Chart_4PM.pdf</div><div class="file-sub">840 KB · Treatment chart</div></div>
+                </div>
+                <div class="msg-meta">4:12 PM</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="sheet-backdrop" id="attach-picker-backdrop" onclick="closeAttachPicker(event)">
+            <div class="composer-sheet" onclick="event.stopPropagation()">
+              <div class="sheet-handle"></div>
+              <div class="sheet-title">Attach</div>
+              <div class="sheet-subtitle">Add to Priya Singh's record</div>
+              <div class="attach-option-list">
+                <div class="attach-option" onclick="pickSource('camera')">
+                  <div class="attach-option-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M4 8.5A1.5 1.5 0 0 1 5.5 7h2l1-2h7l1 2h2A1.5 1.5 0 0 1 20 8.5v9A1.5 1.5 0 0 1 18.5 19h-13A1.5 1.5 0 0 1 4 17.5v-9Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><circle cx="12" cy="13" r="3.2" stroke="currentColor" stroke-width="1.6"/></svg></div>
+                  <span>Camera</span>
+                </div>
+                <div class="attach-option" onclick="pickSource('gallery')">
+                  <div class="attach-option-icon"><svg viewBox="0 0 24 24" fill="none"><rect x="4" y="4.5" width="16" height="15" rx="2" stroke="currentColor" stroke-width="1.6"/><circle cx="9" cy="10" r="1.6" stroke="currentColor" stroke-width="1.5"/><path d="M5.5 17l4.5-4.8 3 3.2 2-2.2 3.5 3.8" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg></div>
+                  <span>Photo Gallery</span>
+                </div>
+                <div class="attach-option" onclick="pickSource('document')">
+                  <div class="attach-option-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M6 3.5h8l4 4v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-16a1 1 0 0 1 1-1Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M14 3.5V7a1 1 0 0 0 1 1h3.5" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg></div>
+                  <span>Document</span>
+                </div>
+              </div>
+              <button class="sheet-submit" style="background:transparent; color:var(--muted); margin-top:4px;" onclick="closeAttachPicker()">Cancel</button>
+            </div>
+          </div>
+
+          <div class="flag-bar" id="flag-bar">
+            <div class="flag-bar-file">
+              <div class="flag-bar-file-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M6 3.5h8l4 4v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-16a1 1 0 0 1 1-1Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M14 3.5V7a1 1 0 0 0 1 1h3.5" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg></div>
+              <span class="flag-bar-file-name">CBC_Report_4PM.pdf</span>
+              <div class="flag-bar-close" onclick="cancelAttach()"><svg viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></div>
+            </div>
+            <div class="flag-chip-row">
+              <div class="flag-chip active" onclick="selectFlag(this)">Lab</div>
+              <div class="flag-chip" onclick="selectFlag(this)">Radiology</div>
+              <div class="flag-chip" onclick="selectFlag(this)">Treatment Chart</div>
+              <div class="flag-chip" onclick="selectFlag(this)">General</div>
+            </div>
+          </div>
+
+          <div class="input-bar">
+            <div class="attach-btn" onclick="attachFile()"><svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></div>
+            <div class="input-pill">Message or attach a report…</div>
+            <div class="send-btn" onclick="sendAttachment()"><svg viewBox="0 0 24 24" fill="none"><path d="M4 12l16-7-6 16-3-6-7-3Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" fill="currentColor"/></svg></div>
+          </div>
+
+          <div class="sheet-backdrop" id="device-sheet-backdrop" onclick="closeDeviceSheet(event)">
+            <div class="composer-sheet" onclick="event.stopPropagation()">
+              <div class="sheet-handle"></div>
+              <div class="sheet-title">Callback Device</div>
+              <div class="sheet-subtitle">Who should Perfusion call for this consultation?</div>
+              <div class="device-option" onclick="selectDevice(this,'Dr. Rohan\\'s S24 Ultra')">
+                <div class="device-radio selected"></div>
+                <div class="device-option-text"><div class="device-option-name">Dr. Rohan's S24 Ultra</div><div class="device-option-sub">Booked this consultation</div></div>
+              </div>
+              <div class="device-option" onclick="selectDevice(this,'Dr. Brajesh\\'s Laptop')">
+                <div class="device-radio"></div>
+                <div class="device-option-text"><div class="device-option-name">Dr. Brajesh's Laptop</div><div class="device-option-sub">Last active today, 8:40 AM</div></div>
+              </div>
+              <div class="device-option" onclick="selectDevice(this,'ICU Nursing Station iPad')">
+                <div class="device-radio"></div>
+                <div class="device-option-text"><div class="device-option-name">ICU Nursing Station iPad</div><div class="device-option-sub">Last active yesterday</div></div>
+              </div>
+              <div class="add-device-row" onclick="alert('Opens: name this device + optional mobile number, for future emergency bypass calling')"><svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Add this device</div>
+              <button class="sheet-submit" onclick="closeDeviceSheet()" style="margin-top:12px;">Save</button>
+            </div>
+          </div>
+
+          <div class="sheet-backdrop" id="vitals-composer-backdrop" onclick="closeAddVitals(event)">
+            <div class="composer-sheet" onclick="event.stopPropagation()">
+              <div class="sheet-handle"></div>
+              <div class="sheet-title">Add Vitals</div>
+              <div class="sheet-subtitle">Recorded for Priya Singh · Vitals · I/O · GCS chart</div>
+              <div style="display:flex; gap:10px;">
+                <div style="flex:1;">
+                  <div class="sheet-label">BP</div>
+                  <input class="sheet-input" id="v-bp" placeholder="e.g. 122/80">
+                </div>
+                <div style="flex:1;">
+                  <div class="sheet-label">HR</div>
+                  <input class="sheet-input" id="v-hr" placeholder="e.g. 88">
+                </div>
+              </div>
+              <div style="display:flex; gap:10px;">
+                <div style="flex:1;">
+                  <div class="sheet-label">RR</div>
+                  <input class="sheet-input" id="v-rr" placeholder="e.g. 16">
+                </div>
+                <div style="flex:1;">
+                  <div class="sheet-label">SpO2</div>
+                  <input class="sheet-input" id="v-spo2" placeholder="e.g. 98%">
+                </div>
+              </div>
+              <div style="display:flex; gap:10px;">
+                <div style="flex:1;">
+                  <div class="sheet-label">GCS</div>
+                  <input class="sheet-input" id="v-gcs" placeholder="e.g. 15/15">
+                </div>
+                <div style="flex:1;">
+                  <div class="sheet-label">I/O (net)</div>
+                  <input class="sheet-input" id="v-io" placeholder="e.g. +180 mL">
+                </div>
+              </div>
+              <div class="sheet-note">This becomes the latest entry on Priya Singh's vitals chart, visible to Dr. S. Sharma immediately.</div>
+              <button class="sheet-submit" onclick="submitVitals()">Add to Chart</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ============ PAGE 2: PATIENT PROFILE ============ -->
+        <div class="page" id="page-profile">
+          <div class="sub-header">
+            <div class="back-btn" onclick="goTo('chat')"><svg viewBox="0 0 24 24" fill="none"><path d="M15 5l-7 7 7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div class="sub-header-text">
+              <div class="sub-header-title">Patient Profile</div>
+              <div class="sub-header-sub">Static clinical details</div>
+            </div>
+          </div>
+          <div class="profile-scroll">
+
+            <div class="profile-hero">
+              <div class="profile-badge">27F</div>
+              <div class="profile-name">Priya Singh</div>
+              <div class="profile-meta">PAT-00001234 · City Hospital, <b>Bemetara</b></div>
+            </div>
+
+            <div class="p-section">
+              <div class="p-section-title">ALLERGIES</div>
+              <div class="p-chip-row">
+                <div class="chip allergy"><svg viewBox="0 0 24 24" fill="none"><path d="M12 3l9 16H3L12 3Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M12 10v4M12 17h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Penicillin</div>
+                <div class="chip allergy"><svg viewBox="0 0 24 24" fill="none"><path d="M12 3l9 16H3L12 3Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M12 10v4M12 17h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Sulfa drugs</div>
+              </div>
+            </div>
+
+            <div class="p-section">
+              <div class="p-section-title">COMORBIDITIES</div>
+              <div class="p-chip-row">
+                <div class="chip">Type 2 Diabetes</div>
+                <div class="chip">Hypertension</div>
+                <div class="chip">CKD Stage 2</div>
+              </div>
+            </div>
+
+            <div class="p-section">
+              <div class="p-section-title">BASELINE MEDICATIONS</div>
+              <div class="p-list">
+                <div class="p-row"><span class="p-row-label">Metformin</span><span class="p-row-value">500mg · BD</span></div>
+                <div class="p-row"><span class="p-row-label">Telmisartan</span><span class="p-row-value">40mg · OD</span></div>
+                <div class="p-row"><span class="p-row-label">Atorvastatin</span><span class="p-row-value">20mg · HS</span></div>
+              </div>
+            </div>
+
+            <div class="p-section">
+              <div class="p-section-title">BASELINE PARAMETERS</div>
+              <div class="p-list">
+                <div class="p-row"><span class="p-row-label">Blood group</span><span class="p-row-value">B+</span></div>
+                <div class="p-row"><span class="p-row-label">Baseline BP</span><span class="p-row-value">122/78</span></div>
+                <div class="p-row"><span class="p-row-label">Baseline GCS</span><span class="p-row-value">15/15</span></div>
+                <div class="p-row"><span class="p-row-label">Weight</span><span class="p-row-value">64 kg</span></div>
+              </div>
+            </div>
+
+            <div class="p-section">
+              <div class="p-section-title">PAST ADMISSIONS</div>
+              <div class="p-list">
+                <div class="p-history-item">
+                  <div class="p-history-date">March 2026</div>
+                  <div class="p-history-desc">DKA management — City Hospital, Bemetara</div>
+                </div>
+                <div class="p-history-item">
+                  <div class="p-history-date">November 2025</div>
+                  <div class="p-history-desc">Hypertensive crisis — observation, 2 days</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="p-section" style="border-bottom:none;">
+              <div class="p-section-title">EMERGENCY CONTACT</div>
+              <div class="p-list">
+                <div class="p-row"><span class="p-row-label">Contact</span><span class="p-row-value">Rakesh Singh (Husband)</span></div>
+                <div class="p-row"><span class="p-row-label">Phone</span><span class="p-row-value">+91 98XXX XXXXX</span></div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- ============ PAGE 3: VITALS / IO / GCS FLOWSHEET ============ -->
+        <div class="page" id="page-vitals">
+          <div class="sub-header">
+            <div class="back-btn" onclick="goTo('chat')"><svg viewBox="0 0 24 24" fill="none"><path d="M15 5l-7 7 7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div class="sub-header-text">
+              <div class="sub-header-title">Vitals · I/O · GCS</div>
+              <div class="sub-header-sub">Priya Singh · full history</div>
+            </div>
+          </div>
+          <div class="flow-legend">
+            <span><span class="dot" style="background:var(--red);"></span>Out of range</span>
+            <span><span class="dot" style="background:var(--muted-2);"></span>Not recorded</span>
+          </div>
+          <div class="flow-scroll">
+            <div class="flow-table">
+              <div class="flow-head-row">
+                <div class="flow-head-cell">TIME</div>
+                <div class="flow-head-cell">BP</div>
+                <div class="flow-head-cell">HR</div>
+                <div class="flow-head-cell">RR</div>
+                <div class="flow-head-cell">SpO2</div>
+                <div class="flow-head-cell">GCS</div>
+                <div class="flow-head-cell">I/O · UO/hr</div>
+              </div>
+
+              <div class="flow-date-row">Today</div>
+
+              <div class="flow-row">
+                <div class="flow-cell time">4:10 PM</div>
+                <div class="flow-cell">128/82</div>
+                <div class="flow-cell">96</div>
+                <div class="flow-cell">18</div>
+                <div class="flow-cell">97%</div>
+                <div class="flow-cell empty">—</div>
+                <div class="flow-cell io-cell">+320<div class="io-sub">UO 40/hr</div></div>
+              </div>
+              <div class="flow-row">
+                <div class="flow-cell time">3:00 PM</div>
+                <div class="flow-cell">122/80</div>
+                <div class="flow-cell">92</div>
+                <div class="flow-cell">17</div>
+                <div class="flow-cell">98%</div>
+                <div class="flow-cell empty">—</div>
+                <div class="flow-cell empty">—</div>
+              </div>
+              <div class="flow-row">
+                <div class="flow-cell time">1:00 PM</div>
+                <div class="flow-cell">118/76</div>
+                <div class="flow-cell">90</div>
+                <div class="flow-cell">16</div>
+                <div class="flow-cell">98%</div>
+                <div class="flow-cell empty">—</div>
+                <div class="flow-cell io-cell">+180<div class="io-sub">UO 35/hr</div></div>
+              </div>
+              <div class="flow-row">
+                <div class="flow-cell time">11:00 AM</div>
+                <div class="flow-cell">102/68</div>
+                <div class="flow-cell">88</div>
+                <div class="flow-cell">17</div>
+                <div class="flow-cell">97%</div>
+                <div class="flow-cell empty">—</div>
+                <div class="flow-cell empty">—</div>
+              </div>
+              <div class="flow-row">
+                <div class="flow-cell time">9:44 AM</div>
+                <div class="flow-cell">102/68</div>
+                <div class="flow-cell">89</div>
+                <div class="flow-cell">18</div>
+                <div class="flow-cell">96%</div>
+                <div class="flow-cell">15</div>
+                <div class="flow-cell empty">—</div>
+              </div>
+              <div class="flow-row">
+                <div class="flow-cell time">9:25 AM</div>
+                <div class="flow-cell flag">88/54</div>
+                <div class="flow-cell flag">112</div>
+                <div class="flow-cell flag">24</div>
+                <div class="flow-cell">94%</div>
+                <div class="flow-cell flag">14</div>
+                <div class="flow-cell empty">—</div>
+              </div>
+              <div class="flow-row">
+                <div class="flow-cell time">9:20 AM</div>
+                <div class="flow-cell">110/72</div>
+                <div class="flow-cell">86</div>
+                <div class="flow-cell">16</div>
+                <div class="flow-cell">98%</div>
+                <div class="flow-cell">15</div>
+                <div class="flow-cell empty">—</div>
+              </div>
+
+              <div class="flow-date-row">Yesterday</div>
+
+              <div class="flow-row">
+                <div class="flow-cell time">9:00 PM</div>
+                <div class="flow-cell">116/74</div>
+                <div class="flow-cell">84</div>
+                <div class="flow-cell">16</div>
+                <div class="flow-cell">98%</div>
+                <div class="flow-cell empty">—</div>
+                <div class="flow-cell io-cell">+410<div class="io-sub">UO 45/hr</div></div>
+              </div>
+              <div class="flow-row">
+                <div class="flow-cell time">5:00 PM</div>
+                <div class="flow-cell">120/78</div>
+                <div class="flow-cell">82</div>
+                <div class="flow-cell">15</div>
+                <div class="flow-cell">99%</div>
+                <div class="flow-cell empty">—</div>
+                <div class="flow-cell empty">—</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ============ PAGE 4: CLINICAL ADVISORY TRAIL ============ -->
+        <div class="page" id="page-advisory">
+          <div class="sub-header">
+            <div class="back-btn" onclick="goTo('chat')"><svg viewBox="0 0 24 24" fill="none"><path d="M15 5l-7 7 7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div class="sub-header-text">
+              <div class="sub-header-title">Clinical Advisory</div>
+              <div class="sub-header-sub">Priya Singh · full record</div>
+            </div>
+            <div class="tb-icon" title="Download"><svg viewBox="0 0 24 24" fill="none"><path d="M12 4v11M8 11.5 12 15l4-3.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 19h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></div>
+          </div>
+          <div class="advisory-scroll">
+            <div class="advisory-header">
+              <div class="advisory-header-row">
+                <div>
+                  <div class="advisory-patient-name">Priya Singh · 27F</div>
+                  <div class="advisory-patient-sub">PAT-00001234 · City Hospital, Bemetara</div>
+                </div>
+              </div>
+              <div class="advisory-disclaimer">This Clinical Advisory reflects clinical opinion and support provided by Perfusion's consulting physician to the treating team. Treatment and prescribing responsibility remains with the treating physicians at City Hospital.</div>
+            </div>
+            <div class="advisory-entries" id="advisory-entries">
+              <div class="advisory-entry">
+                <div class="advisory-entry-head">
+                  <span class="advisory-entry-time">9:28 AM, Today</span>
+                  <span class="advisory-entry-author">· Dr. Perfusion Consultant</span>
+                </div>
+                <div class="advisory-entry-status">BP dropping to 88/54, patient drowsy, GCS down to 14</div>
+                <div class="advisory-entry-text">Start Noradrenaline at 0.05 mcg/kg/min, titrate to MAP &gt;65. Recheck BP in 15 min, keep GCS on hourly watch.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+<script>
+  function openDeviceSheet(){
+    document.getElementById('device-sheet-backdrop').classList.add('open');
+  }
+  function closeDeviceSheet(e){
+    document.getElementById('device-sheet-backdrop').classList.remove('open');
+  }
+  function selectDevice(el, name){
+    document.querySelectorAll('.device-radio').forEach(r => r.classList.remove('selected'));
+    el.querySelector('.device-radio').classList.add('selected');
+    document.getElementById('callback-device-name').textContent = name;
+    document.getElementById('callback-row').classList.remove('due');
+  }
+  // demo only: put the row into its "due for reconfirmation" blinking state after a short delay,
+  // standing in for the real 4-hourly trigger. Tapping the row (to confirm or change) clears it.
+  setTimeout(() => { document.getElementById('callback-row').classList.add('due'); }, 900);
+
+  function goTo(name){
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.getElementById('page-' + name).classList.add('active');
+  }
+
+  // ---------- chat attachment: source picker → flag bar ----------
+  function attachFile(){
+    document.getElementById('attach-picker-backdrop').classList.add('open');
+  }
+  function closeAttachPicker(e){
+    document.getElementById('attach-picker-backdrop').classList.remove('open');
+  }
+  function pickSource(source){
+    document.getElementById('attach-picker-backdrop').classList.remove('open');
+    const fileIcon = document.querySelector('.flag-bar-file-icon');
+    const fileName = document.querySelector('.flag-bar-file-name');
+    if(source === 'camera'){
+      fileName.textContent = 'Photo_capture_0915.jpg';
+      fileIcon.innerHTML = '<svg viewBox="0 0 24 24" fill="none"><path d="M4 8.5A1.5 1.5 0 0 1 5.5 7h2l1-2h7l1 2h2A1.5 1.5 0 0 1 20 8.5v9A1.5 1.5 0 0 1 18.5 19h-13A1.5 1.5 0 0 1 4 17.5v-9Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><circle cx="12" cy="13" r="3.2" stroke="currentColor" stroke-width="1.6"/></svg>';
+    } else if(source === 'gallery'){
+      fileName.textContent = 'IMG_20260915_1642.jpg';
+      fileIcon.innerHTML = '<svg viewBox="0 0 24 24" fill="none"><rect x="4" y="4.5" width="16" height="15" rx="2" stroke="currentColor" stroke-width="1.6"/><circle cx="9" cy="10" r="1.6" stroke="currentColor" stroke-width="1.5"/><path d="M5.5 17l4.5-4.8 3 3.2 2-2.2 3.5 3.8" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>';
+    } else {
+      fileName.textContent = 'CBC_Report_4PM.pdf';
+      fileIcon.innerHTML = '<svg viewBox="0 0 24 24" fill="none"><path d="M6 3.5h8l4 4v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-16a1 1 0 0 1 1-1Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M14 3.5V7a1 1 0 0 0 1 1h3.5" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>';
+    }
+    document.getElementById('flag-bar').classList.add('open');
+  }
+  function cancelAttach(){
+    document.getElementById('flag-bar').classList.remove('open');
+  }
+  function selectFlag(el){
+    document.querySelectorAll('.flag-chip').forEach(c => c.classList.remove('active'));
+    el.classList.add('active');
+  }
+  function sendAttachment(){
+    const flagBar = document.getElementById('flag-bar');
+    if(!flagBar.classList.contains('open')) return; // plain text send, not modeled in this mockup
+    const activeFlag = document.querySelector('.flag-chip.active').textContent;
+    const fileName = document.querySelector('.flag-bar-file-name').textContent;
+
+    const chatFeed = document.querySelector('.chat-feed');
+    const msgRow = document.createElement('div');
+    msgRow.className = 'msg-row out';
+    msgRow.innerHTML = `
+      <span class="msg-sender" style="text-align:right; align-self:flex-end;">${activeFlag}</span>
+      <div class="bubble file-bubble">
+        <div class="file-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M6 3.5h8l4 4v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-16a1 1 0 0 1 1-1Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M14 3.5V7a1 1 0 0 0 1 1h3.5" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg></div>
+        <div class="file-text">
+          <div class="file-name">${fileName}</div>
+          <div class="file-sub">${activeFlag}</div>
+        </div>
+      </div>
+      <div class="msg-meta">Just now · Sent</div>
+    `;
+    chatFeed.appendChild(msgRow);
+    flagBar.classList.remove('open');
+
+    const scrollEl = document.querySelector('#page-chat .scroll');
+    scrollEl.scrollTop = scrollEl.scrollHeight;
+  }
+
+  // ---------- add vitals ----------
+  function openAddVitals(){
+    document.getElementById('vitals-composer-backdrop').classList.add('open');
+  }
+  function closeAddVitals(e){
+    document.getElementById('vitals-composer-backdrop').classList.remove('open');
+  }
+  function submitVitals(){
+    const bp = document.getElementById('v-bp').value.trim();
+    const hr = document.getElementById('v-hr').value.trim();
+    const rr = document.getElementById('v-rr').value.trim();
+    const spo2 = document.getElementById('v-spo2').value.trim();
+    const gcs = document.getElementById('v-gcs').value.trim();
+    const io = document.getElementById('v-io').value.trim();
+    if(!bp && !hr){ document.getElementById('v-bp').focus(); return; }
+
+    // update the docked strip's latest values
+    if(bp) document.getElementById('dock-vitals-value').textContent = bp;
+    if(hr || rr) document.getElementById('dock-vitals-sub').textContent = `HR ${hr||'--'} · RR ${rr||'--'}`;
+    if(io) document.getElementById('dock-io-value').textContent = io;
+    if(gcs) document.getElementById('dock-gcs-value').textContent = gcs;
+    document.querySelectorAll('.stale-dot').forEach(d => d.className = 'stale-dot stale-fresh');
+
+    document.getElementById('vitals-composer-backdrop').classList.remove('open');
+    ['v-bp','v-hr','v-rr','v-spo2','v-gcs','v-io'].forEach(id => document.getElementById(id).value = '');
+  }
+</script>
+
+</body>
+</html>

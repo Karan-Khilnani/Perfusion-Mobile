@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Perfusion — New Advisory Badge (edge case)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --red:#DB2841; --charcoal:#2A2A2A; --canvas:#F7F7F9; --card:#FFFFFF;
+    --hairline:#ECEDF0; --muted:#7A7F8A; --muted-2:#A6ABB4; --grey-tint:#F0F1F3;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{
+    background:#E8E6E2; font-family:'Inter', sans-serif;
+    display:flex; flex-direction:column; align-items:center; gap:18px;
+    padding:40px 16px 80px; min-height:100vh;
+  }
+  .review-bar{
+    display:flex; align-items:center; gap:6px; background:#fff; border:1px solid var(--hairline);
+    border-radius:999px; padding:8px 16px; box-shadow:0 1px 3px rgba(0,0,0,.06);
+    font-size:12px; color:var(--muted-2); text-align:center; max-width:340px;
+  }
+
+  .device{
+    width:390px; max-width:100%; background:#000; border-radius:36px; padding:12px;
+    box-shadow:0 30px 60px -20px rgba(0,0,0,.35);
+  }
+  .screen{ width:100%; background:var(--canvas); border-radius:26px; overflow:hidden; padding-bottom:8px; }
+
+  .log-row{ position:relative; display:flex; align-items:flex-start; gap:12px; padding:16px; background:var(--card); }
+  .row-badge{
+    width:42px; height:42px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+    font-weight:700; font-size:10.5px; letter-spacing:-0.2px; background:#E1F0FF; color:#1D5DA6; flex-shrink:0;
+  }
+  .row-block{ flex:1; min-width:0; }
+  .row-title{ font-size:14.5px; font-weight:700; color:var(--charcoal); }
+  .row-hospital-line{ margin-top:4px; display:flex; align-items:baseline; justify-content:space-between; gap:8px; }
+  .row-hospital{ font-size:12px; color:var(--muted); }
+  .row-hospital .place{ color:var(--charcoal); font-weight:700; }
+  .row-time{ font-size:12px; color:var(--muted-2); font-weight:500; flex-shrink:0; }
+  .row-bottom{ margin-top:5px; display:flex; align-items:center; justify-content:space-between; gap:10px; }
+  .row-patient{ font-size:12.5px; color:var(--muted); display:flex; align-items:center; gap:5px; }
+  .row-patient svg{ width:12px; height:12px; color:var(--muted-2); }
+  .row-status{ display:flex; align-items:center; gap:4px; font-size:12px; font-weight:600; color:var(--green,#17A672); flex-shrink:0; }
+  .status-dot{ width:6px; height:6px; border-radius:50%; background:currentColor; }
+
+  .row-expand-inner{
+    margin-top:12px; padding-top:14px; border-top:1px solid var(--hairline);
+    display:flex; align-items:flex-start; justify-content:space-around;
+  }
+  .expand-item{ display:flex; flex-direction:column; align-items:center; gap:6px; }
+  .expand-btn{
+    position:relative; width:44px; height:44px; border-radius:50%; background:var(--grey-tint);
+    display:flex; align-items:center; justify-content:center; color:var(--charcoal); cursor:pointer;
+    transition:background .15s ease;
+  }
+  .expand-btn svg{ width:19px; height:19px; }
+  .expand-btn.case-file-btn.green{ background:#E8F5EE; color:#2F7D5C; }
+  .expand-label{ font-size:11px; font-weight:600; color:var(--muted); }
+
+  /* ---------- the new-activity badge ---------- */
+  .badge-count{
+    position:absolute; top:-3px; right:-3px;
+    min-width:18px; height:18px; padding:0 4px; border-radius:9px;
+    background:var(--red); color:#fff; font-size:10.5px; font-weight:700;
+    display:flex; align-items:center; justify-content:center;
+    border:2px solid var(--card); transition:transform .15s ease, opacity .15s ease;
+  }
+  .badge-count.cleared{ transform:scale(0); opacity:0; }
+
+  .caption{
+    max-width:340px; text-align:center; font-size:12.5px; color:var(--muted); line-height:1.5; padding:0 10px;
+  }
+  .caption b{ color:var(--charcoal); }
+</style>
+</head>
+<body>
+
+  <div class="review-bar">Edge case: new Clinical Advisory arrives → Advisory icon carries an unread badge, same visual language as the notification bell's unread dot</div>
+
+  <div class="device">
+    <div class="screen">
+      <div class="log-row">
+        <div class="row-badge">HYD</div>
+        <div class="row-block">
+          <div class="row-title">Cardiology · Dr. S. Sharma</div>
+          <div class="row-hospital-line">
+            <div class="row-hospital">Apollo Hospitals, <span class="place">Hyderabad</span></div>
+            <span class="row-time">4:30 PM</span>
+          </div>
+          <div class="row-bottom">
+            <div class="row-patient"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3.2" stroke="currentColor" stroke-width="1.6"/><path d="M5.5 19c0-3.6 2.9-5.6 6.5-5.6s6.5 2 6.5 5.6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>Rahul Sharma</div>
+            <span class="row-status"><span class="status-dot"></span>Completed</span>
+          </div>
+
+          <div class="row-expand-inner">
+            <div class="expand-item">
+              <div class="expand-btn"><svg viewBox="0 0 24 24" fill="none"><path d="M6 3h3l2 5-2.5 1.5a11 11 0 0 0 5 5L15 12l5 2v3a2 2 0 0 1-2 2C10.5 19 5 13.5 5 6a2 2 0 0 1 1-3Z" fill="currentColor"/></svg></div>
+              <span class="expand-label">Call</span>
+            </div>
+            <div class="expand-item">
+              <div class="expand-btn"><svg viewBox="0 0 24 24" fill="none"><path d="M4 7.5A1.5 1.5 0 0 1 5.5 6h8A1.5 1.5 0 0 1 15 7.5v9A1.5 1.5 0 0 1 13.5 18h-8A1.5 1.5 0 0 1 4 16.5v-9Z" stroke="currentColor" stroke-width="1.6"/><path d="M15 10.5 20 8v8l-5-2.5" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg></div>
+              <span class="expand-label">Video</span>
+            </div>
+            <div class="expand-item">
+              <div class="expand-btn case-file-btn green"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3.6" stroke="currentColor" stroke-width="1.7"/><path d="M4.8 20c0-4.4 3.2-6.8 7.2-6.8s7.2 2.4 7.2 6.8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+              <span class="expand-label">Case File</span>
+            </div>
+            <div class="expand-item">
+              <div class="expand-btn" onclick="clearBadge(this)">
+                <svg viewBox="0 0 24 24" fill="none"><path d="M6 3.5h8l4 4v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-16a1 1 0 0 1 1-1Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M14 3.5V7a1 1 0 0 0 1 1h3.5" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M12 11v5M9.5 13.5 12 16l2.5-2.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <span class="badge-count" id="advisory-badge">1</span>
+              </div>
+              <span class="expand-label">Advisory</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="caption">
+    New advisory from Dr. S. Sharma → push notification sent, the advisory appears as a card in <b>chat</b>, and the <b>Advisory</b> icon on this consultation's row carries a badge until opened. Tap the icon to see it clear, same as opening a notification marks it read.
+  </div>
+
+<script>
+  function clearBadge(btn){
+    const badge = btn.querySelector('.badge-count');
+    if(badge) badge.classList.add('cleared');
+  }
+</script>
+
+</body>
+</html>
