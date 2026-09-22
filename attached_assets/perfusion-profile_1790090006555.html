@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Perfusion — My Profile (CP-14, CS-21)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --red:#DB2841; --charcoal:#2A2A2A; --canvas:#F7F7F9; --card:#FFFFFF;
+    --hairline:#ECEDF0; --muted:#7A7F8A; --muted-2:#A6ABB4; --blue:#2F6FED; --blue-tint:#EAF1FE;
+    --green:#17A672; --green-tint:#E7F7F1; --grey-tint:#F0F1F3;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{ background:#E8E6E2; font-family:'Inter', sans-serif; display:flex; flex-direction:column; align-items:center; gap:16px; padding:40px 16px 80px; min-height:100vh; }
+  .review-bar{ display:flex; align-items:center; gap:6px; background:#fff; border:1px solid var(--hairline); border-radius:999px; padding:8px 16px; font-size:12px; color:var(--muted-2); }
+  .review-bar button{ font-size:12px; font-weight:600; color:var(--muted); background:transparent; border:none; border-radius:999px; padding:6px 12px; cursor:pointer; }
+  .review-bar button.active{ background:var(--charcoal); color:#fff; }
+
+  .device{ width:390px; max-width:100%; height:844px; background:#000; border-radius:46px; padding:14px; box-shadow:0 30px 60px -20px rgba(0,0,0,.35), 0 10px 20px -10px rgba(0,0,0,.2); }
+  .screen{ width:100%; height:100%; background:var(--canvas); border-radius:34px; overflow:hidden; position:relative; display:flex; flex-direction:column; }
+  .notch{ position:absolute; top:14px; left:50%; transform:translateX(-50%); width:120px; height:28px; background:#000; border-radius:20px; z-index:50; }
+  .statusbar{ display:flex; justify-content:space-between; align-items:center; padding:16px 26px 4px; font-size:13px; font-weight:600; color:var(--charcoal); background:var(--card); flex-shrink:0; }
+  .page-title-bar{ padding:12px 16px; background:var(--card); border-bottom:1px solid var(--hairline); flex-shrink:0; }
+  .page-title{ font-family:'Sora',sans-serif; font-weight:600; font-size:16px; color:var(--charcoal); }
+
+  .scroll{ flex:1; overflow-y:auto; }
+
+  .profile-hero{ background:#fff; border-bottom:1px solid var(--hairline); padding:24px 20px 20px; display:flex; flex-direction:column; align-items:center; text-align:center; }
+  .profile-photo-wrap{ position:relative; margin-bottom:12px; }
+  .profile-photo{ width:76px; height:76px; border-radius:50%; background:linear-gradient(160deg,#DDE1E6,#C7CCD3); display:flex; align-items:center; justify-content:center; color:#8A9099; }
+  .profile-photo svg{ width:36px; height:36px; }
+  .photo-edit-btn{ position:absolute; bottom:-2px; right:-2px; width:26px; height:26px; border-radius:50%; background:var(--red); border:2px solid #fff; display:flex; align-items:center; justify-content:center; }
+  .photo-edit-btn svg{ width:12px; height:12px; color:#fff; }
+  .profile-name{ font-family:'Sora',sans-serif; font-weight:600; font-size:18px; color:var(--charcoal); }
+  .profile-sub{ font-size:12.5px; color:var(--muted); margin-top:3px; }
+  .verify-badge{ display:inline-flex; align-items:center; gap:5px; background:var(--green-tint); color:var(--green); font-size:11px; font-weight:700; padding:5px 12px; border-radius:999px; margin-top:10px; }
+  .verify-badge svg{ width:12px; height:12px; }
+  .verify-badge.pending{ background:#FCF1E3; color:#E08A2E; }
+
+  .section{ background:#fff; padding:16px 20px; border-bottom:1px solid var(--hairline); }
+  .section-title{ font-size:11.5px; font-weight:700; color:var(--muted-2); letter-spacing:.3px; margin-bottom:12px; }
+  .field-row{ display:flex; align-items:center; justify-content:space-between; gap:14px; padding:9px 0; border-bottom:1px solid var(--hairline); }
+  .field-row:last-child{ border-bottom:none; }
+  .field-label{ font-size:12.5px; color:var(--muted); display:flex; align-items:center; gap:5px; flex-shrink:0; }
+  .field-label svg{ width:11px; height:11px; color:var(--muted-2); }
+  .field-value{ font-size:12.5px; font-weight:600; color:var(--charcoal); text-align:right; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
+  .field-value.locked{ color:var(--muted-2); }
+  .field-value.editable{ color:var(--charcoal); }
+
+  .doc-row{ display:flex; align-items:center; gap:10px; padding:9px 0; border-bottom:1px solid var(--hairline); }
+  .doc-row:last-child{ border-bottom:none; }
+  .doc-icon{ width:30px; height:30px; border-radius:8px; background:var(--grey-tint); display:flex; align-items:center; justify-content:center; color:var(--charcoal); flex-shrink:0; }
+  .doc-icon svg{ width:14px; height:14px; }
+  .doc-text{ flex:1; min-width:0; }
+  .doc-name{ font-size:12.5px; font-weight:600; color:var(--charcoal); }
+  .doc-status{ font-size:10.5px; margin-top:1px; font-weight:700; }
+  .doc-status.verified{ color:var(--green); }
+  .doc-status.pending{ color:#E08A2E; }
+  .doc-preview{ font-size:11.5px; font-weight:700; color:var(--red); flex-shrink:0; }
+  .add-doc-row{ display:flex; align-items:center; gap:8px; padding:9px 0; color:var(--red); font-weight:700; font-size:12.5px; cursor:pointer; }
+  .add-doc-row svg{ width:14px; height:14px; }
+
+  .portfolio-text-block{ font-size:12.5px; color:var(--charcoal); line-height:1.6; margin-bottom:14px; }
+  .portfolio-photos-label{ font-size:10.5px; font-weight:700; color:var(--muted-2); letter-spacing:.2px; margin-bottom:9px; }
+  .portfolio-photo-row{ display:flex; gap:8px; overflow-x:auto; }
+  .portfolio-photo{ width:64px; height:64px; border-radius:10px; background:var(--grey-tint); display:flex; align-items:center; justify-content:center; color:var(--muted-2); flex-shrink:0; }
+  .portfolio-photo svg{ width:20px; height:20px; }
+  .portfolio-photo-add{ border:1.5px dashed var(--hairline); color:var(--red); cursor:pointer; }
+
+  .signature-box{ height:70px; border:1.5px dashed var(--hairline); border-radius:12px; display:flex; align-items:center; justify-content:center; margin-bottom:8px; background:var(--canvas); }
+  .signature-box svg{ width:28px; height:28px; color:var(--muted-2); }
+  .signature-preview{ font-family:'Sora',sans-serif; font-style:italic; font-size:20px; color:var(--charcoal); }
+  .signature-action{ text-align:center; font-size:11.5px; font-weight:700; color:var(--red); cursor:pointer; }
+
+  .hero-edit-btn{ position:absolute; top:16px; right:16px; width:32px; height:32px; border-radius:50%; background:var(--grey-tint); display:flex; align-items:center; justify-content:center; color:var(--charcoal); cursor:pointer; }
+  .hero-edit-btn svg{ width:14px; height:14px; }
+  .profile-hero{ position:relative; }
+
+  .link-row{ display:flex; align-items:center; justify-content:space-between; padding:13px 20px; background:#fff; border-bottom:1px solid var(--hairline); cursor:pointer; }
+  .link-row-left{ display:flex; align-items:center; gap:11px; }
+  .link-icon{ width:30px; height:30px; border-radius:8px; background:var(--grey-tint); display:flex; align-items:center; justify-content:center; color:var(--charcoal); flex-shrink:0; }
+  .link-icon svg{ width:14px; height:14px; }
+  .link-text{ font-size:13px; font-weight:600; color:var(--charcoal); }
+  .link-sub{ font-size:11px; color:var(--muted-2); margin-top:1px; }
+  .link-chevron{ color:var(--muted-2); }
+  .link-chevron svg{ width:14px; height:14px; }
+
+  .settings-spacer{ height:20px; }
+  .logout-area{ padding:20px 20px 0; }
+  .logout-btn{ width:100%; text-align:center; padding:10px; font-size:11.5px; font-weight:600; color:var(--muted-2); cursor:pointer; }
+  .logout-note{ text-align:center; font-size:10px; color:var(--muted-2); margin-top:4px; padding:0 30px; line-height:1.4; }
+
+  .role-block{ display:none; }
+  .role-block.active{ display:block; }
+
+  .edit-page{ display:none; position:absolute; inset:0; background:var(--canvas); flex-direction:column; z-index:60; }
+  .edit-page.active{ display:flex; }
+  .edit-scroll{ flex:1; overflow-y:auto; padding:16px 20px; }
+  .edit-field{ margin-bottom:14px; }
+  .edit-field label{ font-size:11px; font-weight:700; color:var(--muted-2); letter-spacing:.2px; display:block; margin-bottom:6px; }
+  .edit-field input, .edit-field textarea{
+    width:100%; border:1px solid var(--hairline); border-radius:10px; padding:10px 12px;
+    font-size:13px; color:var(--charcoal); background:#fff; font-family:'Inter',sans-serif;
+  }
+  .edit-field textarea{ min-height:70px; resize:none; }
+  .edit-locked-note{ font-size:11px; color:var(--muted-2); margin:6px 0 16px; padding:9px 11px; background:var(--grey-tint); border-radius:9px; line-height:1.5; }
+  .edit-footer{ padding:12px 20px 20px; background:#fff; border-top:1px solid var(--hairline); flex-shrink:0; }
+  .edit-save-btn{ width:100%; height:46px; border-radius:23px; background:var(--red); color:#fff; border:none; font-weight:700; font-size:13.5px; font-family:'Inter',sans-serif; }
+</style>
+</head>
+<body>
+
+  <div class="review-bar">
+    <span>Role</span>
+    <button class="active" onclick="setRole('provider', this)">Provider</button>
+    <button onclick="setRole('seeker', this)">Seeker</button>
+  </div>
+
+  <div class="device">
+    <div class="screen">
+      <div class="notch"></div>
+      <div class="statusbar">
+        <span>9:41</span>
+        <span style="display:flex; gap:4px; align-items:center;">
+          <svg width="16" height="12" viewBox="0 0 16 12" fill="none"><path d="M1 4.5C4.5 1.5 11.5 1.5 15 4.5" stroke="#2A2A2A" stroke-width="1.4" stroke-linecap="round"/><path d="M3.2 7C5.5 5 10.5 5 12.8 7" stroke="#2A2A2A" stroke-width="1.4" stroke-linecap="round"/><circle cx="8" cy="9.5" r="1" fill="#2A2A2A"/></svg>
+          <svg width="18" height="11" viewBox="0 0 18 11" fill="none"><rect x="0.5" y="0.5" width="15" height="10" rx="2.5" stroke="#2A2A2A"/><rect x="2" y="2" width="10" height="7" rx="1" fill="#2A2A2A"/><rect x="16.5" y="3.5" width="1.5" height="4" rx="0.7" fill="#2A2A2A"/></svg>
+        </span>
+      </div>
+      <div class="page-title-bar"><div class="page-title">My Profile</div></div>
+
+      <div class="scroll">
+
+        <!-- ============ PROVIDER ============ -->
+        <div class="role-block active" id="role-provider">
+          <div class="profile-hero">
+            <div class="hero-edit-btn" onclick="openEdit('provider')"><svg viewBox="0 0 24 24" fill="none"><path d="M4 20l1-4.2L15.8 5a1.5 1.5 0 0 1 2.1 0l1.1 1.1a1.5 1.5 0 0 1 0 2.1L8.2 19l-4.2 1Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg></div>
+            <div class="profile-photo-wrap">
+              <div class="profile-photo"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8.5" r="3.6" stroke="currentColor" stroke-width="1.8"/><path d="M4.5 20.5c0-4.5 3.3-7 7.5-7s7.5 2.5 7.5 7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></div>
+              <div class="photo-edit-btn"><svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></div>
+            </div>
+            <div class="profile-name">Dr. S. Sharma</div>
+            <div class="profile-sub">Cardiology · Apollo Hospitals, Hyderabad</div>
+            <div class="verify-badge"><svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>Verified Provider</div>
+          </div>
+
+          <div class="section">
+            <div class="section-title">PERSONAL DETAILS</div>
+            <div class="field-row"><span class="field-label">Display Name</span><span class="field-value editable">Dr. S. Sharma</span></div>
+            <div class="field-row"><span class="field-label">Email</span><span class="field-value editable">s.sharma@apollo.in</span></div>
+            <div class="field-row"><span class="field-label">City</span><span class="field-value editable">Hyderabad</span></div>
+            <div class="field-row"><span class="field-label">State</span><span class="field-value editable">Telangana</span></div>
+            <div class="field-row"><span class="field-label">Contact Phone</span><span class="field-value editable">+91 98XXX XXXXX</span></div>
+          </div>
+
+          <div class="section">
+            <div class="section-title">PROFESSIONAL DETAILS <span style="float:right; font-weight:500; color:var(--muted-2);">Some fields locked after verification</span></div>
+            <div class="field-row"><span class="field-label">Qualification</span><span class="field-value editable">MBBS, MD, DM</span></div>
+            <div class="field-row"><span class="field-label">Specialization</span><span class="field-value editable">Cardiology</span></div>
+            <div class="field-row"><span class="field-label">Years of Experience</span><span class="field-value editable">15 years</span></div>
+            <div class="field-row"><span class="field-label">Consultation Fee</span><span class="field-value editable">₹2,000</span></div>
+            <div class="field-row">
+              <span class="field-label"><svg viewBox="0 0 24 24" fill="none"><rect x="5" y="9" width="14" height="10" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M8 9V6a4 4 0 0 1 8 0v3" stroke="currentColor" stroke-width="1.6"/></svg>Registration Number</span>
+              <span class="field-value locked">TS/MED/44821</span>
+            </div>
+            <div class="field-row">
+              <span class="field-label"><svg viewBox="0 0 24 24" fill="none"><rect x="5" y="9" width="14" height="10" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M8 9V6a4 4 0 0 1 8 0v3" stroke="currentColor" stroke-width="1.6"/></svg>Registered With</span>
+              <span class="field-value locked">Telangana Medical Council</span>
+            </div>
+            <div class="field-row">
+              <span class="field-label"><svg viewBox="0 0 24 24" fill="none"><rect x="5" y="9" width="14" height="10" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M8 9V6a4 4 0 0 1 8 0v3" stroke="currentColor" stroke-width="1.6"/></svg>Affiliated Institute</span>
+              <span class="field-value locked">Apollo Hospitals, Hyderabad</span>
+            </div>
+          </div>
+
+          <div class="section">
+            <div class="section-title">REGISTRATION DOCUMENTS</div>
+            <div class="doc-row">
+              <div class="doc-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M6 3.5h8l4 4v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-16a1 1 0 0 1 1-1Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg></div>
+              <div class="doc-text"><div class="doc-name">Medical_Council_Certificate.pdf</div><div class="doc-status verified">Verified</div></div>
+              <div class="doc-preview">View</div>
+            </div>
+            <div class="doc-row">
+              <div class="doc-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M6 3.5h8l4 4v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-16a1 1 0 0 1 1-1Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg></div>
+              <div class="doc-text"><div class="doc-name">DM_Cardiology_Degree.pdf</div><div class="doc-status pending">Under review</div></div>
+              <div class="doc-preview">View</div>
+            </div>
+            <div class="add-doc-row"><svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Add document</div>
+          </div>
+
+          <div class="section">
+            <div class="section-title">SIGNATURE</div>
+            <div class="signature-box"><span class="signature-preview">S. Sharma</span></div>
+            <div class="signature-action" onclick="alert('Upload or draw a new signature')">Update signature</div>
+          </div>
+
+          <div class="section" style="border-bottom:none;">
+            <div class="section-title">PORTFOLIO</div>
+            <div class="portfolio-text-block">Interventional cardiologist with 15 years' experience across structural heart disease and complex coronary interventions. Trained at AIIMS New Delhi, currently leading the Cath Lab at Apollo Hyderabad. Particular interest in remote critical-care collaboration with tier-2/3 hospitals — believe timely specialist input changes outcomes more than proximity does.</div>
+            <div class="portfolio-photos-label">PHOTOS</div>
+            <div class="portfolio-photo-row">
+              <div class="portfolio-photo"><svg viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="14" rx="2" stroke="currentColor" stroke-width="1.6"/><circle cx="8" cy="9.5" r="1.4" stroke="currentColor" stroke-width="1.4"/><path d="M4.5 15l4-4 3 3 3.5-3.5L20 15" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg></div>
+              <div class="portfolio-photo"><svg viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="14" rx="2" stroke="currentColor" stroke-width="1.6"/><circle cx="8" cy="9.5" r="1.4" stroke="currentColor" stroke-width="1.4"/><path d="M4.5 15l4-4 3 3 3.5-3.5L20 15" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg></div>
+              <div class="portfolio-photo portfolio-photo-add" onclick="alert('Add a photo to portfolio')"><svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ============ SEEKER ============ -->
+        <div class="role-block" id="role-seeker">
+          <div class="profile-hero">
+            <div class="hero-edit-btn" onclick="openEdit('seeker')"><svg viewBox="0 0 24 24" fill="none"><path d="M4 20l1-4.2L15.8 5a1.5 1.5 0 0 1 2.1 0l1.1 1.1a1.5 1.5 0 0 1 0 2.1L8.2 19l-4.2 1Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg></div>
+            <div class="profile-photo-wrap">
+              <div class="profile-photo"><svg viewBox="0 0 24 24" fill="none"><path d="M6 20V6a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v14" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M9 9h1.5M13.5 9H15M9 12.5h1.5M13.5 12.5H15M10.5 20v-4h3v4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></div>
+              <div class="photo-edit-btn"><svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></div>
+            </div>
+            <div class="profile-name">City Hospital</div>
+            <div class="profile-sub">Bemetara, Chhattisgarh</div>
+          </div>
+
+          <div class="section">
+            <div class="section-title">HOSPITAL DETAILS <span style="float:right; font-weight:500; color:var(--muted-2);">Some fields locked</span></div>
+            <div class="field-row">
+              <span class="field-label"><svg viewBox="0 0 24 24" fill="none"><rect x="5" y="9" width="14" height="10" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M8 9V6a4 4 0 0 1 8 0v3" stroke="currentColor" stroke-width="1.6"/></svg>Hospital Name</span>
+              <span class="field-value locked">City Hospital</span>
+            </div>
+            <div class="field-row">
+              <span class="field-label"><svg viewBox="0 0 24 24" fill="none"><rect x="5" y="9" width="14" height="10" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M8 9V6a4 4 0 0 1 8 0v3" stroke="currentColor" stroke-width="1.6"/></svg>Registration ID</span>
+              <span class="field-value locked">CGHOSP-00417</span>
+            </div>
+            <div class="field-row"><span class="field-label">Address</span><span class="field-value editable">Nehru Nagar, Bemetara, CG</span></div>
+            <div class="field-row"><span class="field-label">Hospital Contact</span><span class="field-value editable">+91 771XX XXXXX</span></div>
+            <div class="field-row"><span class="field-label">Email</span><span class="field-value editable">admin@cityhospital.in</span></div>
+          </div>
+
+          <div class="section">
+            <div class="section-title">REGISTRATION DOCUMENTS</div>
+            <div class="doc-row">
+              <div class="doc-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M6 3.5h8l4 4v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-16a1 1 0 0 1 1-1Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg></div>
+              <div class="doc-text"><div class="doc-name">Hospital_Registration_Certificate.pdf</div><div class="doc-status verified">Verified</div></div>
+              <div class="doc-preview">View</div>
+            </div>
+            <div class="add-doc-row"><svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Add document</div>
+          </div>
+
+          <div class="section" style="border-bottom:none;">
+            <div class="section-title">OWNER DETAILS</div>
+            <div class="field-row"><span class="field-label">Owner Name</span><span class="field-value editable">Rakesh Verma</span></div>
+            <div class="field-row"><span class="field-label">Owner Contact</span><span class="field-value editable">+91 98XXX XXXXX</span></div>
+            <div class="field-row"><span class="field-label">Owner Email</span><span class="field-value editable">rakesh@cityhospital.in</span></div>
+          </div>
+        </div>
+
+        <div class="settings-spacer"></div>
+
+        <div class="link-row">
+          <div class="link-row-left">
+            <div class="link-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M12 3v3M12 18v3M5 12H3M21 12h-2M6 6l1.5 1.5M17.5 16.5 19 18M6 18l1.5-1.5M17.5 7.5 19 6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="12" cy="12" r="3.4" stroke="currentColor" stroke-width="1.6"/></svg></div>
+            <div><div class="link-text">Availability</div><div class="link-sub role-block active" id="avail-sub-provider">Weekly hours, pause consultations</div></div>
+          </div>
+          <div class="link-chevron"><svg viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        </div>
+
+        <div class="link-row" id="devices-link" style="display:none;">
+          <div class="link-row-left">
+            <div class="link-icon"><svg viewBox="0 0 24 24" fill="none"><rect x="7" y="3" width="10" height="18" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M10.5 18h3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></div>
+            <div><div class="link-text">Callback Devices</div><div class="link-sub">Manage who Perfusion calls</div></div>
+          </div>
+          <div class="link-chevron"><svg viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        </div>
+
+        <div class="link-row">
+          <div class="link-row-left">
+            <div class="link-icon"><svg viewBox="0 0 24 24" fill="none"><rect x="5" y="4" width="14" height="17" rx="2" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="16.5" r="1" fill="currentColor"/></svg></div>
+            <div><div class="link-text">Change Password</div></div>
+          </div>
+          <div class="link-chevron"><svg viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        </div>
+
+        <div class="link-row">
+          <div class="link-row-left">
+            <div class="link-icon"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8.5" stroke="currentColor" stroke-width="1.6"/><path d="M9.8 9.3a2.3 2.3 0 1 1 3.4 2c-.9.6-1.2 1-1.2 2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="12" cy="16.3" r="0.9" fill="currentColor"/></svg></div>
+            <div><div class="link-text">Help &amp; Support</div></div>
+          </div>
+          <div class="link-chevron"><svg viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        </div>
+
+        <div class="logout-area">
+          <div class="logout-btn" onclick="alert('Log out? Are you sure you want to log out.')">Log Out</div>
+          <div class="logout-note">You'll need to log in again to use Perfusion. Sessions otherwise stay signed in indefinitely.</div>
+        </div>
+
+      </div>
+
+      <!-- ============ EDIT PROFILE — PROVIDER ============ -->
+      <div class="edit-page" id="edit-provider">
+        <div class="page-title-bar" style="display:flex; align-items:center; gap:10px;">
+          <div class="back-btn" onclick="closeEdit('provider')" style="width:28px; height:28px; border-radius:50%; display:flex; align-items:center; justify-content:center; color:var(--charcoal);"><svg viewBox="0 0 24 24" fill="none"><path d="M15 5l-7 7 7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="page-title">Edit Profile</div>
+        </div>
+        <div class="edit-scroll">
+          <div class="edit-field"><label>DISPLAY NAME</label><input value="Dr. S. Sharma"></div>
+          <div class="edit-field"><label>EMAIL</label><input value="s.sharma@apollo.in"></div>
+          <div class="edit-field"><label>CITY</label><input value="Hyderabad"></div>
+          <div class="edit-field"><label>STATE</label><input value="Telangana"></div>
+          <div class="edit-field"><label>CONTACT PHONE</label><input value="+91 98XXX XXXXX"></div>
+          <div class="edit-field"><label>QUALIFICATION</label><input value="MBBS, MD, DM"></div>
+          <div class="edit-field"><label>SPECIALIZATION</label><input value="Cardiology"></div>
+          <div class="edit-field"><label>YEARS OF EXPERIENCE</label><input value="15 years"></div>
+          <div class="edit-field"><label>CONSULTATION FEE</label><input value="₹2,000"></div>
+          <div class="edit-field"><label>PORTFOLIO — ABOUT</label><textarea style="min-height:110px;">Interventional cardiologist with 15 years' experience across structural heart disease and complex coronary interventions. Trained at AIIMS New Delhi, currently leading the Cath Lab at Apollo Hyderabad. Particular interest in remote critical-care collaboration with tier-2/3 hospitals.</textarea></div>
+          <div class="edit-locked-note">Registration Number, Registered With, and Affiliated Institute are verified by Perfusion admin and can't be edited here. Contact support to correct these.</div>
+        </div>
+        <div class="edit-footer"><button class="edit-save-btn" onclick="closeEdit('provider')">Save Changes</button></div>
+      </div>
+
+      <!-- ============ EDIT PROFILE — SEEKER ============ -->
+      <div class="edit-page" id="edit-seeker">
+        <div class="page-title-bar" style="display:flex; align-items:center; gap:10px;">
+          <div class="back-btn" onclick="closeEdit('seeker')" style="width:28px; height:28px; border-radius:50%; display:flex; align-items:center; justify-content:center; color:var(--charcoal);"><svg viewBox="0 0 24 24" fill="none"><path d="M15 5l-7 7 7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="page-title">Edit Hospital Profile</div>
+        </div>
+        <div class="edit-scroll">
+          <div class="edit-field"><label>ADDRESS</label><input value="Nehru Nagar, Bemetara, CG"></div>
+          <div class="edit-field"><label>HOSPITAL CONTACT</label><input value="+91 771XX XXXXX"></div>
+          <div class="edit-field"><label>EMAIL</label><input value="admin@cityhospital.in"></div>
+          <div class="edit-field"><label>OWNER NAME</label><input value="Rakesh Verma"></div>
+          <div class="edit-field"><label>OWNER CONTACT</label><input value="+91 98XXX XXXXX"></div>
+          <div class="edit-field"><label>OWNER EMAIL</label><input value="rakesh@cityhospital.in"></div>
+          <div class="edit-locked-note">Hospital Name and Registration ID are verified by Perfusion admin and can't be edited here. Contact support to correct these.</div>
+        </div>
+        <div class="edit-footer"><button class="edit-save-btn" onclick="closeEdit('seeker')">Save Changes</button></div>
+      </div>
+
+    </div>
+  </div>
+
+<script>
+  function openEdit(role){ document.getElementById('edit-' + role).classList.add('active'); }
+  function closeEdit(role){ document.getElementById('edit-' + role).classList.remove('active'); }
+
+  function setRole(role, btn){
+    document.querySelectorAll('.review-bar button').forEach(b => { if(b.textContent==='Provider'||b.textContent==='Seeker') b.classList.remove('active'); });
+    btn.classList.add('active');
+    document.getElementById('role-provider').classList.toggle('active', role==='provider');
+    document.getElementById('role-seeker').classList.toggle('active', role==='seeker');
+    document.getElementById('devices-link').style.display = role==='seeker' ? 'flex' : 'none';
+    document.getElementById('avail-sub-provider').textContent = role==='provider' ? 'Weekly hours, pause consultations' : 'Weekly hours, pause consultations';
+  }
+</script>
+
+</body>
+</html>

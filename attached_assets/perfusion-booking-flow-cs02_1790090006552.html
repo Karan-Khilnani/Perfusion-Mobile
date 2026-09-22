@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Perfusion — New Consultation (Shortened Flow)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --red:#DB2841; --red-dim:#F6DDE1; --charcoal:#2A2A2A; --canvas:#F7F7F9; --card:#FFFFFF;
+    --hairline:#ECEDF0; --muted:#7A7F8A; --muted-2:#A6ABB4; --blue:#2F6FED; --blue-tint:#EAF1FE;
+    --green:#17A672; --grey-tint:#F0F1F3;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{ background:#E8E6E2; font-family:'Inter', sans-serif; display:flex; flex-direction:column; align-items:center; gap:16px; padding:40px 16px 80px; min-height:100vh; }
+  .review-bar{ font-size:12px; color:var(--muted-2); background:#fff; border:1px solid var(--hairline); border-radius:999px; padding:8px 16px; text-align:center; max-width:340px; }
+  .device{ width:390px; max-width:100%; height:844px; background:#000; border-radius:46px; padding:14px; box-shadow:0 30px 60px -20px rgba(0,0,0,.35), 0 10px 20px -10px rgba(0,0,0,.2); }
+  .screen{ width:100%; height:100%; background:var(--canvas); border-radius:34px; overflow:hidden; position:relative; display:flex; flex-direction:column; }
+  .notch{ position:absolute; top:14px; left:50%; transform:translateX(-50%); width:120px; height:28px; background:#000; border-radius:20px; z-index:50; }
+  .statusbar{ display:flex; justify-content:space-between; align-items:center; padding:16px 26px 4px; font-size:13px; font-weight:600; color:var(--charcoal); background:var(--card); flex-shrink:0; }
+
+  .flow-header{ background:var(--card); border-bottom:1px solid var(--hairline); flex-shrink:0; }
+  .flow-header-top{ display:flex; align-items:center; gap:10px; padding:12px 16px; }
+  .flow-back{ width:30px; height:30px; border-radius:50%; display:flex; align-items:center; justify-content:center; color:var(--charcoal); flex-shrink:0; }
+  .flow-back svg{ width:17px; height:17px; }
+  .flow-title{ font-family:'Sora',sans-serif; font-weight:600; font-size:15.5px; color:var(--charcoal); }
+  .flow-step-label{ font-size:11px; color:var(--muted-2); font-weight:600; }
+
+  .flow-body{ flex:1; overflow-y:auto; padding:16px; }
+  .flow-body::-webkit-scrollbar{ display:none; }
+
+  .search-input{ display:flex; align-items:center; gap:9px; background:#fff; border:1px solid var(--hairline); border-radius:12px; padding:11px 14px; margin-bottom:12px; position:relative; }
+  .search-input svg{ width:16px; height:16px; color:var(--muted-2); flex-shrink:0; }
+  .search-input input{ border:none; outline:none; font-size:13px; color:var(--charcoal); flex:1; font-family:'Inter',sans-serif; background:transparent; }
+  .search-input input::placeholder{ color:var(--muted-2); }
+
+  .filter-row{ display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap; }
+  .specialty-chips{ display:flex; gap:8px; overflow-x:auto; padding-bottom:2px; }
+  .specialty-chip{ flex-shrink:0; font-size:12px; font-weight:600; padding:7px 14px; border-radius:999px; background:#fff; border:1px solid var(--hairline); color:var(--muted); white-space:nowrap; cursor:pointer; }
+  .specialty-chip.active{ background:var(--charcoal); color:#fff; border-color:var(--charcoal); }
+  .avail-toggle{ display:flex; align-items:center; gap:7px; background:#fff; border:1px solid var(--hairline); border-radius:999px; padding:7px 13px; margin-bottom:14px; width:fit-content; }
+  .avail-toggle-switch{ width:30px; height:17px; border-radius:999px; background:var(--green); position:relative; cursor:pointer; }
+  .avail-toggle-switch::after{ content:''; position:absolute; top:2px; left:15px; width:13px; height:13px; border-radius:50%; background:#fff; }
+  .avail-toggle span{ font-size:12px; font-weight:600; color:var(--charcoal); }
+
+  .provider-card{ background:#fff; border:1px solid var(--hairline); border-radius:14px; padding:14px; margin-bottom:12px; }
+  .provider-top{ display:flex; align-items:center; gap:11px; }
+  .provider-photo{ width:50px; height:50px; border-radius:50%; flex-shrink:0; background:linear-gradient(160deg,#DDE1E6,#C7CCD3); display:flex; align-items:center; justify-content:center; color:#8A9099; }
+  .provider-photo svg{ width:24px; height:24px; }
+  .provider-name{ font-size:14.5px; font-weight:700; color:var(--charcoal); }
+  .provider-spec{ font-size:12.5px; color:var(--red); font-weight:700; margin-top:2px; }
+  .provider-quals{ font-size:11px; color:var(--muted); margin-top:1px; }
+  .provider-exp{ display:flex; align-items:center; gap:5px; margin-top:9px; font-size:11.5px; color:var(--muted); font-weight:600; }
+  .provider-exp svg{ width:13px; height:13px; color:var(--muted-2); }
+  .avail-tomorrow-pill{ display:inline-flex; align-items:center; gap:5px; background:var(--blue-tint); color:var(--blue); font-size:11.5px; font-weight:700; padding:6px 12px; border-radius:999px; margin-top:11px; }
+  .avail-tomorrow-pill svg{ width:12px; height:12px; }
+  .slot-chip-label{ font-size:10px; font-weight:700; color:var(--muted-2); letter-spacing:.2px; margin-top:11px; margin-bottom:7px; }
+  .slot-chip-row{ display:flex; gap:8px; flex-wrap:wrap; }
+  .slot-chip{ font-size:12px; font-weight:700; padding:8px 14px; border-radius:10px; background:var(--blue-tint); color:var(--blue); cursor:pointer; }
+  .slot-chip:active{ background:var(--red); color:#fff; }
+
+  .selection-recap{ display:flex; align-items:center; gap:10px; background:#fff; border:1px solid var(--hairline); border-radius:12px; padding:11px 13px; margin-bottom:16px; cursor:pointer; }
+  .recap-badge{ width:36px; height:36px; border-radius:50%; flex-shrink:0; background:linear-gradient(160deg,#DDE1E6,#C7CCD3); display:flex; align-items:center; justify-content:center; color:#8A9099; }
+  .recap-badge svg{ width:17px; height:17px; }
+  .recap-text{ flex:1; min-width:0; }
+  .recap-name{ font-size:13px; font-weight:700; color:var(--charcoal); }
+  .recap-sub{ font-size:11px; color:var(--muted); margin-top:1px; }
+  .recap-change{ font-size:11.5px; font-weight:700; color:var(--red); flex-shrink:0; }
+
+  .field-label{ font-size:11.5px; font-weight:700; color:var(--muted-2); letter-spacing:.2px; margin-bottom:7px; margin-top:16px; }
+  .field-label:first-child{ margin-top:0; }
+  .textarea-field{ width:100%; min-height:74px; border:1px solid var(--hairline); border-radius:11px; padding:11px 13px; font-size:13px; font-family:'Inter',sans-serif; color:var(--charcoal); background:#fff; resize:none; }
+  .input-field{ width:100%; height:42px; border:1px solid var(--hairline); border-radius:11px; padding:0 13px; font-size:13px; color:var(--charcoal); background:#fff; font-family:'Inter',sans-serif; }
+  .field-row{ display:flex; gap:10px; }
+  .field-row > div{ flex:1; }
+
+  .patient-suggestions{ background:#fff; border:1px solid var(--hairline); border-radius:12px; margin-top:-6px; margin-bottom:12px; overflow:hidden; display:none; }
+  .patient-suggestions.show{ display:block; }
+  .suggestion-row{ display:flex; align-items:center; gap:10px; padding:10px 13px; border-bottom:1px solid var(--hairline); cursor:pointer; }
+  .suggestion-row:last-child{ border-bottom:none; }
+  .suggestion-avatar{ width:32px; height:32px; border-radius:50%; background:var(--grey-tint); display:flex; align-items:center; justify-content:center; font-weight:700; font-size:10px; color:var(--charcoal); flex-shrink:0; }
+  .suggestion-text{ flex:1; min-width:0; }
+  .suggestion-name{ font-size:13px; font-weight:700; color:var(--charcoal); }
+  .suggestion-id{ font-size:11px; color:var(--muted); margin-top:1px; }
+  .new-patient-suggestion{ display:flex; align-items:center; gap:9px; padding:11px 13px; color:var(--red); font-weight:700; font-size:12.5px; cursor:pointer; }
+  .new-patient-suggestion svg{ width:15px; height:15px; }
+
+  .new-patient-fields{ display:none; background:#fff; border:1px solid var(--hairline); border-radius:12px; padding:13px; margin-bottom:6px; }
+  .new-patient-fields.show{ display:block; }
+  .new-patient-fields .field-label{ margin-top:12px; }
+  .new-patient-fields .field-label:first-child{ margin-top:0; }
+  .selected-patient-chip{ display:none; align-items:center; gap:10px; background:var(--red-dim); border:1px solid #F0C4CC; border-radius:12px; padding:11px 13px; margin-bottom:6px; }
+  .selected-patient-chip.show{ display:flex; }
+  .selected-patient-chip .suggestion-avatar{ background:#fff; color:var(--red); }
+  .clear-patient{ color:var(--red); font-weight:700; font-size:11.5px; cursor:pointer; flex-shrink:0; }
+
+  .attach-row{ display:flex; align-items:center; gap:10px; padding:11px 12px; background:#fff; border:1px solid var(--hairline); border-radius:11px; margin-top:10px; cursor:pointer; color:var(--muted); font-size:12.5px; font-weight:600; }
+  .attach-row svg{ width:16px; height:16px; color:var(--muted-2); }
+
+  .select-field{
+    width:100%; height:42px; border:1px solid var(--hairline); border-radius:11px; padding:0 13px;
+    font-size:13px; color:var(--muted-2); background:#fff url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"><path d="M6 9l6 6 6-6" stroke="%237A7F8A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>') no-repeat right 12px center;
+    background-size:15px; appearance:none; -webkit-appearance:none; font-family:'Inter',sans-serif;
+  }
+  .select-field.filled{ color:var(--charcoal); }
+  .phone-input{ display:flex; align-items:center; border:1px solid var(--hairline); border-radius:11px; background:#fff; overflow:hidden; }
+  .phone-prefix{ padding:0 11px; height:42px; display:flex; align-items:center; font-size:13px; color:var(--muted); background:var(--grey-tint); border-right:1px solid var(--hairline); font-weight:600; }
+  .phone-input input{ flex:1; height:42px; border:none; outline:none; padding:0 12px; font-size:13px; color:var(--charcoal); font-family:'Inter',sans-serif; }
+  .field-sub-note{ font-size:10.5px; color:var(--muted-2); margin-top:4px; line-height:1.4; }
+
+  .checkbox-row{ display:flex; align-items:center; gap:9px; margin-top:14px; cursor:pointer; }
+  .checkbox-box{ width:19px; height:19px; border-radius:5px; border:1.5px solid var(--hairline); flex-shrink:0; display:flex; align-items:center; justify-content:center; }
+  .checkbox-box.checked{ background:var(--red); border-color:var(--red); }
+  .checkbox-box svg{ width:12px; height:12px; color:#fff; display:none; }
+  .checkbox-box.checked svg{ display:block; }
+  .checkbox-label{ font-size:12.5px; font-weight:600; color:var(--charcoal); }
+
+  .callback-note{ display:flex; align-items:flex-start; gap:7px; margin-bottom:8px; }
+  .callback-note svg{ width:14px; height:14px; color:var(--muted-2); flex-shrink:0; margin-top:1px; }
+  .callback-note-text{ font-size:11px; color:var(--muted); line-height:1.5; }
+
+  .upload-section-title{ font-size:11.5px; font-weight:700; color:var(--charcoal); margin-top:16px; margin-bottom:2px; }
+  .upload-hint{ font-size:10.5px; color:var(--muted-2); margin-bottom:7px; }
+  .attached-file{ display:flex; align-items:center; gap:9px; padding:9px 10px; background:#fff; border:1px solid var(--hairline); border-radius:10px; margin-top:8px; }
+  .attached-file-icon{ width:28px; height:28px; border-radius:7px; background:var(--grey-tint); display:flex; align-items:center; justify-content:center; color:var(--charcoal); flex-shrink:0; }
+  .attached-file-icon svg{ width:13px; height:13px; }
+  .attached-file-name{ flex:1; font-size:12px; font-weight:600; color:var(--charcoal); }
+  .attached-file-remove{ color:var(--muted-2); cursor:pointer; }
+
+  .flow-footer{ padding:12px 16px 20px; background:var(--card); border-top:1px solid var(--hairline); flex-shrink:0; }
+  .flow-cta{ width:100%; height:48px; border-radius:24px; background:var(--red); color:#fff; border:none; font-family:'Inter',sans-serif; font-weight:700; font-size:14px; cursor:pointer; }
+  .flow-cta:disabled{ background:var(--grey-tint); color:var(--muted-2); }
+
+  /* confirm sheet */
+  .sheet-backdrop{ position:absolute; inset:0; background:rgba(20,20,25,.42); z-index:80; display:none; align-items:flex-end; }
+  .sheet-backdrop.open{ display:flex; }
+  .confirm-sheet{ width:100%; background:#fff; border-radius:20px 20px 0 0; padding:10px 20px 22px; }
+  .sheet-handle{ width:34px; height:4px; border-radius:2px; background:var(--hairline); margin:0 auto 14px; }
+  .confirm-sheet-title{ font-family:'Sora',sans-serif; font-weight:600; font-size:16px; color:var(--charcoal); margin-bottom:10px; text-align:center; }
+  .confirm-sheet-body{ font-size:13px; color:var(--muted); line-height:1.55; text-align:center; margin-bottom:8px; }
+  .confirm-sheet-body b{ color:var(--charcoal); }
+  .warning-line{ font-size:11.5px; color:var(--muted); text-align:center; margin-bottom:18px; padding:10px 12px; background:#FFF8F5; border-radius:10px; border:1px solid #F5E2D8; }
+  .confirm-sheet-btn{ width:100%; height:46px; border-radius:23px; font-weight:700; font-size:13.5px; border:none; margin-bottom:8px; cursor:pointer; }
+  .confirm-sheet-btn.primary{ background:var(--red); color:#fff; }
+  .confirm-sheet-btn.secondary{ background:transparent; color:var(--muted); }
+
+  .confirm-screen{ flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:40px 30px; text-align:center; }
+  .confirm-check{ width:72px; height:72px; border-radius:50%; background:#E7F7F1; display:flex; align-items:center; justify-content:center; margin-bottom:20px; }
+  .confirm-check svg{ width:34px; height:34px; color:var(--green); }
+  .confirm-title{ font-family:'Sora',sans-serif; font-weight:600; font-size:19px; color:var(--charcoal); }
+  .confirm-sub{ font-size:13px; color:var(--muted); margin-top:8px; line-height:1.5; }
+  .confirm-newpatient-tag{ margin-top:14px; background:var(--green-tint,#E7F7F1); color:var(--green); font-size:11.5px; font-weight:700; padding:7px 14px; border-radius:999px; display:none; }
+  .confirm-newpatient-tag.show{ display:inline-block; }
+  .confirm-actions{ width:100%; margin-top:24px; display:flex; flex-direction:column; gap:10px; }
+  .confirm-btn{ width:100%; height:46px; border-radius:23px; font-weight:700; font-size:13.5px; cursor:pointer; border:none; }
+  .confirm-btn.primary{ background:var(--red); color:#fff; }
+  .confirm-btn.secondary{ background:#fff; border:1px solid var(--hairline); color:var(--charcoal); }
+
+  .page{ display:none; flex-direction:column; height:100%; position:relative; }
+  .page.active{ display:flex; }
+</style>
+</head>
+<body>
+
+  <div class="review-bar">Care Seeker — New Consultation, shortened flow: Explore Consultants → Patient + Clinical Details → Book</div>
+
+  <div class="device">
+    <div class="screen">
+      <div class="notch"></div>
+      <div class="statusbar">
+        <span>9:41</span>
+        <span style="display:flex; gap:4px; align-items:center;">
+          <svg width="16" height="12" viewBox="0 0 16 12" fill="none"><path d="M1 4.5C4.5 1.5 11.5 1.5 15 4.5" stroke="#2A2A2A" stroke-width="1.4" stroke-linecap="round"/><path d="M3.2 7C5.5 5 10.5 5 12.8 7" stroke="#2A2A2A" stroke-width="1.4" stroke-linecap="round"/><circle cx="8" cy="9.5" r="1" fill="#2A2A2A"/></svg>
+          <svg width="18" height="11" viewBox="0 0 18 11" fill="none"><rect x="0.5" y="0.5" width="15" height="10" rx="2.5" stroke="#2A2A2A"/><rect x="2" y="2" width="10" height="7" rx="1" fill="#2A2A2A"/><rect x="16.5" y="3.5" width="1.5" height="4" rx="0.7" fill="#2A2A2A"/></svg>
+        </span>
+      </div>
+
+      <!-- ================= STEP 1: EXPLORE CONSULTANTS ================= -->
+      <div class="page active" id="step-1">
+        <div class="flow-header">
+          <div class="flow-header-top">
+            <div class="flow-back"><svg viewBox="0 0 24 24" fill="none"><path d="M15 5l-7 7 7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div style="flex:1;"><div class="flow-title">Explore Consultants</div><div class="flow-step-label">Step 1 of 2</div></div>
+          </div>
+        </div>
+        <div class="flow-body">
+          <div class="search-input"><svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="1.8"/><path d="M20 20l-4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><input placeholder="Search by name or specialty…"></div>
+          <div class="specialty-chips" style="margin-bottom:12px;">
+            <div class="specialty-chip active">All</div>
+            <div class="specialty-chip">Cardiology</div>
+            <div class="specialty-chip">Neurology</div>
+            <div class="specialty-chip">Critical Care</div>
+            <div class="specialty-chip">Pulmonology</div>
+          </div>
+          <div class="avail-toggle"><div class="avail-toggle-switch"></div><span>Available today only</span></div>
+
+          <div class="provider-card">
+            <div class="provider-top">
+              <div class="provider-photo"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8.5" r="3.6" stroke="currentColor" stroke-width="1.8"/><path d="M4.5 20.5c0-4.5 3.3-7 7.5-7s7.5 2.5 7.5 7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></div>
+              <div><div class="provider-name">Dr. S. Sharma</div><div class="provider-spec">Cardiology</div><div class="provider-quals">MBBS, MD, DM · Apollo Hospitals, Hyderabad</div></div>
+            </div>
+            <div class="provider-exp"><svg viewBox="0 0 24 24" fill="none"><rect x="3" y="7.5" width="18" height="12" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M8 7.5V6a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v1.5" stroke="currentColor" stroke-width="1.6"/></svg>15 years experience</div>
+            <div class="slot-chip-label">TODAY</div>
+            <div class="slot-chip-row">
+              <div class="slot-chip" onclick="pickSlot(this,'Dr. S. Sharma','Cardiology','Apollo Hospitals, Hyderabad')">5:30 PM</div>
+              <div class="slot-chip" onclick="pickSlot(this,'Dr. S. Sharma','Cardiology','Apollo Hospitals, Hyderabad')">6:00 PM</div>
+              <div class="slot-chip" onclick="pickSlot(this,'Dr. S. Sharma','Cardiology','Apollo Hospitals, Hyderabad')">7:30 PM</div>
+            </div>
+          </div>
+
+          <div class="provider-card">
+            <div class="provider-top">
+              <div class="provider-photo"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8.5" r="3.6" stroke="currentColor" stroke-width="1.8"/><path d="M4.5 20.5c0-4.5 3.3-7 7.5-7s7.5 2.5 7.5 7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></div>
+              <div><div class="provider-name">Dr. A. Rao</div><div class="provider-spec">Cardiology</div><div class="provider-quals">MBBS, MD, DM · Narayana Health, Raipur</div></div>
+            </div>
+            <div class="provider-exp"><svg viewBox="0 0 24 24" fill="none"><rect x="3" y="7.5" width="18" height="12" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M8 7.5V6a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v1.5" stroke="currentColor" stroke-width="1.6"/></svg>12 years experience</div>
+            <div class="slot-chip-label">TODAY</div>
+            <div class="slot-chip-row">
+              <div class="slot-chip" onclick="pickSlot(this,'Dr. A. Rao','Cardiology','Narayana Health, Raipur')">6:00 PM</div>
+              <div class="slot-chip" onclick="pickSlot(this,'Dr. A. Rao','Cardiology','Narayana Health, Raipur')">6:45 PM</div>
+            </div>
+          </div>
+
+          <div class="provider-card">
+            <div class="provider-top">
+              <div class="provider-photo"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8.5" r="3.6" stroke="currentColor" stroke-width="1.8"/><path d="M4.5 20.5c0-4.5 3.3-7 7.5-7s7.5 2.5 7.5 7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></div>
+              <div><div class="provider-name">Dr. I. Khan</div><div class="provider-spec">Critical Care</div><div class="provider-quals">MBBS, MD · Fortis Healthcare, Mumbai</div></div>
+            </div>
+            <div class="provider-exp"><svg viewBox="0 0 24 24" fill="none"><rect x="3" y="7.5" width="18" height="12" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M8 7.5V6a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v1.5" stroke="currentColor" stroke-width="1.6"/></svg>10 years experience</div>
+            <div class="avail-tomorrow-pill"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8.5" stroke="currentColor" stroke-width="1.7"/><path d="M12 7.5V12l3 2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>Available Tomorrow</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ================= STEP 2: PATIENT + CLINICAL DETAILS ================= -->
+      <div class="page" id="step-2">
+        <div class="flow-header">
+          <div class="flow-header-top">
+            <div class="flow-back" onclick="goStep(1)"><svg viewBox="0 0 24 24" fill="none"><path d="M15 5l-7 7 7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div style="flex:1;"><div class="flow-title">Patient &amp; Clinical Details</div><div class="flow-step-label">Step 2 of 2</div></div>
+          </div>
+        </div>
+        <div class="flow-body">
+          <div class="selection-recap" onclick="goStep(1)">
+            <div class="recap-badge" id="recap-badge"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8.5" r="3.6" stroke="currentColor" stroke-width="1.8"/><path d="M4.5 20.5c0-4.5 3.3-7 7.5-7s7.5 2.5 7.5 7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></div>
+            <div class="recap-text">
+              <div class="recap-name" id="recap-name">Dr. S. Sharma · Cardiology</div>
+              <div class="recap-sub" id="recap-sub">Apollo Hospitals, Hyderabad · Today, 5:30 PM</div>
+            </div>
+            <div class="recap-change">Change</div>
+          </div>
+
+          <div class="field-label">PATIENT</div>
+          <div class="selected-patient-chip" id="selected-patient-chip">
+            <div class="suggestion-avatar" id="sel-patient-avatar">27F</div>
+            <div class="suggestion-text">
+              <div class="suggestion-name" id="sel-patient-name">Priya Singh</div>
+              <div class="suggestion-id" id="sel-patient-id">PAT-00001234</div>
+            </div>
+            <div class="clear-patient" onclick="clearPatient()">Change</div>
+          </div>
+          <div class="search-input" id="patient-search-wrap">
+            <svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="1.8"/><path d="M20 20l-4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+            <input id="patient-search" placeholder="Search patient by name…" oninput="filterPatients(this.value)">
+          </div>
+          <div class="patient-suggestions" id="patient-suggestions">
+            <div class="suggestion-row" onclick="choosePatient('Priya Singh','27F','PAT-00001234')">
+              <div class="suggestion-avatar">27F</div>
+              <div class="suggestion-text"><div class="suggestion-name">Priya Singh</div><div class="suggestion-id">27F · PAT-00001234</div></div>
+            </div>
+            <div class="suggestion-row" onclick="choosePatient('Priya Verma','8F','PAT-00000971')">
+              <div class="suggestion-avatar">8F</div>
+              <div class="suggestion-text"><div class="suggestion-name">Priya Verma</div><div class="suggestion-id">8F · PAT-00000971</div></div>
+            </div>
+            <div class="new-patient-suggestion" onclick="showNewPatient()"><svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Add new patient</div>
+          </div>
+
+          <div class="new-patient-fields" id="new-patient-fields">
+            <div class="field-row">
+              <div><div class="field-label">PATIENT NAME *</div><input class="input-field" id="np-name" placeholder="Full name"></div>
+              <div><div class="field-label">AGE *</div><input class="input-field" id="np-age" placeholder="Age"></div>
+            </div>
+            <div class="field-row">
+              <div>
+                <div class="field-label">GENDER *</div>
+                <select class="select-field" onchange="this.classList.add('filled')">
+                  <option value="" disabled selected>Select gender</option>
+                  <option>Female</option><option>Male</option><option>Other</option>
+                </select>
+              </div>
+              <div>
+                <div class="field-label">PATIENT'S CONTACT NUMBER *</div>
+                <div class="phone-input"><span class="phone-prefix">+91</span><input placeholder="XXXXX XXXXX"></div>
+              </div>
+            </div>
+            <div class="field-row">
+              <div><div class="field-label">WEIGHT (KG)</div><input class="input-field" placeholder="e.g. 72"></div>
+              <div><div class="field-label">UHID / IP NUMBER</div><input class="input-field" placeholder="Hospital IP/UHID number"></div>
+            </div>
+
+            <div class="checkbox-row" onclick="toggleAllergyCheck(this)">
+              <div class="checkbox-box checked" id="allergy-checkbox"><svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+              <span class="checkbox-label">No known allergies / Not specified</span>
+            </div>
+            <div id="allergy-field-wrap" style="display:none;">
+              <div class="field-label">ALLERGIES</div>
+              <input class="input-field" placeholder="e.g. Penicillin, Sulfa drugs">
+            </div>
+
+            <div style="font-size:11px; color:var(--muted); margin-top:12px; line-height:1.5;">A unique Patient ID is generated automatically once this consultation is booked, and this patient is added to your hospital's patient list for future bookings.</div>
+          </div>
+
+          <div class="field-label">CLINICAL SUMMARY *</div>
+          <textarea class="textarea-field" style="min-height:96px;" placeholder="Describe chief complaints, history of present illness, relevant past history, examination findings…"></textarea>
+
+          <div class="field-label">PROVISIONAL DIAGNOSIS (OPTIONAL)</div>
+          <input class="input-field" placeholder="e.g. Suspected ACS, r/o NSTEMI">
+
+          <div class="field-label">INVESTIGATIONS (OPTIONAL)</div>
+          <textarea class="textarea-field" placeholder="Lab results, imaging findings, ECG findings…"></textarea>
+
+          <div class="upload-section-title">Upload Reports</div>
+          <div class="upload-hint">Lab reports, ECG, imaging — any diagnostic material</div>
+          <div class="attach-row" onclick="mockAttach('report')"><svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>Add report</div>
+          <div id="attached-list-reports"></div>
+
+          <div class="upload-section-title">Upload Treatment Chart</div>
+          <div class="upload-hint">Current medications, fluid orders, nursing chart</div>
+          <div class="attach-row" onclick="mockAttach('chart')"><svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>Add treatment chart</div>
+          <div id="attached-list-chart"></div>
+
+          <div style="font-size:10.5px; color:var(--muted-2); margin-top:10px; line-height:1.5;">No limit on number of files or file size. JPEG, PNG, PDF, DOC and related formats accepted.</div>
+        </div>
+        <div class="flow-footer"><button class="flow-cta" onclick="openConfirmSheet()">Book Consultation</button></div>
+
+        <div class="sheet-backdrop" id="confirm-backdrop" onclick="closeConfirmSheet(event)">
+          <div class="confirm-sheet" onclick="event.stopPropagation()">
+            <div class="sheet-handle"></div>
+            <div class="confirm-sheet-title">Confirm Booking</div>
+            <div class="confirm-sheet-body">Book <b id="cf-patient">Priya Singh</b> with <b id="cf-provider">Dr. S. Sharma</b><br><span id="cf-slot">Today, 5:30 PM</span> · postpaid, billed later</div>
+            <div class="warning-line">This is immediately scheduled and cannot be cancelled from the app.</div>
+            <button class="confirm-sheet-btn primary" onclick="confirmBooking()">Confirm &amp; Book</button>
+            <button class="confirm-sheet-btn secondary" onclick="closeConfirmSheet()">Go Back</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ================= CONFIRMATION ================= -->
+      <div class="page" id="step-confirm">
+        <div class="confirm-screen">
+          <div class="confirm-check"><svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="confirm-title">Consultation Scheduled</div>
+          <div class="confirm-sub" id="confirm-final-text">Priya Singh is booked with Dr. S. Sharma today at 5:30 PM. Chat is open now — you can start sending reports immediately.</div>
+          <div class="confirm-newpatient-tag" id="confirm-newpatient-tag">New patient added · PAT-00001241</div>
+          <div class="confirm-actions">
+            <button class="confirm-btn primary" onclick="alert('Opens Case File / Chat for this consultation')">Open Chat</button>
+            <button class="confirm-btn secondary" onclick="resetFlow()">Back to Dashboard</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+<script>
+  let selectedPatient = null;
+  let isNewPatient = false;
+
+  function goStep(n){
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.getElementById('step-' + n).classList.add('active');
+  }
+  function pickSlot(el, name, spec, hosp){
+    document.getElementById('recap-name').textContent = name + ' · ' + spec;
+    document.getElementById('recap-sub').textContent = hosp + ' · Today, ' + el.textContent;
+    document.getElementById('cf-provider').textContent = name;
+    document.getElementById('cf-slot').textContent = 'Today, ' + el.textContent;
+    goStep(2);
+  }
+  function filterPatients(val){
+    document.getElementById('patient-suggestions').classList.toggle('show', val.length > 0);
+  }
+  function choosePatient(name, agesex, id){
+    selectedPatient = { name, agesex, id };
+    isNewPatient = false;
+    document.getElementById('sel-patient-avatar').textContent = agesex;
+    document.getElementById('sel-patient-name').textContent = name;
+    document.getElementById('sel-patient-id').textContent = agesex + ' · ' + id;
+    document.getElementById('selected-patient-chip').classList.add('show');
+    document.getElementById('patient-search-wrap').style.display = 'none';
+    document.getElementById('patient-suggestions').classList.remove('show');
+    document.getElementById('new-patient-fields').classList.remove('show');
+    document.getElementById('cf-patient').textContent = name;
+  }
+  function showNewPatient(){
+    document.getElementById('new-patient-fields').classList.add('show');
+    document.getElementById('patient-search-wrap').style.display = 'none';
+    document.getElementById('patient-suggestions').classList.remove('show');
+    isNewPatient = true;
+  }
+  function clearPatient(){
+    selectedPatient = null;
+    document.getElementById('selected-patient-chip').classList.remove('show');
+    document.getElementById('patient-search-wrap').style.display = 'flex';
+    document.getElementById('patient-search').value = '';
+  }
+  let reportCount = 0;
+  let chartCount = 0;
+  function toggleAllergyCheck(row){
+    const box = document.getElementById('allergy-checkbox');
+    const wrap = document.getElementById('allergy-field-wrap');
+    const isChecked = box.classList.toggle('checked');
+    wrap.style.display = isChecked ? 'none' : 'block';
+  }
+  function mockAttach(kind){
+    const listId = kind === 'report' ? 'attached-list-reports' : 'attached-list-chart';
+    const list = document.getElementById(listId);
+    let fileName;
+    if(kind === 'report'){
+      reportCount++;
+      fileName = 'ECG_Report_' + reportCount + '.pdf';
+    } else {
+      chartCount++;
+      fileName = 'Treatment_Chart_' + chartCount + '.pdf';
+    }
+    const div = document.createElement('div');
+    div.className = 'attached-file';
+    div.innerHTML = `
+      <div class="attached-file-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M6 3.5h8l4 4v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-16a1 1 0 0 1 1-1Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg></div>
+      <div class="attached-file-name">${fileName}</div>
+      <div class="attached-file-remove" onclick="this.closest('.attached-file').remove();">✕</div>
+    `;
+    list.appendChild(div);
+  }
+  function openConfirmSheet(){
+    if(isNewPatient){
+      const nm = document.getElementById('np-name').value || 'New Patient';
+      document.getElementById('cf-patient').textContent = nm;
+    }
+    document.getElementById('confirm-backdrop').classList.add('open');
+  }
+  function closeConfirmSheet(e){
+    document.getElementById('confirm-backdrop').classList.remove('open');
+  }
+  function confirmBooking(){
+    const patientName = document.getElementById('cf-patient').textContent;
+    const providerName = document.getElementById('cf-provider').textContent;
+    const slot = document.getElementById('cf-slot').textContent;
+    document.getElementById('confirm-final-text').textContent = patientName + ' is booked with ' + providerName + ', ' + slot.toLowerCase() + '. Chat is open now — you can start sending reports immediately.';
+    const tag = document.getElementById('confirm-newpatient-tag');
+    if(isNewPatient){
+      tag.textContent = 'New patient added · PAT-00001241';
+      tag.classList.add('show');
+    } else {
+      tag.classList.remove('show');
+    }
+    closeConfirmSheet();
+    goStep('confirm');
+  }
+  function resetFlow(){
+    goStep(1);
+  }
+</script>
+
+</body>
+</html>

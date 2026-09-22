@@ -1,0 +1,19 @@
+Prompt for Replit:
+
+This is the final, complete prompt for building the mobile app. Do not treat this as another audit-and-ask round — the reconciled specification attached is the fully-resolved source of truth. Build directly from it.
+
+Source of truth: Perfusion_Mobile_Reconciled_Spec.docx (attached, current version) + all attached HTML reference screens. These are self-contained — field lists, design system, navigation map, data relationships, and QA matrix are all in the document. Do not consult any earlier mobile journey document if it conflicts with this one; this one wins, always.
+
+Confirmed architecture, so you don't need to ask:
+
+Full rewrite of artifacts/perfusion-mobile — disregard the existing Expo build entirely, it does not inform this build.
+Calling is VoIP-only (Section 4.13) — no Twilio, no waiting-room screen. Native from day one (Section 4.9) — CallKit/PushKit on iOS, ConnectionService/FCM on Android — this is architecture, not a later polish pass.
+Callback Device (Section 4.11) is the sole call-routing mechanism, captured at first login alongside an emergency-contact mobile number.
+Clinical Advisory, not Prescription, everywhere in mobile UI — reusing the backend's existing advice field (already confirmed free-text, no schema change needed).
+Sessions persist indefinitely (Section 4.12) — no expiry, no forced logout on password change, logout buried in Settings.
+Case File's chat/attachment backend is being built via a parallel web initiative — build mobile's Case File to consume that shared API once available; do not invent a separate mobile-only backend for it.
+One backend, shared with web — artifacts/api-server and artifacts/perfusion-web are read-only reference for you, never edit them from this build.
+
+What I need back, once, at the end — not as gated approval checkpoints: a single summary covering (1) the endpoint-to-screen map you built against, (2) anything in the spec that turned out to be impossible or contradicted by the actual backend, flagged clearly, (3) what got built vs. deferred if anything had to be cut for time. Don't pause mid-build to ask permission for routine implementation choices — use engineering judgment consistent with the spec's design system (Section 9) and flag only genuine blockers (a missing endpoint with no clear owner, a real contradiction you can't resolve yourself).
+
+Build it.
