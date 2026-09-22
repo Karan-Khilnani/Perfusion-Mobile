@@ -7,7 +7,8 @@ export type CallEventType =
   | "call_declined"
   | "call_timeout"
   | "call_cancelled"
-  | "document_uploaded";
+  | "document_uploaded"
+  | "case_file_updated";
 
 export interface CallEvent {
   type: CallEventType;
@@ -24,15 +25,20 @@ export interface CallEvent {
 
 type CallEventHandler = (event: CallEvent) => void;
 
-export function useCallEvents(onEvent: CallEventHandler) {
+export function useCallEvents(onEvent: CallEventHandler, onOpen?: () => void) {
   const { isAuthenticated } = useAuth();
   const eventSourceRef = useRef<EventSource | null>(null);
   const handlerRef = useRef<CallEventHandler>(onEvent);
+  const onOpenRef = useRef(onOpen);
 
   // Keep handler ref up to date without re-connecting
   useEffect(() => {
     handlerRef.current = onEvent;
   }, [onEvent]);
+
+  useEffect(() => {
+    onOpenRef.current = onOpen;
+  }, [onOpen]);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -45,6 +51,12 @@ export function useCallEvents(onEvent: CallEventHandler) {
 
       const es = new EventSource("/api/call-events", { withCredentials: true });
       eventSourceRef.current = es;
+
+      es.onopen = () => {
+        if (active) {
+          onOpenRef.current?.();
+        }
+      };
 
       es.onmessage = (event) => {
         try {

@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { StatusBadge } from "@/components/status-badge";
 import { BookingTimeline } from "@/components/booking-timeline";
-import { ClipboardList, FlaskConical, Stethoscope, Calendar, IndianRupee, ChevronRight, Video, Scan, Download, FileText, Upload, Paperclip, X, Search, CheckCircle2, Clock, RefreshCw, Phone } from "lucide-react";
+import { ClipboardList, FlaskConical, Stethoscope, Calendar, IndianRupee, ChevronRight, ChevronDown, Video, Scan, Download, FileText, Upload, Paperclip, X, Search, CheckCircle2, Clock, RefreshCw, Phone, FolderOpen } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -218,6 +218,7 @@ function InlineDocument({ url, label }: { url: string; label: string }) {
 }
 
 export default function OrdersPage() {
+  const [, navigate] = useLocation();
   const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null);
   const [showUploadDialog, setShowUploadDialog] = useState(false);
   const [uploadBooking, setUploadBooking] = useState<Booking | null>(null);
@@ -305,97 +306,157 @@ export default function OrdersPage() {
     return filtered;
   };
 
-  const BookingCard = ({ booking }: { booking: Booking }) => {
+  const [expandedBookingIds, setExpandedBookingIds] = useState<Set<string>>(new Set());
+  const toggleExpand = (id: string) => {
+    setExpandedBookingIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const BookingCard = ({ booking, key }: { booking: Booking, key?: string }) => {
     const Icon = typeIcons[booking.bookingType as BookingType];
-    const [, cardNavigate] = useLocation();
     const canFollowUp = booking.bookingType === "consultation" &&
       booking.createdAt &&
       differenceInDays(new Date(), new Date(booking.createdAt)) < 7 &&
       !["cancelled"].includes(booking.status);
+    const isExpanded = expandedBookingIds.has(booking.id);
 
     return (
-      <Card
-        className={`cursor-pointer overflow-visible transition-all ${
-          selectedBooking?.id === booking.id ? "ring-2 ring-primary" : ""
-        }`}
-        onClick={() => setSelectedBookingId(booking.id)}
-        data-testid={`card-booking-${booking.id}`}
-      >
-        <CardContent className="p-4">
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex items-start gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                <Icon className="h-5 w-5 text-primary" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h3 className="font-medium leading-tight">{booking.serviceName}</h3>
-                  {(booking as any).isFollowUp && (
-                    <Badge className="text-xs bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 border-0">
-                      Follow Up
-                    </Badge>
-                  )}
-                </div>
-                <p className="text-sm text-muted-foreground">{booking.providerName}</p>
-                <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                  <span className="flex items-center gap-1">
-                    <Calendar className="h-3 w-3" />
-                    {format(new Date(booking.createdAt!), "MMM d, yyyy")}
-                  </span>
-                  {parseFloat(booking.amount) > 0 && (
-                    <span className="flex items-center gap-1">
-                      <IndianRupee className="h-3 w-3" />
-                      {booking.amount}
-                    </span>
-                  )}
-                </div>
-                {(booking as any).prescriptionApprovedAt && (
-                  <div className="mt-3 space-y-1">
-                    <a
-                      href={`/api/bookings/${booking.id}/prescription-trail/download`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={(e) => e.stopPropagation()}
-                      data-testid={`button-download-prescription-card-${booking.id}`}
-                    >
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-7 text-xs border-blue-300 text-blue-700 hover:bg-blue-50 dark:border-blue-700 dark:text-blue-300 dark:hover:bg-blue-900/30 gap-1"
-                      >
-                        <Download className="h-3 w-3" />
-                        Download Complete Summary
-                      </Button>
-                    </a>
-                    <PrescriptionReviewTrail bookingId={booking.id} compact />
-                  </div>
-                )}
-                {canFollowUp && (
-                  <div className="mt-3">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-7 text-xs border-blue-300 text-blue-700 hover:bg-blue-50 dark:border-blue-700 dark:text-blue-300 dark:hover:bg-blue-900/30"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        cardNavigate(`/user/consultation/${booking.serviceId}/book?parentBookingId=${booking.id}`);
-                      }}
-                      data-testid={`button-follow-up-${booking.id}`}
-                    >
-                      <RefreshCw className="mr-1.5 h-3 w-3" />
-                      Book Follow-Up
-                    </Button>
-                  </div>
-                )}
-              </div>
+      <div key={key} className="flex flex-col border rounded-lg bg-card shadow-sm transition-all overflow-hidden" data-testid={`card-booking-${booking.id}`}>
+        <button
+          onClick={() => {
+            if (booking.bookingType === "consultation") {
+              toggleExpand(booking.id);
+            } else {
+              setSelectedBookingId(booking.id);
+            }
+          }}
+          aria-expanded={isExpanded}
+          aria-controls={`booking-expansion-${booking.id}`}
+          className={`flex items-start justify-between gap-3 p-4 text-left w-full focus:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+            selectedBooking?.id === booking.id && booking.bookingType !== "consultation" ? "ring-2 ring-primary" : ""
+          }`}
+        >
+          <div className="flex items-start gap-3 flex-1 min-w-0">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+              <Icon className="h-5 w-5 text-primary" />
             </div>
-            <div className="flex flex-col items-end gap-2">
-              <StatusBadge status={booking.status} />
-              <ChevronRight className="h-4 w-4 text-muted-foreground" />
+            <div className="min-w-0 flex-1 pr-2">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="font-medium leading-tight">{booking.serviceName}</h3>
+                {(booking as any).isFollowUp && (
+                  <Badge className="text-xs bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 border-0">
+                    Follow Up
+                  </Badge>
+                )}
+              </div>
+              <p className="text-sm text-muted-foreground">{booking.providerName}</p>
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                <span className="flex items-center gap-1">
+                  <Calendar className="h-3 w-3" />
+                  {format(new Date(booking.createdAt!), "MMM d, yyyy")}
+                </span>
+                {parseFloat(booking.amount) > 0 && (
+                  <span className="flex items-center gap-1">
+                    <IndianRupee className="h-3 w-3" />
+                    {booking.amount}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
-        </CardContent>
-      </Card>
+          <div className="flex flex-col items-end gap-2 shrink-0">
+            <StatusBadge status={booking.status} />
+            {booking.bookingType === "consultation" ? (
+              <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${isExpanded ? "rotate-180" : ""}`} />
+            ) : (
+              <ChevronRight className="h-4 w-4 text-muted-foreground" />
+            )}
+          </div>
+        </button>
+
+        {isExpanded && booking.bookingType === "consultation" && (
+          <div id={`booking-expansion-${booking.id}`} className="px-4 pb-4 pt-2 border-t bg-muted/20">
+            <div className="flex flex-wrap gap-2 items-center">
+              {(() => {
+                const rxStatus = getPostRxStatus(booking as any);
+                const win = getCallWindow(booking as any);
+                const prescriptionApprovedAt = (booking as any).prescriptionApprovedAt;
+                const videoOpen = prescriptionApprovedAt ? rxStatus.videoEnabled : win.open;
+
+                if (videoOpen && booking.videoRoomId) {
+                  return (
+                    <Button
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigate(`/video/${encodeURIComponent(booking.videoRoomId!)}?returnTo=/user/orders`);
+                      }}
+                      className="h-8 gap-1.5"
+                    >
+                      <Video className="h-3.5 w-3.5" />
+                      Join Video
+                    </Button>
+                  );
+                } else if (!prescriptionApprovedAt && !win.open && booking.videoRoomId) {
+                  return (
+                    <Button size="sm" variant="outline" disabled className="h-8 gap-1.5">
+                      <Clock className="h-3.5 w-3.5" />
+                      {callWindowLabel(win)}
+                    </Button>
+                  );
+                }
+                return null;
+              })()}
+
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigate(`/case-file/${booking.id}`);
+                }}
+                className="h-8 gap-1.5"
+              >
+                <FolderOpen className="h-3.5 w-3.5" />
+                Case File
+              </Button>
+
+              {(booking as any).prescriptionApprovedAt && (
+                <a
+                  href={`/api/bookings/${booking.id}/prescription-trail/download`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <Button size="sm" variant="outline" className="h-8 gap-1.5 border-blue-300 text-blue-700 hover:bg-blue-50 dark:border-blue-700 dark:text-blue-300 dark:hover:bg-blue-900/30">
+                    <Download className="h-3.5 w-3.5" />
+                    Advisory
+                  </Button>
+                </a>
+              )}
+
+              {canFollowUp && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-8 gap-1.5 border-blue-300 text-blue-700 hover:bg-blue-50 dark:border-blue-700 dark:text-blue-300 dark:hover:bg-blue-900/30"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate(`/user/consultation/${booking.serviceId}/book?parentBookingId=${booking.id}`);
+                  }}
+                >
+                  <RefreshCw className="h-3.5 w-3.5" />
+                  Follow-Up
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
     );
   };
 
@@ -603,235 +664,11 @@ export default function OrdersPage() {
             <dt className="text-muted-foreground">Payment Status</dt>
             <dd className="capitalize">{booking.paymentStatus}</dd>
           </div>
-          <div className="flex justify-between">
+          <div className="flex justify-between pb-2">
             <dt className="text-muted-foreground">Created</dt>
             <dd>{format(new Date(booking.createdAt!), "PPpp")}</dd>
           </div>
         </dl>
-
-        {booking.bookingType === "consultation" && booking.videoRoomId && !["completed", "cancelled"].includes(booking.status) && (() => {
-          const prescriptionApprovedAt = (booking as any).prescriptionApprovedAt;
-          const rxStatus = getPostRxStatus(booking as any);
-          const win = getCallWindow(booking as any);
-          const videoOpen = prescriptionApprovedAt ? rxStatus.videoEnabled : win.open;
-          const disabledLabel = prescriptionApprovedAt
-            ? rxStatus.inWindow ? "Video Disabled" : "Consult Ended"
-            : callWindowLabel(win);
-          const disabledTip = prescriptionApprovedAt
-            ? rxStatus.inWindow
-              ? "Video calls are currently disabled for this consultation"
-              : "Post-consultation 24-hour window has expired"
-            : win.reason === "before_window" && win.windowStart
-            ? `Call opens at ${toISTTimeString(win.windowStart)} IST`
-            : win.reason === "expired" && win.windowEnd
-            ? `Slot ended at ${toISTTimeString(win.windowEnd)} IST`
-            : "Call window is not active";
-          return (
-            <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
-              <div className="flex items-center gap-2 text-primary">
-                <Video className="h-5 w-5" />
-                <span className="font-medium">Video Consultation</span>
-              </div>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Join the video call at your scheduled appointment time
-              </p>
-              {videoOpen ? (
-                <Link href={`/video/${encodeURIComponent(booking.videoRoomId)}?returnTo=/user/orders`}>
-                  <Button className="mt-3" data-testid="button-join-video-call">
-                    <Video className="mr-2 h-4 w-4" />
-                    Join Video Call
-                  </Button>
-                </Link>
-              ) : (
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button className="mt-3" disabled variant="outline" data-testid="button-join-video-call">
-                        <Clock className="mr-2 h-4 w-4" />
-                        {disabledLabel}
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>{disabledTip}</TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              )}
-            </div>
-          );
-        })()}
-
-        {booking.bookingType === "consultation" && (
-          <CallConsultantButton
-            bookingId={booking.id}
-            videoRoomId={booking.videoRoomId}
-            status={booking.status}
-            appointmentSlot={(booking as any).appointmentSlot}
-            callWindowExtendedUntil={(booking as any).callWindowExtendedUntil}
-            prescriptionApprovedAt={(booking as any).prescriptionApprovedAt}
-            postRxExpiresAt={(booking as any).postRxExpiresAt}
-            postRxCallsEnabled={(booking as any).postRxCallsEnabled}
-          />
-        )}
-
-        {validUrls(booking.documentUrls).length > 0 && (
-          <div className="rounded-lg border p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <FileText className="h-5 w-5 text-muted-foreground" />
-              <span className="font-medium">Uploaded Reports</span>
-            </div>
-            {validUrls(booking.documentUrls).map((url, i) => (
-              <InlineDocument key={i} url={url} label={getFileName(url) || `Report ${i + 1}`} />
-            ))}
-          </div>
-        )}
-
-        {validUrls((booking as any).treatmentChartUrls).length > 0 && (
-          <div className="rounded-lg border p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <Paperclip className="h-5 w-5 text-muted-foreground" />
-              <span className="font-medium">Treatment Charts</span>
-            </div>
-            {validUrls((booking as any).treatmentChartUrls).map((url, i) => (
-              <InlineDocument key={i} url={url} label={getFileName(url) || `Treatment Chart ${i + 1}`} />
-            ))}
-          </div>
-        )}
-
-        {!["completed", "cancelled"].includes(booking.status) && (() => {
-          const prescriptionApprovedAt = (booking as any).prescriptionApprovedAt;
-          const rxStatus = getPostRxStatus(booking as any);
-          const uploadsAllowed = prescriptionApprovedAt
-            ? rxStatus.uploadsEnabled
-            : true;
-          if (!uploadsAllowed && prescriptionApprovedAt) {
-            return (
-              <div className="rounded-lg border border-dashed p-4">
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <Upload className="h-5 w-5" />
-                  <span className="font-medium">Document Uploads</span>
-                </div>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {rxStatus.inWindow
-                    ? "Uploads are currently disabled for this consultation — contact your consultant to re-enable them."
-                    : "Post-consultation 24-hour window has expired. No further uploads are accepted."}
-                </p>
-              </div>
-            );
-          }
-          return (
-            <div className="rounded-lg border p-4">
-              <div className="flex items-center gap-2">
-                <Upload className="h-5 w-5 text-muted-foreground" />
-                <span className="font-medium">Upload More Documents</span>
-              </div>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Upload additional reports or treatment charts
-              </p>
-              <div className="mt-3 flex gap-2 flex-wrap">
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setUploadBooking(booking);
-                    setUploadCategory("reports");
-                    setPendingFiles([]);
-                    setShowUploadDialog(true);
-                  }}
-                  data-testid="button-upload-reports"
-                >
-                  <Upload className="mr-2 h-4 w-4" />
-                  Upload Reports
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setUploadBooking(booking);
-                    setUploadCategory("charts");
-                    setPendingFiles([]);
-                    setShowUploadDialog(true);
-                  }}
-                  data-testid="button-upload-charts"
-                >
-                  <Paperclip className="mr-2 h-4 w-4" />
-                  Upload Treatment Charts
-                </Button>
-              </div>
-            </div>
-          );
-        })()}
-
-        {(booking as any).prescriptionGeneratedAt && booking.bookingType === "consultation" && (
-          <div className="rounded-lg border border-blue-500/20 bg-blue-500/5 p-4">
-            <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400">
-              <FileText className="h-5 w-5" />
-              <span className="font-medium">Consultation Summary Available</span>
-            </div>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Your consultation summary has been generated by the consultant
-            </p>
-            <div className="mt-3 space-y-3 rounded-md border bg-background p-3">
-              <div>
-                <p className="text-xs font-medium text-muted-foreground">Diagnosis</p>
-                <p className="text-sm">{(booking as any).prescriptionDiagnosis}</p>
-              </div>
-              {(booking as any).prescriptionPhysicianNotes && (
-                <div>
-                  <p className="text-xs font-medium text-muted-foreground">Physician Notes</p>
-                  <p className="text-sm">{(booking as any).prescriptionPhysicianNotes}</p>
-                </div>
-              )}
-              {(booking as any).prescriptionMedications && (
-                <div>
-                  <p className="text-xs font-medium text-muted-foreground">Clinical Advisory</p>
-                  <p className="text-sm whitespace-pre-line">{(booking as any).prescriptionMedications}</p>
-                </div>
-              )}
-              {(booking as any).prescriptionFollowUp && (
-                <div>
-                  <p className="text-xs font-medium text-muted-foreground">Follow-up</p>
-                  <p className="text-sm">{(booking as any).prescriptionFollowUp}</p>
-                </div>
-              )}
-            </div>
-            {(booking as any).prescriptionApprovedAt ? (
-              <a
-                href={`/api/bookings/${booking.id}/prescription-trail/download`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-block mt-3"
-                data-testid="button-download-prescription"
-              >
-                <Button className="gap-2" variant="default">
-                  <Download className="h-4 w-4" />
-                  Download Complete Summary
-                </Button>
-              </a>
-            ) : (
-              <Button 
-                className="mt-3" 
-                variant="default" 
-                onClick={async () => {
-                  try {
-                    const response = await fetch(`/api/bookings/${booking.id}/prescription-pdf`, { credentials: "include" });
-                    const data = await response.json();
-                    if (data.locked && data.prescriptionPdfUrl) {
-                      window.open(data.prescriptionPdfUrl, "_blank");
-                      return;
-                    }
-                    if (!response.ok) throw new Error("Failed to fetch clinical advisory data");
-                    const { generatePrescriptionPDF } = await import("@/lib/prescription-pdf");
-                    await generatePrescriptionPDF(data);
-                  } catch (error) {
-                    console.error("PDF generation error:", error);
-                  }
-                }}
-                data-testid="button-download-prescription"
-              >
-                <Download className="mr-2 h-4 w-4" />
-                Download Summary PDF
-              </Button>
-            )}
-            <PrescriptionReviewTrail bookingId={booking.id} />
-          </div>
-        )}
 
         {booking.reportUrl && (
           <div className="rounded-lg border border-green-500/20 bg-green-500/5 p-4">
@@ -1075,9 +912,7 @@ export default function OrdersPage() {
               ) : !bookings?.length ? (
                 <EmptyState type="All" />
               ) : (
-                bookings.map((booking) => (
-                  <BookingCard key={booking.id} booking={booking} />
-                ))
+                bookings.map((booking) => BookingCard({ booking, key: booking.id }))
               )}
             </TabsContent>
 
@@ -1233,7 +1068,7 @@ export default function OrdersPage() {
           <DialogHeader>
             <DialogTitle>Upload {uploadCategory === "reports" ? "Reports" : "Treatment Charts"}</DialogTitle>
             <DialogDescription>
-              {uploadCategory === "reports" 
+              {uploadCategory === "reports"
                 ? "Upload patient reports, lab results, or medical records. You can select multiple files."
                 : "Upload treatment records, nursing charts, or medication charts. You can select multiple files."}
             </DialogDescription>

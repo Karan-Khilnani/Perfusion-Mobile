@@ -6,11 +6,15 @@
  * OpenAPI spec version: 0.1.0
  */
 import {
+  useMutation,
   useQuery
 } from '@tanstack/react-query';
 import type {
+  MutationFunction,
   QueryFunction,
   QueryKey,
+  UseMutationOptions,
+  UseMutationResult,
   UseQueryOptions,
   UseQueryResult
 } from '@tanstack/react-query';
@@ -18,11 +22,23 @@ import type {
 import type {
   BookingCallInfo,
   CallStatus,
+  CaseFileAdvisory,
+  CaseFileAdvisoryInput,
+  CaseFileAggregate,
+  CaseFileAttachmentInput,
+  CaseFileCapabilities,
+  CaseFileFollowUpAccessInput,
+  CaseFileMessage,
+  CaseFileMessageInput,
+  CaseFileMessagesResponse,
+  CaseFileVital,
+  CaseFileVitalInput,
+  GetCaseFileMessagesParams,
   HealthStatus
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
-import type { ErrorType } from '../custom-fetch';
+import type { ErrorType , BodyType } from '../custom-fetch';
 
 type AwaitedInput<T> = PromiseLike<T> | T;
 
@@ -253,6 +269,776 @@ export function useGetCallStatus<TData = Awaited<ReturnType<typeof getCallStatus
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetCallStatusQueryOptions(bookingId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetCaseFileUrl = (bookingId: string,) => {
+
+
+
+
+  return `/api/bookings/${bookingId}/case-file`
+}
+
+/**
+ * @summary Get the authorized Case File aggregate
+ */
+export const getCaseFile = async (bookingId: string, options?: RequestInit): Promise<CaseFileAggregate> => {
+
+  return customFetch<CaseFileAggregate>(getGetCaseFileUrl(bookingId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetCaseFileQueryKey = (bookingId: string,) => {
+    return [
+    `/api/bookings/${bookingId}/case-file`
+    ] as const;
+    }
+
+
+export const getGetCaseFileQueryOptions = <TData = Awaited<ReturnType<typeof getCaseFile>>, TError = ErrorType<void>>(bookingId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCaseFile>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCaseFileQueryKey(bookingId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCaseFile>>> = ({ signal }) => getCaseFile(bookingId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(bookingId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCaseFile>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetCaseFileQueryResult = NonNullable<Awaited<ReturnType<typeof getCaseFile>>>
+export type GetCaseFileQueryError = ErrorType<void>
+
+
+/**
+ * @summary Get the authorized Case File aggregate
+ */
+
+export function useGetCaseFile<TData = Awaited<ReturnType<typeof getCaseFile>>, TError = ErrorType<void>>(
+ bookingId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCaseFile>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetCaseFileQueryOptions(bookingId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetCaseFileMessagesUrl = (bookingId: string,
+    params?: GetCaseFileMessagesParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/bookings/${bookingId}/case-file/messages?${stringifiedParams}` : `/api/bookings/${bookingId}/case-file/messages`
+}
+
+/**
+ * @summary List Case File messages
+ */
+export const getCaseFileMessages = async (bookingId: string,
+    params?: GetCaseFileMessagesParams, options?: RequestInit): Promise<CaseFileMessagesResponse> => {
+
+  return customFetch<CaseFileMessagesResponse>(getGetCaseFileMessagesUrl(bookingId,params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetCaseFileMessagesQueryKey = (bookingId: string,
+    params?: GetCaseFileMessagesParams,) => {
+    return [
+    `/api/bookings/${bookingId}/case-file/messages`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetCaseFileMessagesQueryOptions = <TData = Awaited<ReturnType<typeof getCaseFileMessages>>, TError = ErrorType<unknown>>(bookingId: string,
+    params?: GetCaseFileMessagesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCaseFileMessages>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCaseFileMessagesQueryKey(bookingId,params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCaseFileMessages>>> = ({ signal }) => getCaseFileMessages(bookingId,params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(bookingId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCaseFileMessages>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetCaseFileMessagesQueryResult = NonNullable<Awaited<ReturnType<typeof getCaseFileMessages>>>
+export type GetCaseFileMessagesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List Case File messages
+ */
+
+export function useGetCaseFileMessages<TData = Awaited<ReturnType<typeof getCaseFileMessages>>, TError = ErrorType<unknown>>(
+ bookingId: string,
+    params?: GetCaseFileMessagesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCaseFileMessages>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetCaseFileMessagesQueryOptions(bookingId,params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreateCaseFileMessageUrl = (bookingId: string,) => {
+
+
+
+
+  return `/api/bookings/${bookingId}/case-file/messages`
+}
+
+/**
+ * @summary Send a Case File text message
+ */
+export const createCaseFileMessage = async (bookingId: string,
+    caseFileMessageInput: CaseFileMessageInput, options?: RequestInit): Promise<CaseFileMessage> => {
+
+  return customFetch<CaseFileMessage>(getCreateCaseFileMessageUrl(bookingId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      caseFileMessageInput,)
+  }
+);}
+
+
+
+
+export const getCreateCaseFileMessageMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createCaseFileMessage>>, TError,{bookingId: string;data: BodyType<CaseFileMessageInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createCaseFileMessage>>, TError,{bookingId: string;data: BodyType<CaseFileMessageInput>}, TContext> => {
+
+const mutationKey = ['createCaseFileMessage'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createCaseFileMessage>>, {bookingId: string;data: BodyType<CaseFileMessageInput>}> = (props) => {
+          const {bookingId,data} = props ?? {};
+
+          return  createCaseFileMessage(bookingId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateCaseFileMessageMutationResult = NonNullable<Awaited<ReturnType<typeof createCaseFileMessage>>>
+    export type CreateCaseFileMessageMutationBody = BodyType<CaseFileMessageInput>
+    export type CreateCaseFileMessageMutationError = ErrorType<void>
+
+    /**
+ * @summary Send a Case File text message
+ */
+export const useCreateCaseFileMessage = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createCaseFileMessage>>, TError,{bookingId: string;data: BodyType<CaseFileMessageInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createCaseFileMessage>>,
+        TError,
+        {bookingId: string;data: BodyType<CaseFileMessageInput>},
+        TContext
+      > => {
+      return useMutation(getCreateCaseFileMessageMutationOptions(options));
+    }
+
+export const getGetCaseFileVitalsUrl = (bookingId: string,) => {
+
+
+
+
+  return `/api/bookings/${bookingId}/case-file/vitals`
+}
+
+/**
+ * @summary List Case File vitals
+ */
+export const getCaseFileVitals = async (bookingId: string, options?: RequestInit): Promise<CaseFileVital[]> => {
+
+  return customFetch<CaseFileVital[]>(getGetCaseFileVitalsUrl(bookingId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetCaseFileVitalsQueryKey = (bookingId: string,) => {
+    return [
+    `/api/bookings/${bookingId}/case-file/vitals`
+    ] as const;
+    }
+
+
+export const getGetCaseFileVitalsQueryOptions = <TData = Awaited<ReturnType<typeof getCaseFileVitals>>, TError = ErrorType<unknown>>(bookingId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCaseFileVitals>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCaseFileVitalsQueryKey(bookingId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCaseFileVitals>>> = ({ signal }) => getCaseFileVitals(bookingId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(bookingId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCaseFileVitals>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetCaseFileVitalsQueryResult = NonNullable<Awaited<ReturnType<typeof getCaseFileVitals>>>
+export type GetCaseFileVitalsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List Case File vitals
+ */
+
+export function useGetCaseFileVitals<TData = Awaited<ReturnType<typeof getCaseFileVitals>>, TError = ErrorType<unknown>>(
+ bookingId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCaseFileVitals>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetCaseFileVitalsQueryOptions(bookingId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreateCaseFileVitalUrl = (bookingId: string,) => {
+
+
+
+
+  return `/api/bookings/${bookingId}/case-file/vitals`
+}
+
+/**
+ * @summary Add a Seeker-recorded vital
+ */
+export const createCaseFileVital = async (bookingId: string,
+    caseFileVitalInput: CaseFileVitalInput, options?: RequestInit): Promise<CaseFileVital> => {
+
+  return customFetch<CaseFileVital>(getCreateCaseFileVitalUrl(bookingId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      caseFileVitalInput,)
+  }
+);}
+
+
+
+
+export const getCreateCaseFileVitalMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createCaseFileVital>>, TError,{bookingId: string;data: BodyType<CaseFileVitalInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createCaseFileVital>>, TError,{bookingId: string;data: BodyType<CaseFileVitalInput>}, TContext> => {
+
+const mutationKey = ['createCaseFileVital'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createCaseFileVital>>, {bookingId: string;data: BodyType<CaseFileVitalInput>}> = (props) => {
+          const {bookingId,data} = props ?? {};
+
+          return  createCaseFileVital(bookingId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateCaseFileVitalMutationResult = NonNullable<Awaited<ReturnType<typeof createCaseFileVital>>>
+    export type CreateCaseFileVitalMutationBody = BodyType<CaseFileVitalInput>
+    export type CreateCaseFileVitalMutationError = ErrorType<void>
+
+    /**
+ * @summary Add a Seeker-recorded vital
+ */
+export const useCreateCaseFileVital = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createCaseFileVital>>, TError,{bookingId: string;data: BodyType<CaseFileVitalInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createCaseFileVital>>,
+        TError,
+        {bookingId: string;data: BodyType<CaseFileVitalInput>},
+        TContext
+      > => {
+      return useMutation(getCreateCaseFileVitalMutationOptions(options));
+    }
+
+export const getGetCaseFileAdvisoriesUrl = (bookingId: string,) => {
+
+
+
+
+  return `/api/bookings/${bookingId}/case-file/advisories`
+}
+
+/**
+ * @summary List the Clinical Advisory trail
+ */
+export const getCaseFileAdvisories = async (bookingId: string, options?: RequestInit): Promise<CaseFileAdvisory[]> => {
+
+  return customFetch<CaseFileAdvisory[]>(getGetCaseFileAdvisoriesUrl(bookingId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetCaseFileAdvisoriesQueryKey = (bookingId: string,) => {
+    return [
+    `/api/bookings/${bookingId}/case-file/advisories`
+    ] as const;
+    }
+
+
+export const getGetCaseFileAdvisoriesQueryOptions = <TData = Awaited<ReturnType<typeof getCaseFileAdvisories>>, TError = ErrorType<unknown>>(bookingId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCaseFileAdvisories>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCaseFileAdvisoriesQueryKey(bookingId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCaseFileAdvisories>>> = ({ signal }) => getCaseFileAdvisories(bookingId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(bookingId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCaseFileAdvisories>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetCaseFileAdvisoriesQueryResult = NonNullable<Awaited<ReturnType<typeof getCaseFileAdvisories>>>
+export type GetCaseFileAdvisoriesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List the Clinical Advisory trail
+ */
+
+export function useGetCaseFileAdvisories<TData = Awaited<ReturnType<typeof getCaseFileAdvisories>>, TError = ErrorType<unknown>>(
+ bookingId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCaseFileAdvisories>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetCaseFileAdvisoriesQueryOptions(bookingId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreateCaseFileAdvisoryUrl = (bookingId: string,) => {
+
+
+
+
+  return `/api/bookings/${bookingId}/case-file/advisories`
+}
+
+/**
+ * @summary Add a Provider Clinical Advisory
+ */
+export const createCaseFileAdvisory = async (bookingId: string,
+    caseFileAdvisoryInput: CaseFileAdvisoryInput, options?: RequestInit): Promise<CaseFileAdvisory> => {
+
+  return customFetch<CaseFileAdvisory>(getCreateCaseFileAdvisoryUrl(bookingId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      caseFileAdvisoryInput,)
+  }
+);}
+
+
+
+
+export const getCreateCaseFileAdvisoryMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createCaseFileAdvisory>>, TError,{bookingId: string;data: BodyType<CaseFileAdvisoryInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createCaseFileAdvisory>>, TError,{bookingId: string;data: BodyType<CaseFileAdvisoryInput>}, TContext> => {
+
+const mutationKey = ['createCaseFileAdvisory'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createCaseFileAdvisory>>, {bookingId: string;data: BodyType<CaseFileAdvisoryInput>}> = (props) => {
+          const {bookingId,data} = props ?? {};
+
+          return  createCaseFileAdvisory(bookingId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateCaseFileAdvisoryMutationResult = NonNullable<Awaited<ReturnType<typeof createCaseFileAdvisory>>>
+    export type CreateCaseFileAdvisoryMutationBody = BodyType<CaseFileAdvisoryInput>
+    export type CreateCaseFileAdvisoryMutationError = ErrorType<void>
+
+    /**
+ * @summary Add a Provider Clinical Advisory
+ */
+export const useCreateCaseFileAdvisory = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createCaseFileAdvisory>>, TError,{bookingId: string;data: BodyType<CaseFileAdvisoryInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createCaseFileAdvisory>>,
+        TError,
+        {bookingId: string;data: BodyType<CaseFileAdvisoryInput>},
+        TContext
+      > => {
+      return useMutation(getCreateCaseFileAdvisoryMutationOptions(options));
+    }
+
+export const getCreateCaseFileAttachmentUrl = (bookingId: string,) => {
+
+
+
+
+  return `/api/bookings/${bookingId}/case-file/attachments`
+}
+
+/**
+ * @summary Finalize a Case File attachment
+ */
+export const createCaseFileAttachment = async (bookingId: string,
+    caseFileAttachmentInput: CaseFileAttachmentInput, options?: RequestInit): Promise<CaseFileMessage> => {
+    const formData = new FormData();
+formData.append(`file`, caseFileAttachmentInput.file);
+if(caseFileAttachmentInput.source !== undefined) {
+ formData.append(`source`, caseFileAttachmentInput.source);
+ }
+if(caseFileAttachmentInput.category !== undefined) {
+ formData.append(`category`, caseFileAttachmentInput.category);
+ }
+
+  return customFetch<CaseFileMessage>(getCreateCaseFileAttachmentUrl(bookingId),
+  {
+    ...options,
+    method: 'POST'
+    ,
+    body:
+      formData,
+  }
+);}
+
+
+
+
+export const getCreateCaseFileAttachmentMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createCaseFileAttachment>>, TError,{bookingId: string;data: BodyType<CaseFileAttachmentInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createCaseFileAttachment>>, TError,{bookingId: string;data: BodyType<CaseFileAttachmentInput>}, TContext> => {
+
+const mutationKey = ['createCaseFileAttachment'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createCaseFileAttachment>>, {bookingId: string;data: BodyType<CaseFileAttachmentInput>}> = (props) => {
+          const {bookingId,data} = props ?? {};
+
+          return  createCaseFileAttachment(bookingId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateCaseFileAttachmentMutationResult = NonNullable<Awaited<ReturnType<typeof createCaseFileAttachment>>>
+    export type CreateCaseFileAttachmentMutationBody = BodyType<CaseFileAttachmentInput>
+    export type CreateCaseFileAttachmentMutationError = ErrorType<void>
+
+    /**
+ * @summary Finalize a Case File attachment
+ */
+export const useCreateCaseFileAttachment = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createCaseFileAttachment>>, TError,{bookingId: string;data: BodyType<CaseFileAttachmentInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createCaseFileAttachment>>,
+        TError,
+        {bookingId: string;data: BodyType<CaseFileAttachmentInput>},
+        TContext
+      > => {
+      return useMutation(getCreateCaseFileAttachmentMutationOptions(options));
+    }
+
+export const getUpdateCaseFileFollowUpAccessUrl = (bookingId: string,) => {
+
+
+
+
+  return `/api/bookings/${bookingId}/case-file/follow-up-access`
+}
+
+/**
+ * @summary Toggle Seeker follow-up call/video access
+ */
+export const updateCaseFileFollowUpAccess = async (bookingId: string,
+    caseFileFollowUpAccessInput: CaseFileFollowUpAccessInput, options?: RequestInit): Promise<CaseFileCapabilities> => {
+
+  return customFetch<CaseFileCapabilities>(getUpdateCaseFileFollowUpAccessUrl(bookingId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      caseFileFollowUpAccessInput,)
+  }
+);}
+
+
+
+
+export const getUpdateCaseFileFollowUpAccessMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateCaseFileFollowUpAccess>>, TError,{bookingId: string;data: BodyType<CaseFileFollowUpAccessInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateCaseFileFollowUpAccess>>, TError,{bookingId: string;data: BodyType<CaseFileFollowUpAccessInput>}, TContext> => {
+
+const mutationKey = ['updateCaseFileFollowUpAccess'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateCaseFileFollowUpAccess>>, {bookingId: string;data: BodyType<CaseFileFollowUpAccessInput>}> = (props) => {
+          const {bookingId,data} = props ?? {};
+
+          return  updateCaseFileFollowUpAccess(bookingId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateCaseFileFollowUpAccessMutationResult = NonNullable<Awaited<ReturnType<typeof updateCaseFileFollowUpAccess>>>
+    export type UpdateCaseFileFollowUpAccessMutationBody = BodyType<CaseFileFollowUpAccessInput>
+    export type UpdateCaseFileFollowUpAccessMutationError = ErrorType<void>
+
+    /**
+ * @summary Toggle Seeker follow-up call/video access
+ */
+export const useUpdateCaseFileFollowUpAccess = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateCaseFileFollowUpAccess>>, TError,{bookingId: string;data: BodyType<CaseFileFollowUpAccessInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateCaseFileFollowUpAccess>>,
+        TError,
+        {bookingId: string;data: BodyType<CaseFileFollowUpAccessInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateCaseFileFollowUpAccessMutationOptions(options));
+    }
+
+export const getDownloadCaseFileAttachmentUrl = (bookingId: string,
+    attachmentId: string,) => {
+
+
+
+
+  return `/api/bookings/${bookingId}/case-file/attachments/${attachmentId}/download`
+}
+
+/**
+ * @summary Download an authorized Case File attachment
+ */
+export const downloadCaseFileAttachment = async (bookingId: string,
+    attachmentId: string, options?: RequestInit): Promise<Blob> => {
+
+  return customFetch<Blob>(getDownloadCaseFileAttachmentUrl(bookingId,attachmentId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getDownloadCaseFileAttachmentQueryKey = (bookingId: string,
+    attachmentId: string,) => {
+    return [
+    `/api/bookings/${bookingId}/case-file/attachments/${attachmentId}/download`
+    ] as const;
+    }
+
+
+export const getDownloadCaseFileAttachmentQueryOptions = <TData = Awaited<ReturnType<typeof downloadCaseFileAttachment>>, TError = ErrorType<void>>(bookingId: string,
+    attachmentId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof downloadCaseFileAttachment>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getDownloadCaseFileAttachmentQueryKey(bookingId,attachmentId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof downloadCaseFileAttachment>>> = ({ signal }) => downloadCaseFileAttachment(bookingId,attachmentId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(bookingId && attachmentId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof downloadCaseFileAttachment>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type DownloadCaseFileAttachmentQueryResult = NonNullable<Awaited<ReturnType<typeof downloadCaseFileAttachment>>>
+export type DownloadCaseFileAttachmentQueryError = ErrorType<void>
+
+
+/**
+ * @summary Download an authorized Case File attachment
+ */
+
+export function useDownloadCaseFileAttachment<TData = Awaited<ReturnType<typeof downloadCaseFileAttachment>>, TError = ErrorType<void>>(
+ bookingId: string,
+    attachmentId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof downloadCaseFileAttachment>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getDownloadCaseFileAttachmentQueryOptions(bookingId,attachmentId,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

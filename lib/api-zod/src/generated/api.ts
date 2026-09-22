@@ -47,3 +47,270 @@ export const GetCallStatusResponse = zod.object({
 })
 
 
+/**
+ * @summary Get the authorized Case File aggregate
+ */
+export const GetCaseFileParams = zod.object({
+  "bookingId": zod.coerce.string()
+})
+
+export const GetCaseFileResponse = zod.object({
+  "booking": zod.object({
+  "id": zod.string(),
+  "bookingNumber": zod.string().nullable(),
+  "patientName": zod.string(),
+  "patientAge": zod.number(),
+  "patientGender": zod.string().nullable(),
+  "providerName": zod.string().nullable(),
+  "serviceName": zod.string(),
+  "appointmentSlot": zod.string().nullable(),
+  "status": zod.string(),
+  "bookingType": zod.string(),
+  "userId": zod.string(),
+  "providerId": zod.string().nullable(),
+  "postRxCallsEnabled": zod.boolean(),
+  "postRxVideoEnabled": zod.boolean()
+}),
+  "capabilities": zod.object({
+  "canMessage": zod.boolean(),
+  "canAttach": zod.boolean(),
+  "canAddVitals": zod.boolean(),
+  "canComposeAdvisory": zod.boolean(),
+  "canToggleFollowUp": zod.boolean(),
+  "readOnly": zod.boolean(),
+  "callsEnabled": zod.boolean(),
+  "videoEnabled": zod.boolean()
+}),
+  "summary": zod.object({
+  "allergies": zod.string().nullish(),
+  "comorbidities": zod.string().nullish(),
+  "presentingComplaint": zod.string().nullish(),
+  "workingDiagnosis": zod.string().nullish(),
+  "clinicalHistory": zod.string().nullish(),
+  "submittedByUserId": zod.string().nullish(),
+  "submittedAt": zod.coerce.date().nullish()
+}),
+  "profile": zod.object({
+  "allergies": zod.string().nullish(),
+  "comorbidities": zod.string().nullish(),
+  "baselineMedications": zod.string().nullish(),
+  "baselineParameters": zod.string().nullish(),
+  "pastAdmissions": zod.string().nullish(),
+  "emergencyContact": zod.string().nullish()
+}),
+  "latestVitals": zod.union([zod.object({
+  "id": zod.string(),
+  "bookingId": zod.string(),
+  "recordedByUserId": zod.string(),
+  "observedAt": zod.coerce.date(),
+  "systolicBp": zod.number().nullish(),
+  "diastolicBp": zod.number().nullish(),
+  "heartRate": zod.number().nullish(),
+  "respiratoryRate": zod.number().nullish(),
+  "intake": zod.number().nullish(),
+  "output": zod.number().nullish(),
+  "hourlyUrineOutput": zod.number().nullish(),
+  "gcs": zod.number().nullish(),
+  "createdAt": zod.coerce.date()
+}),zod.null()]),
+  "latestVitalsFreshness": zod.union([zod.literal('fresh'),zod.literal('aging'),zod.literal('stale'),zod.literal(null)]).nullish(),
+  "advisories": zod.array(zod.object({
+  "id": zod.string(),
+  "bookingId": zod.string(),
+  "authorUserId": zod.string(),
+  "narrative": zod.string(),
+  "attachmentIds": zod.array(zod.string()).optional(),
+  "authoredAt": zod.coerce.date()
+})).optional()
+})
+
+
+/**
+ * @summary List Case File messages
+ */
+export const GetCaseFileMessagesParams = zod.object({
+  "bookingId": zod.coerce.string()
+})
+
+export const getCaseFileMessagesQueryLimitDefault = 50;
+export const getCaseFileMessagesQueryLimitMax = 100;
+
+
+
+export const GetCaseFileMessagesQueryParams = zod.object({
+  "cursor": zod.date().optional(),
+  "limit": zod.coerce.number().min(1).max(getCaseFileMessagesQueryLimitMax).default(getCaseFileMessagesQueryLimitDefault)
+})
+
+export const GetCaseFileMessagesResponse = zod.object({
+  "messages": zod.array(zod.object({
+  "id": zod.string(),
+  "bookingId": zod.string(),
+  "senderUserId": zod.string(),
+  "senderRole": zod.string(),
+  "kind": zod.string(),
+  "body": zod.string().nullish(),
+  "createdAt": zod.coerce.date(),
+  "attachment": zod.union([zod.object({
+  "id": zod.string(),
+  "bookingId": zod.string(),
+  "messageId": zod.string().nullish(),
+  "uploaderUserId": zod.string().optional(),
+  "uploaderRole": zod.string().optional(),
+  "originalFilename": zod.string().nullish(),
+  "mimeType": zod.string().nullish(),
+  "byteSize": zod.number().nullish(),
+  "objectPath": zod.string().nullish(),
+  "legacyUrl": zod.string().nullish(),
+  "source": zod.string(),
+  "category": zod.string(),
+  "createdAt": zod.coerce.date()
+}),zod.null()]).optional()
+})),
+  "nextCursor": zod.string().nullable()
+})
+
+
+/**
+ * @summary Send a Case File text message
+ */
+export const CreateCaseFileMessageParams = zod.object({
+  "bookingId": zod.coerce.string()
+})
+
+export const createCaseFileMessageBodyBodyMax = 10000;
+
+
+
+export const CreateCaseFileMessageBody = zod.object({
+  "body": zod.string().min(1).max(createCaseFileMessageBodyBodyMax)
+})
+
+
+/**
+ * @summary List Case File vitals
+ */
+export const GetCaseFileVitalsParams = zod.object({
+  "bookingId": zod.coerce.string()
+})
+
+export const GetCaseFileVitalsResponseItem = zod.object({
+  "id": zod.string(),
+  "bookingId": zod.string(),
+  "recordedByUserId": zod.string(),
+  "observedAt": zod.coerce.date(),
+  "systolicBp": zod.number().nullish(),
+  "diastolicBp": zod.number().nullish(),
+  "heartRate": zod.number().nullish(),
+  "respiratoryRate": zod.number().nullish(),
+  "intake": zod.number().nullish(),
+  "output": zod.number().nullish(),
+  "hourlyUrineOutput": zod.number().nullish(),
+  "gcs": zod.number().nullish(),
+  "createdAt": zod.coerce.date()
+})
+export const GetCaseFileVitalsResponse = zod.array(GetCaseFileVitalsResponseItem)
+
+
+/**
+ * @summary Add a Seeker-recorded vital
+ */
+export const CreateCaseFileVitalParams = zod.object({
+  "bookingId": zod.coerce.string()
+})
+
+export const CreateCaseFileVitalBody = zod.object({
+  "observedAt": zod.coerce.date(),
+  "systolicBp": zod.number().nullish(),
+  "diastolicBp": zod.number().nullish(),
+  "heartRate": zod.number().nullish(),
+  "respiratoryRate": zod.number().nullish(),
+  "intake": zod.number().nullish(),
+  "output": zod.number().nullish(),
+  "hourlyUrineOutput": zod.number().nullish(),
+  "gcs": zod.number().nullish()
+})
+
+
+/**
+ * @summary List the Clinical Advisory trail
+ */
+export const GetCaseFileAdvisoriesParams = zod.object({
+  "bookingId": zod.coerce.string()
+})
+
+export const GetCaseFileAdvisoriesResponseItem = zod.object({
+  "id": zod.string(),
+  "bookingId": zod.string(),
+  "authorUserId": zod.string(),
+  "narrative": zod.string(),
+  "attachmentIds": zod.array(zod.string()).optional(),
+  "authoredAt": zod.coerce.date()
+})
+export const GetCaseFileAdvisoriesResponse = zod.array(GetCaseFileAdvisoriesResponseItem)
+
+
+/**
+ * @summary Add a Provider Clinical Advisory
+ */
+export const CreateCaseFileAdvisoryParams = zod.object({
+  "bookingId": zod.coerce.string()
+})
+
+export const createCaseFileAdvisoryBodyNarrativeMax = 20000;
+
+
+
+export const CreateCaseFileAdvisoryBody = zod.object({
+  "narrative": zod.string().min(1).max(createCaseFileAdvisoryBodyNarrativeMax),
+  "attachmentIds": zod.array(zod.string()).optional()
+})
+
+
+/**
+ * @summary Finalize a Case File attachment
+ */
+export const CreateCaseFileAttachmentParams = zod.object({
+  "bookingId": zod.coerce.string()
+})
+
+export const CreateCaseFileAttachmentBody = zod.object({
+  "file": zod.instanceof(File),
+  "source": zod.enum(['camera', 'photo_gallery', 'document']).optional(),
+  "category": zod.enum(['lab', 'radiology', 'treatment_chart', 'general', 'uncategorized']).optional()
+})
+
+
+/**
+ * @summary Toggle Seeker follow-up call/video access
+ */
+export const UpdateCaseFileFollowUpAccessParams = zod.object({
+  "bookingId": zod.coerce.string()
+})
+
+export const UpdateCaseFileFollowUpAccessBody = zod.object({
+  "callsEnabled": zod.boolean().optional(),
+  "videoEnabled": zod.boolean().optional()
+})
+
+export const UpdateCaseFileFollowUpAccessResponse = zod.object({
+  "canMessage": zod.boolean(),
+  "canAttach": zod.boolean(),
+  "canAddVitals": zod.boolean(),
+  "canComposeAdvisory": zod.boolean(),
+  "canToggleFollowUp": zod.boolean(),
+  "readOnly": zod.boolean(),
+  "callsEnabled": zod.boolean(),
+  "videoEnabled": zod.boolean()
+})
+
+
+/**
+ * @summary Download an authorized Case File attachment
+ */
+export const DownloadCaseFileAttachmentParams = zod.object({
+  "bookingId": zod.coerce.string(),
+  "attachmentId": zod.coerce.string()
+})
+
+

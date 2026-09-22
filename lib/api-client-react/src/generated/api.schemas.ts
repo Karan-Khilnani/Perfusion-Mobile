@@ -27,3 +27,241 @@ export interface CallStatus {
   isCaller?: boolean;
 }
 
+export interface CaseFileCapabilities {
+  canMessage: boolean;
+  canAttach: boolean;
+  canAddVitals: boolean;
+  canComposeAdvisory: boolean;
+  canToggleFollowUp: boolean;
+  readOnly: boolean;
+  callsEnabled: boolean;
+  videoEnabled: boolean;
+}
+
+export interface CaseFileAttachment {
+  id: string;
+  bookingId: string;
+  /** @nullable */
+  messageId?: string | null;
+  uploaderUserId?: string;
+  uploaderRole?: string;
+  /** @nullable */
+  originalFilename?: string | null;
+  /** @nullable */
+  mimeType?: string | null;
+  /** @nullable */
+  byteSize?: number | null;
+  /** @nullable */
+  objectPath?: string | null;
+  /** @nullable */
+  legacyUrl?: string | null;
+  source: string;
+  category: string;
+  createdAt: string;
+}
+
+export interface CaseFileMessage {
+  id: string;
+  bookingId: string;
+  senderUserId: string;
+  senderRole: string;
+  kind: string;
+  /** @nullable */
+  body?: string | null;
+  createdAt: string;
+  attachment?: CaseFileAttachment | null;
+}
+
+export interface CaseFileMessageInput {
+  /**
+     * @minLength 1
+     * @maxLength 10000
+     */
+  body: string;
+}
+
+export interface CaseFileMessagesResponse {
+  messages: CaseFileMessage[];
+  /** @nullable */
+  nextCursor: string | null;
+}
+
+export interface CaseFileVital {
+  id: string;
+  bookingId: string;
+  recordedByUserId: string;
+  observedAt: string;
+  /** @nullable */
+  systolicBp?: number | null;
+  /** @nullable */
+  diastolicBp?: number | null;
+  /** @nullable */
+  heartRate?: number | null;
+  /** @nullable */
+  respiratoryRate?: number | null;
+  /** @nullable */
+  intake?: number | null;
+  /** @nullable */
+  output?: number | null;
+  /** @nullable */
+  hourlyUrineOutput?: number | null;
+  /** @nullable */
+  gcs?: number | null;
+  createdAt: string;
+}
+
+export interface CaseFileVitalInput {
+  observedAt: string;
+  /** @nullable */
+  systolicBp?: number | null;
+  /** @nullable */
+  diastolicBp?: number | null;
+  /** @nullable */
+  heartRate?: number | null;
+  /** @nullable */
+  respiratoryRate?: number | null;
+  /** @nullable */
+  intake?: number | null;
+  /** @nullable */
+  output?: number | null;
+  /** @nullable */
+  hourlyUrineOutput?: number | null;
+  /** @nullable */
+  gcs?: number | null;
+}
+
+export interface CaseFileAdvisory {
+  id: string;
+  bookingId: string;
+  authorUserId: string;
+  narrative: string;
+  attachmentIds?: string[];
+  authoredAt: string;
+}
+
+export interface CaseFileAdvisoryInput {
+  /**
+     * @minLength 1
+     * @maxLength 20000
+     */
+  narrative: string;
+  attachmentIds?: string[];
+}
+
+export type CaseFileAttachmentInputSource = typeof CaseFileAttachmentInputSource[keyof typeof CaseFileAttachmentInputSource];
+
+
+export const CaseFileAttachmentInputSource = {
+  camera: 'camera',
+  photo_gallery: 'photo_gallery',
+  document: 'document',
+} as const;
+
+export type CaseFileAttachmentInputCategory = typeof CaseFileAttachmentInputCategory[keyof typeof CaseFileAttachmentInputCategory];
+
+
+export const CaseFileAttachmentInputCategory = {
+  lab: 'lab',
+  radiology: 'radiology',
+  treatment_chart: 'treatment_chart',
+  general: 'general',
+  uncategorized: 'uncategorized',
+} as const;
+
+export interface CaseFileAttachmentInput {
+  file: Blob;
+  source?: CaseFileAttachmentInputSource;
+  category?: CaseFileAttachmentInputCategory;
+}
+
+export interface CaseFileFollowUpAccessInput {
+  callsEnabled?: boolean;
+  videoEnabled?: boolean;
+}
+
+export interface CaseFileSummary {
+  /** @nullable */
+  allergies?: string | null;
+  /** @nullable */
+  comorbidities?: string | null;
+  /** @nullable */
+  presentingComplaint?: string | null;
+  /** @nullable */
+  workingDiagnosis?: string | null;
+  /** @nullable */
+  clinicalHistory?: string | null;
+  /** @nullable */
+  submittedByUserId?: string | null;
+  /** @nullable */
+  submittedAt?: string | null;
+}
+
+export interface CaseFileProfile {
+  /** @nullable */
+  allergies?: string | null;
+  /** @nullable */
+  comorbidities?: string | null;
+  /** @nullable */
+  baselineMedications?: string | null;
+  /** @nullable */
+  baselineParameters?: string | null;
+  /** @nullable */
+  pastAdmissions?: string | null;
+  /** @nullable */
+  emergencyContact?: string | null;
+}
+
+/**
+ * @nullable
+ */
+export type CaseFileAggregateLatestVitalsFreshness = typeof CaseFileAggregateLatestVitalsFreshness[keyof typeof CaseFileAggregateLatestVitalsFreshness] | null;
+
+
+export const CaseFileAggregateLatestVitalsFreshness = {
+  fresh: 'fresh',
+  aging: 'aging',
+  stale: 'stale',
+} as const;
+
+export interface CaseFileAggregateBooking {
+  id: string;
+  /** @nullable */
+  bookingNumber: string | null;
+  patientName: string;
+  patientAge: number;
+  /** @nullable */
+  patientGender: string | null;
+  /** @nullable */
+  providerName: string | null;
+  serviceName: string;
+  /** @nullable */
+  appointmentSlot: string | null;
+  status: string;
+  bookingType: string;
+  userId: string;
+  /** @nullable */
+  providerId: string | null;
+  postRxCallsEnabled: boolean;
+  postRxVideoEnabled: boolean;
+}
+
+export interface CaseFileAggregate {
+  booking: CaseFileAggregateBooking;
+  capabilities: CaseFileCapabilities;
+  summary: CaseFileSummary;
+  profile: CaseFileProfile;
+  latestVitals: CaseFileVital | null;
+  /** @nullable */
+  latestVitalsFreshness?: CaseFileAggregateLatestVitalsFreshness;
+  advisories?: CaseFileAdvisory[];
+}
+
+export type GetCaseFileMessagesParams = {
+cursor?: string;
+/**
+ * @minimum 1
+ * @maximum 100
+ */
+limit?: number;
+};
+

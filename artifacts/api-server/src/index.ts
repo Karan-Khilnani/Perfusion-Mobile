@@ -135,6 +135,186 @@ async function startServer() {
     `);
     await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS prescription_reviews_booking_review_unique ON prescription_reviews(booking_id, review_number)`);
 
+    // Case File normalized records. Legacy booking URL/advisory fields are intentionally
+    // retained; these tables provide durable metadata for all new Case File activity.
+    await pool.query(`CREATE TABLE IF NOT EXISTS case_file_profiles (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+      patient_user_id varchar NOT NULL UNIQUE,
+      allergies text,
+      comorbidities text,
+      baseline_medications text,
+      baseline_parameters text,
+      past_admissions text,
+      emergency_contact text,
+      created_at timestamptz DEFAULT now(),
+      updated_at timestamptz DEFAULT now()
+    )`);
+    await pool.query(`CREATE TABLE IF NOT EXISTS case_file_summaries (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+      booking_id varchar NOT NULL UNIQUE,
+      allergies text,
+      comorbidities text,
+      presenting_complaint text,
+      working_diagnosis text,
+      clinical_history text,
+      submitted_by_user_id varchar,
+      submitted_at timestamptz DEFAULT now(),
+      created_at timestamptz DEFAULT now()
+    )`);
+    await pool.query(`CREATE TABLE IF NOT EXISTS case_file_messages (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+      booking_id varchar NOT NULL,
+      sender_user_id varchar NOT NULL,
+      sender_role varchar(30) NOT NULL,
+      kind varchar(40) NOT NULL DEFAULT 'text',
+      body text,
+      created_at timestamptz DEFAULT now()
+    )`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS case_file_messages_booking_created_idx ON case_file_messages(booking_id, created_at)`);
+    await pool.query(`CREATE TABLE IF NOT EXISTS case_file_attachments (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+      booking_id varchar NOT NULL,
+      message_id varchar,
+      uploader_user_id varchar NOT NULL,
+      uploader_role varchar(30) NOT NULL,
+      original_filename varchar(255),
+      mime_type varchar(150),
+      byte_size integer,
+      object_path text,
+      legacy_url text,
+      source varchar(40) NOT NULL DEFAULT 'document',
+      category varchar(40) NOT NULL DEFAULT 'uncategorized',
+      created_at timestamptz DEFAULT now()
+    )`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS case_file_attachments_booking_created_idx ON case_file_attachments(booking_id, created_at)`);
+    await pool.query(`CREATE TABLE IF NOT EXISTS case_file_vitals (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+      booking_id varchar NOT NULL,
+      recorded_by_user_id varchar NOT NULL,
+      observed_at timestamptz NOT NULL,
+      systolic_bp integer,
+      diastolic_bp integer,
+      heart_rate integer,
+      respiratory_rate integer,
+      intake double precision,
+      output double precision,
+      hourly_urine_output double precision,
+      gcs integer,
+      created_at timestamptz DEFAULT now()
+    )`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS case_file_vitals_booking_observed_idx ON case_file_vitals(booking_id, observed_at)`);
+    await pool.query(`CREATE TABLE IF NOT EXISTS case_file_advisories (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+      booking_id varchar NOT NULL,
+      author_user_id varchar NOT NULL,
+      narrative text NOT NULL,
+      attachment_ids text[],
+      authored_at timestamptz DEFAULT now(),
+      created_at timestamptz DEFAULT now()
+    )`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS case_file_advisories_booking_authored_idx ON case_file_advisories(booking_id, authored_at)`);
+    // Safe, repeatable legacy backfill for encounter summaries and URL attachments.
+    await pool.query(`
+      INSERT INTO case_file_summaries (booking_id, allergies, presenting_complaint, working_diagnosis, clinical_history, submitted_by_user_id)
+      SELECT b.id, CASE WHEN COALESCE(b.patient_allergy_not_specified, true) THEN NULL ELSE b.patient_allergies END,
+        b.clinical_summary, b.provisional_diagnosis, b.clinical_summary, b.user_id
+      FROM bookings b
+      WHERE b.booking_type = 'consultation'
+      ON CONFLICT (booking_id) DO UPDATE SET
+        allergies = EXCLUDED.allergies,
+        presenting_complaint = EXCLUDED.presenting_complaint,
+        working_diagnosis = EXCLUDED.working_diagnosis,
+        clinical_history = EXCLUDED.clinical_history,
+        submitted_by_user_id = EXCLUDED.submitted_by_user_id,
+        submitted_at = COALESCE(case_file_summaries.submitted_at, EXCLUDED.submitted_at)
+      WHERE NOT EXISTS (
+        SELECT 1 FROM bookings b2
+        WHERE b2.id = case_file_summaries.booking_id
+          AND (b2.status IN ('completed', 'cancelled') OR b2.prescription_approved_at IS NOT NULL)
+      )
+    `);
+    await pool.query(`
+      INSERT INTO case_file_attachments (id, booking_id, uploader_user_id, uploader_role, legacy_url, source, category)
+      SELECT md5('legacy-document:' || b.id || ':' || u.url), b.id, b.user_id, 'care_seeker', u.url, 'legacy_document', 'uncategorized'
+      FROM bookings b CROSS JOIN LATERAL unnest(COALESCE(b.document_urls, ARRAY[]::text[])) AS u(url)
+      WHERE u.url IS NOT NULL AND u.url <> '' AND u.url <> 'undefined'
+      ON CONFLICT (id) DO NOTHING
+    `);
+    await pool.query(`
+      INSERT INTO case_file_attachments (id, booking_id, uploader_user_id, uploader_role, legacy_url, source, category)
+      SELECT md5('legacy-report:' || b.id || ':' || u.url), b.id, COALESCE(b.provider_id, b.user_id), CASE WHEN b.provider_id IS NULL THEN 'care_seeker' ELSE 'provider' END, u.url, 'legacy_report', 'general'
+      FROM bookings b CROSS JOIN LATERAL (VALUES (b.report_url), (b.processed_report_url)) AS u(url)
+      WHERE b.booking_type = 'consultation' AND u.url IS NOT NULL AND u.url <> ''
+      ON CONFLICT (id) DO NOTHING
+    `);
+    await pool.query(`
+      DELETE FROM case_file_messages
+      WHERE id IN (
+        SELECT md5('clinical-advisory-reference:' || id) FROM case_file_advisories
+        WHERE id = md5('legacy-advisory:' || booking_id)
+      )
+    `);
+    await pool.query(`DELETE FROM case_file_advisories WHERE id LIKE 'legacy-advisory:%'`);
+    await pool.query(`
+      INSERT INTO case_file_advisories (id, booking_id, author_user_id, narrative, authored_at)
+      SELECT md5('legacy-advisory:' || b.id), b.id, COALESCE(b.prescription_approved_by_user_id, (SELECT p.user_id FROM providers p WHERE p.id = b.provider_id)),
+        concat_ws(E'\\n\\n', NULLIF(b.prescription_diagnosis, ''), NULLIF(b.prescription_advice, ''), NULLIF(b.prescription_physician_notes, ''), NULLIF(b.prescription_medications, '')),
+        COALESCE(b.prescription_approved_at, b.prescription_generated_at, b.created_at)
+      FROM bookings b
+      WHERE b.booking_type = 'consultation'
+        AND b.prescription_approved_at IS NOT NULL
+        AND COALESCE(b.prescription_approved_by_user_id, (SELECT p.user_id FROM providers p WHERE p.id = b.provider_id)) IS NOT NULL
+        AND concat_ws(E'\\n\\n', NULLIF(b.prescription_diagnosis, ''), NULLIF(b.prescription_advice, ''), NULLIF(b.prescription_physician_notes, ''), NULLIF(b.prescription_medications, '')) <> ''
+      ON CONFLICT (id) DO NOTHING
+    `);
+    await pool.query(`
+      INSERT INTO case_file_advisories (id, booking_id, author_user_id, narrative, authored_at, attachment_ids)
+      SELECT md5('legacy-review:' || r.id), r.booking_id, COALESCE(r.approved_by_user_id, (SELECT p.user_id FROM providers p WHERE p.id = b.provider_id)), concat_ws(E'\\n\\n', NULLIF(r.diagnosis, ''), NULLIF(r.advice, ''), NULLIF(r.physician_notes, ''), NULLIF(r.medications, '')), r.approved_at,
+        CASE WHEN r.pdf_url IS NOT NULL THEN ARRAY[r.pdf_url] ELSE ARRAY[]::text[] END
+      FROM prescription_reviews r JOIN bookings b ON b.id = r.booking_id
+      WHERE r.approved_at IS NOT NULL
+        AND COALESCE(r.approved_by_user_id, (SELECT p.user_id FROM providers p WHERE p.id = b.provider_id)) IS NOT NULL
+        AND concat_ws(E'\\n\\n', NULLIF(r.diagnosis, ''), NULLIF(r.advice, ''), NULLIF(r.physician_notes, ''), NULLIF(r.medications, '')) <> ''
+      ON CONFLICT (id) DO NOTHING
+    `);
+    await pool.query(`
+      INSERT INTO case_file_attachments (id, booking_id, uploader_user_id, uploader_role, legacy_url, source, category)
+      SELECT md5('legacy-treatment:' || b.id || ':' || u.url), b.id, b.user_id, 'care_seeker', u.url, 'legacy_treatment_chart', 'treatment_chart'
+      FROM bookings b CROSS JOIN LATERAL unnest(COALESCE(b.treatment_chart_urls, ARRAY[]::text[])) AS u(url)
+      WHERE u.url IS NOT NULL AND u.url <> '' AND u.url <> 'undefined'
+      ON CONFLICT (id) DO NOTHING
+    `);
+    await pool.query(`
+      INSERT INTO case_file_messages (id, booking_id, sender_user_id, sender_role, kind, body, created_at)
+      SELECT md5('clinical-advisory-reference:' || a.id), a.booking_id, a.author_user_id, 'provider',
+        'clinical_advisory_reference',
+        json_build_object('advisoryId', a.id, 'narrative', a.narrative)::text,
+        a.authored_at
+      FROM case_file_advisories a
+      WHERE NOT EXISTS (
+        SELECT 1 FROM case_file_messages m
+        WHERE m.id = md5('clinical-advisory-reference:' || a.id)
+      )
+    `);
+    await pool.query(`
+      INSERT INTO case_file_messages (id, booking_id, sender_user_id, sender_role, kind, created_at)
+      SELECT md5('legacy-attachment-message:' || a.id), a.booking_id, a.uploader_user_id, a.uploader_role,
+        'attachment', COALESCE(b.created_at, a.created_at, now())
+      FROM case_file_attachments a
+      JOIN bookings b ON b.id = a.booking_id
+      WHERE a.message_id IS NULL AND a.source LIKE 'legacy_%'
+      ON CONFLICT (id) DO NOTHING
+    `);
+    await pool.query(`
+      UPDATE case_file_attachments a
+      SET message_id = md5('legacy-attachment-message:' || a.id)
+      WHERE a.message_id IS NULL AND a.source LIKE 'legacy_%'
+        AND EXISTS (
+          SELECT 1 FROM case_file_messages m
+          WHERE m.id = md5('legacy-attachment-message:' || a.id)
+        )
+    `);
+
     // User agreements table (click-wrap)
     await pool.query(`CREATE TABLE IF NOT EXISTS user_agreements (
       id varchar PRIMARY KEY DEFAULT gen_random_uuid(),

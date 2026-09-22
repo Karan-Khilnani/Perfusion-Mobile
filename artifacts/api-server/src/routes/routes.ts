@@ -11,7 +11,7 @@ import { fireOneBooking } from "../services/consultation-scheduler";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
-import { uploadFile as supabaseUpload } from "../services/supabase-storage";
+import { uploadFile as supabaseUpload, uploadPrivateCaseFile, downloadPrivateCaseFile, downloadLegacyCaseFile } from "../services/supabase-storage";
 import { notifyAdminLabBooking, notifyAdminConsultantBooking, notifyUserReportReady, cancelVoiceCall, triggerVoiceCall, triggerBridgeCall, formatPhoneNumber } from "../services/msg91";
 import { generateBookingNumber } from "../services/booking-number";
 import { calculateCustomerPrice, deriveMarginFromPrice, derivePriceFromMargin } from "../services/pricing";
@@ -23,6 +23,7 @@ import { AGREEMENT_VERSION, AGREEMENT_FULL_TEXT, partnerTypeLabel } from "../ser
 import { sendPushNotification, getVapidPublicKey, type PushPayload } from "../services/push-notifications";
 import { getCallWindow } from "../services/call-window";
 import { Expo, type ExpoPushMessage } from "expo-server-sdk";
+import { randomUUID } from "crypto";
 
 function sanitizeUserForClient<T extends Record<string, any> | undefined>(user: T) {
   if (!user) return user;
@@ -40,6 +41,43 @@ function getLoginMethod(user: Record<string, any> | undefined) {
   if (user.googleId && !user.password) return "google";
   if (user.password) return "password";
   return "unavailable";
+}
+
+const CASE_FILE_CLOSED_STATUSES = new Set(["completed", "cancelled"]);
+const CASE_FILE_SEEKER_CATEGORIES = new Set(["lab", "radiology", "treatment_chart", "general"]);
+
+async function getCaseFileParticipant(bookingId: string, user: any) {
+  const booking = await storage.getBookingById(bookingId);
+  if (!booking) return { booking: null, allowed: false, isSeeker: false, isProvider: false, provider: null };
+  const provider = booking.providerId ? await storage.getProviderById(booking.providerId) : null;
+  const isSeeker = booking.userId === user?.id;
+  const isProvider = user?.role === "provider" && provider?.userId === user?.id;
+  const allowed = isSeeker || isProvider || user?.role === "admin";
+  return { booking, allowed, isSeeker, isProvider, provider };
+}
+
+function caseFileReadOnly(booking: any) {
+  return CASE_FILE_CLOSED_STATUSES.has(String(booking?.status || "").toLowerCase());
+}
+
+function caseFileFreshness(observedAt: Date | string | null) {
+  if (!observedAt) return null;
+  const age = Date.now() - new Date(observedAt).getTime();
+  return age <= 60 * 60 * 1000 ? "fresh" : age <= 4 * 60 * 60 * 1000 ? "aging" : "stale";
+}
+
+async function syncLegacyCaseFileSummary(booking: any) {
+  if (booking?.bookingType !== "consultation" || caseFileReadOnly(booking) || booking?.prescriptionApprovedAt) return;
+  await getPool().query(`UPDATE case_file_summaries
+    SET allergies = $2, presenting_complaint = $3, working_diagnosis = $4,
+        clinical_history = $3, submitted_by_user_id = $5, submitted_at = COALESCE(submitted_at, now())
+    WHERE booking_id = $1`, [
+    booking.id,
+    booking.patientAllergyNotSpecified ? null : booking.patientAllergies,
+    booking.clinicalSummary || null,
+    booking.provisionalDiagnosis || null,
+    booking.userId,
+  ]);
 }
 
 function enrichAdminBookingsWithAccessDetails(
@@ -185,6 +223,16 @@ const uploadReport = multer({
     } else {
       cb(new Error("Invalid file type. Allowed: PDF, JPEG, PNG, GIF, DICOM"));
     }
+  },
+});
+
+const caseFileUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 25 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = ["application/pdf", "image/jpeg", "image/png", "image/gif", "application/dicom"];
+    if (allowedTypes.includes(file.mimetype) || file.originalname.toLowerCase().endsWith(".dcm")) cb(null, true);
+    else cb(new Error("Invalid file type. Allowed: PDF, JPEG, PNG, GIF, or DICOM"));
   },
 });
 
@@ -1128,6 +1176,338 @@ export async function registerRoutes(
     }
   });
 
+  // ─── Case File API ─────────────────────────────────────────────────────────
+  // The Case File is participant-authorized, append-only clinical history.
+  app.get("/api/bookings/:bookingId/case-file", isAuthenticated, async (req: any, res) => {
+    try {
+      const access = await getCaseFileParticipant(req.params.bookingId, req.user);
+      if (!access.booking) return res.status(404).json({ message: "Booking not found" });
+      if (!access.allowed) return res.status(403).json({ message: "Access denied" });
+      const pool = getPool();
+      const booking = access.booking as any;
+      const summary = (await pool.query(`SELECT allergies, comorbidities, presenting_complaint AS "presentingComplaint",
+        working_diagnosis AS "workingDiagnosis", clinical_history AS "clinicalHistory",
+        submitted_by_user_id AS "submittedByUserId", submitted_at AS "submittedAt"
+        FROM case_file_summaries WHERE booking_id = $1`, [booking.id])).rows[0] || {
+        allergies: booking.patientAllergyNotSpecified ? null : booking.patientAllergies,
+        comorbidities: null,
+        presentingComplaint: booking.clinicalSummary || null,
+        workingDiagnosis: booking.provisionalDiagnosis || null,
+        clinicalHistory: booking.clinicalSummary || null,
+        submittedByUserId: booking.userId,
+        submittedAt: booking.createdAt,
+      };
+      const profile = (await pool.query("SELECT allergies, comorbidities, baseline_medications AS \"baselineMedications\", baseline_parameters AS \"baselineParameters\", past_admissions AS \"pastAdmissions\", emergency_contact AS \"emergencyContact\" FROM case_file_profiles WHERE patient_user_id = $1", [booking.userId])).rows[0] || {
+        allergies: booking.patientAllergyNotSpecified ? null : booking.patientAllergies,
+        comorbidities: null, baselineMedications: null, baselineParameters: null, pastAdmissions: null, emergencyContact: booking.patientContact || null,
+      };
+      const latest = (await pool.query(`SELECT id, booking_id AS "bookingId", recorded_by_user_id AS "recordedByUserId",
+        observed_at AS "observedAt", systolic_bp AS "systolicBp", diastolic_bp AS "diastolicBp",
+        heart_rate AS "heartRate", respiratory_rate AS "respiratoryRate", intake, output,
+        hourly_urine_output AS "hourlyUrineOutput", gcs, created_at AS "createdAt"
+        FROM case_file_vitals WHERE booking_id = $1 ORDER BY observed_at DESC, id DESC LIMIT 1`, [booking.id])).rows[0] || null;
+      const advisories = (await pool.query("SELECT id, booking_id AS \"bookingId\", author_user_id AS \"authorUserId\", narrative, attachment_ids AS \"attachmentIds\", authored_at AS \"authoredAt\" FROM case_file_advisories WHERE booking_id = $1 ORDER BY authored_at ASC, id ASC", [booking.id])).rows;
+      const readOnly = caseFileReadOnly(booking);
+      const providerUser = access.provider?.userId;
+      const isOwnerProvider = access.isProvider;
+      const caseFileBooking = {
+        id: booking.id,
+        bookingNumber: booking.bookingNumber || null,
+        patientName: booking.patientName,
+        patientAge: booking.patientAge,
+        patientGender: booking.patientGender || null,
+        providerName: booking.providerName || null,
+        serviceName: booking.serviceName,
+        appointmentSlot: booking.appointmentSlot || null,
+        status: booking.status,
+        bookingType: booking.bookingType,
+        userId: booking.userId,
+        providerId: booking.providerId || null,
+        postRxCallsEnabled: Boolean(booking.postRxCallsEnabled),
+        postRxVideoEnabled: Boolean(booking.postRxVideoEnabled),
+      };
+      res.json({
+        booking: caseFileBooking,
+        summary,
+        profile,
+        latestVitals: latest,
+        latestVitalsFreshness: caseFileFreshness(latest?.observedAt),
+        advisories,
+        capabilities: {
+          canMessage: !readOnly && (access.isSeeker || isOwnerProvider),
+          canAttach: !readOnly && (access.isSeeker || isOwnerProvider),
+          canAddVitals: !readOnly && access.isSeeker,
+          canComposeAdvisory: !readOnly && access.isProvider,
+          canToggleFollowUp: !readOnly && access.isProvider,
+          readOnly,
+          callsEnabled: !!booking.postRxCallsEnabled,
+          videoEnabled: !!booking.postRxVideoEnabled,
+          providerUserId: providerUser || null,
+        },
+      });
+    } catch (error) {
+      req.log?.error({ err: error }, "Case File aggregate failed");
+      res.status(500).json({ message: "Failed to load Case File" });
+    }
+  });
+
+  app.get("/api/bookings/:bookingId/case-file/messages", isAuthenticated, async (req: any, res) => {
+    try {
+      const access = await getCaseFileParticipant(req.params.bookingId, req.user);
+      if (!access.booking) return res.status(404).json({ message: "Booking not found" });
+      if (!access.allowed) return res.status(403).json({ message: "Access denied" });
+      const limit = Math.min(Math.max(Number(req.query.limit) || 50, 1), 100);
+      const cursor = req.query.cursor ? new Date(String(req.query.cursor)) : null;
+      const pool = getPool();
+      const result = cursor
+        ? await pool.query(`SELECT m.*, a.id AS attachment_id, a.original_filename, a.mime_type, a.byte_size, a.object_path, a.legacy_url, a.source, a.category, a.created_at AS attachment_created_at
+          FROM case_file_messages m LEFT JOIN case_file_attachments a ON a.message_id = m.id
+          WHERE m.booking_id = $1 AND m.created_at < $2 ORDER BY m.created_at DESC, m.id DESC LIMIT $3`, [access.booking.id, cursor, limit + 1])
+        : await pool.query(`SELECT m.*, a.id AS attachment_id, a.original_filename, a.mime_type, a.byte_size, a.object_path, a.legacy_url, a.source, a.category, a.created_at AS attachment_created_at
+          FROM case_file_messages m LEFT JOIN case_file_attachments a ON a.message_id = m.id
+          WHERE m.booking_id = $1 ORDER BY m.created_at DESC, m.id DESC LIMIT $2`, [access.booking.id, limit + 1]);
+      const hasMore = result.rows.length > limit;
+      const rows = result.rows.slice(0, limit).reverse();
+      const messages = rows.map((row: any) => ({
+        id: row.id, bookingId: row.booking_id, senderUserId: row.sender_user_id, senderRole: row.sender_role,
+        kind: row.kind, body: row.body, createdAt: row.created_at,
+        attachment: row.attachment_id ? {
+          id: row.attachment_id, bookingId: row.booking_id, messageId: row.id, uploaderUserId: row.sender_user_id,
+          uploaderRole: row.sender_role, originalFilename: row.original_filename, mimeType: row.mime_type, byteSize: row.byte_size,
+          objectPath: null, legacyUrl: null, source: row.source, category: row.category, createdAt: row.attachment_created_at,
+        } : null,
+      }));
+      res.json({ messages, nextCursor: hasMore && messages[0] ? messages[0].createdAt : null });
+    } catch (error) {
+      req.log?.error({ err: error }, "Case File messages failed");
+      res.status(500).json({ message: "Failed to load messages" });
+    }
+  });
+
+  app.post("/api/bookings/:bookingId/case-file/messages", isAuthenticated, async (req: any, res) => {
+    try {
+      const access = await getCaseFileParticipant(req.params.bookingId, req.user);
+      if (!access.booking) return res.status(404).json({ message: "Booking not found" });
+      if (!access.allowed || (!access.isSeeker && !access.isProvider)) return res.status(403).json({ message: "Only Case File participants may send messages" });
+      if (caseFileReadOnly(access.booking)) return res.status(403).json({ message: "This Case File is read-only" });
+      const body = typeof req.body?.body === "string" ? req.body.body.trim() : "";
+      if (!body) return res.status(400).json({ message: "Message body is required" });
+      if (body.length > 10000) return res.status(400).json({ message: "Message body must be 10,000 characters or fewer" });
+      const id = randomUUID();
+      const createdAt = new Date();
+      await getPool().query("INSERT INTO case_file_messages (id, booking_id, sender_user_id, sender_role, kind, body, created_at) VALUES ($1,$2,$3,$4,'text',$5,$6)", [id, access.booking.id, req.user.id, req.user.role, body, createdAt]);
+      const message = { id, bookingId: access.booking.id, senderUserId: req.user.id, senderRole: req.user.role, kind: "text", body, createdAt };
+      broadcastCaseFileUpdate(access.booking, { type: "case_file_updated", bookingId: access.booking.id, change: "message_created", messageId: id });
+      res.status(201).json(message);
+    } catch (error) {
+      req.log?.error({ err: error }, "Case File message failed");
+      res.status(500).json({ message: "Failed to send message" });
+    }
+  });
+
+  app.get("/api/bookings/:bookingId/case-file/vitals", isAuthenticated, async (req: any, res) => {
+    try {
+      const access = await getCaseFileParticipant(req.params.bookingId, req.user);
+      if (!access.booking) return res.status(404).json({ message: "Booking not found" });
+      if (!access.allowed) return res.status(403).json({ message: "Access denied" });
+      const rows = (await getPool().query(`SELECT id, booking_id AS "bookingId", recorded_by_user_id AS "recordedByUserId", observed_at AS "observedAt", systolic_bp AS "systolicBp", diastolic_bp AS "diastolicBp", heart_rate AS "heartRate", respiratory_rate AS "respiratoryRate", intake, output, hourly_urine_output AS "hourlyUrineOutput", gcs, created_at AS "createdAt" FROM case_file_vitals WHERE booking_id = $1 ORDER BY observed_at ASC, id ASC`, [access.booking.id])).rows;
+      res.json(rows);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to load vitals" });
+    }
+  });
+
+  app.post("/api/bookings/:bookingId/case-file/vitals", isAuthenticated, async (req: any, res) => {
+    try {
+      const access = await getCaseFileParticipant(req.params.bookingId, req.user);
+      if (!access.booking) return res.status(404).json({ message: "Booking not found" });
+      if (!access.allowed || !access.isSeeker) return res.status(403).json({ message: "Only the Seeker may add vitals" });
+      if (caseFileReadOnly(access.booking)) return res.status(403).json({ message: "This Case File is read-only" });
+      const observedAt = new Date(req.body?.observedAt || "");
+      if (Number.isNaN(observedAt.getTime())) return res.status(400).json({ message: "A valid observedAt is required" });
+      const measurements: Array<[string, number, number]> = [
+        ["systolicBp", 0, 300], ["diastolicBp", 0, 300], ["heartRate", 0, 300],
+        ["respiratoryRate", 0, 100], ["intake", 0, 100000], ["output", 0, 100000],
+        ["hourlyUrineOutput", 0, 100000], ["gcs", 3, 15],
+      ];
+      const supplied = measurements.filter(([key]) => req.body?.[key] !== undefined && req.body?.[key] !== null && req.body?.[key] !== "");
+      if (supplied.length === 0) return res.status(400).json({ message: "At least one vital measurement is required" });
+      for (const [key, minimum, maximum] of supplied) {
+        const value = req.body[key];
+        if (typeof value !== "number" || !Number.isFinite(value) || value < minimum || value > maximum) {
+          return res.status(400).json({ message: `${key} must be a number between ${minimum} and ${maximum}` });
+        }
+      }
+      const id = randomUUID();
+      const v = req.body;
+      await getPool().query(`INSERT INTO case_file_vitals (id, booking_id, recorded_by_user_id, observed_at, systolic_bp, diastolic_bp, heart_rate, respiratory_rate, intake, output, hourly_urine_output, gcs) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`, [id, access.booking.id, req.user.id, observedAt, v.systolicBp ?? null, v.diastolicBp ?? null, v.heartRate ?? null, v.respiratoryRate ?? null, v.intake ?? null, v.output ?? null, v.hourlyUrineOutput ?? null, v.gcs ?? null]);
+      const result = (await getPool().query(`SELECT id, booking_id AS "bookingId", recorded_by_user_id AS "recordedByUserId", observed_at AS "observedAt", systolic_bp AS "systolicBp", diastolic_bp AS "diastolicBp", heart_rate AS "heartRate", respiratory_rate AS "respiratoryRate", intake, output, hourly_urine_output AS "hourlyUrineOutput", gcs, created_at AS "createdAt" FROM case_file_vitals WHERE id = $1`, [id])).rows[0];
+      broadcastCaseFileUpdate(access.booking, { type: "case_file_updated", bookingId: access.booking.id, change: "vitals_added", vitalId: id });
+      res.status(201).json(result);
+    } catch (error) {
+      req.log?.error({ err: error }, "Case File vitals failed");
+      res.status(500).json({ message: "Failed to add vitals" });
+    }
+  });
+
+  app.get("/api/bookings/:bookingId/case-file/advisories", isAuthenticated, async (req: any, res) => {
+    try {
+      const access = await getCaseFileParticipant(req.params.bookingId, req.user);
+      if (!access.booking) return res.status(404).json({ message: "Booking not found" });
+      if (!access.allowed) return res.status(403).json({ message: "Access denied" });
+      const rows = (await getPool().query(`SELECT id, booking_id AS "bookingId", author_user_id AS "authorUserId", narrative, attachment_ids AS "attachmentIds", authored_at AS "authoredAt" FROM case_file_advisories WHERE booking_id = $1 ORDER BY authored_at ASC, id ASC`, [access.booking.id])).rows;
+      res.json(rows);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to load Clinical Advisories" });
+    }
+  });
+
+  app.get("/api/bookings/:bookingId/case-file/attachments/:attachmentId/download", isAuthenticated, async (req: any, res) => {
+    try {
+      const access = await getCaseFileParticipant(req.params.bookingId, req.user);
+      if (!access.booking) return res.status(404).json({ message: "Booking not found" });
+      if (!access.allowed) return res.status(403).json({ message: "Access denied" });
+      const row = (await getPool().query("SELECT legacy_url, object_path, original_filename, mime_type, source FROM case_file_attachments WHERE id = $1 AND booking_id = $2", [req.params.attachmentId, access.booking.id])).rows[0];
+      if (!row) return res.status(404).json({ message: "Attachment not found" });
+      const target = row.object_path || row.legacy_url;
+      if (!target) return res.status(404).json({ message: "Attachment content is unavailable" });
+      if (String(row.source || "").startsWith("legacy_") && /^https?:\/\//i.test(target)) {
+        const file = await downloadLegacyCaseFile(target);
+        const contentType = row.mime_type || file.type || "application/octet-stream";
+        const contentDisposition = row.original_filename
+          ? `inline; filename="${String(row.original_filename).replace(/["\r\n]/g, "_")}"`
+          : "inline";
+        res.setHeader("Content-Type", contentType);
+        res.setHeader("Content-Disposition", contentDisposition);
+        return res.send(Buffer.from(await file.arrayBuffer()));
+      }
+      if (!String(row.source || "").startsWith("legacy_")) {
+        const file = await downloadPrivateCaseFile(String(row.object_path));
+        const contentDisposition = row.original_filename
+          ? `inline; filename="${String(row.original_filename).replace(/["\r\n]/g, "_")}"`
+          : "inline";
+        res.setHeader("Content-Type", row.mime_type || file.type || "application/octet-stream");
+        res.setHeader("Content-Disposition", contentDisposition);
+        return res.send(Buffer.from(await file.arrayBuffer()));
+      }
+      if (String(row.source || "").startsWith("legacy_") && (target.startsWith("/api/uploads/") || target.startsWith("/uploads/"))) {
+        const localPath = path.resolve(process.cwd(), "uploads", target.replace(/^\/api\/uploads\//, "").replace(/^\/uploads\//, ""));
+        const uploadsRoot = path.resolve(process.cwd(), "uploads");
+        if (!localPath.startsWith(`${uploadsRoot}${path.sep}`)) return res.status(400).json({ message: "Invalid attachment path" });
+        res.setHeader("Content-Type", row.mime_type || "application/octet-stream");
+        res.setHeader("Content-Disposition", row.original_filename ? `inline; filename="${String(row.original_filename).replace(/["\r\n]/g, "_")}"` : "inline");
+        return res.sendFile(localPath);
+      }
+      return res.status(404).json({ message: "Attachment content is unavailable" });
+    } catch (error) {
+      req.log?.error({ err: error }, "Case File attachment download failed");
+      if (error instanceof Error && error.message.startsWith("Unsupported legacy attachment")) {
+        return res.status(400).json({ message: "Attachment source is unsupported" });
+      }
+      if (error instanceof Error && error.message.startsWith("Legacy Case File download failed")) {
+        return res.status(404).json({ message: "Attachment content is unavailable" });
+      }
+      res.status(500).json({ message: "Failed to download attachment" });
+    }
+  });
+
+  app.post("/api/bookings/:bookingId/case-file/advisories", isAuthenticated, async (req: any, res) => {
+    try {
+      const access = await getCaseFileParticipant(req.params.bookingId, req.user);
+      if (!access.booking) return res.status(404).json({ message: "Booking not found" });
+      if (!access.allowed || !access.isProvider) return res.status(403).json({ message: "Only the assigned Provider may add Clinical Advisories" });
+      if (caseFileReadOnly(access.booking)) return res.status(403).json({ message: "This Case File is read-only" });
+      const narrative = typeof req.body?.narrative === "string" ? req.body.narrative.trim() : "";
+      if (!narrative) return res.status(400).json({ message: "Narrative is required" });
+      if (narrative.length > 20000) return res.status(400).json({ message: "Narrative must be 20,000 characters or fewer" });
+      const id = randomUUID();
+      const attachmentIds = Array.isArray(req.body?.attachmentIds) ? req.body.attachmentIds : [];
+      const messageId = randomUUID();
+      const pool = getPool();
+      const client = await pool.connect();
+      let result: any;
+      try {
+        await client.query("BEGIN");
+        result = (await client.query(`INSERT INTO case_file_advisories (id, booking_id, author_user_id, narrative, attachment_ids) VALUES ($1,$2,$3,$4,$5) RETURNING id, booking_id AS "bookingId", author_user_id AS "authorUserId", narrative, attachment_ids AS "attachmentIds", authored_at AS "authoredAt"`, [id, access.booking.id, req.user.id, narrative, attachmentIds])).rows[0];
+        await client.query("INSERT INTO case_file_messages (id, booking_id, sender_user_id, sender_role, kind, body) VALUES ($1,$2,$3,$4,'clinical_advisory_reference',$5)", [messageId, access.booking.id, req.user.id, req.user.role, JSON.stringify({ advisoryId: id, narrative })]);
+        await client.query("COMMIT");
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally {
+        client.release();
+      }
+      broadcastCaseFileUpdate(access.booking, { type: "case_file_updated", bookingId: access.booking.id, change: "advisory_added", advisoryId: id });
+      broadcastCaseFileUpdate(access.booking, { type: "case_file_updated", bookingId: access.booking.id, change: "message_created", messageId });
+      res.status(201).json(result);
+    } catch (error) {
+      req.log?.error({ err: error }, "Case File Advisory failed");
+      res.status(500).json({ message: "Failed to add Clinical Advisory" });
+    }
+  });
+
+  app.post("/api/bookings/:bookingId/case-file/attachments", isAuthenticated, caseFileUpload.single("file"), async (req: any, res) => {
+    try {
+      const access = await getCaseFileParticipant(req.params.bookingId, req.user);
+      if (!access.booking) return res.status(404).json({ message: "Booking not found" });
+      if (!access.allowed || (!access.isSeeker && !access.isProvider)) return res.status(403).json({ message: "Only Case File participants may attach files" });
+      if (caseFileReadOnly(access.booking)) return res.status(403).json({ message: "This Case File is read-only" });
+      const category = access.isProvider ? "uncategorized" : String(req.body?.category || "uncategorized").toLowerCase();
+      if (access.isSeeker && !CASE_FILE_SEEKER_CATEGORIES.has(category)) return res.status(400).json({ message: "Seeker attachments require Lab, Radiology, Treatment Chart, or General category" });
+      if (!req.file) return res.status(400).json({ message: "No file uploaded" });
+      const source = ["camera", "photo_gallery", "document"].includes(String(req.body?.source || "document"))
+        ? String(req.body?.source || "document")
+        : "document";
+      let fileUrl: string;
+      try {
+        if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) throw new Error("Supabase storage is not configured");
+        fileUrl = await uploadPrivateCaseFile(req.file.buffer, req.file.originalname, req.file.mimetype);
+      } catch (error) {
+        if (process.env.NODE_ENV === "production") return res.status(503).json({ message: "File storage is temporarily unavailable. Please try again later." });
+        throw error;
+      }
+      const pool = getPool();
+      const client = await pool.connect();
+      const messageId = randomUUID();
+      const attachmentId = randomUUID();
+      const now = new Date();
+      try {
+        await client.query("BEGIN");
+        await client.query("INSERT INTO case_file_messages (id, booking_id, sender_user_id, sender_role, kind, created_at) VALUES ($1,$2,$3,$4,'attachment',$5)", [messageId, access.booking.id, req.user.id, req.user.role, now]);
+        await client.query("INSERT INTO case_file_attachments (id, booking_id, message_id, uploader_user_id, uploader_role, original_filename, mime_type, byte_size, object_path, source, category, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)", [attachmentId, access.booking.id, messageId, req.user.id, req.user.role, req.file.originalname, req.file.mimetype, req.file.size, fileUrl, source, category, now]);
+        await client.query("COMMIT");
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally {
+        client.release();
+      }
+      broadcastCaseFileUpdate(access.booking, { type: "case_file_updated", bookingId: access.booking.id, change: "attachment_finalized", messageId });
+      res.status(201).json({ id: messageId, bookingId: access.booking.id, senderUserId: req.user.id, senderRole: req.user.role, kind: "attachment", body: null, createdAt: now, attachment: { id: attachmentId, bookingId: access.booking.id, messageId, uploaderUserId: req.user.id, uploaderRole: req.user.role, originalFilename: req.file.originalname, mimeType: req.file.mimetype, byteSize: req.file.size, objectPath: null, legacyUrl: null, source, category, createdAt: now } });
+    } catch (error) {
+      req.log?.error({ err: error }, "Case File attachment failed");
+      res.status(500).json({ message: "Failed to upload attachment" });
+    }
+  });
+
+  app.patch("/api/bookings/:bookingId/case-file/follow-up-access", isAuthenticated, async (req: any, res) => {
+    try {
+      const access = await getCaseFileParticipant(req.params.bookingId, req.user);
+      if (!access.booking) return res.status(404).json({ message: "Booking not found" });
+      if (!access.allowed || !access.isProvider) return res.status(403).json({ message: "Only the assigned Provider may update follow-up access" });
+      if (caseFileReadOnly(access.booking)) return res.status(403).json({ message: "This Case File is read-only" });
+      const patch: Record<string, boolean> = {};
+      if (typeof req.body?.callsEnabled === "boolean") patch.postRxCallsEnabled = req.body.callsEnabled;
+      if (typeof req.body?.videoEnabled === "boolean") patch.postRxVideoEnabled = req.body.videoEnabled;
+      if (!Object.keys(patch).length) return res.status(400).json({ message: "callsEnabled or videoEnabled is required" });
+      await storage.updateBooking(access.booking.id, patch as any);
+      broadcastCaseFileUpdate(access.booking, { type: "case_file_updated", bookingId: access.booking.id, change: "follow_up_access_changed" });
+      res.json({ canMessage: true, canAttach: true, canAddVitals: false, canComposeAdvisory: true, canToggleFollowUp: true, readOnly: false, callsEnabled: patch.postRxCallsEnabled ?? (access.booking as any).postRxCallsEnabled, videoEnabled: patch.postRxVideoEnabled ?? (access.booking as any).postRxVideoEnabled });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update follow-up access" });
+    }
+  });
+
   app.post("/api/bookings", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user?.id;
@@ -1327,6 +1707,9 @@ export async function registerRoutes(
           return res.status(403).json({ message: "Access denied. You can only update your own bookings." });
         }
       }
+      if (caseFileReadOnly(existingBooking) && (req.body?.reportUrl || req.body?.reportNotes)) {
+        return res.status(403).json({ message: "This Case File is read-only" });
+      }
       
       const { status, reportUrl, reportNotes } = req.body as { 
         status: BookingStatus; 
@@ -1344,7 +1727,6 @@ export async function registerRoutes(
       if (!booking) {
         return res.status(404).json({ message: "Booking not found" });
       }
-
       if (status === "report_ready" && booking.bookingType !== "consultation") {
         const sendReportNotification = (processedReportPublicUrl?: string) => {
           let userPhone = booking.patientContact;
@@ -1427,6 +1809,7 @@ export async function registerRoutes(
       if (!booking) {
         return res.status(404).json({ message: "Booking not found" });
       }
+      if (caseFileReadOnly(booking)) return res.status(403).json({ message: "This Case File is read-only" });
       
       // Only allow providers and admins to generate Clinical Advisories
       if (user.role !== "provider" && user.role !== "admin") {
@@ -4187,6 +4570,7 @@ export async function registerRoutes(
       }
       
       const updated = await storage.updateBooking(req.params.id, req.body);
+      await syncLegacyCaseFileSummary(updated);
       res.json(updated);
     } catch (error) {
       console.error("Error updating booking:", error);
@@ -4203,6 +4587,7 @@ export async function registerRoutes(
 
       const booking = await storage.getBookingById(req.params.id);
       if (!booking) return res.status(404).json({ message: "Booking not found" });
+      if (caseFileReadOnly(booking)) return res.status(403).json({ message: "This Case File is read-only" });
 
       // Allow the seeker (booking owner) or the assigned provider
       let isAuthorised = booking.userId === userId;
@@ -4275,6 +4660,7 @@ export async function registerRoutes(
       if (!booking) {
         return res.status(404).json({ message: "Booking not found" });
       }
+      if (caseFileReadOnly(booking)) return res.status(403).json({ message: "This Case File is read-only" });
       
       // Only allow the booking owner to upload documents
       if (booking.userId !== userId) {
@@ -4317,6 +4703,7 @@ export async function registerRoutes(
       if (!booking) {
         return res.status(404).json({ message: "Booking not found" });
       }
+      if (caseFileReadOnly(booking)) return res.status(403).json({ message: "This Case File is read-only" });
       
       if (booking.userId !== userId) {
         return res.status(403).json({ message: "Access denied." });
@@ -5131,6 +5518,15 @@ export async function registerRoutes(
     });
   }
 
+  function broadcastCaseFileUpdate(booking: any, event: object) {
+    broadcastCallEvent(booking.userId, event);
+    if (booking.providerId) {
+      storage.getProviderById(booking.providerId).then((provider) => {
+        if (provider?.userId && provider.userId !== booking.userId) broadcastCallEvent(provider.userId, event);
+      }).catch(() => {});
+    }
+  }
+
   // SSE endpoint — clients connect here to receive real-time call events
   app.get("/api/call-events", isAuthenticated, (req: any, res) => {
     const userId = req.user?.id;
@@ -5593,6 +5989,7 @@ export async function registerRoutes(
       }
       const booking = await storage.getBookingById(req.params.id);
       if (!booking) return res.status(404).json({ error: "Booking not found" });
+      if (caseFileReadOnly(booking)) return res.status(403).json({ error: "This Case File is read-only" });
       if (!(booking as any).prescriptionApprovedAt) {
         return res.status(400).json({ error: "Clinical Advisory must be confirmed before toggling post-advisory features" });
       }

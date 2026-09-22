@@ -55,6 +55,7 @@ import AdminDiagnosticsPage from "@/pages/admin/diagnostics";
 import AdminAgreementsPage from "@/pages/admin/agreements";
 import AdminAppointmentsPage from "@/pages/admin/appointments";
 import { AgreementGate } from "@/components/agreement-gate";
+import CaseFilePage from "@/pages/case-file";
 
 function withUserLayout(Component: React.ComponentType) {
   return function WrappedComponent() {
@@ -134,6 +135,7 @@ function Router() {
       <Route path="/admin/diagnostics" component={withAdminLayout(AdminDiagnosticsPage)} />
       <Route path="/admin/agreements" component={withAdminLayout(AdminAgreementsPage)} />
       <Route path="/admin/appointments" component={withAdminLayout(AdminAppointmentsPage)} />
+      <Route path="/case-file/:bookingId" component={CaseFilePage} />
       
       <Route component={NotFound} />
     </Switch>

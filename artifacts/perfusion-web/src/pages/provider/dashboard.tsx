@@ -23,6 +23,8 @@ import {
   ExternalLink,
   Phone,
   FilePlus,
+  FolderOpen,
+  ChevronDown,
 } from "lucide-react";
 import { getCallWindow, callWindowLabel, toISTTimeString, getPostRxStatus } from "@/lib/call-window";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -463,18 +465,256 @@ function ReviewDownloads({ bookingId }: { bookingId: string }) {
   );
 }
 
+function ActiveConsultationCard({
+  booking,
+  navigate,
+  onOpenSummary,
+  onAddReview
+}: {
+  booking: ActiveConsultation;
+  navigate: (path: string) => void;
+  onOpenSummary: (b: ActiveConsultation) => void;
+  onAddReview: (b: ActiveConsultation) => void;
+}) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const docUrls = (booking.documentUrls ?? []).filter(Boolean);
+  const chartUrls = (booking.treatmentChartUrls ?? []).filter(Boolean);
+
+  return (
+    <div
+      className="rounded-2xl border bg-card flex flex-col"
+      data-testid={`card-consultation-${booking.id}`}
+    >
+      <button
+        onClick={() => setIsExpanded(!isExpanded)}
+        aria-expanded={isExpanded}
+        aria-controls={`actions-${booking.id}`}
+        className="flex items-start justify-between p-4 sm:p-6 w-full text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-2xl"
+      >
+        <div className="space-y-1.5 flex-1 min-w-0 pr-4">
+          <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5 min-w-0">
+            <p className="text-lg sm:text-xl font-bold tracking-tight break-words">{booking.patientName}</p>
+            <div className="flex items-center gap-1.5 shrink-0">
+              {booking.patientAge && (
+                <Badge variant="secondary" className="font-normal text-xs">
+                  {booking.patientAge} yrs
+                </Badge>
+              )}
+              {booking.patientGender && (
+                <Badge variant="outline" className="font-normal capitalize text-xs">
+                  {booking.patientGender}
+                </Badge>
+              )}
+            </div>
+          </div>
+          <div className="flex items-start gap-2 text-muted-foreground">
+            <Building2 className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+            <span className="text-sm leading-snug">{booking.seekerHospitalName}</span>
+          </div>
+          <div className="flex items-start gap-2 text-muted-foreground">
+            <Calendar className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+            <span className="text-sm font-medium text-foreground leading-snug">
+              {formatSlot(booking.appointmentSlot)}
+            </span>
+          </div>
+        </div>
+        <div className="flex flex-col items-end gap-2 shrink-0">
+          <Badge variant="outline" className="text-xs uppercase bg-muted/30">
+            {booking.status.replace(/_/g, ' ')}
+          </Badge>
+          <ChevronDown className={`h-5 w-5 text-muted-foreground transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+        </div>
+      </button>
+
+      {isExpanded && (
+        <div id={`actions-${booking.id}`} className="px-4 pb-4 sm:px-6 sm:pb-6 space-y-4 pt-2 border-t">
+          <div className="grid grid-cols-2 gap-2.5">
+            {booking.videoRoomId ? (() => {
+              const prescriptionApprovedAt = (booking as any).prescriptionApprovedAt;
+              const rxStatus = getPostRxStatus(booking as any);
+              const win = getCallWindow(booking as any);
+              const videoOpen = prescriptionApprovedAt ? rxStatus.videoEnabled : win.open;
+              if (videoOpen) {
+                return (
+                  <Button
+                    className="w-full h-10 gap-2 rounded-xl text-sm overflow-hidden"
+                    onClick={() => navigate(`/video/${encodeURIComponent(booking.videoRoomId!)}?returnTo=/provider`)}
+                    data-testid={`button-join-call-${booking.id}`}
+                  >
+                    <Video className="h-4 w-4 shrink-0" />
+                    <span className="truncate">Join Video Room</span>
+                  </Button>
+                );
+              }
+              return (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        className="w-full h-10 gap-2 rounded-xl text-sm overflow-hidden"
+                        disabled
+                        variant="outline"
+                        data-testid={`button-join-call-${booking.id}`}
+                      >
+                        <Clock className="h-4 w-4 shrink-0" />
+                        <span className="truncate">
+                          {prescriptionApprovedAt
+                            ? rxStatus.inWindow ? "Video Disabled" : "Consult Ended"
+                            : callWindowLabel(win)}
+                        </span>
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      {prescriptionApprovedAt
+                        ? rxStatus.inWindow
+                          ? "Video is disabled — toggle on from the post-consultation controls"
+                          : "Post-consultation 24-hour window has expired"
+                        : win.reason === "before_window" && win.windowStart
+                        ? `Call opens at ${toISTTimeString(win.windowStart)} IST`
+                        : win.reason === "expired" && win.windowEnd
+                        ? `Slot ended at ${toISTTimeString(win.windowEnd)} IST`
+                        : "Call window is not active"}
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              );
+            })() : (
+              <Button className="w-full h-10 rounded-xl text-sm overflow-hidden" disabled variant="outline">
+                <Video className="h-4 w-4 shrink-0 mr-1.5" />
+                <span className="truncate">No Room Yet</span>
+              </Button>
+            )}
+
+            <Button
+              variant="secondary"
+              className="w-full h-10 gap-2 rounded-xl text-sm overflow-hidden"
+              onClick={() => navigate(`/case-file/${booking.id}`)}
+              data-testid={`button-case-file-${booking.id}`}
+            >
+              <FolderOpen className="h-4 w-4 shrink-0" />
+              <span className="truncate">Case File</span>
+            </Button>
+            <Button
+              variant="outline"
+              className="w-full h-10 gap-2 rounded-xl text-sm overflow-hidden"
+              onClick={() => navigate(`/case-file/${booking.id}?tab=advisories`)}
+              data-testid={`button-advise-${booking.id}`}
+            >
+              <FilePlus className="h-4 w-4 shrink-0" />
+              <span className="truncate">Advise</span>
+            </Button>
+
+            <Button
+              variant="secondary"
+              className="w-full h-10 gap-2 rounded-xl text-sm overflow-hidden col-span-2"
+              onClick={() => onOpenSummary(booking)}
+              data-testid={`button-generate-summary-${booking.id}`}
+            >
+              <FileText className="h-4 w-4 shrink-0" />
+              <span className="truncate">
+                {(booking as any).prescriptionApprovedAt
+                  ? "View Summary"
+                  : (booking as any).prescriptionGeneratedAt
+                    ? "Edit Draft"
+                    : "Generate Summary"}
+              </span>
+            </Button>
+          </div>
+
+          <CallSeekerButton booking={booking} />
+          <PostRxToggles booking={booking} />
+
+          {(booking as any).prescriptionApprovedAt && getPostRxStatus(booking as any).inWindow && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="w-full gap-2 border-violet-500/30 text-violet-700 dark:text-violet-400 hover:bg-violet-500/5"
+              onClick={() => onAddReview(booking)}
+              data-testid={`button-add-review-${booking.id}`}
+            >
+              <FilePlus className="h-4 w-4" />
+              Add Review Summary
+            </Button>
+          )}
+
+          <PatientDetailsDialog
+            booking={booking}
+            trigger={
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full gap-2"
+                data-testid={`button-patient-details-${booking.id}`}
+              >
+                <User className="h-4 w-4 shrink-0" />
+                Patient Details
+              </Button>
+            }
+          />
+
+          {docUrls.length > 0 ? (
+            <FileListDialog
+              title="Patient Reports"
+              urls={docUrls}
+              trigger={
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full gap-2"
+                  data-testid={`button-view-reports-${booking.id}`}
+                >
+                  <Activity className="h-4 w-4 shrink-0" />
+                  View Reports
+                </Button>
+              }
+            />
+          ) : (
+            <Button variant="outline" size="sm" className="w-full gap-2" disabled>
+              <Activity className="h-4 w-4 shrink-0" />
+              No Reports Uploaded
+            </Button>
+          )}
+
+          {chartUrls.length > 0 ? (
+            <FileListDialog
+              title="Treatment Charts"
+              urls={chartUrls}
+              trigger={
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full gap-2"
+                  data-testid={`button-view-charts-${booking.id}`}
+                >
+                  <ClipboardList className="h-4 w-4 shrink-0" />
+                  View Treatment Chart
+                </Button>
+              }
+            />
+          ) : (
+            <Button variant="outline" size="sm" className="w-full gap-2" disabled>
+              <ClipboardList className="h-4 w-4 shrink-0" />
+              No Treatment Chart
+            </Button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ConsultationsSection({
   isLoading,
   activeConsultations,
+  navigate,
   onOpenSummary,
   onAddReview,
-  navigate,
 }: {
   isLoading: boolean;
   activeConsultations: ActiveConsultation[];
-  onOpenSummary: (b: ActiveConsultation) => void;
-  onAddReview: (b: ActiveConsultation) => void;
   navigate: (path: string) => void;
+  onOpenSummary: (booking: ActiveConsultation) => void;
+  onAddReview: (booking: ActiveConsultation) => void;
 }) {
   return (
     <section>
@@ -510,191 +750,13 @@ function ConsultationsSection({
             const chartUrls = (booking.treatmentChartUrls ?? []).filter(Boolean);
 
             return (
-              <div
+              <ActiveConsultationCard
                 key={booking.id}
-                className="rounded-2xl border bg-card p-4 sm:p-6 space-y-4"
-                data-testid={`card-consultation-${booking.id}`}
-              >
-                <div className="space-y-1.5">
-                  <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5 min-w-0">
-                    <p className="text-lg sm:text-xl font-bold tracking-tight break-words">{booking.patientName}</p>
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      {booking.patientAge && (
-                        <Badge variant="secondary" className="font-normal text-xs">
-                          {booking.patientAge} yrs
-                        </Badge>
-                      )}
-                      {booking.patientGender && (
-                        <Badge variant="outline" className="font-normal capitalize text-xs">
-                          {booking.patientGender}
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-2 text-muted-foreground">
-                    <Building2 className="h-3.5 w-3.5 shrink-0 mt-0.5" />
-                    <span className="text-sm leading-snug">{booking.seekerHospitalName}</span>
-                  </div>
-                  <div className="flex items-start gap-2 text-muted-foreground">
-                    <Calendar className="h-3.5 w-3.5 shrink-0 mt-0.5" />
-                    <span className="text-sm font-medium text-foreground leading-snug">
-                      {formatSlot(booking.appointmentSlot)}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2.5">
-                  {booking.videoRoomId ? (() => {
-                    const prescriptionApprovedAt = (booking as any).prescriptionApprovedAt;
-                    const rxStatus = getPostRxStatus(booking as any);
-                    const win = getCallWindow(booking as any);
-                    const videoOpen = prescriptionApprovedAt ? rxStatus.videoEnabled : win.open;
-                    if (videoOpen) {
-                      return (
-                        <Button
-                          className="w-full h-10 gap-2 rounded-xl text-sm overflow-hidden"
-                          onClick={() => navigate(`/video/${encodeURIComponent(booking.videoRoomId!)}?returnTo=/provider`)}
-                          data-testid={`button-join-call-${booking.id}`}
-                        >
-                          <Video className="h-4 w-4 shrink-0" />
-                          <span className="truncate">Join Video Room</span>
-                        </Button>
-                      );
-                    }
-                    return (
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              className="w-full h-10 gap-2 rounded-xl text-sm overflow-hidden"
-                              disabled
-                              variant="outline"
-                              data-testid={`button-join-call-${booking.id}`}
-                            >
-                              <Clock className="h-4 w-4 shrink-0" />
-                              <span className="truncate">
-                                {prescriptionApprovedAt
-                                  ? rxStatus.inWindow ? "Video Disabled" : "Consult Ended"
-                                  : callWindowLabel(win)}
-                              </span>
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            {prescriptionApprovedAt
-                              ? rxStatus.inWindow
-                                ? "Video is disabled — toggle on from the post-consultation controls"
-                                : "Post-consultation 24-hour window has expired"
-                              : win.reason === "before_window" && win.windowStart
-                              ? `Call opens at ${toISTTimeString(win.windowStart)} IST`
-                              : win.reason === "expired" && win.windowEnd
-                              ? `Slot ended at ${toISTTimeString(win.windowEnd)} IST`
-                              : "Call window is not active"}
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    );
-                  })() : (
-                    <Button className="w-full h-10 rounded-xl text-sm overflow-hidden" disabled variant="outline">
-                      <Video className="h-4 w-4 shrink-0 mr-1.5" />
-                      <span className="truncate">No Room Yet</span>
-                    </Button>
-                  )}
-
-                  <Button
-                    variant="secondary"
-                    className="w-full h-10 gap-2 rounded-xl text-sm overflow-hidden"
-                    onClick={() => onOpenSummary(booking)}
-                    data-testid={`button-generate-summary-${booking.id}`}
-                  >
-                    <FileText className="h-4 w-4 shrink-0" />
-                    <span className="truncate">
-                      {(booking as any).prescriptionApprovedAt
-                        ? "View Summary"
-                        : (booking as any).prescriptionGeneratedAt
-                          ? "Edit Draft"
-                          : "Generate Summary"}
-                    </span>
-                  </Button>
-                </div>
-
-                <CallSeekerButton booking={booking} />
-
-                <PostRxToggles booking={booking} />
-
-                {(booking as any).prescriptionApprovedAt && getPostRxStatus(booking as any).inWindow && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="w-full gap-2 border-violet-500/30 text-violet-700 dark:text-violet-400 hover:bg-violet-500/5"
-                    onClick={() => onAddReview(booking)}
-                    data-testid={`button-add-review-${booking.id}`}
-                  >
-                    <FilePlus className="h-4 w-4" />
-                    Add Review Summary
-                  </Button>
-                )}
-
-                <PatientDetailsDialog
-                  booking={booking}
-                  trigger={
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="w-full gap-2"
-                      data-testid={`button-patient-details-${booking.id}`}
-                    >
-                      <User className="h-4 w-4 shrink-0" />
-                      Patient Details
-                    </Button>
-                  }
-                />
-
-                {docUrls.length > 0 ? (
-                  <FileListDialog
-                    title="Patient Reports"
-                    urls={docUrls}
-                    trigger={
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="w-full gap-2"
-                        data-testid={`button-view-reports-${booking.id}`}
-                      >
-                        <Activity className="h-4 w-4 shrink-0" />
-                        View Reports
-                      </Button>
-                    }
-                  />
-                ) : (
-                  <Button variant="outline" size="sm" className="w-full gap-2" disabled>
-                    <Activity className="h-4 w-4 shrink-0" />
-                    No Reports Uploaded
-                  </Button>
-                )}
-
-                {chartUrls.length > 0 ? (
-                  <FileListDialog
-                    title="Treatment Charts"
-                    urls={chartUrls}
-                    trigger={
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="w-full gap-2"
-                        data-testid={`button-view-charts-${booking.id}`}
-                      >
-                        <ClipboardList className="h-4 w-4 shrink-0" />
-                        View Treatment Chart
-                      </Button>
-                    }
-                  />
-                ) : (
-                  <Button variant="outline" size="sm" className="w-full gap-2" disabled>
-                    <ClipboardList className="h-4 w-4 shrink-0" />
-                    No Treatment Chart
-                  </Button>
-                )}
-              </div>
+                booking={booking}
+                navigate={navigate}
+                onOpenSummary={onOpenSummary}
+                onAddReview={onAddReview}
+              />
             );
           })}
         </div>
@@ -934,9 +996,9 @@ export default function ProviderDashboard() {
           <ConsultationsSection
             isLoading={false}
             activeConsultations={activeConsultations}
+            navigate={navigate}
             onOpenSummary={openSummaryDialog}
             onAddReview={openReviewDialog}
-            navigate={navigate}
           />
 
           <section>
@@ -1054,9 +1116,9 @@ export default function ProviderDashboard() {
             <ConsultationsSection
               isLoading={false}
               activeConsultations={activeConsultations}
+              navigate={navigate}
               onOpenSummary={openSummaryDialog}
               onAddReview={openReviewDialog}
-              navigate={navigate}
             />
           </>
         )}

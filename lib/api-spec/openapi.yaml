@@ -68,7 +68,201 @@ paths:
           description: Access denied
         "404":
           description: Booking not found
+  /bookings/{bookingId}/case-file:
+    get:
+      operationId: getCaseFile
+      tags: [case-file]
+      summary: Get the authorized Case File aggregate
+      parameters:
+        - $ref: "#/components/parameters/BookingId"
+      responses:
+        "200":
+          description: Case File aggregate
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CaseFileAggregate"
+        "403": { description: Access denied }
+        "404": { description: Booking not found }
+  /bookings/{bookingId}/case-file/messages:
+    get:
+      operationId: getCaseFileMessages
+      tags: [case-file]
+      summary: List Case File messages
+      parameters:
+        - $ref: "#/components/parameters/BookingId"
+        - name: cursor
+          in: query
+          required: false
+          schema: { type: string, format: date-time }
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+      responses:
+        "200":
+          description: Messages
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CaseFileMessagesResponse"
+    post:
+      operationId: createCaseFileMessage
+      tags: [case-file]
+      summary: Send a Case File text message
+      parameters:
+        - $ref: "#/components/parameters/BookingId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CaseFileMessageInput"
+      responses:
+        "201":
+          description: Created message
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CaseFileMessage"
+        "403": { description: Access denied or closed Case File }
+  /bookings/{bookingId}/case-file/vitals:
+    get:
+      operationId: getCaseFileVitals
+      tags: [case-file]
+      summary: List Case File vitals
+      parameters:
+        - $ref: "#/components/parameters/BookingId"
+      responses:
+        "200":
+          description: Vitals flowsheet
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/CaseFileVital" }
+    post:
+      operationId: createCaseFileVital
+      tags: [case-file]
+      summary: Add a Seeker-recorded vital
+      parameters:
+        - $ref: "#/components/parameters/BookingId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CaseFileVitalInput" }
+      responses:
+        "201":
+          description: Created vital
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CaseFileVital" }
+        "403": { description: Only the Seeker may add vitals }
+  /bookings/{bookingId}/case-file/advisories:
+    get:
+      operationId: getCaseFileAdvisories
+      tags: [case-file]
+      summary: List the Clinical Advisory trail
+      parameters:
+        - $ref: "#/components/parameters/BookingId"
+      responses:
+        "200":
+          description: Advisory trail
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/CaseFileAdvisory" }
+    post:
+      operationId: createCaseFileAdvisory
+      tags: [case-file]
+      summary: Add a Provider Clinical Advisory
+      parameters:
+        - $ref: "#/components/parameters/BookingId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CaseFileAdvisoryInput" }
+      responses:
+        "201":
+          description: Created Advisory
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CaseFileAdvisory" }
+        "403": { description: Only the assigned Provider may add Advisories }
+  /bookings/{bookingId}/case-file/attachments:
+    post:
+      operationId: createCaseFileAttachment
+      tags: [case-file]
+      summary: Finalize a Case File attachment
+      parameters:
+        - $ref: "#/components/parameters/BookingId"
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema: { $ref: "#/components/schemas/CaseFileAttachmentInput" }
+      responses:
+        "201":
+          description: Created attachment message
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CaseFileMessage" }
+        "403": { description: Access denied or closed Case File }
+  /bookings/{bookingId}/case-file/follow-up-access:
+    patch:
+      operationId: updateCaseFileFollowUpAccess
+      tags: [case-file]
+      summary: Toggle Seeker follow-up call/video access
+      parameters:
+        - $ref: "#/components/parameters/BookingId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CaseFileFollowUpAccessInput" }
+      responses:
+        "200":
+          description: Updated access
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CaseFileCapabilities" }
+        "403": { description: Only the assigned Provider may update access }
+  /bookings/{bookingId}/case-file/attachments/{attachmentId}/download:
+    get:
+      operationId: downloadCaseFileAttachment
+      tags: [case-file]
+      summary: Download an authorized Case File attachment
+      parameters:
+        - $ref: "#/components/parameters/BookingId"
+        - name: attachmentId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Attachment bytes
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+            application/pdf:
+              schema: { type: string, format: binary }
+            image/jpeg:
+              schema: { type: string, format: binary }
+            image/png:
+              schema: { type: string, format: binary }
+        "302": { description: Legacy attachment redirect }
+        "403": { description: Access denied }
+        "404": { description: Attachment not found }
 components:
+  parameters:
+    BookingId:
+      name: bookingId
+      in: path
+      required: true
+      schema: { type: string }
   schemas:
     HealthStatus:
       type: object
@@ -104,4 +298,173 @@ components:
           type: boolean
       required:
         - status
+    CaseFileCapabilities:
+      type: object
+      required: [canMessage, canAttach, canAddVitals, canComposeAdvisory, canToggleFollowUp, readOnly, callsEnabled, videoEnabled]
+      properties:
+        canMessage: { type: boolean }
+        canAttach: { type: boolean }
+        canAddVitals: { type: boolean }
+        canComposeAdvisory: { type: boolean }
+        canToggleFollowUp: { type: boolean }
+        readOnly: { type: boolean }
+        callsEnabled: { type: boolean }
+        videoEnabled: { type: boolean }
+    CaseFileAttachment:
+      type: object
+      required: [id, bookingId, category, source, createdAt]
+      properties:
+        id: { type: string }
+        bookingId: { type: string }
+        messageId: { type: ["string", "null"] }
+        uploaderUserId: { type: string }
+        uploaderRole: { type: string }
+        originalFilename: { type: ["string", "null"] }
+        mimeType: { type: ["string", "null"] }
+        byteSize: { type: ["integer", "null"] }
+        objectPath: { type: ["string", "null"] }
+        legacyUrl: { type: ["string", "null"] }
+        source: { type: string }
+        category: { type: string }
+        createdAt: { type: string, format: date-time }
+    CaseFileMessage:
+      type: object
+      required: [id, bookingId, senderUserId, senderRole, kind, createdAt]
+      properties:
+        id: { type: string }
+        bookingId: { type: string }
+        senderUserId: { type: string }
+        senderRole: { type: string }
+        kind: { type: string }
+        body: { type: ["string", "null"] }
+        createdAt: { type: string, format: date-time }
+        attachment: { oneOf: [{ $ref: "#/components/schemas/CaseFileAttachment" }, { type: "null" }] }
+    CaseFileMessageInput:
+      type: object
+      required: [body]
+      properties:
+        body: { type: string, minLength: 1, maxLength: 10000 }
+    CaseFileMessagesResponse:
+      type: object
+      required: [messages, nextCursor]
+      properties:
+        messages:
+          type: array
+          items: { $ref: "#/components/schemas/CaseFileMessage" }
+        nextCursor: { type: ["string", "null"] }
+    CaseFileVital:
+      type: object
+      required: [id, bookingId, recordedByUserId, observedAt, createdAt]
+      properties:
+        id: { type: string }
+        bookingId: { type: string }
+        recordedByUserId: { type: string }
+        observedAt: { type: string, format: date-time }
+        systolicBp: { type: ["integer", "null"] }
+        diastolicBp: { type: ["integer", "null"] }
+        heartRate: { type: ["integer", "null"] }
+        respiratoryRate: { type: ["integer", "null"] }
+        intake: { type: ["number", "null"] }
+        output: { type: ["number", "null"] }
+        hourlyUrineOutput: { type: ["number", "null"] }
+        gcs: { type: ["integer", "null"] }
+        createdAt: { type: string, format: date-time }
+    CaseFileVitalInput:
+      type: object
+      required: [observedAt]
+      properties:
+        observedAt: { type: string, format: date-time }
+        systolicBp: { type: ["integer", "null"] }
+        diastolicBp: { type: ["integer", "null"] }
+        heartRate: { type: ["integer", "null"] }
+        respiratoryRate: { type: ["integer", "null"] }
+        intake: { type: ["number", "null"] }
+        output: { type: ["number", "null"] }
+        hourlyUrineOutput: { type: ["number", "null"] }
+        gcs: { type: ["integer", "null"] }
+    CaseFileAdvisory:
+      type: object
+      required: [id, bookingId, authorUserId, narrative, authoredAt]
+      properties:
+        id: { type: string }
+        bookingId: { type: string }
+        authorUserId: { type: string }
+        narrative: { type: string }
+        attachmentIds:
+          type: array
+          items: { type: string }
+        authoredAt: { type: string, format: date-time }
+    CaseFileAdvisoryInput:
+      type: object
+      required: [narrative]
+      properties:
+        narrative: { type: string, minLength: 1, maxLength: 20000 }
+        attachmentIds:
+          type: array
+          items: { type: string }
+    CaseFileAttachmentInput:
+      type: object
+      required: [file]
+      properties:
+        file:
+          type: string
+          format: binary
+        source: { type: string, enum: [camera, photo_gallery, document] }
+        category: { type: string, enum: [lab, radiology, treatment_chart, general, uncategorized] }
+    CaseFileFollowUpAccessInput:
+      type: object
+      properties:
+        callsEnabled: { type: boolean }
+        videoEnabled: { type: boolean }
+    CaseFileSummary:
+      type: object
+      properties:
+        allergies: { type: ["string", "null"] }
+        comorbidities: { type: ["string", "null"] }
+        presentingComplaint: { type: ["string", "null"] }
+        workingDiagnosis: { type: ["string", "null"] }
+        clinicalHistory: { type: ["string", "null"] }
+        submittedByUserId: { type: ["string", "null"] }
+        submittedAt: { type: ["string", "null"], format: date-time }
+    CaseFileProfile:
+      type: object
+      properties:
+        allergies: { type: ["string", "null"] }
+        comorbidities: { type: ["string", "null"] }
+        baselineMedications: { type: ["string", "null"] }
+        baselineParameters: { type: ["string", "null"] }
+        pastAdmissions: { type: ["string", "null"] }
+        emergencyContact: { type: ["string", "null"] }
+    CaseFileAggregate:
+      type: object
+      required: [booking, capabilities, summary, profile, latestVitals]
+      properties:
+        booking:
+          $ref: "#/components/schemas/CaseFileAggregateBooking"
+        capabilities: { $ref: "#/components/schemas/CaseFileCapabilities" }
+        summary: { $ref: "#/components/schemas/CaseFileSummary" }
+        profile: { $ref: "#/components/schemas/CaseFileProfile" }
+        latestVitals: { oneOf: [{ $ref: "#/components/schemas/CaseFileVital" }, { type: "null" }] }
+        latestVitalsFreshness: { type: ["string", "null"], enum: [fresh, aging, stale, null] }
+        advisories:
+          type: array
+          items: { $ref: "#/components/schemas/CaseFileAdvisory" }
+    CaseFileAggregateBooking:
+      type: object
+      required: [id, bookingNumber, patientName, patientAge, patientGender, providerName, serviceName, appointmentSlot, status, bookingType, userId, providerId, postRxCallsEnabled, postRxVideoEnabled]
+      properties:
+        id: { type: string }
+        bookingNumber: { type: ["string", "null"] }
+        patientName: { type: string }
+        patientAge: { type: integer }
+        patientGender: { type: ["string", "null"] }
+        providerName: { type: ["string", "null"] }
+        serviceName: { type: string }
+        appointmentSlot: { type: ["string", "null"] }
+        status: { type: string }
+        bookingType: { type: string }
+        userId: { type: string }
+        providerId: { type: ["string", "null"] }
+        postRxCallsEnabled: { type: boolean }
+        postRxVideoEnabled: { type: boolean }
 

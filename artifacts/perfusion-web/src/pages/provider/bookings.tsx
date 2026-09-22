@@ -13,7 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { StatusBadge } from "@/components/status-badge";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { ClipboardList, RefreshCw, Video, Upload, Stethoscope, FlaskConical, ScanLine, FileText, Download, Paperclip, FileSignature, Loader2, File, ShieldCheck, Lock, Clock, Image, ExternalLink, FilePlus } from "lucide-react";
+import { ClipboardList, RefreshCw, Video, Upload, Stethoscope, FlaskConical, ScanLine, FileText, Download, Paperclip, FileSignature, Loader2, File, ShieldCheck, Lock, Clock, Image, ExternalLink, FilePlus, FolderOpen, ChevronDown } from "lucide-react";
 import { getCallWindow, callWindowLabel, toISTTimeString, getPostRxStatus } from "@/lib/call-window";
 import { Link } from "wouter";
 import type { Booking, BookingStatus, BookingType, Provider, PrescriptionReview } from "@shared/schema";
@@ -283,10 +283,10 @@ export default function ProviderBookingsPage() {
 
   const uploadReportMutation = useMutation({
     mutationFn: async ({ id, reportUrl, reportNotes }: { id: string; reportUrl: string; reportNotes: string }) => {
-      const response = await apiRequest("PATCH", `/api/bookings/${id}/status`, { 
+      const response = await apiRequest("PATCH", `/api/bookings/${id}/status`, {
         status: "report_ready",
         reportUrl,
-        reportNotes 
+        reportNotes
       });
       return response.json();
     },
@@ -310,30 +310,30 @@ export default function ProviderBookingsPage() {
 
   const handleUploadReport = async () => {
     if (!selectedBooking) return;
-    
+
     setIsUploading(true);
     try {
       let finalReportUrl = reportUrl;
-      
+
       // If file upload method and file is selected, upload the file first
       if (uploadMethod === "file" && selectedFile) {
         const formData = new FormData();
         formData.append("file", selectedFile);
-        
+
         const response = await fetch("/api/upload/report", {
           method: "POST",
           body: formData,
           credentials: "include",
         });
-        
+
         if (!response.ok) {
           throw new Error("Failed to upload file");
         }
-        
+
         const data = await response.json();
         finalReportUrl = data.url;
       }
-      
+
       if (!finalReportUrl) {
         toast({
           title: "Error",
@@ -343,11 +343,11 @@ export default function ProviderBookingsPage() {
         setIsUploading(false);
         return;
       }
-      
-      uploadReportMutation.mutate({ 
-        id: selectedBooking.id, 
+
+      uploadReportMutation.mutate({
+        id: selectedBooking.id,
         reportUrl: finalReportUrl,
-        reportNotes 
+        reportNotes
       });
       // Note: resetReportDialog is called in mutation onSuccess
     } catch (error) {
@@ -381,18 +381,18 @@ export default function ProviderBookingsPage() {
   };
 
   const prescriptionMutation = useMutation({
-    mutationFn: async ({ id, diagnosis, medications, advice, followUp, physicianNotes }: { 
-      id: string; 
-      diagnosis: string; 
-      medications: string; 
-      advice: string; 
+    mutationFn: async ({ id, diagnosis, medications, advice, followUp, physicianNotes }: {
+      id: string;
+      diagnosis: string;
+      medications: string;
+      advice: string;
       followUp: string;
       physicianNotes: string;
     }) => {
-      const response = await apiRequest("PATCH", `/api/bookings/${id}/prescription`, { 
-        diagnosis, 
-        medications, 
-        advice, 
+      const response = await apiRequest("PATCH", `/api/bookings/${id}/prescription`, {
+        diagnosis,
+        medications,
+        advice,
         followUp,
         physicianNotes,
       });
@@ -491,8 +491,23 @@ export default function ProviderBookingsPage() {
   const activeBookings = filteredBookings.filter((b) => ["sample_collected", "processing"].includes(b.status));
   const completedBookings = filteredBookings.filter((b) => ["report_ready", "completed", "cancelled"].includes(b.status));
 
-  const BookingRow = ({ booking }: { booking: Booking }) => (
+  const [expandedBookingIds, setExpandedBookingIds] = useState<Set<string>>(new Set());
+
+  const toggleExpand = (id: string) => {
+    setExpandedBookingIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const BookingRow = ({ booking, key }: { booking: Booking, key?: string }) => {
+    const isExpanded = expandedBookingIds.has(booking.id);
+
+    return (
     <div
+      key={key}
       className="flex flex-col gap-4 rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between"
       data-testid={`booking-row-${booking.id}`}
     >
@@ -513,6 +528,16 @@ export default function ProviderBookingsPage() {
                 </Badge>
               )}
               <StatusBadge status={booking.status} />
+              {booking.bookingType === "consultation" && (
+                <button
+                  onClick={() => toggleExpand(booking.id)}
+                  aria-expanded={isExpanded}
+                  aria-controls={`booking-actions-${booking.id}`}
+                  className="ml-auto flex items-center text-xs text-muted-foreground hover:text-foreground focus:outline-none sm:hidden"
+                >
+                  {isExpanded ? 'Hide Actions' : 'Show Actions'}
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -540,115 +565,130 @@ export default function ProviderBookingsPage() {
       </div>
       <div className="flex flex-col items-start gap-2 sm:items-end">
         <span className="font-medium">
-          ₹{(booking.bookingType === "lab" || booking.bookingType === "teleradiology") && (booking as any).providerPrice 
-            ? (booking as any).providerPrice 
+          ₹{(booking.bookingType === "lab" || booking.bookingType === "teleradiology") && (booking as any).providerPrice
+            ? (booking as any).providerPrice
             : booking.amount}
         </span>
         {(booking.bookingType === "lab" || booking.bookingType === "teleradiology") && (booking as any).providerPrice && (
           <span className="text-xs text-muted-foreground">Your rate</span>
         )}
-        {booking.bookingType === "consultation" && booking.videoRoomId && (() => {
-          const prescriptionApprovedAt = (booking as any).prescriptionApprovedAt;
-          const rxStatus = getPostRxStatus(booking as any);
-          const win = getCallWindow(booking as any);
-          const videoOpen = prescriptionApprovedAt ? rxStatus.videoEnabled : win.open;
-          if (videoOpen) {
-            return (
-              <div className="flex flex-col items-end gap-0.5">
-                <Link href={`/video/${encodeURIComponent(booking.videoRoomId!)}?returnTo=/provider/bookings`}>
-                  <Button size="sm" variant="outline" data-testid={`button-join-video-${booking.id}`}>
-                    <Video className="mr-2 h-3.5 w-3.5" />
-                    Join Video Room
-                  </Button>
-                </Link>
-                {!prescriptionApprovedAt && win.reason === "extended" && win.extendedUntil && (
-                  <span className="text-xs text-amber-600 dark:text-amber-400">
-                    Extended until {toISTTimeString(win.extendedUntil)}
-                  </span>
-                )}
-              </div>
-            );
-          }
-          return (
-            <Button size="sm" variant="outline" disabled data-testid={`button-join-video-${booking.id}`}>
-              <Clock className="mr-2 h-3.5 w-3.5" />
-              {prescriptionApprovedAt
-                ? rxStatus.inWindow ? "Video Disabled" : "Consult Ended"
-                : callWindowLabel(win)}
-            </Button>
-          );
-        })()}
-        {booking.bookingType === "consultation" && (
-          <>
+
+        {booking.bookingType === "consultation" && isExpanded && (
+          <div id={`booking-actions-${booking.id}`} className="flex flex-col gap-2 items-end w-full sm:w-auto pt-2 border-t sm:border-t-0 sm:pt-0">
+            {booking.videoRoomId ? (() => {
+              const prescriptionApprovedAt = (booking as any).prescriptionApprovedAt;
+              const rxStatus = getPostRxStatus(booking as any);
+              const win = getCallWindow(booking as any);
+              const videoOpen = prescriptionApprovedAt ? rxStatus.videoEnabled : win.open;
+              if (videoOpen) {
+                return (
+                  <div className="flex flex-col items-end gap-0.5 w-full sm:w-auto">
+                    <Link href={`/video/${encodeURIComponent(booking.videoRoomId!)}?returnTo=/provider/bookings`}>
+                      <Button size="sm" variant="outline" className="w-full sm:w-auto" data-testid={`button-join-video-${booking.id}`}>
+                        <Video className="mr-2 h-3.5 w-3.5" />
+                        Join Video Room
+                      </Button>
+                    </Link>
+                    {!prescriptionApprovedAt && win.reason === "extended" && win.extendedUntil && (
+                      <span className="text-xs text-amber-600 dark:text-amber-400">
+                        Extended until {toISTTimeString(win.extendedUntil)}
+                      </span>
+                    )}
+                  </div>
+                );
+              }
+              return (
+                <Button size="sm" variant="outline" className="w-full sm:w-auto" disabled data-testid={`button-join-video-${booking.id}`}>
+                  <Clock className="mr-2 h-3.5 w-3.5" />
+                  {prescriptionApprovedAt
+                    ? rxStatus.inWindow ? "Video Disabled" : "Consult Ended"
+                    : callWindowLabel(win)}
+                </Button>
+              );
+            })() : (
+              <Button size="sm" variant="outline" className="w-full sm:w-auto" disabled>
+                <Video className="mr-2 h-3.5 w-3.5" />
+                No Room Yet
+              </Button>
+            )}
+
+            <div className="flex gap-2 w-full sm:w-auto">
+              <Link href={`/case-file/${booking.id}`}>
+                <Button size="sm" className="w-full sm:w-auto" data-testid={`button-case-file-${booking.id}`}>
+                  <FolderOpen className="mr-2 h-3.5 w-3.5" />
+                  Case File
+                </Button>
+              </Link>
+              <Link href={`/case-file/${booking.id}?tab=advisories`}>
+                <Button size="sm" variant="outline" className="w-full sm:w-auto" data-testid={`button-advise-${booking.id}`}>
+                  <FilePlus className="mr-2 h-3.5 w-3.5" />
+                  Advise
+                </Button>
+              </Link>
+            </div>
+
             {(booking as any).prescriptionApprovedAt ? (
-              <div className="flex flex-col items-end gap-1">
+              <div className="flex flex-col items-end gap-1 w-full sm:w-auto mt-2">
                 <div className="flex items-center gap-1 rounded-full bg-green-100 px-3 py-1 text-xs font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400">
                   <ShieldCheck className="h-3.5 w-3.5" />
-                  Signed & Locked
+                  Summary Signed
                 </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => openPrescriptionDialog(booking)}
-                  data-testid={`button-view-prescription-${booking.id}`}
-                >
-                  <FileText className="mr-2 h-3.5 w-3.5" />
-                  View Consultation Summary
-                </Button>
+                <div className="flex gap-2 mt-2 w-full sm:w-auto">
+                  <a href={`/api/bookings/${booking.id}/prescription-trail/download`} target="_blank" rel="noopener noreferrer" className="w-full sm:w-auto">
+                    <Button size="sm" variant="outline" className="w-full sm:w-auto text-green-600">
+                      <Download className="mr-2 h-3.5 w-3.5" />
+                      Advisory
+                    </Button>
+                  </a>
+                  <Button size="sm" variant="secondary" className="w-full sm:w-auto" onClick={() => openPrescriptionDialog(booking)}>
+                    <FileText className="mr-2 h-3.5 w-3.5" />
+                    Details
+                  </Button>
+                </div>
               </div>
             ) : (
-              <>
-                <Button
-                  size="sm"
-                  variant={(booking as any).prescriptionGeneratedAt ? "secondary" : "default"}
-                  onClick={() => openPrescriptionDialog(booking)}
-                  data-testid={`button-prescription-${booking.id}`}
-                >
-                  <FileSignature className="mr-2 h-3.5 w-3.5" />
-                  {(booking as any).prescriptionGeneratedAt ? "Edit Summary Draft" : "Generate Summary"}
-                </Button>
-                {(booking as any).prescriptionGeneratedAt && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={async () => {
-                      try {
-                        const response = await fetch(`/api/bookings/${booking.id}/prescription-pdf`, { credentials: "include" });
-                        if (!response.ok) throw new Error("Failed to fetch clinical advisory data");
-                        const prescriptionData = await response.json();
-                        const { generatePrescriptionPDF } = await import("@/lib/prescription-pdf");
-                        await generatePrescriptionPDF(prescriptionData);
-                      } catch (error) {
-                        console.error("PDF generation error:", error);
-                      }
-                    }}
-                    data-testid={`button-download-prescription-${booking.id}`}
-                  >
-                    <Download className="mr-2 h-3.5 w-3.5" />
-                    Draft PDF
-                  </Button>
-                )}
-              </>
+              <Button size="sm" variant="default" className="w-full sm:w-auto mt-2" onClick={() => openPrescriptionDialog(booking)}>
+                <FileSignature className="mr-2 h-3.5 w-3.5" />
+                {(booking as any).prescriptionGeneratedAt ? "Edit Summary Draft" : "Generate Summary"}
+              </Button>
             )}
-          </>
+
+            {(booking as any).prescriptionApprovedAt && getPostRxStatus(booking as any).inWindow && (
+              <Button size="sm" variant="outline" className="w-full sm:w-auto mt-2 text-violet-600 border-violet-200" onClick={() => {
+                setReviewBooking(booking);
+                setReviewDiagnosis(booking.prescriptionDiagnosis || "");
+                setShowReviewDialog(true);
+              }}>
+                <FilePlus className="mr-2 h-3.5 w-3.5" />
+                Add Review Summary
+              </Button>
+            )}
+
+            <div className="mt-2 w-full sm:w-auto">
+              <PostRxToggles booking={booking} />
+            </div>
+
+            <Select
+              value={booking.status}
+              onValueChange={(value) =>
+                updateStatusMutation.mutate({ id: booking.id, status: value as BookingStatus })
+              }
+              disabled={updateStatusMutation.isPending}
+            >
+              <SelectTrigger className="w-full sm:w-auto mt-2" data-testid={`select-status-consultation-${booking.id}`}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {statusOptions.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         )}
-        <PostRxToggles booking={booking} />
-        {booking.bookingType === "consultation" && (booking as any).prescriptionApprovedAt && getPostRxStatus(booking as any).inWindow && (
-          <Button
-            size="sm"
-            variant="outline"
-            className="w-full gap-2 border-violet-500/30 text-violet-700 dark:text-violet-400 hover:bg-violet-500/5"
-            onClick={() => {
-              setReviewBooking(booking);
-              setReviewDiagnosis(""); setReviewMedications(""); setReviewPhysicianNotes(""); setReviewFollowUp(""); setReviewAdvice("");
-              setShowReviewDialog(true);
-            }}
-            data-testid={`button-add-review-${booking.id}`}
-          >
-            <FilePlus className="mr-2 h-3.5 w-3.5" />
-            Add Review Summary
-          </Button>
-        )}
+
         {(booking.bookingType === "lab" || booking.bookingType === "teleradiology") && !booking.reportUrl && (
           <Button
             size="sm"
@@ -663,7 +703,7 @@ export default function ProviderBookingsPage() {
             Upload Report
           </Button>
         )}
-        {booking.reportUrl && (
+        {(booking.bookingType === "lab" || booking.bookingType === "teleradiology") && booking.reportUrl && (
           <a href={booking.reportUrl} target="_blank" rel="noopener noreferrer">
             <Button size="sm" variant="outline" className="text-green-600" data-testid={`button-view-report-${booking.id}`}>
               <Download className="mr-2 h-3.5 w-3.5" />
@@ -671,44 +711,62 @@ export default function ProviderBookingsPage() {
             </Button>
           </a>
         )}
-        <Button
-          size="sm"
-          variant="ghost"
-          onClick={() => {
-            setDocsBooking(booking);
-            setShowDocsDialog(true);
-          }}
-          data-testid={`button-view-docs-${booking.id}`}
-        >
-          <Paperclip className="mr-1 h-3.5 w-3.5" />
-          {(() => {
-            const docCount = booking.documentUrls?.length || 0;
-            const chartCount = ((booking as any).treatmentChartUrls as string[] | null)?.length || 0;
-            const total = docCount + chartCount;
-            return total > 0 ? `${total} doc(s)` : "Documents";
-          })()}
-        </Button>
-        <Select
-          value={booking.status}
-          onValueChange={(value) =>
-            updateStatusMutation.mutate({ id: booking.id, status: value as BookingStatus })
-          }
-          disabled={updateStatusMutation.isPending}
-        >
-          <SelectTrigger className="w-40" data-testid={`select-status-${booking.id}`}>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {statusOptions.map((option) => (
-              <SelectItem key={option.value} value={option.value}>
-                {option.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {(booking.bookingType === "lab" || booking.bookingType === "teleradiology") && (
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => {
+              setDocsBooking(booking);
+              setShowDocsDialog(true);
+            }}
+            data-testid={`button-view-docs-${booking.id}`}
+          >
+            <Paperclip className="mr-1 h-3.5 w-3.5" />
+            {(() => {
+              const docCount = booking.documentUrls?.length || 0;
+              const chartCount = ((booking as any).treatmentChartUrls as string[] | null)?.length || 0;
+              const total = docCount + chartCount;
+              return total > 0 ? `${total} doc(s)` : "Documents";
+            })()}
+          </Button>
+        )}
+
+        {booking.bookingType === "consultation" && (
+          <button
+            onClick={() => toggleExpand(booking.id)}
+            aria-expanded={isExpanded}
+            aria-controls={`booking-actions-${booking.id}`}
+            className="hidden sm:flex mt-2 items-center text-xs text-muted-foreground hover:text-foreground focus:outline-none"
+          >
+            <ChevronDown className={`h-4 w-4 mr-1 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+            {isExpanded ? 'Hide Actions' : 'Show Actions'}
+          </button>
+        )}
+
+        {booking.bookingType !== "consultation" && (
+          <Select
+            value={booking.status}
+            onValueChange={(value) =>
+              updateStatusMutation.mutate({ id: booking.id, status: value as BookingStatus })
+            }
+            disabled={updateStatusMutation.isPending}
+          >
+            <SelectTrigger className="w-40" data-testid={`select-status-${booking.id}`}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {statusOptions.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
       </div>
     </div>
-  );
+    );
+  };
 
   const EmptyState = ({ message }: { message: string }) => (
     <div className="flex flex-col items-center justify-center py-12 text-center">
@@ -766,9 +824,7 @@ export default function ProviderBookingsPage() {
               ) : pendingBookings.length === 0 ? (
                 <EmptyState message="No pending bookings" />
               ) : (
-                pendingBookings.map((booking) => (
-                  <BookingRow key={booking.id} booking={booking} />
-                ))
+                pendingBookings.map((booking) => BookingRow({ booking, key: booking.id }))
               )}
             </CardContent>
           </Card>
@@ -790,9 +846,7 @@ export default function ProviderBookingsPage() {
               ) : activeBookings.length === 0 ? (
                 <EmptyState message="No active bookings" />
               ) : (
-                activeBookings.map((booking) => (
-                  <BookingRow key={booking.id} booking={booking} />
-                ))
+                activeBookings.map((booking) => BookingRow({ booking, key: booking.id }))
               )}
             </CardContent>
           </Card>
@@ -814,9 +868,7 @@ export default function ProviderBookingsPage() {
               ) : completedBookings.length === 0 ? (
                 <EmptyState message="No completed bookings" />
               ) : (
-                completedBookings.map((booking) => (
-                  <BookingRow key={booking.id} booking={booking} />
-                ))
+                completedBookings.map((booking) => BookingRow({ booking, key: booking.id }))
               )}
             </CardContent>
           </Card>
