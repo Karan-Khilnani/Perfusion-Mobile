@@ -70,9 +70,10 @@
       "typedRoutes": true,
       "reactCompiler": true
     },
+    "owner": "perfusion",
     "extra": {
       "eas": {
-        "projectId": "34cf9ecd-e6c0-4f54-973f-9b479f2"
+        "projectId": "152f3e2b-ef3c-485d-b808-6d017eb2f925"
       }
     }
   }
