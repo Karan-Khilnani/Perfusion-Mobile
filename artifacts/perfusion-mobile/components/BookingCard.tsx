@@ -1,262 +1,198 @@
 import { Feather, Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import React from "react";
+import React, { useState } from "react";
 import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 
+import { useAuth } from "@/contexts/AuthContext";
+import {
+  Booking,
+  formatRemainingWindow,
+  formatTime,
+  isSeekerRole,
+  isTerminalStatus,
+  statusPresentation,
+} from "@/lib/mobile-models";
+import colors from "@/constants/colors";
 import { useColors } from "@/hooks/useColors";
 
-export interface Booking {
-  id: string;
-  bookingNumber?: string;
-  serviceName: string;
-  serviceType: string;
-  status: string;
-  scheduledDate?: string;
-  timeSlot?: string;
-  patientName?: string;
-  providerName?: string;
-  videoRoomId?: string;
-  amount?: string;
-}
+export type { Booking };
 
-const STATUS_COLORS: Record<
-  string,
-  { bg: string; text: string; dot: string }
-> = {
-  confirmed: {
-    bg: "#DCFCE7",
-    text: "#15803D",
-    dot: "#16A34A",
-  },
-  pending: {
-    bg: "#FEF3C7",
-    text: "#B45309",
-    dot: "#D97706",
-  },
-  completed: {
-    bg: "#F0F0F0",
-    text: "#737373",
-    dot: "#9CA3AF",
-  },
-  cancelled: {
-    bg: "#FEE2E2",
-    text: "#B91C1C",
-    dot: "#DC2626",
-  },
-  in_progress: {
-    bg: "#EFF6FF",
-    text: "#1D4ED8",
-    dot: "#3B82F6",
-  },
+type Props = {
+  booking: Booking;
+  onPauseToggle?: (booking: Booking) => void;
 };
 
-const SERVICE_ICONS: Record<string, string> = {
-  consultation: "user-md",
-  lab: "flask",
-  teleradiology: "scan",
-  emergency: "activity",
-  transport: "truck",
-};
-
-function formatDate(dateStr?: string): string {
-  if (!dateStr) return "—";
-  try {
-    const d = new Date(dateStr);
-    return d.toLocaleDateString("en-IN", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    });
-  } catch {
-    return dateStr;
-  }
-}
-
-export function BookingCard({ booking }: { booking: Booking }) {
-  const colors = useColors();
-  const statusInfo = STATUS_COLORS[booking.status] || {
-    bg: colors.muted,
-    text: colors.mutedForeground,
-    dot: colors.mutedForeground,
-  };
-
-  const serviceType = booking.serviceType?.toLowerCase() || "consultation";
-  const iconName =
-    (SERVICE_ICONS[serviceType] as any) ||
-    (SERVICE_ICONS.consultation as any);
+export function BookingCard({ booking, onPauseToggle }: Props) {
+  const palette = useColors();
+  const { user } = useAuth();
+  const [expanded, setExpanded] = useState(false);
+  const seeker = isSeekerRole(user?.role);
+  const status = statusPresentation(booking.status, {
+    success: palette.success,
+    terminal: palette.terminal,
+    warning: palette.warning,
+    quiet: palette.quiet,
+    blue: palette.blue,
+  });
+  const terminal = isTerminalStatus(booking.status);
+  const quietWindow = (booking.status === "ongoing" || booking.status === "in_progress") && !booking.videoRoomId;
+  const city = (booking.providerCity || booking.city || booking.providerHospital || "").slice(0, 3).toUpperCase();
+  const initials = seeker
+    ? city || "—"
+    : `${booking.patientAge || "—"}${booking.patientGender ? booking.patientGender.slice(0, 1).toUpperCase() : ""}`;
+  const title = seeker
+    ? `${booking.providerSpecialization || booking.serviceName || "Consultation"} · ${booking.providerName || "Consultant"}`
+    : booking.patientName || "Patient";
+  const place = seeker
+    ? booking.providerHospital || booking.hospitalName || "Specialist network"
+    : booking.seekerHospitalName || booking.hospitalName || "Hospital";
+  const time = formatTime(booking.appointmentSlot || booking.timeSlot || booking.scheduledDate);
+  const remaining = formatRemainingWindow((booking as Booking & { postRxExpiresAt?: string }).postRxExpiresAt);
+  const callsAvailable = !terminal && (booking.postRxCallsEnabled ?? true);
+  const videoAvailable = !terminal && (booking.postRxVideoEnabled ?? true);
 
   return (
-    <Pressable
-      onPress={() => router.push(`/booking/${booking.id}`)}
-      style={({ pressed }) => [
-        styles.card,
-        {
-          backgroundColor: colors.card,
-          borderColor: colors.border,
-          opacity: pressed ? 0.85 : 1,
-        },
-      ]}
-      testID={`booking-card-${booking.id}`}
-    >
-      <View style={styles.iconContainer}>
-        <View
-          style={[
-            styles.iconBg,
-            { backgroundColor: `${colors.primary}15` },
-          ]}
+    <View style={[styles.row, { borderBottomColor: palette.border }]}>
+      <View style={styles.rowMain}>
+        <View style={[styles.badge, { backgroundColor: seeker ? `${palette.blue}12` : palette.accent }]}>
+          <Text style={[styles.badgeText, { color: seeker ? palette.blue : palette.foreground }]}>{initials}</Text>
+        </View>
+        <Pressable
+          style={styles.rowBody}
+          onPress={() => setExpanded((value) => !value)}
+          accessibilityRole="button"
+          accessibilityState={{ expanded }}
+          testID={`consultation-row-${booking.id}`}
         >
-          <Ionicons
-            name="medical"
-            size={20}
-            color={colors.primary}
-          />
-        </View>
-      </View>
-
-      <View style={styles.content}>
-        <View style={styles.header}>
-          <Text
-            style={[styles.serviceName, { color: colors.foreground }]}
-            numberOfLines={1}
-          >
-            {booking.serviceName}
-          </Text>
-          <View
-            style={[
-              styles.statusBadge,
-              { backgroundColor: statusInfo.bg },
-            ]}
-          >
-            <View
-              style={[styles.statusDot, { backgroundColor: statusInfo.dot }]}
-            />
-            <Text style={[styles.statusText, { color: statusInfo.text }]}>
-              {booking.status.replace(/_/g, " ")}
-            </Text>
+          <Text style={[styles.title, { color: palette.foreground }]}>{title}</Text>
+          <View style={styles.placeLine}>
+            <Text style={[styles.placeStrong, { color: palette.foreground }]}>{seeker ? place.split(",")[0] : place}</Text>
+            {seeker && place.includes(",") ? <Text style={[styles.place, { color: palette.mutedForeground }]}>{`, ${place.split(",").slice(1).join(",").trim()}`}</Text> : null}
+            <Text style={[styles.time, { color: palette.mutedForeground }]}>{time}</Text>
           </View>
-        </View>
-
-        {booking.patientName && (
-          <Text
-            style={[styles.detail, { color: colors.mutedForeground }]}
-            numberOfLines={1}
-          >
-            <Feather name="user" size={11} /> {booking.patientName}
-          </Text>
-        )}
-
-        <View style={styles.meta}>
-          {booking.scheduledDate && (
-            <View style={styles.metaItem}>
-              <Feather name="calendar" size={11} color={colors.mutedForeground} />
-              <Text style={[styles.metaText, { color: colors.mutedForeground }]}>
-                {formatDate(booking.scheduledDate)}
+          <View style={styles.patientLine}>
+            <Text style={[styles.patient, { color: palette.mutedForeground }]}>{seeker ? booking.patientName || "Patient" : place}</Text>
+            <View style={styles.status}>
+              <View style={[styles.dot, { backgroundColor: status.dot }, status.label === "Ongoing" && !quietWindow ? styles.liveDot : undefined]} />
+              <Text style={[styles.statusText, { color: quietWindow ? palette.quiet : status.text }]}>
+                {quietWindow && remaining ? `Ongoing · ${remaining}` : status.label}
               </Text>
             </View>
-          )}
-          {booking.timeSlot && (
-            <View style={styles.metaItem}>
-              <Feather name="clock" size={11} color={colors.mutedForeground} />
-              <Text style={[styles.metaText, { color: colors.mutedForeground }]}>
-                {booking.timeSlot}
-              </Text>
-            </View>
-          )}
-          {booking.bookingNumber && (
-            <View style={styles.metaItem}>
-              <Feather name="hash" size={11} color={colors.mutedForeground} />
-              <Text style={[styles.metaText, { color: colors.mutedForeground }]}>
-                {booking.bookingNumber}
-              </Text>
-            </View>
-          )}
-        </View>
+          </View>
+        </Pressable>
+        <Pressable
+          onPress={() => setExpanded((value) => !value)}
+          style={styles.expandButton}
+          accessibilityLabel={expanded ? "Collapse consultation actions" : "Expand consultation actions"}
+        >
+          <Feather name={expanded ? "chevron-up" : "chevron-down"} size={18} color={palette.mutedForeground} />
+        </Pressable>
       </View>
 
-      <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
+      {expanded && (
+        <View style={[styles.actions, { borderTopColor: palette.border }]}>
+          <Action
+            icon="phone"
+            label="Call"
+            disabled={!callsAvailable}
+            color={palette.foreground}
+            onPress={() => router.push(`/call/${booking.id}?mode=voice`)}
+          />
+          <Action
+            icon="video"
+            label="Video"
+            disabled={!videoAvailable}
+            color={palette.foreground}
+            onPress={() => router.push(`/call/${booking.id}?mode=video`)}
+          />
+          <Action
+            icon="folder"
+            label="Case File"
+            color={palette.foreground}
+            onPress={() => router.push(`/case-file/${booking.id}`)}
+          />
+          <Action
+            icon={seeker ? "file-text" : "edit-3"}
+            label={seeker ? "Advisory" : "Advise"}
+            disabled={!seeker && !callsAvailable}
+            color={palette.foreground}
+            badge={seeker ? booking.caseFileUnreadAdvisories : undefined}
+            onPress={() => router.push(`/case-file/${booking.id}?focus=advisory`)}
+          />
+          {!seeker && onPauseToggle && !terminal && (
+            <Pressable
+              style={styles.pauseWord}
+              onPress={() => onPauseToggle(booking)}
+              testID={`pause-follow-up-${booking.id}`}
+            >
+              <Text style={[styles.pauseText, { color: palette.quiet }]}>
+                {booking.postRxCallsEnabled === false && booking.postRxVideoEnabled === false ? "Paused" : "Ongoing"}
+              </Text>
+              <Text style={[styles.pauseHint, { color: palette.mutedForeground }]}>Tap status to pause follow-up</Text>
+            </Pressable>
+          )}
+        </View>
+      )}
+    </View>
+  );
+}
+
+function Action({
+  icon,
+  label,
+  disabled,
+  color,
+  badge,
+  onPress,
+}: {
+  icon: keyof typeof Feather.glyphMap;
+  label: string;
+  disabled?: boolean;
+  color: string;
+  badge?: number;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      style={({ pressed }) => [styles.action, { opacity: disabled ? 0.35 : pressed ? 0.65 : 1 }]}
+      disabled={disabled}
+      onPress={onPress}
+      accessibilityRole="button"
+      testID={`consultation-action-${label.toLowerCase().replace(" ", "-")}`}
+    >
+      <View>
+        <Feather name={icon} size={19} color={color} />
+        {!!badge && <View style={styles.badgeCount}><Text style={styles.badgeCountText}>{badge}</Text></View>}
+      </View>
+      <Text style={[styles.actionText, { color }]}>{label}</Text>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  card: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 14,
-    borderRadius: 12,
-    borderWidth: 1,
-    marginBottom: 10,
-    gap: 12,
-    ...(Platform.OS === "web"
-      ? { boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }
-      : {
-          shadowColor: "#000",
-          shadowOffset: { width: 0, height: 1 },
-          shadowOpacity: 0.06,
-          shadowRadius: 3,
-          elevation: 2,
-        }),
-  },
-  iconContainer: {
-    flexShrink: 0,
-  },
-  iconBg: {
-    width: 42,
-    height: 42,
-    borderRadius: 10,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  content: {
-    flex: 1,
-    gap: 4,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 8,
-  },
-  serviceName: {
-    fontSize: 15,
-    fontFamily: "Inter_600SemiBold",
-    flex: 1,
-  },
-  statusBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 7,
-    paddingVertical: 3,
-    borderRadius: 20,
-  },
-  statusDot: {
-    width: 5,
-    height: 5,
-    borderRadius: 3,
-  },
-  statusText: {
-    fontSize: 11,
-    fontFamily: "Inter_500Medium",
-    textTransform: "capitalize",
-  },
-  detail: {
-    fontSize: 13,
-    fontFamily: "Inter_400Regular",
-  },
-  meta: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-    marginTop: 2,
-  },
-  metaItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 3,
-  },
-  metaText: {
-    fontSize: 12,
-    fontFamily: "Inter_400Regular",
-  },
+  row: { paddingVertical: 14, borderBottomWidth: StyleSheet.hairlineWidth },
+  rowMain: { flexDirection: "row", alignItems: "flex-start", gap: 12 },
+  badge: { width: 48, height: 48, borderRadius: 24, alignItems: "center", justifyContent: "center", marginTop: 1 },
+  badgeText: { fontSize: 13, fontFamily: "Inter_700Bold", letterSpacing: -0.2 },
+  rowBody: { flex: 1, minWidth: 0, gap: 5 },
+  title: { fontSize: 15, lineHeight: 20, fontFamily: "Inter_600SemiBold" },
+  placeLine: { flexDirection: "row", flexWrap: "wrap", alignItems: "baseline", gap: 2 },
+  placeStrong: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
+  place: { fontSize: 12, fontFamily: "Inter_400Regular" },
+  time: { fontSize: 12, fontFamily: "Inter_500Medium", marginLeft: 5 },
+  patientLine: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
+  patient: { flex: 1, fontSize: 13, fontFamily: "Inter_400Regular" },
+  status: { flexDirection: "row", alignItems: "center", gap: 5 },
+  dot: { width: 7, height: 7, borderRadius: 4 },
+  liveDot: { borderWidth: 2, borderColor: "#DB2841", width: 9, height: 9, borderRadius: 5 },
+  statusText: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
+  expandButton: { padding: 7, marginRight: -5, marginTop: -4 },
+  actions: { marginTop: 12, marginLeft: 60, paddingTop: 12, flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", borderTopWidth: StyleSheet.hairlineWidth },
+  action: { alignItems: "center", gap: 5, minWidth: 53 },
+  actionText: { fontSize: 11, fontFamily: "Inter_500Medium" },
+  badgeCount: { position: "absolute", top: -7, right: -9, minWidth: 16, height: 16, paddingHorizontal: 4, borderRadius: 8, backgroundColor: "#DB2841", alignItems: "center", justifyContent: "center" },
+  badgeCountText: { color: "#FFFFFF", fontSize: 10, fontFamily: "Inter_700Bold" },
+  pauseWord: { position: "absolute", left: 0, right: 0, top: 54, alignItems: "center" },
+  pauseText: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
+  pauseHint: { fontSize: 10, fontFamily: "Inter_400Regular", marginTop: 2 },
 });
