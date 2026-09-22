@@ -11,18 +11,28 @@
     "splash": {
       "image": "./assets/images/icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#FAFAFA"
+      "backgroundColor": "#F7F7F9"
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.perfusion.mobile"
+      "bundleIdentifier": "com.perfusion.mobile",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Perfusion uses the camera for secure video consultations and clinical file capture.",
+        "NSMicrophoneUsageDescription": "Perfusion uses the microphone for secure voice and video consultations.",
+        "NSUserNotificationsUsageDescription": "Perfusion sends consultation, Case File, and call notifications."
+      }
     },
     "android": {
       "package": "com.perfusion.mobile",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/icon.png",
-        "backgroundColor": "#FAFAFA"
-      }
+        "backgroundColor": "#F7F7F9"
+      },
+      "permissions": [
+        "CAMERA",
+        "RECORD_AUDIO",
+        "POST_NOTIFICATIONS"
+      ]
     },
     "web": {
       "favicon": "./assets/images/icon.png"
@@ -35,7 +45,14 @@
         }
       ],
       "expo-font",
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/icon.png",
+          "color": "#DB2841"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
