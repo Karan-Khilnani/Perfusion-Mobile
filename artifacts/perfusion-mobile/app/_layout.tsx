@@ -66,6 +66,14 @@ function RootLayoutNav() {
           options={{ title: "Booking Details" }}
         />
         <Stack.Screen
+          name="case-file/[bookingId]"
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="new-consultation"
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
           name="call/[bookingId]"
           options={{ headerShown: false, gestureEnabled: false }}
         />

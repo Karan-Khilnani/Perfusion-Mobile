@@ -54,11 +54,20 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="bookings"
+        name="consultations"
         options={{
-          title: "Bookings",
+          title: "Consultations",
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="calendar-outline" size={size} color={color} />
+            <Ionicons name="call-outline" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="billing"
+        options={{
+          title: "Billing",
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="receipt-outline" size={size} color={color} />
           ),
         }}
       />
@@ -71,6 +80,7 @@ export default function TabLayout() {
           ),
         }}
       />
+      <Tabs.Screen name="bookings" options={{ href: null }} />
     </Tabs>
   );
 }

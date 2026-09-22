@@ -1,5 +1,5 @@
-import { Feather, Ionicons } from "@expo/vector-icons";
-import { useQuery } from "@tanstack/react-query";
+import { Feather } from "@expo/vector-icons";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
 import React from "react";
 import {
@@ -14,347 +14,187 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { BookingCard, type Booking } from "@/components/BookingCard";
+import { BookingCard } from "@/components/BookingCard";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiFetch } from "@/hooks/useApi";
 import { useColors } from "@/hooks/useColors";
+import { Booking, isSeekerRole } from "@/lib/mobile-models";
 
-function useBookings(role?: string) {
+function useConsultations(role?: string) {
   return useQuery<Booking[]>({
-    queryKey: ["bookings", role],
+    queryKey: ["consultations", role],
     queryFn: async () => {
-      const endpoint =
-        role === "provider" ? "/api/provider/bookings" : "/api/bookings";
-      const res = await apiFetch(endpoint);
-      if (!res.ok) throw new Error("Failed to load bookings");
-      return res.json();
+      const endpoint = role === "provider" ? "/api/provider/bookings" : "/api/bookings";
+      const response = await apiFetch(endpoint);
+      if (!response.ok) throw new Error("Unable to load consultations");
+      return response.json();
     },
     enabled: !!role,
-    staleTime: 30_000,
+    refetchInterval: 15_000,
+    refetchOnWindowFocus: true,
   });
 }
 
+function greeting() {
+  const hour = new Date().getHours();
+  if (hour < 12) return "Good morning";
+  if (hour < 17) return "Good afternoon";
+  return "Good evening";
+}
+
 export default function DashboardScreen() {
-  const colors = useColors();
+  const palette = useColors();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const seeker = isSeekerRole(user?.role);
+  const consultations = useConsultations(user?.role);
+  const bookings = [...(consultations.data || [])]
+    .sort((a, b) => {
+      const aDate = new Date(a.scheduledDate || a.appointmentSlot || 0).getTime();
+      const bDate = new Date(b.scheduledDate || b.appointmentSlot || 0).getTime();
+      return bDate - aDate;
+    })
+    .slice(0, 20);
 
-  const {
-    data: bookings,
-    isLoading,
-    isError,
-    refetch,
-    isRefetching,
-  } = useBookings(user?.role);
+  const followUp = useMutation({
+    mutationFn: async (booking: Booking) => {
+      const enabled = !(booking.postRxCallsEnabled !== false || booking.postRxVideoEnabled !== false);
+      const response = await apiFetch(`/api/bookings/${booking.id}/case-file/follow-up-access`, {
+        method: "PATCH",
+        body: JSON.stringify({ callsEnabled: enabled, videoEnabled: enabled }),
+      });
+      if (!response.ok) throw new Error("Could not update follow-up access");
+      return response.json();
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["consultations", user?.role] }),
+  });
 
-  const activeBookings =
-    bookings?.filter(
-      (booking) => !["completed", "cancelled"].includes(booking.status)
-    ) ?? [];
-  const upcoming = activeBookings.slice(0, 5);
-  const todayBookings =
-    activeBookings.filter((b) => {
-      if (!b.scheduledDate) return false;
-      const d = new Date(b.scheduledDate);
-      const today = new Date();
-      return (
-        d.getDate() === today.getDate() &&
-        d.getMonth() === today.getMonth() &&
-        d.getFullYear() === today.getFullYear()
-      );
-    });
-  const isProvider = user?.role === "provider";
-
-  const greeting = () => {
-    const h = new Date().getHours();
-    if (h < 12) return "Good morning";
-    if (h < 17) return "Good afternoon";
-    return "Good evening";
-  };
+  const liveCount = bookings.filter((item) => ["ongoing", "in_progress", "processing"].includes(item.status)).length;
+  const name = user?.firstName || user?.name?.split(" ")[0] || "there";
+  const date = new Date().toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long" });
 
   return (
     <ScrollView
-      style={{ flex: 1, backgroundColor: colors.background }}
+      style={{ flex: 1, backgroundColor: palette.background }}
       contentContainerStyle={[
         styles.container,
         {
-          paddingTop: Platform.OS === "web" ? 67 : insets.top + 16,
-          paddingBottom:
-            Platform.OS === "web" ? 84 + 34 : insets.bottom + 80,
+          paddingTop: Platform.OS === "web" ? 76 : insets.top + 16,
+          paddingBottom: Platform.OS === "web" ? 126 : insets.bottom + 98,
         },
       ]}
-      refreshControl={
-        <RefreshControl
-          refreshing={isRefetching}
-          onRefresh={refetch}
-          tintColor={colors.primary}
-        />
-      }
+      refreshControl={<RefreshControl refreshing={consultations.isRefetching} onRefresh={consultations.refetch} tintColor={palette.primary} />}
       showsVerticalScrollIndicator={false}
     >
-      <View style={styles.greeting}>
-        <View>
-          <Text style={[styles.greetingText, { color: colors.mutedForeground }]}>
-            {greeting()},
-          </Text>
-          <Text style={[styles.userName, { color: colors.foreground }]}>
-            {user?.name || user?.email || "User"}
-          </Text>
-        </View>
-        <View
-          style={[
-            styles.avatarCircle,
-            { backgroundColor: `${colors.primary}18` },
-          ]}
-        >
-          <Ionicons name="person" size={22} color={colors.primary} />
-        </View>
-      </View>
-
-      {todayBookings.length > 0 && (
-        <View
-          style={[
-            styles.todayBanner,
-            { backgroundColor: `${colors.primary}10`, borderColor: `${colors.primary}20` },
-          ]}
-        >
-          <Ionicons name="today-outline" size={18} color={colors.primary} />
-          <Text style={[styles.todayText, { color: colors.primary }]}>
-            {todayBookings.length} {isProvider ? "assigned " : ""}
-            appointment{todayBookings.length > 1 ? "s" : ""} today
-          </Text>
-        </View>
-      )}
-
-      <View style={styles.statsRow}>
-        <StatCard
-          icon="calendar"
-          label={isProvider ? "Assigned" : "Upcoming"}
-          value={String(activeBookings.length)}
-          colors={colors}
-        />
-        <StatCard
-          icon="today"
-          label="Today"
-          value={String(todayBookings.length)}
-          colors={colors}
-          highlight
-        />
-      </View>
-
-      <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
-             {isProvider ? "Assigned Appointments" : "Upcoming Appointments"}
-          </Text>
-          <Pressable onPress={() => router.push("/(tabs)/bookings")}>
-            <Text style={[styles.seeAll, { color: colors.primary }]}>
-              See all
-            </Text>
+      <View style={styles.brandRow}>
+        <Text style={[styles.brand, { color: palette.foreground }]}>Perfusion</Text>
+        <View style={styles.headerActions}>
+          <Pressable style={[styles.headerIcon, { borderColor: palette.border }]} accessibilityLabel="Help">
+            <Feather name="help-circle" size={18} color={palette.foreground} />
+          </Pressable>
+          <Pressable style={[styles.headerIcon, { borderColor: palette.border }]} accessibilityLabel="Notifications">
+            <Feather name="bell" size={18} color={palette.foreground} />
+            {liveCount > 0 && <View style={[styles.notificationDot, { backgroundColor: palette.primary }]} />}
           </Pressable>
         </View>
+      </View>
 
-        {isLoading && (
-          <View style={styles.loader}>
-            <ActivityIndicator color={colors.primary} />
+      <View style={styles.greetingBlock}>
+        <Text style={[styles.greeting, { color: palette.foreground }]}>{greeting()}, {seeker ? "Dr. " : "Dr. "}{name}</Text>
+        <Text style={[styles.date, { color: palette.mutedForeground }]}>
+          {date}{seeker && user?.hospitalName ? ` · ${user.hospitalName}` : ""}
+        </Text>
+      </View>
+
+      {seeker ? (
+        <Pressable
+          style={({ pressed }) => [styles.newConsultation, { backgroundColor: palette.primary, opacity: pressed ? 0.9 : 1 }]}
+          onPress={() => router.push("/new-consultation")}
+          testID="new-consultation-button"
+        >
+          <View style={styles.newConsultationIcon}><Feather name="plus" size={20} color={palette.primary} /></View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.newConsultationTitle}>New Consultation</Text>
+            <Text style={styles.newConsultationSubtitle}>Find a specialist for your patient</Text>
           </View>
-        )}
+          <Feather name="arrow-right" size={19} color="#FFFFFF" />
+        </Pressable>
+      ) : liveCount > 0 ? (
+        <View style={[styles.liveBanner, { borderColor: `${palette.primary}25`, backgroundColor: `${palette.primary}08` }]}>
+          <View style={[styles.livePulse, { backgroundColor: palette.primary }]} />
+          <Text style={[styles.liveBannerText, { color: palette.foreground }]}>
+            {liveCount} consultation{liveCount > 1 ? "s" : ""} ongoing
+          </Text>
+        </View>
+      ) : null}
 
-        {isError && (
-          <View
-            style={[
-              styles.errorBox,
-              { backgroundColor: `${colors.destructive}10`, borderColor: `${colors.destructive}20` },
-            ]}
-          >
-            <Ionicons
-              name="alert-circle-outline"
-              size={18}
-              color={colors.destructive}
-            />
-            <Text style={[styles.errorText, { color: colors.destructive }]}>
-              Failed to load bookings
+      <View style={styles.sectionHeader}>
+        <View>
+          <Text style={[styles.sectionTitle, { color: palette.foreground }]}>
+            {seeker ? "Active Consultations" : "Recent Consultations"}
+          </Text>
+          <Text style={[styles.sectionMeta, { color: palette.mutedForeground }]}>{bookings.length} of {consultations.data?.length || 0}</Text>
+        </View>
+        <Pressable onPress={() => router.push("/(tabs)/consultations")}>
+          <Text style={[styles.viewAll, { color: palette.foreground }]}>View all</Text>
+        </Pressable>
+      </View>
+
+      <View style={[styles.list, { backgroundColor: palette.card, borderColor: palette.border }]}>
+        {consultations.isLoading ? (
+          <View style={styles.state}>
+            <ActivityIndicator color={palette.primary} />
+            <Text style={[styles.stateText, { color: palette.mutedForeground }]}>Loading consultations…</Text>
+          </View>
+        ) : consultations.isError ? (
+          <View style={styles.state}>
+            <Feather name="alert-circle" size={30} color={palette.primary} />
+            <Text style={[styles.stateTitle, { color: palette.foreground }]}>Couldn’t load consultations</Text>
+            <Pressable onPress={() => consultations.refetch()}><Text style={[styles.retry, { color: palette.primary }]}>Retry</Text></Pressable>
+          </View>
+        ) : bookings.length === 0 ? (
+          <View style={styles.state}>
+            <Feather name="phone-call" size={30} color={palette.mutedForeground} />
+            <Text style={[styles.stateTitle, { color: palette.foreground }]}>No consultations yet</Text>
+            <Text style={[styles.stateText, { color: palette.mutedForeground }]}>
+              {seeker ? "Book a specialist consultation to begin." : "Your consultation history will appear here once patients are booked in."}
             </Text>
-            <Pressable onPress={() => refetch()}>
-              <Text style={[styles.retryText, { color: colors.primary }]}>
-                Retry
-              </Text>
-            </Pressable>
           </View>
+        ) : (
+          bookings.map((booking) => (
+            <BookingCard key={booking.id} booking={booking} onPauseToggle={seeker ? undefined : (value) => followUp.mutate(value)} />
+          ))
         )}
-
-        {!isLoading && !isError && upcoming.length === 0 && (
-          <View style={styles.empty}>
-            <Ionicons
-              name="calendar-outline"
-              size={40}
-              color={colors.mutedForeground}
-            />
-            <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
-               {isProvider
-                 ? "No assigned appointments"
-                 : "No upcoming appointments"}
-            </Text>
-          </View>
-        )}
-
-        {upcoming.map((booking) => (
-          <BookingCard key={booking.id} booking={booking} />
-        ))}
       </View>
     </ScrollView>
   );
 }
 
-function StatCard({
-  icon,
-  label,
-  value,
-  colors,
-  highlight,
-}: {
-  icon: any;
-  label: string;
-  value: string;
-  colors: any;
-  highlight?: boolean;
-}) {
-  return (
-    <View
-      style={[
-        styles.statCard,
-        {
-          backgroundColor: highlight
-            ? `${colors.primary}12`
-            : colors.card,
-          borderColor: highlight
-            ? `${colors.primary}25`
-            : colors.border,
-        },
-      ]}
-    >
-      <Ionicons
-        name={icon}
-        size={20}
-        color={highlight ? colors.primary : colors.mutedForeground}
-      />
-      <Text
-        style={[
-          styles.statValue,
-          { color: highlight ? colors.primary : colors.foreground },
-        ]}
-      >
-        {value}
-      </Text>
-      <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>
-        {label}
-      </Text>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
-  container: {
-    paddingHorizontal: 20,
-    gap: 20,
-  },
-  greeting: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  greetingText: {
-    fontSize: 14,
-    fontFamily: "Inter_400Regular",
-  },
-  userName: {
-    fontSize: 22,
-    fontFamily: "Inter_700Bold",
-    letterSpacing: -0.3,
-  },
-  avatarCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  todayBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    padding: 12,
-    borderRadius: 10,
-    borderWidth: 1,
-  },
-  todayText: {
-    fontSize: 14,
-    fontFamily: "Inter_500Medium",
-  },
-  statsRow: {
-    flexDirection: "row",
-    gap: 12,
-  },
-  statCard: {
-    flex: 1,
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    alignItems: "center",
-    gap: 6,
-  },
-  statValue: {
-    fontSize: 28,
-    fontFamily: "Inter_700Bold",
-  },
-  statLabel: {
-    fontSize: 13,
-    fontFamily: "Inter_400Regular",
-  },
-  section: {
-    gap: 12,
-  },
-  sectionHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  sectionTitle: {
-    fontSize: 17,
-    fontFamily: "Inter_600SemiBold",
-  },
-  seeAll: {
-    fontSize: 14,
-    fontFamily: "Inter_500Medium",
-  },
-  loader: {
-    paddingVertical: 32,
-    alignItems: "center",
-  },
-  errorBox: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    padding: 14,
-    borderRadius: 10,
-    borderWidth: 1,
-  },
-  errorText: {
-    fontSize: 14,
-    fontFamily: "Inter_400Regular",
-    flex: 1,
-  },
-  retryText: {
-    fontSize: 14,
-    fontFamily: "Inter_600SemiBold",
-  },
-  empty: {
-    alignItems: "center",
-    paddingVertical: 40,
-    gap: 12,
-  },
-  emptyText: {
-    fontSize: 15,
-    fontFamily: "Inter_400Regular",
-  },
+  container: { paddingHorizontal: 18 },
+  brandRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  brand: { fontSize: 18, fontFamily: "Inter_700Bold", letterSpacing: -0.3 },
+  headerActions: { flexDirection: "row", gap: 8 },
+  headerIcon: { width: 38, height: 38, borderRadius: 19, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  notificationDot: { position: "absolute", top: 8, right: 8, width: 6, height: 6, borderRadius: 3 },
+  greetingBlock: { marginTop: 30, marginBottom: 22, gap: 5 },
+  greeting: { fontSize: 25, lineHeight: 31, fontFamily: "Inter_700Bold", letterSpacing: -0.6 },
+  date: { fontSize: 13, fontFamily: "Inter_400Regular" },
+  newConsultation: { borderRadius: 16, minHeight: 76, paddingHorizontal: 16, flexDirection: "row", alignItems: "center", gap: 13, marginBottom: 26 },
+  newConsultationIcon: { width: 38, height: 38, borderRadius: 19, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center" },
+  newConsultationTitle: { color: "#FFFFFF", fontSize: 16, fontFamily: "Inter_700Bold" },
+  newConsultationSubtitle: { color: "rgba(255,255,255,.78)", fontSize: 12, marginTop: 3, fontFamily: "Inter_400Regular" },
+  liveBanner: { borderWidth: 1, borderRadius: 13, minHeight: 50, paddingHorizontal: 14, flexDirection: "row", alignItems: "center", gap: 9, marginBottom: 24 },
+  livePulse: { width: 8, height: 8, borderRadius: 4 },
+  liveBannerText: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
+  sectionHeader: { flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 11 },
+  sectionTitle: { fontSize: 17, fontFamily: "Inter_700Bold" },
+  sectionMeta: { fontSize: 11, fontFamily: "Inter_400Regular", marginTop: 3 },
+  viewAll: { fontSize: 12, fontFamily: "Inter_600SemiBold", textDecorationLine: "underline" },
+  list: { borderWidth: 1, borderRadius: 18, paddingHorizontal: 14, overflow: "hidden" },
+  state: { alignItems: "center", paddingVertical: 44, paddingHorizontal: 20, gap: 9 },
+  stateTitle: { fontSize: 15, fontFamily: "Inter_600SemiBold", textAlign: "center" },
+  stateText: { fontSize: 13, lineHeight: 19, fontFamily: "Inter_400Regular", textAlign: "center" },
+  retry: { fontSize: 13, fontFamily: "Inter_600SemiBold", padding: 6 },
 });

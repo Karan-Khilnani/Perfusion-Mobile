@@ -1,7 +1,7 @@
-import { Feather, Ionicons } from "@expo/vector-icons";
+import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React, { useState } from "react";
-import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -12,7 +12,6 @@ import {
   isTerminalStatus,
   statusPresentation,
 } from "@/lib/mobile-models";
-import colors from "@/constants/colors";
 import { useColors } from "@/hooks/useColors";
 
 export type { Booking };
