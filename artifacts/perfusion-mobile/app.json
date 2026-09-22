@@ -52,6 +52,18 @@
           "icon": "./assets/images/icon.png",
           "color": "#DB2841"
         }
+      ],
+      [
+        "expo-callkit-telecom",
+        {
+          "incomingCallTimeout": 45,
+          "fulfillAnswerCallTimeout": 30,
+          "includesCallsInRecents": false,
+          "defaultRingtoneIos": "default",
+          "defaultRingtoneAndroid": "default",
+          "microphonePermission": "Perfusion uses the microphone for secure voice and video consultations.",
+          "cameraPermission": "Perfusion uses the camera for secure video consultations."
+        }
       ]
     ],
     "experiments": {

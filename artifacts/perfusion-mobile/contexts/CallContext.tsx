@@ -6,9 +6,15 @@ import React, {
   useRef,
   useState,
 } from "react";
+import { Platform } from "react-native";
+import { router } from "expo-router";
 
 import { useAuth } from "@/contexts/AuthContext";
 import { apiFetch } from "@/hooks/useApi";
+import {
+  initializeNativeCalls,
+  reportNativeIncomingCall,
+} from "@/lib/native-calls";
 
 export interface IncomingCallData {
   bookingId: string;
@@ -34,6 +40,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
     null
   );
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const nativeReportedBookingRef = useRef<string | null>(null);
 
   const checkIncomingCall = useCallback(async () => {
     if (!user) return;
@@ -42,8 +49,19 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
       if (res.ok) {
         const data = await res.json();
         if (data && data.bookingId && !incomingCall) {
+          if (
+            Platform.OS !== "web" &&
+            nativeReportedBookingRef.current !== data.bookingId
+          ) {
+            const nativeReported = await reportNativeIncomingCall(data);
+            if (nativeReported) {
+              nativeReportedBookingRef.current = data.bookingId;
+              return;
+            }
+          }
           setIncomingCall(data);
         } else if (!data || !data.bookingId) {
+          nativeReportedBookingRef.current = null;
           setIncomingCall(null);
         }
       }
@@ -61,6 +79,45 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
       if (pollRef.current) clearInterval(pollRef.current);
     };
   }, [checkIncomingCall, user]);
+
+  useEffect(() => {
+    if (!user || Platform.OS === "web") return;
+
+    let cleanup = () => {};
+    let cancelled = false;
+    initializeNativeCalls({
+      onAnswered: async (bookingId) => {
+        const response = await apiFetch(`/api/call/accept/${bookingId}`, {
+          method: "POST",
+        });
+        if (!response.ok) throw new Error("Could not accept call");
+        setIncomingCall(null);
+        router.push(`/call/${bookingId}`);
+      },
+      onDeclined: async (bookingId) => {
+        await apiFetch(`/api/call/decline/${bookingId}`, { method: "POST" });
+        setIncomingCall(null);
+      },
+      onToken: async (token, tokenType) => {
+        await apiFetch("/api/push/mobile-token", {
+          method: "POST",
+          body: JSON.stringify({
+            token,
+            platform: Platform.OS,
+            tokenType,
+          }),
+        });
+      },
+    }).then((dispose) => {
+      if (cancelled) dispose();
+      else cleanup = dispose;
+    });
+
+    return () => {
+      cancelled = true;
+      cleanup();
+    };
+  }, [user]);
 
   const acceptCall = async (bookingId: string) => {
     const response = await apiFetch(`/api/call/accept/${bookingId}`, { method: "POST" });

@@ -5453,15 +5453,18 @@ export async function registerRoutes(
     try {
       const userId = req.user?.id;
       if (!userId) return res.status(401).json({ error: "Not authenticated" });
-      const { token, platform } = req.body;
+      const { token, platform, tokenType = "EXPO" } = req.body;
       if (!token || !platform) return res.status(400).json({ error: "Missing token or platform" });
+      if (!["EXPO", "APNS_VOIP", "FCM"].includes(tokenType)) {
+        return res.status(400).json({ error: "Invalid mobile push token type" });
+      }
       const { getPool } = await import("./db");
       const pool = getPool();
       await pool.query(
-        `INSERT INTO mobile_push_tokens (user_id, token, platform, updated_at)
-         VALUES ($1, $2, $3, now())
-         ON CONFLICT (token) DO UPDATE SET user_id = $1, platform = $3, updated_at = now()`,
-        [userId, token, platform]
+        `INSERT INTO mobile_push_tokens (user_id, token, platform, token_type, updated_at)
+         VALUES ($1, $2, $3, $4, now())
+         ON CONFLICT (token) DO UPDATE SET user_id = $1, platform = $3, token_type = $4, updated_at = now()`,
+        [userId, token, platform, tokenType]
       );
       res.json({ success: true });
     } catch (error) {
