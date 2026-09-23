@@ -42,6 +42,7 @@ async function startServer() {
     await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS mobile_push_tokens_token_idx ON mobile_push_tokens(token)`);
     await pool.query(`CREATE INDEX IF NOT EXISTS mobile_push_tokens_user_idx ON mobile_push_tokens(user_id)`);
     await pool.query(`ALTER TABLE mobile_push_tokens ADD COLUMN IF NOT EXISTS token_type varchar(20) NOT NULL DEFAULT 'EXPO'`);
+    await pool.query(`ALTER TABLE mobile_push_tokens ADD COLUMN IF NOT EXISTS device_id varchar(120)`);
     await pool.query(`CREATE TABLE IF NOT EXISTS mobile_callback_devices (
       user_id varchar PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
       device_name varchar(100) NOT NULL,

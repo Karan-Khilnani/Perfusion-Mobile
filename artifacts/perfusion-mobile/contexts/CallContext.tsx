@@ -15,6 +15,7 @@ import {
   initializeNativeCalls,
   reportNativeIncomingCall,
 } from "@/lib/native-calls";
+import { getPushDeviceId } from "@/lib/push-device";
 
 export interface IncomingCallData {
   bookingId: string;
@@ -105,6 +106,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
             token,
             platform: Platform.OS,
             tokenType,
+            deviceId: await getPushDeviceId(),
           }),
         });
       },

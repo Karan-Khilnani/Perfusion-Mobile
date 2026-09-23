@@ -1,4 +1,5 @@
 import { Platform } from "react-native";
+import { apiFetch } from "@/hooks/useApi";
 
 import type {
   CallSession,
@@ -80,6 +81,17 @@ export async function initializeNativeCalls(
   }
 
   return () => subscriptions.forEach((subscription) => subscription.remove());
+}
+
+export async function deregisterNativeCallToken(): Promise<void> {
+  const calls = await getCallsModule();
+  const token = calls?.getVoIPPushToken();
+  if (!token) return;
+  const response = await apiFetch("/api/push/mobile-token", {
+    method: "DELETE",
+    body: JSON.stringify({ token: token.token }),
+  });
+  if (!response.ok) throw new Error("Failed to remove native call token");
 }
 
 export async function reportNativeIncomingCall(

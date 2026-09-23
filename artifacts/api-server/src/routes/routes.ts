@@ -22,7 +22,7 @@ import { generateAndStoreAgreementPdf, type AgreementPdfData } from "../services
 import { AGREEMENT_VERSION, AGREEMENT_FULL_TEXT, partnerTypeLabel } from "../services/agreement-text";
 import { sendPushNotification, getVapidPublicKey, type PushPayload } from "../services/push-notifications";
 import { getCallWindow } from "../services/call-window";
-import { Expo, type ExpoPushMessage } from "expo-server-sdk";
+import { notifyMobileIncomingCall } from "../services/mobile-call-push";
 import { randomUUID } from "crypto";
 
 function sanitizeUserForClient<T extends Record<string, any> | undefined>(user: T) {
@@ -5493,18 +5493,22 @@ export async function registerRoutes(
     try {
       const userId = req.user?.id;
       if (!userId) return res.status(401).json({ error: "Not authenticated" });
-      const { token, platform, tokenType = "EXPO" } = req.body;
+      const { token, platform, tokenType = "EXPO", deviceId } = req.body;
       if (!token || !platform) return res.status(400).json({ error: "Missing token or platform" });
       if (!["EXPO", "APNS_VOIP", "FCM"].includes(tokenType)) {
         return res.status(400).json({ error: "Invalid mobile push token type" });
       }
+      if (deviceId != null && (typeof deviceId !== "string" || deviceId.length > 120 || deviceId.length < 8)) {
+        return res.status(400).json({ error: "Invalid device ID" });
+      }
       const { getPool } = await import("./db");
       const pool = getPool();
       await pool.query(
-        `INSERT INTO mobile_push_tokens (user_id, token, platform, token_type, updated_at)
-         VALUES ($1, $2, $3, $4, now())
-         ON CONFLICT (token) DO UPDATE SET user_id = $1, platform = $3, token_type = $4, updated_at = now()`,
-        [userId, token, platform, tokenType]
+        `INSERT INTO mobile_push_tokens (user_id, token, platform, token_type, device_id, updated_at)
+         VALUES ($1, $2, $3, $4, $5, now())
+         ON CONFLICT (token) DO UPDATE SET user_id = $1, platform = $3, token_type = $4,
+           device_id = $5, updated_at = now()`,
+        [userId, token, platform, tokenType, deviceId || null]
       );
       res.json({ success: true });
     } catch (error) {
@@ -5779,51 +5783,16 @@ export async function registerRoutes(
         }).catch(() => {});
       }
 
-      // Send Expo push notification to mobile devices
-      try {
-        const { getPool } = await import("./db");
-        const pool = getPool();
-        const tokenRows = await pool.query(
-          `SELECT token FROM mobile_push_tokens WHERE user_id = $1`,
-          [recipientUserId]
-        );
-        if (tokenRows.rows.length > 0) {
-          const expo = new Expo();
-          const messages: ExpoPushMessage[] = tokenRows.rows
-            .filter((r: any) => Expo.isExpoPushToken(r.token))
-            .map((r: any) => ({
-              to: r.token,
-              sound: "default" as const,
-              title: "Incoming Consultation",
-              body: subtitle,
-              data: {
-                type: "incoming_call",
-                bookingId,
-                callerName,
-                callerRole,
-                videoRoomUrl,
-                subtitle,
-              },
-              priority: "high" as const,
-            }));
-          const chunks = expo.chunkPushNotifications(messages);
-          for (const chunk of chunks) {
-            expo.sendPushNotificationsAsync(chunk).then((receipts) => {
-              receipts.forEach((receipt, i) => {
-                if (receipt.status === "error") {
-                  console.error(`[MobilePush] Error sending to ${messages[i]?.to}:`, receipt.message);
-                  if (receipt.details?.error === "DeviceNotRegistered") {
-                    pool.query(`DELETE FROM mobile_push_tokens WHERE token = $1`, [messages[i]?.to]).catch(() => {});
-                  }
-                }
-              });
-            }).catch((err) => console.error("[MobilePush] Chunk send error:", err));
-          }
-          console.log(`[Ring] Sent Expo push to ${messages.length} mobile device(s) for user ${recipientUserId}`);
-        }
-      } catch (pushErr) {
-        console.error("[MobilePush] Failed to send Expo push:", pushErr);
-      }
+      notifyMobileIncomingCall(recipientUserId, {
+        bookingId,
+        callerId,
+        callerName,
+        callerRole,
+        callType,
+        videoRoomUrl,
+        serviceName: booking.serviceName || "",
+        subtitle,
+      }).catch((error) => req.log.error({ err: error }, "Mobile incoming-call push failed"));
 
       res.json({ success: true, session: { bookingId, status: "ringing" } });
     } catch (error) {

@@ -8,6 +8,8 @@ import {
   getBaseUrl,
   storeCookie,
 } from "@/hooks/useApi";
+import { deregisterNativeCallToken } from "@/lib/native-calls";
+import { getPushDeviceId } from "@/lib/push-device";
 
 async function registerMobilePushToken(): Promise<void> {
   if (Platform.OS === "web") return;
@@ -27,6 +29,7 @@ async function registerMobilePushToken(): Promise<void> {
       body: JSON.stringify({
         token: tokenData.data,
         platform: Platform.OS,
+        deviceId: await getPushDeviceId(),
       }),
     });
   } catch {
@@ -196,8 +199,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const logout = async () => {
-    // Deregister push token before clearing session (non-blocking)
-    deregisterMobilePushToken().catch(() => {});
+    // Remove both device tokens while the user's session still authenticates these requests.
+    await Promise.allSettled([deregisterMobilePushToken(), deregisterNativeCallToken()]);
     try {
       await apiFetch("/api/auth/logout", { method: "POST" });
     } catch {}
