@@ -24,6 +24,7 @@
     },
     "android": {
       "package": "com.perfusion.mobile",
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/icon.png",
         "backgroundColor": "#F7F7F9"

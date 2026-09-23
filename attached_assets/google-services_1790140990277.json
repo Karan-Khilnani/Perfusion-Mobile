@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "804449911669",
+    "project_id": "perfusion-4f89a",
+    "storage_bucket": "perfusion-4f89a.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:804449911669:android:3da2a01a2e0efede9f893c",
+        "android_client_info": {
+          "package_name": "com.perfusion.mobile"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD3HsMH6mXjaWVO3hlJF8TEThHbblQBv0Q"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
