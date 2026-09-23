@@ -4,7 +4,9 @@ import { router, useLocalSearchParams } from "expo-router";
 import React, { useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
+  Linking,
   Modal,
   Platform,
   Pressable,
@@ -21,6 +23,13 @@ import { useAuth } from "@/contexts/AuthContext";
 import { apiFetch } from "@/hooks/useApi";
 import { useColors } from "@/hooks/useColors";
 import {
+  type AttachmentCategory,
+  type AttachmentDraft,
+  type AttachmentSource,
+  pickCaseFileAttachment,
+  uploadCaseFileAttachment,
+} from "@/lib/case-file-attachments";
+import {
   Advisory,
   CaseFileAggregate,
   CaseFileMessage,
@@ -29,7 +38,12 @@ import {
   statusPresentation,
 } from "@/lib/mobile-models";
 
-const CATEGORY_LABELS = ["Lab", "Radiology", "Treatment Chart", "General"] as const;
+const CATEGORY_LABELS: { label: string; value: AttachmentCategory }[] = [
+  { label: "Lab", value: "lab" },
+  { label: "Radiology", value: "radiology" },
+  { label: "Treatment Chart", value: "treatment_chart" },
+  { label: "General", value: "general" },
+];
 
 async function requestJson<T>(path: string, options?: RequestInit): Promise<T> {
   const response = await apiFetch(path, options);
@@ -48,9 +62,55 @@ export default function CaseFileScreen() {
   const queryClient = useQueryClient();
   const seeker = isSeekerRole(user?.role);
   const [message, setMessage] = useState("");
-  const [sheet, setSheet] = useState<"summary" | "profile" | "vitals" | "add-vitals" | "advisory" | "trail" | "source" | null>(
+  const [sheet, setSheet] = useState<"summary" | "profile" | "vitals" | "add-vitals" | "advisory" | "trail" | "source" | "attach" | null>(
     focus === "advisory" ? (seeker ? "trail" : "advisory") : null,
   );
+  const [attachment, setAttachment] = useState<AttachmentDraft | null>(null);
+  const [attachmentCategory, setAttachmentCategory] = useState<AttachmentCategory | null>(null);
+  const [attachmentError, setAttachmentError] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+
+  const chooseAttachment = async (source: AttachmentSource) => {
+    setSheet(null);
+    setAttachmentError(null);
+    try {
+      // Native image/document pickers must wait until the presenting sheet has dismissed.
+      // On web, retain the click gesture so the browser permits the file chooser.
+      if (Platform.OS !== "web") await new Promise((resolve) => setTimeout(resolve, 350));
+      const picked = await pickCaseFileAttachment(source);
+      if (!picked) return;
+      setAttachment(picked);
+      setAttachmentCategory(null);
+      setSheet("attach");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Could not open the file picker.";
+      setAttachmentError(message);
+      setSheet("source");
+      if (Platform.OS !== "web" && message.includes("device settings")) {
+        Alert.alert("Permission needed", message, [
+          { text: "Not now", style: "cancel" },
+          { text: "Open Settings", onPress: () => void Linking.openSettings() },
+        ]);
+      }
+    }
+  };
+
+  const sendAttachment = async () => {
+    if (!attachment || (seeker && !attachmentCategory) || uploading) return;
+    setUploading(true);
+    setAttachmentError(null);
+    try {
+      await uploadCaseFileAttachment(bookingId, attachment, seeker ? attachmentCategory! : "uncategorized");
+      setSheet(null);
+      setAttachment(null);
+      setAttachmentCategory(null);
+      queryClient.invalidateQueries({ queryKey: ["case-file-messages", bookingId] });
+    } catch (error) {
+      setAttachmentError(error instanceof Error ? error.message : "Could not upload the file.");
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const aggregate = useQuery<CaseFileAggregate>({
     queryKey: ["case-file", bookingId],
@@ -258,7 +318,15 @@ export default function CaseFileScreen() {
 
       <CaseFileSheet
         type={sheet}
-        onClose={() => setSheet(null)}
+        onClose={() => { if (!uploading) setSheet(null); }}
+        onChooseAttachment={chooseAttachment}
+        attachment={attachment}
+        attachmentCategory={attachmentCategory}
+        onCategoryChange={setAttachmentCategory}
+        attachmentError={attachmentError}
+        uploading={uploading}
+        onSendAttachment={sendAttachment}
+        seeker={seeker}
         aggregate={caseFile}
         vitals={vitals.data || []}
         advisories={advisories.data || caseFile.advisories || []}
@@ -342,6 +410,14 @@ function MessageBubble({ message, own, bookingId, onAdvisory }: { message: CaseF
 function CaseFileSheet({
   type,
   onClose,
+  onChooseAttachment,
+  attachment,
+  attachmentCategory,
+  onCategoryChange,
+  attachmentError,
+  uploading,
+  onSendAttachment,
+  seeker,
   aggregate,
   vitals,
   advisories,
@@ -351,6 +427,14 @@ function CaseFileSheet({
 }: {
   type: string | null;
   onClose: () => void;
+  onChooseAttachment: (source: AttachmentSource) => void;
+  attachment: AttachmentDraft | null;
+  attachmentCategory: AttachmentCategory | null;
+  onCategoryChange: (category: AttachmentCategory) => void;
+  attachmentError: string | null;
+  uploading: boolean;
+  onSendAttachment: () => void;
+  seeker: boolean;
   aggregate: CaseFileAggregate;
   vitals: Vital[];
   advisories: Advisory[];
@@ -386,19 +470,19 @@ function CaseFileSheet({
     onSuccess: () => { onRefresh(); onClose(); setAdvisory(""); },
   });
   if (!type) return null;
-  const title = type === "summary" ? "Clinical Summary" : type === "profile" ? "Patient Profile" : type === "vitals" ? "Vitals · I/O · GCS" : type === "add-vitals" ? "Add Vitals" : type === "advisory" ? "Add Clinical Advisory" : type === "trail" ? "Clinical Advisory" : "Attach";
+  const title = type === "summary" ? "Clinical Summary" : type === "profile" ? "Patient Profile" : type === "vitals" ? "Vitals · I/O · GCS" : type === "add-vitals" ? "Add Vitals" : type === "advisory" ? "Add Clinical Advisory" : type === "trail" ? "Clinical Advisory" : type === "attach" ? "Review attachment" : "Attach";
 
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.modalBackdrop}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} disabled={uploading} />
         <View style={[styles.sheet, { backgroundColor: palette.card, paddingBottom: Math.max(insets.bottom, 18) }]}>
           <View style={[styles.sheetHeader, { borderBottomColor: palette.border }]}>
             <View>
               <Text style={[styles.sheetTitle, { color: palette.foreground }]}>{title}</Text>
               <Text style={[styles.sheetSubtitle, { color: palette.mutedForeground }]}>{aggregate.booking.patientName}</Text>
             </View>
-            <Pressable onPress={onClose} style={styles.iconButton}><Feather name="x" size={20} color={palette.foreground} /></Pressable>
+            <Pressable onPress={onClose} disabled={uploading} style={styles.iconButton}><Feather name="x" size={20} color={palette.foreground} /></Pressable>
           </View>
           <ScrollView contentContainerStyle={styles.sheetContent} keyboardShouldPersistTaps="handled">
             {type === "summary" && (
@@ -493,19 +577,56 @@ function CaseFileSheet({
             )}
             {type === "source" && (
               <>
-                <Text style={[styles.sheetHint, { color: palette.mutedForeground }]}>Choose a source first. You&apos;ll classify the file before sending.</Text>
-                {[
-                  ["camera", "Camera", "camera"], ["image", "Photo Gallery", "image"], ["file-text", "Document", "document"],
-                ].map(([icon, label]) => (
-                  <Pressable key={label} style={[styles.sourceRow, { borderColor: palette.border }]} onPress={onClose}>
+                <Text style={[styles.sheetHint, { color: palette.mutedForeground }]}>Choose a source. You can review the file before sending it to this Case File.</Text>
+                {attachmentError && <Text style={[styles.uploadError, { color: palette.primary }]} accessibilityRole="alert">{attachmentError}</Text>}
+                {([
+                  ["camera", "Camera", "camera"],
+                  ["image", "Photo Gallery", "photo_gallery"],
+                  ["file-text", "Document", "document"],
+                ] as const).map(([icon, label, source]) => (
+                  <Pressable key={label} style={[styles.sourceRow, { borderColor: palette.border }]} onPress={() => onChooseAttachment(source)}>
                     <Feather name={icon as keyof typeof Feather.glyphMap} size={20} color={palette.foreground} />
                     <Text style={[styles.sourceLabel, { color: palette.foreground }]}>{label}</Text>
                     <Feather name="chevron-right" size={18} color={palette.mutedForeground} />
                   </Pressable>
                 ))}
-                <View style={styles.categoryRow}>
-                  {CATEGORY_LABELS.map((label) => <View key={label} style={[styles.categoryChip, { backgroundColor: palette.accent }]}><Text style={[styles.categoryText, { color: palette.foreground }]}>{label}</Text></View>)}
+                <Text style={[styles.sheetHint, { color: palette.mutedForeground }]}>PDF, JPEG, PNG, GIF or DICOM · up to 25 MB</Text>
+              </>
+            )}
+            {type === "attach" && attachment && (
+              <>
+                <View style={[styles.selectedFile, { backgroundColor: palette.accent }]}>
+                  <Feather name="file-text" size={22} color={palette.foreground} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.selectedFileName, { color: palette.foreground }]} numberOfLines={2}>{attachment.name}</Text>
+                    <Text style={[styles.sheetHint, { color: palette.mutedForeground }]}>
+                      {attachment.size ? `${(attachment.size / 1024 / 1024).toFixed(1)} MB · ` : ""}{attachment.source === "photo_gallery" ? "Photo Gallery" : attachment.source === "camera" ? "Camera" : "Document"}
+                    </Text>
+                  </View>
                 </View>
+                {seeker && (
+                  <>
+                    <Text style={[styles.fieldLabel, { color: palette.mutedForeground }]}>FILE CATEGORY</Text>
+                    <View style={styles.categoryRow}>
+                      {CATEGORY_LABELS.map(({ label, value }) => (
+                        <Pressable
+                          key={value}
+                          onPress={() => onCategoryChange(value)}
+                          accessibilityRole="radio"
+                          accessibilityState={{ selected: attachmentCategory === value }}
+                          style={[styles.categoryChip, { backgroundColor: attachmentCategory === value ? palette.foreground : palette.accent }]}
+                        >
+                          <Text style={[styles.categoryText, { color: attachmentCategory === value ? palette.card : palette.foreground }]}>{label}</Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  </>
+                )}
+                {attachmentError && <Text style={[styles.uploadError, { color: palette.primary }]} accessibilityRole="alert">{attachmentError}</Text>}
+                <SubmitButton label="Send to Case File" disabled={seeker && !attachmentCategory} pending={uploading} onPress={onSendAttachment} />
+                <Pressable onPress={onClose} disabled={uploading} style={styles.cancelAttachment}>
+                  <Text style={[styles.sheetHint, { color: palette.mutedForeground }]}>Cancel</Text>
+                </Pressable>
               </>
             )}
           </ScrollView>
@@ -625,6 +746,10 @@ const styles = StyleSheet.create({
   fieldInput: { height: 44, borderRadius: 10, borderWidth: 1, paddingHorizontal: 11, fontSize: 14, fontFamily: "Inter_500Medium" },
   sourceRow: { borderWidth: 1, borderRadius: 12, padding: 14, flexDirection: "row", alignItems: "center", gap: 12 },
   sourceLabel: { flex: 1, fontSize: 14, fontFamily: "Inter_600SemiBold" },
+  selectedFile: { borderRadius: 12, padding: 14, flexDirection: "row", alignItems: "center", gap: 12 },
+  selectedFileName: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
+  uploadError: { fontSize: 12, lineHeight: 18, fontFamily: "Inter_500Medium" },
+  cancelAttachment: { alignItems: "center", padding: 8 },
   categoryRow: { flexDirection: "row", flexWrap: "wrap", gap: 7 },
   categoryChip: { borderRadius: 14, paddingHorizontal: 10, paddingVertical: 6 },
   categoryText: { fontSize: 11, fontFamily: "Inter_500Medium" },

@@ -60,6 +60,9 @@
   },
   "dependencies": {
     "@livekit/react-native-webrtc": "^144.2.0",
-    "expo-callkit-telecom": "^0.5.0"
+    "expo-callkit-telecom": "^0.5.0",
+    "expo-document-picker": "~14.0.8",
+    "expo-file-system": "~19.0.24",
+    "expo-image-manipulator": "~14.0.8"
   }
 }
