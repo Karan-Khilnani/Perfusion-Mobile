@@ -6,12 +6,19 @@
   "build": {
     "development": {
       "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_DOMAIN": "perfusionhealth.com"
+      },
       "android": {
         "buildType": "apk"
       }
     },
     "preview": {
       "distribution": "internal",
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_DOMAIN": "perfusionhealth.com"
+      },
       "android": {
         "buildType": "apk"
       }
