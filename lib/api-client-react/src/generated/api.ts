@@ -22,6 +22,8 @@ import type {
 import type {
   BookingCallInfo,
   CallStatus,
+  CallbackDevice,
+  CallbackDeviceInput,
   CaseFileAdvisory,
   CaseFileAdvisoryInput,
   CaseFileAggregate,
@@ -48,6 +50,154 @@ type AwaitedInput<T> = PromiseLike<T> | T;
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 
+
+export const getGetCallbackDeviceUrl = () => {
+
+
+
+
+  return `/api/profile/callback-device`
+}
+
+/**
+ * @summary Get the signed-in user's callback device
+ */
+export const getCallbackDevice = async ( options?: RequestInit): Promise<CallbackDevice | null> => {
+
+  return customFetch<CallbackDevice | null>(getGetCallbackDeviceUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetCallbackDeviceQueryKey = () => {
+    return [
+    `/api/profile/callback-device`
+    ] as const;
+    }
+
+
+export const getGetCallbackDeviceQueryOptions = <TData = Awaited<ReturnType<typeof getCallbackDevice>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCallbackDevice>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCallbackDeviceQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCallbackDevice>>> = ({ signal }) => getCallbackDevice({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCallbackDevice>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetCallbackDeviceQueryResult = NonNullable<Awaited<ReturnType<typeof getCallbackDevice>>>
+export type GetCallbackDeviceQueryError = ErrorType<void>
+
+
+/**
+ * @summary Get the signed-in user's callback device
+ */
+
+export function useGetCallbackDevice<TData = Awaited<ReturnType<typeof getCallbackDevice>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCallbackDevice>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetCallbackDeviceQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getSaveCallbackDeviceUrl = () => {
+
+
+
+
+  return `/api/profile/callback-device`
+}
+
+/**
+ * @summary Create or update the signed-in user's callback device
+ */
+export const saveCallbackDevice = async (callbackDeviceInput: CallbackDeviceInput, options?: RequestInit): Promise<CallbackDevice> => {
+
+  return customFetch<CallbackDevice>(getSaveCallbackDeviceUrl(),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      callbackDeviceInput,)
+  }
+);}
+
+
+
+
+export const getSaveCallbackDeviceMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveCallbackDevice>>, TError,{data: BodyType<CallbackDeviceInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof saveCallbackDevice>>, TError,{data: BodyType<CallbackDeviceInput>}, TContext> => {
+
+const mutationKey = ['saveCallbackDevice'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof saveCallbackDevice>>, {data: BodyType<CallbackDeviceInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  saveCallbackDevice(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SaveCallbackDeviceMutationResult = NonNullable<Awaited<ReturnType<typeof saveCallbackDevice>>>
+    export type SaveCallbackDeviceMutationBody = BodyType<CallbackDeviceInput>
+    export type SaveCallbackDeviceMutationError = ErrorType<void>
+
+    /**
+ * @summary Create or update the signed-in user's callback device
+ */
+export const useSaveCallbackDevice = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveCallbackDevice>>, TError,{data: BodyType<CallbackDeviceInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof saveCallbackDevice>>,
+        TError,
+        {data: BodyType<CallbackDeviceInput>},
+        TContext
+      > => {
+      return useMutation(getSaveCallbackDeviceMutationOptions(options));
+    }
 
 export const getHealthCheckUrl = () => {
 

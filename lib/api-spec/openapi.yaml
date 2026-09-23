@@ -11,6 +11,40 @@ tags:
   - name: health
     description: Health operations
 paths:
+  /profile/callback-device:
+    get:
+      operationId: getCallbackDevice
+      tags: [profile]
+      summary: Get the signed-in user's callback device
+      responses:
+        "200":
+          description: Device or null when setup is needed
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/CallbackDevice"
+                  - type: "null"
+        "401": { description: Not authenticated }
+    put:
+      operationId: saveCallbackDevice
+      tags: [profile]
+      summary: Create or update the signed-in user's callback device
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CallbackDeviceInput"
+      responses:
+        "200":
+          description: Saved callback device
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CallbackDevice"
+        "400": { description: Invalid device name or phone number }
+        "401": { description: Not authenticated }
   /healthz:
     get:
       operationId: healthCheck
@@ -264,6 +298,19 @@ components:
       required: true
       schema: { type: string }
   schemas:
+    CallbackDevice:
+      type: object
+      required: [deviceName, phoneNumber, updatedAt]
+      properties:
+        deviceName: { type: string }
+        phoneNumber: { type: string }
+        updatedAt: { type: string, format: date-time }
+    CallbackDeviceInput:
+      type: object
+      required: [deviceName, phoneNumber]
+      properties:
+        deviceName: { type: string, minLength: 1, maxLength: 100 }
+        phoneNumber: { type: string, minLength: 7, maxLength: 25 }
     HealthStatus:
       type: object
       properties:

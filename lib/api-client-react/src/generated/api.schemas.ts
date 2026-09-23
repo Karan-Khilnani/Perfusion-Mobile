@@ -5,6 +5,25 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+export interface CallbackDevice {
+  deviceName: string;
+  phoneNumber: string;
+  updatedAt: string;
+}
+
+export interface CallbackDeviceInput {
+  /**
+     * @minLength 1
+     * @maxLength 100
+     */
+  deviceName: string;
+  /**
+     * @minLength 7
+     * @maxLength 25
+     */
+  phoneNumber: string;
+}
+
 export interface HealthStatus {
   status: string;
 }

@@ -6,7 +6,7 @@ import {
   useFonts,
 } from "@expo-google-fonts/inter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Redirect, Stack } from "expo-router";
+import { Redirect, Stack, usePathname } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect } from "react";
 import {
@@ -36,9 +36,10 @@ const PRIMARY = "#B73434";
 const BG = "#FAFAFA";
 
 function RootLayoutNav() {
-  const { user, loading } = useAuth();
+  const { user, loading, callbackDevice, callbackDeviceLoading, callbackDeviceError } = useAuth();
+  const pathname = usePathname();
 
-  if (loading) {
+  if (loading || (user?.role !== "admin" && user && callbackDeviceLoading)) {
     return (
       <View
         style={{
@@ -62,6 +63,10 @@ function RootLayoutNav() {
           options={{ headerShown: false, gestureEnabled: false }}
         />
         <Stack.Screen
+          name="callback-device"
+          options={{ title: "Callback Device", gestureEnabled: !!callbackDevice }}
+        />
+        <Stack.Screen
           name="booking/[id]"
           options={{ title: "Booking Details" }}
         />
@@ -79,6 +84,7 @@ function RootLayoutNav() {
         />
       </Stack>
       {!user && <Redirect href="/login" />}
+      {user && user.role !== "admin" && (!callbackDevice || callbackDeviceError) && pathname !== "/callback-device" && <Redirect href="/callback-device" />}
       {user && <IncomingCallOverlay />}
     </>
   );

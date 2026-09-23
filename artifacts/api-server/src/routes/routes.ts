@@ -3550,6 +3550,46 @@ export async function registerRoutes(
     }
   });
 
+  // ── Mobile Callback Device (one account-level fallback number) ───────────
+  app.get("/api/profile/callback-device", isAuthenticated, async (req: any, res) => {
+    try {
+      const result = await getPool().query(
+        `SELECT device_name AS "deviceName", phone_number AS "phoneNumber", updated_at AS "updatedAt"
+         FROM mobile_callback_devices WHERE user_id = $1`,
+        [req.user.id],
+      );
+      return res.json(result.rows[0] ?? null);
+    } catch (error) {
+      req.log?.error({ err: error }, "Error fetching callback device");
+      return res.status(500).json({ message: "Failed to fetch callback device" });
+    }
+  });
+
+  app.put("/api/profile/callback-device", isAuthenticated, async (req: any, res) => {
+    const { deviceName, phoneNumber } = req.body ?? {};
+    if (typeof deviceName !== "string" || !deviceName.trim() || deviceName.trim().length > 100) {
+      return res.status(400).json({ message: "Device name is required (up to 100 characters)" });
+    }
+    if (typeof phoneNumber !== "string" || !/^\+?[\d\s\-().]{7,25}$/.test(phoneNumber.trim()) ||
+        phoneNumber.replace(/\D/g, "").length < 7) {
+      return res.status(400).json({ message: "Enter a valid callback phone number" });
+    }
+    try {
+      const result = await getPool().query(
+        `INSERT INTO mobile_callback_devices (user_id, device_name, phone_number)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (user_id) DO UPDATE
+         SET device_name = EXCLUDED.device_name, phone_number = EXCLUDED.phone_number, updated_at = now()
+         RETURNING device_name AS "deviceName", phone_number AS "phoneNumber", updated_at AS "updatedAt"`,
+        [req.user.id, deviceName.trim(), phoneNumber.trim()],
+      );
+      return res.json(result.rows[0]);
+    } catch (error) {
+      req.log?.error({ err: error }, "Error saving callback device");
+      return res.status(500).json({ message: "Failed to save callback device" });
+    }
+  });
+
   // ── Ward Contacts (seeker phone numbers per ward) ─────────────────────────
   app.get("/api/profile/ward-contacts", isAuthenticated, async (req: any, res) => {
     try {

@@ -9,6 +9,38 @@ import * as zod from 'zod';
 
 
 /**
+ * @summary Get the signed-in user's callback device
+ */
+export const GetCallbackDeviceResponse = zod.union([zod.object({
+  "deviceName": zod.string(),
+  "phoneNumber": zod.string(),
+  "updatedAt": zod.coerce.date()
+}),zod.null()])
+
+
+/**
+ * @summary Create or update the signed-in user's callback device
+ */
+export const saveCallbackDeviceBodyDeviceNameMax = 100;
+
+export const saveCallbackDeviceBodyPhoneNumberMin = 7;
+export const saveCallbackDeviceBodyPhoneNumberMax = 25;
+
+
+
+export const SaveCallbackDeviceBody = zod.object({
+  "deviceName": zod.string().min(1).max(saveCallbackDeviceBodyDeviceNameMax),
+  "phoneNumber": zod.string().min(saveCallbackDeviceBodyPhoneNumberMin).max(saveCallbackDeviceBodyPhoneNumberMax)
+})
+
+export const SaveCallbackDeviceResponse = zod.object({
+  "deviceName": zod.string(),
+  "phoneNumber": zod.string(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
  * Returns server health status
  * @summary Health check
  */

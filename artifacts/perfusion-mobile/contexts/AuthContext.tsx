@@ -58,6 +58,12 @@ export interface User {
   hospitalName?: string;
 }
 
+export interface CallbackDevice {
+  deviceName: string;
+  phoneNumber: string;
+  updatedAt: string;
+}
+
 function normalizeUser(data: Record<string, unknown>): User {
   const firstName = typeof data.firstName === "string" ? data.firstName : "";
   const lastName = typeof data.lastName === "string" ? data.lastName : "";
@@ -87,6 +93,11 @@ function normalizeUser(data: Record<string, unknown>): User {
 interface AuthContextType {
   user: User | null;
   loading: boolean;
+  callbackDevice: CallbackDevice | null;
+  callbackDeviceLoading: boolean;
+  callbackDeviceError: string | null;
+  refreshCallbackDevice: () => Promise<void>;
+  saveCallbackDevice: (deviceName: string, phoneNumber: string) => Promise<void>;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
@@ -97,6 +108,38 @@ const AuthContext = createContext<AuthContextType | null>(null);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [callbackDevice, setCallbackDevice] = useState<CallbackDevice | null>(null);
+  const [callbackDeviceLoading, setCallbackDeviceLoading] = useState(true);
+  const [callbackDeviceError, setCallbackDeviceError] = useState<string | null>(null);
+
+  const refreshCallbackDevice = async () => {
+    setCallbackDeviceLoading(true);
+    setCallbackDeviceError(null);
+    setCallbackDevice(null);
+    try {
+      const response = await apiFetch("/api/profile/callback-device");
+      if (!response.ok) throw new Error("Could not load Callback Device. Try again.");
+      setCallbackDevice((await response.json()) as CallbackDevice | null);
+    } catch (error) {
+      setCallbackDevice(null);
+      setCallbackDeviceError(error instanceof Error ? error.message : "Could not load Callback Device.");
+    } finally {
+      setCallbackDeviceLoading(false);
+    }
+  };
+
+  const saveCallbackDevice = async (deviceName: string, phoneNumber: string) => {
+    const response = await apiFetch("/api/profile/callback-device", {
+      method: "PUT",
+      body: JSON.stringify({ deviceName, phoneNumber }),
+    });
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      throw new Error(body.message || "Could not save Callback Device.");
+    }
+    setCallbackDevice((await response.json()) as CallbackDevice);
+    setCallbackDeviceError(null);
+  };
 
   const refreshUser = async () => {
     try {
@@ -104,11 +147,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (res.ok) {
         const data = (await res.json()) as Record<string, unknown>;
         setUser(normalizeUser(data));
+        if (data.role !== "admin") await refreshCallbackDevice();
+        else setCallbackDeviceLoading(false);
       } else {
         setUser(null);
+        setCallbackDevice(null);
+        setCallbackDeviceLoading(false);
       }
     } catch {
       setUser(null);
+      setCallbackDevice(null);
+      setCallbackDeviceLoading(false);
     }
   };
 
@@ -140,6 +189,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     }
     setUser(normalizeUser(data));
+    if (data.role !== "admin") await refreshCallbackDevice();
+    else setCallbackDeviceLoading(false);
     // Register Expo push token after successful login (non-blocking)
     registerMobilePushToken().catch(() => {});
   };
@@ -152,10 +203,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch {}
     await clearCookie();
     setUser(null);
+    setCallbackDevice(null);
+    setCallbackDeviceError(null);
+    setCallbackDeviceLoading(false);
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, refreshUser }}>
+    <AuthContext.Provider value={{
+      user, loading, login, logout, refreshUser,
+      callbackDevice, callbackDeviceLoading, callbackDeviceError,
+      refreshCallbackDevice, saveCallbackDevice,
+    }}>
       {children}
     </AuthContext.Provider>
   );

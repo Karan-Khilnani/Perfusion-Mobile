@@ -1,5 +1,6 @@
 import { Feather, Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
+import { router } from "expo-router";
 import React, { useState } from "react";
 import {
   Alert,
@@ -50,7 +51,7 @@ function ProfileRow({
 export default function ProfileScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { user, logout } = useAuth();
+  const { user, logout, callbackDevice } = useAuth();
   const [loggingOut, setLoggingOut] = useState(false);
 
   const handleLogout = () => {
@@ -185,6 +186,19 @@ export default function ProfileScreen() {
           </View>
         </View>
       </View>
+
+      {user?.role !== "admin" && (
+        <Pressable
+          onPress={() => router.push("/callback-device")}
+          style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border, padding: 16 }]}
+          testID="edit-callback-device"
+        >
+          <Text style={[styles.cardTitle, { color: colors.foreground, padding: 0 }]}>Callback Device  ›</Text>
+          <Text style={[styles.rowValue, { color: colors.mutedForeground, marginTop: 6 }]}>
+            {callbackDevice ? `${callbackDevice.deviceName} · ${callbackDevice.phoneNumber}` : "Set up your callback number"}
+          </Text>
+        </Pressable>
+      )}
 
       <Pressable
         onPress={handleLogout}

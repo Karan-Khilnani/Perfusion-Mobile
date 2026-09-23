@@ -7,6 +7,8 @@
  */
 
 export * from './bookingCallInfo';
+export * from './callbackDevice';
+export * from './callbackDeviceInput';
 export * from './callStatus';
 export * from './caseFileAdvisory';
 export * from './caseFileAdvisoryInput';
