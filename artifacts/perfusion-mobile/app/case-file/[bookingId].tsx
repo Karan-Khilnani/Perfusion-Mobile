@@ -719,7 +719,7 @@ const styles = StyleSheet.create({
   modalBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,.36)", justifyContent: "flex-end" },
   sheet: { maxHeight: "82%", borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: "hidden" },
   sheetHeader: { paddingHorizontal: 18, paddingVertical: 14, flexDirection: "row", justifyContent: "space-between", alignItems: "center", borderBottomWidth: StyleSheet.hairlineWidth },
-  sheetTitle: { fontSize: 18, fontFamily: "Inter_700Bold" },
+  sheetTitle: { fontSize: 18, fontFamily: "Sora_600SemiBold" },
   sheetSubtitle: { fontSize: 11, marginTop: 2, fontFamily: "Inter_400Regular" },
   sheetContent: { padding: 18, gap: 18 },
   infoSection: { gap: 6 },

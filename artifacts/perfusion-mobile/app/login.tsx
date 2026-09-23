@@ -243,7 +243,7 @@ const styles = StyleSheet.create({
   },
   appName: {
     fontSize: 28,
-    fontFamily: "Inter_700Bold",
+    fontFamily: "Sora_700Bold",
     letterSpacing: -0.5,
   },
   tagline: {
@@ -255,7 +255,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 24,
-    fontFamily: "Inter_700Bold",
+    fontFamily: "Sora_700Bold",
   },
   subtitle: {
     fontSize: 15,
@@ -311,7 +311,7 @@ const styles = StyleSheet.create({
   },
   loginButtonText: {
     fontSize: 16,
-    fontFamily: "Inter_600SemiBold",
+    fontFamily: "Sora_600SemiBold",
     color: "#FFFFFF",
   },
   footer: {

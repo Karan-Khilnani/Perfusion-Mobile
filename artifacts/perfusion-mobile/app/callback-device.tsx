@@ -119,12 +119,12 @@ export default function CallbackDeviceScreen() {
 const styles = StyleSheet.create({
   container: { paddingHorizontal: 24, gap: 12, flexGrow: 1 },
   icon: { width: 64, height: 64, borderRadius: 18, alignItems: "center", justifyContent: "center" },
-  title: { fontSize: 25, fontFamily: "Inter_700Bold", marginTop: 8 },
+  title: { fontSize: 25, fontFamily: "Sora_700Bold", marginTop: 8 },
   description: { fontSize: 15, lineHeight: 23, fontFamily: "Inter_400Regular", marginBottom: 12 },
   notice: { padding: 14, borderWidth: 1, borderRadius: 10, gap: 10 },
   label: { fontSize: 14, fontFamily: "Inter_600SemiBold", marginTop: 8 },
   input: { height: 50, borderWidth: 1, borderRadius: 10, paddingHorizontal: 14, fontSize: 16 },
   button: { marginTop: 20, height: 52, borderRadius: 12, alignItems: "center", justifyContent: "center" },
-  buttonText: { color: "#fff", fontSize: 16, fontFamily: "Inter_600SemiBold" },
+  buttonText: { color: "#fff", fontSize: 16, fontFamily: "Sora_600SemiBold" },
   signOut: { alignItems: "center", padding: 16 },
 });
