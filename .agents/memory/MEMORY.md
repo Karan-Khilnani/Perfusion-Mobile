@@ -9,3 +9,4 @@
 - [Mobile Callback Device](mobile-callback-device.md) — keep account-level fallback phone separate from patient emergency contacts, ward contacts, and booking-specific callback numbers.
 - [Android EAS Gradle logs](android-eas-gradle-logs.md) — EAS build log files may be Brotli-encoded despite a .txt extension; decode before diagnosing native failures.
 - [Expo native startup](expo-native-startup.md) — native OnCreate can run before JavaScript imports or login; inspect APK configuration and lifecycle, not just build success.
+- [pnpm peer-context type errors](pnpm-peer-context.md) — after dependency changes, identical library versions can link through different optional-peer contexts; realign before diagnosing type errors.

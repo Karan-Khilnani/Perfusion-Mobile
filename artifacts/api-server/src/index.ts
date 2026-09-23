@@ -4,6 +4,7 @@ import { createServer } from "http";
 import { registerRoutes } from "./routes/routes";
 import { seedDatabase } from "./seed";
 import { startConsultationScheduler } from "./services/consultation-scheduler";
+import { verifyMobileCallPush } from "./services/mobile-call-push";
 
 const rawPort = process.env["PORT"];
 
@@ -406,6 +407,7 @@ async function startServer() {
       },
       () => {
         logger.info({ port }, "Server listening");
+        void verifyMobileCallPush();
       },
     );
 

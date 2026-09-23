@@ -52,6 +52,17 @@ function getFirebaseMessaging() {
   }
 }
 
+export async function verifyMobileCallPush(): Promise<void> {
+  if (!getFirebaseMessaging()) return;
+  try {
+    // Confirms the service account can authenticate; never log the returned access token.
+    await getApp(APP_NAME).options.credential?.getAccessToken();
+    logger.info("[MobilePush] Firebase server credentials authenticated");
+  } catch {
+    logger.error("[MobilePush] Firebase server authentication failed; native calls cannot be delivered");
+  }
+}
+
 export async function notifyMobileIncomingCall(userId: string, call: IncomingCallPush): Promise<void> {
   const pool = getPool();
   const { rows } = await pool.query<TokenRow>(
@@ -92,7 +103,8 @@ export async function notifyMobileIncomingCall(userId: string, call: IncomingCal
           const response = result.responses[i];
           if (response.success) {
             sentNative.add(batch[i].token);
-            if (batch[i].device_id) sentDevices.add(batch[i].device_id);
+            const deviceId = batch[i].device_id;
+            if (deviceId) sentDevices.add(deviceId);
           } else {
             const code = response.error?.code;
             logger.warn({ code }, "[MobilePush] Native call delivery failed");
