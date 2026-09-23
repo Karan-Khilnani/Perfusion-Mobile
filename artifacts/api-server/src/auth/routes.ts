@@ -12,6 +12,8 @@ import {
   createGoogleUser,
   linkGoogleId,
   setVerificationCode,
+  setGooglePasswordSetupCode,
+  setGoogleAccountPassword,
   verifyEmailCode,
   getRawUserById,
   completeUserProfile,
@@ -307,7 +309,10 @@ export function registerAuthRoutes(app: Express): void {
       }
 
       if (!user.password) {
-        return res.status(401).json({ message: "This account uses Google sign-in. Please use the Google button to log in." });
+        return res.status(401).json({
+          message: "This account was created with Google. Set a password below to sign in with email and password.",
+          googleAccount: true,
+        });
       }
       
       const isValid = await verifyPassword(validatedData.password, user.password);
@@ -349,6 +354,56 @@ export function registerAuthRoutes(app: Express): void {
       }
       console.error("Login error:", error);
       res.status(500).json({ message: "Login failed" });
+    }
+  });
+
+  app.post("/api/auth/google-password/request", async (req, res) => {
+    try {
+      const email = z.string().email().parse(req.body?.email).toLowerCase();
+      const user = await getUserByEmail(email);
+      if (!user || !user.googleId || user.password) {
+        return res.json({ message: "If this account can use a password, a verification code has been sent." });
+      }
+
+      const code = generateVerificationCode();
+      await setGooglePasswordSetupCode(user.id, code);
+      const sent = await sendVerificationEmail(user.email, code, user.firstName || undefined);
+      if (!sent) {
+        return res.status(500).json({ message: "Could not send the verification code. Please try again." });
+      }
+      return res.json({ message: "Verification code sent to your email." });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Enter a valid email address." });
+      }
+      console.error("Google password request error:", error);
+      return res.status(500).json({ message: "Could not request a password." });
+    }
+  });
+
+  app.post("/api/auth/google-password/complete", async (req, res) => {
+    try {
+      const data = z.object({
+        email: z.string().email(),
+        code: z.string().length(6),
+        password: z.string().min(6),
+      }).parse(req.body);
+      const user = await getUserByEmail(data.email);
+      if (!user) {
+        return res.status(400).json({ message: "Invalid verification details." });
+      }
+
+      const result = await setGoogleAccountPassword(user.id, data.code, data.password);
+      if (!result.success) {
+        return res.status(400).json({ message: result.message });
+      }
+      return res.json({ message: result.message });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Enter a valid email, 6-digit code, and password." });
+      }
+      console.error("Google password completion error:", error);
+      return res.status(500).json({ message: "Could not create the password." });
     }
   });
 

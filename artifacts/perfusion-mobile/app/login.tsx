@@ -28,6 +28,7 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [googleAccount, setGoogleAccount] = useState(false);
 
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
@@ -36,6 +37,7 @@ export default function LoginScreen() {
     }
     setLoading(true);
     setError(null);
+    setGoogleAccount(false);
     try {
       await login(email.trim(), password);
       if (Platform.OS !== "web") {
@@ -43,7 +45,9 @@ export default function LoginScreen() {
       }
       router.replace("/(tabs)");
     } catch (e: any) {
-      setError(e?.message || "Login failed. Please try again.");
+      const message = e?.message || "Login failed. Please try again.";
+      setError(message);
+      setGoogleAccount(message.toLowerCase().includes("google"));
       if (Platform.OS !== "web") {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       }
@@ -212,6 +216,26 @@ export default function LoginScreen() {
               <Text style={styles.loginButtonText}>Sign In</Text>
             )}
           </Pressable>
+
+          {googleAccount && (
+            <Pressable
+              onPress={() => router.push({ pathname: "/set-password", params: { email: email.trim() } })}
+              testID="set-google-password-link"
+            >
+              <Text style={[styles.secondaryLink, { color: colors.primary }]}>
+                Set a password for this Google account
+              </Text>
+            </Pressable>
+          )}
+
+          <Pressable
+            onPress={() => router.push("/register")}
+            testID="register-link"
+          >
+            <Text style={[styles.secondaryLink, { color: colors.primary }]}>
+              Create a new account
+            </Text>
+          </Pressable>
         </View>
 
         <Text style={[styles.footer, { color: colors.mutedForeground }]}>
@@ -313,6 +337,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: "Sora_600SemiBold",
     color: "#FFFFFF",
+  },
+  secondaryLink: {
+    textAlign: "center",
+    fontSize: 14,
+    fontFamily: "Inter_500Medium",
   },
   footer: {
     textAlign: "center",

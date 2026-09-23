@@ -68,6 +68,18 @@ function RootLayoutNav() {
           options={{ headerShown: false, gestureEnabled: false }}
         />
         <Stack.Screen
+          name="register"
+          options={{ headerShown: false, gestureEnabled: false }}
+        />
+        <Stack.Screen
+          name="set-password"
+          options={{ headerShown: false, gestureEnabled: false }}
+        />
+        <Stack.Screen
+          name="verify-email"
+          options={{ headerShown: false, gestureEnabled: false }}
+        />
+        <Stack.Screen
           name="callback-device"
           options={{ title: "Callback Device", gestureEnabled: !!callbackDevice }}
         />
@@ -88,8 +100,8 @@ function RootLayoutNav() {
           options={{ headerShown: false, gestureEnabled: false }}
         />
       </Stack>
-      {!user && <Redirect href="/login" />}
-      {user && user.role !== "admin" && (!callbackDevice || callbackDeviceError) && pathname !== "/callback-device" && <Redirect href="/callback-device" />}
+      {!user && !["/login", "/register", "/set-password"].includes(pathname) && <Redirect href="/login" />}
+      {user && user.role !== "admin" && (!callbackDevice || callbackDeviceError) && pathname !== "/callback-device" && pathname !== "/verify-email" && <Redirect href="/callback-device" />}
       {user && <IncomingCallOverlay />}
     </>
   );

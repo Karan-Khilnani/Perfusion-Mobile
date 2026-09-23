@@ -67,6 +67,13 @@ export interface CallbackDevice {
   updatedAt: string;
 }
 
+export interface RegistrationInput {
+  email: string;
+  password: string;
+  firstName: string;
+  lastName: string;
+}
+
 function normalizeUser(data: Record<string, unknown>): User {
   const firstName = typeof data.firstName === "string" ? data.firstName : "";
   const lastName = typeof data.lastName === "string" ? data.lastName : "";
@@ -102,6 +109,9 @@ interface AuthContextType {
   refreshCallbackDevice: () => Promise<void>;
   saveCallbackDevice: (deviceName: string, phoneNumber: string) => Promise<void>;
   login: (email: string, password: string) => Promise<void>;
+  register: (input: RegistrationInput) => Promise<void>;
+  verifyEmail: (code: string) => Promise<void>;
+  resendVerification: () => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
 }
@@ -185,17 +195,64 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       throw new Error(msg);
     }
     const setCookieHeader = res.headers.get("set-cookie");
-    if (setCookieHeader) {
-      const match = setCookieHeader.match(/connect\.sid=[^;]+/);
-      if (match) {
-        await storeCookie(match[0]);
-      }
-    }
+    const match = setCookieHeader?.match(/connect\.sid=[^;]+/);
+    if (match) await storeCookie(match[0]);
     setUser(normalizeUser(data));
     if (data.role !== "admin") await refreshCallbackDevice();
     else setCallbackDeviceLoading(false);
     // Register Expo push token after successful login (non-blocking)
     registerMobilePushToken().catch(() => {});
+  };
+
+  const register = async (input: RegistrationInput) => {
+    const res = await fetch(`${getBaseUrl()}/api/auth/register`, {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Mobile-Client": "1",
+      },
+      body: JSON.stringify({
+        ...input,
+        role: "care_seeker",
+        hospitalName: "Personal account",
+        hospitalAddress: "Not applicable",
+        hospitalRegistrationNo: "Not applicable",
+        hospitalRegisteredOrg: "Personal account",
+      }),
+    });
+    const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+    if (!res.ok) {
+      throw new Error(typeof data.message === "string" ? data.message : "Registration failed");
+    }
+    const setCookieHeader = res.headers.get("set-cookie");
+    const match = setCookieHeader?.match(/connect\.sid=[^;]+/);
+    if (match) await storeCookie(match[0]);
+    setUser(normalizeUser(data));
+    setCallbackDevice(null);
+    setCallbackDeviceLoading(false);
+    setCallbackDeviceError(null);
+  };
+
+  const verifyEmail = async (code: string) => {
+    const res = await apiFetch("/api/auth/verify-email", {
+      method: "POST",
+      body: JSON.stringify({ code }),
+    });
+    const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+    if (!res.ok) {
+      throw new Error(typeof data.message === "string" ? data.message : "Verification failed");
+    }
+    setUser(normalizeUser(data));
+    await refreshCallbackDevice();
+  };
+
+  const resendVerification = async () => {
+    const res = await apiFetch("/api/auth/resend-verification", { method: "POST" });
+    const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+    if (!res.ok) {
+      throw new Error(typeof data.message === "string" ? data.message : "Could not resend the code");
+    }
   };
 
   const logout = async () => {
@@ -213,7 +270,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthContext.Provider value={{
-      user, loading, login, logout, refreshUser,
+      user, loading, login, register, verifyEmail, resendVerification, logout, refreshUser,
       callbackDevice, callbackDeviceLoading, callbackDeviceError,
       refreshCallbackDevice, saveCallbackDevice,
     }}>

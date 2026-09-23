@@ -116,6 +116,47 @@ export async function setVerificationCode(userId: string, code: string): Promise
     .where(eq(users.id, userId));
 }
 
+export async function setGooglePasswordSetupCode(userId: string, code: string): Promise<void> {
+  const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+  await db
+    .update(users)
+    .set({ verificationCode: code, verificationCodeExpiresAt: expiresAt, updatedAt: new Date() })
+    .where(eq(users.id, userId));
+}
+
+export async function setGoogleAccountPassword(
+  userId: string,
+  code: string,
+  password: string,
+): Promise<{ success: boolean; message: string }> {
+  const [user] = await db.select().from(users).where(eq(users.id, userId));
+  if (!user || !user.googleId) {
+    return { success: false, message: "Google account not found" };
+  }
+  if (user.password) {
+    return { success: false, message: "A password is already configured for this account" };
+  }
+  if (!user.verificationCode || user.verificationCode !== code) {
+    return { success: false, message: "Invalid verification code" };
+  }
+  if (user.verificationCodeExpiresAt && user.verificationCodeExpiresAt < new Date()) {
+    return { success: false, message: "Verification code has expired. Request a new code." };
+  }
+
+  const passwordHash = await bcrypt.hash(password, 10);
+  await db
+    .update(users)
+    .set({
+      password: passwordHash,
+      verificationCode: null,
+      verificationCodeExpiresAt: null,
+      emailVerified: true,
+      updatedAt: new Date(),
+    })
+    .where(eq(users.id, userId));
+  return { success: true, message: "Password created successfully" };
+}
+
 export async function verifyEmailCode(userId: string, code: string): Promise<{ success: boolean; message: string }> {
   const [user] = await db.select().from(users).where(eq(users.id, userId));
   if (!user) return { success: false, message: "User not found" };
