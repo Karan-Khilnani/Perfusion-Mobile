@@ -54,7 +54,7 @@
         }
       ],
       [
-        "expo-callkit-telecom",
+        "./plugins/withSafeCallKit",
         {
           "incomingCallTimeout": 45,
           "fulfillAnswerCallTimeout": 30,
