@@ -69,6 +69,27 @@ export default function CaseFileScreen() {
   const [attachmentCategory, setAttachmentCategory] = useState<AttachmentCategory | null>(null);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [startingCall, setStartingCall] = useState<"voice" | "video" | null>(null);
+  const [callError, setCallError] = useState<string | null>(null);
+
+  const startCall = async (callType: "voice" | "video") => {
+    if (startingCall) return;
+    setStartingCall(callType);
+    setCallError(null);
+    try {
+      const result = await requestJson<{ session: { sessionGeneration: string } }>(`/api/call/ring/${bookingId}`, {
+        method: "POST",
+        body: JSON.stringify({ callType }),
+      });
+      router.push(`/call/${bookingId}?mode=${callType}&generation=${result.session.sessionGeneration}`);
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : "Could not start the call.";
+      setCallError(reason);
+      if (Platform.OS !== "web") Alert.alert("Cannot start call", reason);
+    } finally {
+      setStartingCall(null);
+    }
+  };
 
   const chooseAttachment = async (source: AttachmentSource) => {
     setSheet(null);
@@ -193,10 +214,10 @@ export default function CaseFileScreen() {
           </View>
         </Pressable>
         <View style={styles.headerActions}>
-          <Pressable disabled={!capabilities.callsEnabled} onPress={() => router.push(`/call/${bookingId}?mode=voice`)} style={{ opacity: capabilities.callsEnabled ? 1 : 0.3 }}>
+          <Pressable disabled={!capabilities.callsEnabled || !!startingCall} onPress={() => startCall("voice")} accessibilityLabel="Call care team" style={{ opacity: capabilities.callsEnabled && !startingCall ? 1 : 0.3 }}>
             <Feather name="phone" size={19} color={palette.foreground} />
           </Pressable>
-          <Pressable disabled={!capabilities.videoEnabled} onPress={() => router.push(`/call/${bookingId}?mode=video`)} style={{ opacity: capabilities.videoEnabled ? 1 : 0.3 }}>
+          <Pressable disabled={!capabilities.videoEnabled || !!startingCall} onPress={() => startCall("video")} accessibilityLabel="Video call care team" style={{ opacity: capabilities.videoEnabled && !startingCall ? 1 : 0.3 }}>
             <Feather name="video" size={20} color={palette.foreground} />
           </Pressable>
         </View>
@@ -213,6 +234,7 @@ export default function CaseFileScreen() {
           <Text style={[styles.readOnly, { color: palette.mutedForeground }]}>Read only</Text>
         )}
       </View>
+      {callError && <Text style={[styles.callError, { color: palette.primary, backgroundColor: palette.conversationCard }]} accessibilityRole="alert">{callError}</Text>}
 
       <View style={[styles.clinicalContext, { backgroundColor: palette.conversationCard, borderBottomColor: palette.conversationBorder }]}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
@@ -728,6 +750,7 @@ const styles = StyleSheet.create({
   statusLabel: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
   readOnly: { marginLeft: "auto", fontSize: 11, fontFamily: "Inter_500Medium" },
   followUp: { fontSize: 12, fontFamily: "Inter_700Bold", marginLeft: 5 },
+  callError: { paddingHorizontal: 16, paddingVertical: 7, fontSize: 11, fontFamily: "Inter_500Medium" },
   clinicalContext: { borderBottomWidth: StyleSheet.hairlineWidth, paddingBottom: 9 },
   chips: { paddingHorizontal: 14, paddingTop: 9, paddingBottom: 7, gap: 6 },
   chip: { borderWidth: 1, borderRadius: 14, paddingHorizontal: 9, paddingVertical: 5, flexDirection: "row", alignItems: "center", gap: 5 },

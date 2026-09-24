@@ -1,8 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
-import * as Haptics from "expo-haptics";
 import { router, useLocalSearchParams } from "expo-router";
-import * as WebBrowser from "expo-web-browser";
 import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -15,8 +13,8 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { WebView } from "react-native-webview";
 
+import { CallMedia } from "@/components/CallMedia";
 import { apiFetch } from "@/hooks/useApi";
 import { useColors } from "@/hooks/useColors";
 
@@ -27,21 +25,27 @@ interface CallInfo {
 }
 
 interface CallStatus {
-  status: string;
+  status: "none" | "ringing" | "accepted" | "declined" | "timeout" | "ended";
   isCaller?: boolean;
+  callType?: "voice" | "video";
+  videoRoomUrl?: string;
+  sessionGeneration?: string;
 }
 
 export default function CallScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { bookingId, mode } = useLocalSearchParams<{
+  const { bookingId, mode, generation } = useLocalSearchParams<{
     bookingId: string;
     mode?: "voice" | "video";
+    generation?: string;
   }>();
-  const callMode = mode === "voice" ? "voice" : "video";
+  const [roomAttempt, setRoomAttempt] = useState(0);
   const [permissionsReady, setPermissionsReady] = useState(Platform.OS !== "android");
   const [permissionDenied, setPermissionDenied] = useState(false);
   const [roomError, setRoomError] = useState(false);
+  const [endPending, setEndPending] = useState(false);
+  const [endError, setEndError] = useState<string | null>(null);
 
   const { data: booking, isLoading } = useQuery<CallInfo>({
     queryKey: ["booking", bookingId],
@@ -53,20 +57,7 @@ export default function CallScreen() {
     enabled: !!bookingId,
   });
 
-  const { data: tokenData } = useQuery<{ token: string; userName: string }>({
-    queryKey: ["daily-token", bookingId, booking?.videoRoomId],
-    queryFn: async () => {
-      const encodedUrl = encodeURIComponent(booking!.videoRoomId!);
-      const res = await apiFetch(
-        `/api/bookings/room/${encodedUrl}/daily-token`
-      );
-      if (!res.ok) throw new Error("Token error");
-      return res.json();
-    },
-    enabled: !!booking?.videoRoomId,
-  });
-
-  const { data: callStatus } = useQuery<CallStatus>({
+  const { data: callStatus, isLoading: statusLoading, isError: statusError } = useQuery<CallStatus>({
     queryKey: ["call-status", bookingId],
     queryFn: async () => {
       const res = await apiFetch(`/api/call/status/${bookingId}`);
@@ -74,10 +65,28 @@ export default function CallScreen() {
       return res.json();
     },
     enabled: !!bookingId,
+    refetchInterval: 2000,
+  });
+  const currentSession = !generation || callStatus?.sessionGeneration === generation;
+  const currentStatus = currentSession ? callStatus?.status : "ended";
+  // The session is authoritative; the route mode is only used while it loads.
+  const callMode = callStatus?.callType || (mode === "voice" ? "voice" : "video");
+
+  const { data: tokenData, isError: tokenError } = useQuery<{ token: string; userName: string }>({
+    queryKey: ["daily-token", bookingId, callStatus?.videoRoomUrl],
+    queryFn: async () => {
+      const encodedUrl = encodeURIComponent(callStatus!.videoRoomUrl!);
+      const res = await apiFetch(
+        `/api/bookings/room/${encodedUrl}/daily-token`
+      );
+      if (!res.ok) throw new Error("Token error");
+      return res.json();
+    },
+    enabled: !!callStatus?.videoRoomUrl && currentStatus === "accepted",
   });
 
   useEffect(() => {
-    if (Platform.OS !== "android") return;
+    if (Platform.OS !== "android" || currentStatus !== "accepted") return;
 
     const requestMediaPermissions = async () => {
       const permissions = [PermissionsAndroid.PERMISSIONS.RECORD_AUDIO];
@@ -93,11 +102,11 @@ export default function CallScreen() {
     };
 
     requestMediaPermissions().catch(() => setPermissionDenied(true));
-  }, [callMode]);
+  }, [callMode, currentStatus]);
 
   const roomUrl = useMemo(() => {
-    if (!booking?.videoRoomId || !tokenData?.token) return null;
-    const separator = booking.videoRoomId.includes("?") ? "&" : "?";
+    if (!callStatus?.videoRoomUrl || !tokenData?.token || currentStatus !== "accepted") return null;
+    const separator = callStatus.videoRoomUrl.includes("?") ? "&" : "?";
     const params = [
       `t=${encodeURIComponent(tokenData.token)}`,
       "prejoinUI=false",
@@ -105,31 +114,38 @@ export default function CallScreen() {
     ]
       .filter(Boolean)
       .join("&");
-    return `${booking.videoRoomId}${separator}${params}`;
-  }, [booking?.videoRoomId, callMode, tokenData?.token]);
-
-  const handleOpenRoom = async () => {
-    if (!roomUrl) return;
-    if (Platform.OS !== "web") {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    }
-    await WebBrowser.openBrowserAsync(roomUrl, {
-      presentationStyle:
-        WebBrowser.WebBrowserPresentationStyle.FULL_SCREEN,
-    });
-  };
+    return `${callStatus.videoRoomUrl}${separator}${params}`;
+  }, [callStatus?.videoRoomUrl, callMode, currentStatus, tokenData?.token]);
 
   const handleEndCall = async () => {
+    if (endPending) return;
+    setEndPending(true);
+    setEndError(null);
     try {
-      if (callStatus?.status && callStatus.status !== "none") {
-        const action = callStatus.isCaller ? "cancel" : "decline";
-        await apiFetch(`/api/call/${action}/${bookingId}`, { method: "POST" });
+      if (currentStatus === "ringing") {
+        const action = callStatus?.isCaller ? "cancel" : "decline";
+        const response = await apiFetch(`/api/call/${action}/${bookingId}`, {
+          method: "POST",
+          body: JSON.stringify({ sessionGeneration: generation || callStatus?.sessionGeneration }),
+        });
+        if (!response.ok) throw new Error("Could not cancel the call. Please try again.");
+      } else if (currentStatus === "accepted") {
+        const response = await apiFetch(`/api/call/end/${bookingId}`, {
+          method: "POST",
+          body: JSON.stringify({ sessionGeneration: generation || callStatus?.sessionGeneration }),
+        });
+        if (!response.ok) throw new Error("Could not end the call. Please try again.");
       }
-    } catch {}
-    router.back();
+      router.back();
+    } catch (error) {
+      setEndError(error instanceof Error ? error.message : "Could not end the call.");
+    } finally {
+      setEndPending(false);
+    }
   };
 
-  if (isLoading || !roomUrl || (Platform.OS === "android" && !permissionsReady && !permissionDenied)) {
+  if (isLoading || statusLoading || (currentStatus === "accepted" && !!callStatus?.videoRoomUrl && !roomUrl && !tokenError && !statusError) ||
+      (currentStatus === "accepted" && Platform.OS === "android" && !permissionsReady && !permissionDenied)) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <ActivityIndicator color={colors.primary} size="large" />
@@ -137,7 +153,7 @@ export default function CallScreen() {
     );
   }
 
-  if (Platform.OS !== "web" && permissionDenied) {
+  if (currentStatus === "accepted" && Platform.OS !== "web" && permissionDenied) {
     return (
       <View style={[styles.permissionScreen, { backgroundColor: colors.background }]}>
         <Ionicons
@@ -149,7 +165,7 @@ export default function CallScreen() {
           {callMode === "voice" ? "Microphone access is required" : "Camera and microphone access are required"}
         </Text>
         <Text style={[styles.permissionText, { color: colors.mutedForeground }]}>
-          Allow access in device settings to join this consultation in the app.
+          Allow access in device settings to continue this consultation in the app.
         </Text>
         <Pressable
           onPress={() => Linking.openSettings()}
@@ -157,43 +173,34 @@ export default function CallScreen() {
         >
           <Text style={styles.settingsButtonText}>Open Settings</Text>
         </Pressable>
-        <Pressable onPress={handleEndCall} style={styles.endBtn}>
+        <Pressable onPress={handleEndCall} disabled={endPending} style={styles.endBtn}>
           <Text style={[styles.endBtnText, { color: colors.destructive }]}>Leave</Text>
         </Pressable>
+        {endError && <Text style={[styles.permissionText, { color: colors.destructive }]} accessibilityRole="alert">{endError}</Text>}
       </View>
     );
   }
 
-  if (Platform.OS !== "web") {
+  if (currentStatus === "accepted" && roomUrl) {
     return (
       <View style={styles.roomContainer}>
-        <WebView
-          source={{ uri: roomUrl }}
-          style={styles.webView}
-          javaScriptEnabled
-          domStorageEnabled
-          allowsInlineMediaPlayback
-          mediaPlaybackRequiresUserAction={false}
-          mediaCapturePermissionGrantType="grantIfSameHostElsePrompt"
-          setSupportMultipleWindows={false}
-          onError={() => setRoomError(true)}
-          onHttpError={() => setRoomError(true)}
-          testID="in-app-call-room"
-        />
+        <CallMedia key={roomAttempt} url={roomUrl} onError={() => setRoomError(true)} />
         <View style={[styles.roomHeader, { top: insets.top + 8 }]}>
           <Pressable
             onPress={handleEndCall}
-            style={styles.leaveRoomButton}
-            accessibilityLabel="Leave consultation"
+            disabled={endPending}
+            style={[styles.leaveRoomButton, { backgroundColor: colors.destructive }]}
+            accessibilityLabel="End call"
             testID="leave-in-app-call"
           >
-            <Ionicons name="close" size={24} color="#FFFFFF" />
+            <Ionicons name="call" size={22} color={colors.callForeground} style={{ transform: [{ rotate: "135deg" }] }} />
           </Pressable>
+          {endError && <Text style={[styles.roomErrorText, { color: colors.callForeground }]} accessibilityRole="alert">{endError}</Text>}
         </View>
         {roomError && (
           <View style={styles.roomError}>
             <Text style={styles.roomErrorText}>The secure call could not be loaded.</Text>
-            <Pressable onPress={() => setRoomError(false)}>
+            <Pressable onPress={() => { setRoomError(false); setRoomAttempt((n) => n + 1); }}>
               <Text style={[styles.retryText, { color: colors.primary }]}>Try again</Text>
             </Pressable>
           </View>
@@ -207,7 +214,7 @@ export default function CallScreen() {
       style={[
         styles.container,
         {
-          backgroundColor: "#0A0A0A",
+          backgroundColor: colors.callBackground,
           paddingTop: Platform.OS === "web" ? 67 + insets.top : insets.top + 16,
           paddingBottom:
             Platform.OS === "web" ? 34 + insets.bottom : insets.bottom + 32,
@@ -216,7 +223,7 @@ export default function CallScreen() {
     >
       <View style={styles.topBar}>
         <Pressable onPress={handleEndCall} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={22} color="#fff" />
+          <Ionicons name="arrow-back" size={22} color={colors.callForeground} />
         </Pressable>
         <Text style={styles.topTitle}>
           {booking?.serviceName || "Consultation"}
@@ -228,53 +235,41 @@ export default function CallScreen() {
         <View
           style={[
             styles.avatarArea,
-            { backgroundColor: `${colors.primary}18` },
+            { backgroundColor: `${colors.conversationPrimary}18` },
           ]}
         >
-          <Ionicons name="medical" size={64} color={colors.primary} />
+          <Ionicons name={callMode === "voice" ? "call-outline" : "videocam-outline"} size={58} color={colors.conversationPrimary} />
         </View>
-        <Text style={styles.consultTitle}>
+        <Text style={[styles.consultTitle, { color: colors.callForeground }]}>
           {booking?.serviceName || "Consultation"}
         </Text>
         {booking?.patientName && (
           <Text style={styles.patientName}>{booking.patientName}</Text>
         )}
-        <Text style={styles.hint}>
-          Tap below to join the {callMode} consultation
+        <Text style={[styles.hint, { color: colors.callForeground }]}>
+          {currentStatus === "ringing"
+            ? callStatus?.isCaller ? `Calling… Waiting for the other participant to answer` : "Incoming call…"
+            : statusError || tokenError ? "Unable to connect to the secure call. Please try again."
+            : currentStatus === "declined" ? "The call was declined."
+            : currentStatus === "timeout" ? "No answer. The call timed out."
+            : currentStatus === "none" ? "There is no active call. Start a new call from the consultation."
+            : "The call has ended."}
         </Text>
       </View>
 
       <View style={styles.actions}>
         <Pressable
-          onPress={handleOpenRoom}
-          disabled={!booking?.videoRoomId || !tokenData?.token}
-          style={({ pressed }) => [
-            styles.joinBtn,
-            {
-              backgroundColor: !booking?.videoRoomId || !tokenData?.token
-                ? `${colors.primary}50`
-                : colors.primary,
-              opacity: pressed ? 0.9 : 1,
-            },
-          ]}
-          testID="open-video-room"
-        >
-          <Ionicons name={callMode === "voice" ? "call" : "videocam"} size={22} color="#fff" />
-          <Text style={styles.joinBtnText}>
-            {tokenData?.token ? `Join ${callMode === "voice" ? "Voice" : "Video"} Call` : "Preparing Secure Call…"}
-          </Text>
-        </Pressable>
-
-        <Pressable
           onPress={handleEndCall}
+          disabled={endPending}
           style={({ pressed }) => [
             styles.endBtn,
             { opacity: pressed ? 0.8 : 1 },
           ]}
         >
-          <Ionicons name="close-circle-outline" size={20} color="#EF4444" />
-          <Text style={styles.endBtnText}>Leave</Text>
+          <Ionicons name={currentStatus === "ringing" ? "call" : "arrow-back"} size={22} color={colors.callForeground} style={currentStatus === "ringing" ? { transform: [{ rotate: "135deg" }] } : undefined} />
+          <Text style={[styles.endBtnText, { color: colors.callForeground }]}>{currentStatus === "ringing" ? "Cancel call" : "Back to consultation"}</Text>
         </Pressable>
+        {endError && <Text style={[styles.roomErrorText, { color: colors.callForeground }]} accessibilityRole="alert">{endError}</Text>}
       </View>
     </View>
   );

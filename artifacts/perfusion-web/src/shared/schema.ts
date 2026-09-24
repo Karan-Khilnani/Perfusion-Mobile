@@ -472,11 +472,13 @@ export type ConsultantSlotOverride = typeof consultantSlotOverrides.$inferSelect
 // Call Sessions — persisted in DB so all autoscale instances share state
 export const callSessionsTable = pgTable("call_sessions", {
   bookingId: varchar("booking_id").primaryKey(),
+  sessionGeneration: varchar("session_generation").notNull().default(sql`gen_random_uuid()`),
   callerId: varchar("caller_id").notNull(),
   callerName: varchar("caller_name", { length: 255 }).notNull(),
   callerRole: varchar("caller_role", { length: 20 }).notNull(),
   recipientUserId: varchar("recipient_user_id").notNull(),
   videoRoomUrl: text("video_room_url").notNull(),
+  callType: varchar("call_type", { length: 10 }).notNull().default("video"),
   serviceName: varchar("service_name", { length: 255 }).notNull().default(""),
   subtitle: varchar("subtitle", { length: 255 }).notNull().default(""),
   status: varchar("status", { length: 20 }).notNull().default("ringing"),

@@ -9,16 +9,18 @@ import type {
 
 export interface NativeIncomingCall {
   bookingId: string;
+  sessionGeneration?: string;
   callerName: string;
   callerRole: string;
   videoRoomUrl: string;
   serviceName?: string;
   subtitle?: string;
+  callType?: "voice" | "video";
 }
 
 interface NativeCallHandlers {
-  onAnswered: (bookingId: string) => Promise<void>;
-  onDeclined: (bookingId: string) => Promise<void>;
+  onAnswered: (bookingId: string, sessionGeneration?: string) => Promise<void>;
+  onDeclined: (bookingId: string, sessionGeneration?: string) => Promise<void>;
   onToken: (token: string, type: PushTokenType) => Promise<void>;
 }
 
@@ -37,6 +39,11 @@ async function getCallsModule(): Promise<CallsModule | null> {
 function bookingIdFromSession(session: CallSession | null): string | null {
   const value = session?.incomingCallEvent?.metadata?.bookingId;
   return typeof value === "string" ? value : null;
+}
+
+function generationFromSession(session: CallSession | null): string | undefined {
+  const value = session?.incomingCallEvent?.metadata?.sessionGeneration;
+  return typeof value === "string" ? value : undefined;
 }
 
 export async function initializeNativeCalls(
@@ -60,7 +67,7 @@ export async function initializeNativeCalls(
       }
 
       try {
-        await handlers.onAnswered(bookingId);
+        await handlers.onAnswered(bookingId, generationFromSession(session));
         await calls.fulfillIncomingCallConnected(requestId);
       } catch {
         await calls.failIncomingCallConnected(id, requestId);
@@ -69,7 +76,7 @@ export async function initializeNativeCalls(
     calls.addCallEndedListener(({ session }) => {
       const bookingId = bookingIdFromSession(session);
       if (bookingId && session.status !== "connected") {
-        handlers.onDeclined(bookingId).catch(() => {});
+        handlers.onDeclined(bookingId, generationFromSession(session)).catch(() => {});
       }
     }),
   ];
@@ -101,9 +108,9 @@ export async function reportNativeIncomingCall(
   if (!calls) return false;
 
   const event: IncomingCallEvent = {
-    eventId: incomingCall.bookingId,
-    serverCallId: incomingCall.bookingId,
-    hasVideo: true,
+    eventId: incomingCall.sessionGeneration || incomingCall.bookingId,
+    serverCallId: incomingCall.sessionGeneration || incomingCall.bookingId,
+    hasVideo: incomingCall.callType !== "voice",
     startedAt: new Date().toISOString(),
     caller: {
       id: `${incomingCall.callerRole}:${incomingCall.callerName}`,
@@ -111,9 +118,11 @@ export async function reportNativeIncomingCall(
     },
     metadata: {
       bookingId: incomingCall.bookingId,
+      sessionGeneration: incomingCall.sessionGeneration,
       videoRoomUrl: incomingCall.videoRoomUrl,
       serviceName: incomingCall.serviceName,
       subtitle: incomingCall.subtitle,
+      callType: incomingCall.callType,
     },
   };
 

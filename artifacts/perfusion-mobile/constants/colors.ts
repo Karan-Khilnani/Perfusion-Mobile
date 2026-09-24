@@ -36,6 +36,8 @@ const colors = {
     advisoryBackground: "#FFFAF2",
     advisoryBorder: "#D4B893",
     advisoryForeground: "#93642C",
+    callBackground: "#102A2B",
+    callForeground: "#F5FBF9",
   },
   dark: {
     text: "#F2F2F2",
@@ -74,6 +76,8 @@ const colors = {
     advisoryBackground: "#332A20",
     advisoryBorder: "#7E6547",
     advisoryForeground: "#E2B878",
+    callBackground: "#0D1C1D",
+    callForeground: "#F5FBF9",
   },
   radius: 12,
 };

@@ -1,7 +1,7 @@
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Alert,
   Animated,
@@ -21,6 +21,7 @@ export function IncomingCallOverlay() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const pulseAnim = useRef(new Animated.Value(1)).current;
+  const [responding, setResponding] = useState(false);
 
   useEffect(() => {
     if (!incomingCall) return;
@@ -48,21 +49,27 @@ export function IncomingCallOverlay() {
   if (!incomingCall) return null;
 
   const handleAccept = async () => {
+    if (responding) return;
+    setResponding(true);
     if (Platform.OS !== "web") {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
     try {
       await acceptCall(incomingCall.bookingId);
-      router.push(`/call/${incomingCall.bookingId}`);
+      router.push(`/call/${incomingCall.bookingId}?mode=${incomingCall.callType === "voice" ? "voice" : "video"}&generation=${incomingCall.sessionGeneration || ""}`);
     } catch (error) {
       Alert.alert(
         "Could not accept call",
         error instanceof Error ? error.message : "Please check your connection and try again.",
       );
+    } finally {
+      setResponding(false);
     }
   };
 
   const handleDecline = async () => {
+    if (responding) return;
+    setResponding(true);
     if (Platform.OS !== "web") {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     }
@@ -73,6 +80,8 @@ export function IncomingCallOverlay() {
         "Could not decline call",
         error instanceof Error ? error.message : "Please check your connection and try again.",
       );
+    } finally {
+      setResponding(false);
     }
   };
 
@@ -88,7 +97,7 @@ export function IncomingCallOverlay() {
     >
       <View style={styles.content}>
         <View style={styles.topSection}>
-          <Text style={styles.incomingLabel}>Incoming Call</Text>
+          <Text style={styles.incomingLabel}>Incoming {incomingCall.callType === "voice" ? "Voice" : "Video"} Call</Text>
           <Animated.View
             style={[
               styles.avatarRing,
@@ -117,6 +126,7 @@ export function IncomingCallOverlay() {
           <View style={styles.actionItem}>
             <Pressable
               onPress={handleDecline}
+              disabled={responding}
               style={({ pressed }) => [
                 styles.actionButton,
                 styles.declineButton,
@@ -131,13 +141,14 @@ export function IncomingCallOverlay() {
           <View style={styles.actionItem}>
             <Pressable
               onPress={handleAccept}
+              disabled={responding}
               style={({ pressed }) => [
                 styles.actionButton,
                 styles.acceptButton,
                 { opacity: pressed ? 0.8 : 1 },
               ]}
             >
-              <Ionicons name="videocam" size={28} color="#fff" />
+              <Ionicons name={incomingCall.callType === "voice" ? "call" : "videocam"} size={28} color="#fff" />
             </Pressable>
             <Text style={styles.actionLabel}>Accept</Text>
           </View>

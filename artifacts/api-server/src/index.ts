@@ -30,6 +30,9 @@ async function startServer() {
     // Incremental schema migrations (idempotent — safe to run every startup)
     const { getPool } = await import("./db");
     const pool = getPool();
+    await pool.query(`ALTER TABLE call_sessions ADD COLUMN IF NOT EXISTS call_type varchar(10) NOT NULL DEFAULT 'video'`);
+    await pool.query(`ALTER TABLE call_sessions ADD COLUMN IF NOT EXISTS session_generation varchar NOT NULL DEFAULT gen_random_uuid()`);
+    await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS call_sessions_generation_idx ON call_sessions(session_generation)`);
     await pool.query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS reminder_fired_at timestamptz`);
     await pool.query(`ALTER TABLE consultants ADD COLUMN IF NOT EXISTS contact_phone varchar(20)`);
     await pool.query(`CREATE TABLE IF NOT EXISTS mobile_push_tokens (

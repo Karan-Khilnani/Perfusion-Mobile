@@ -19,11 +19,13 @@ import { getPushDeviceId } from "@/lib/push-device";
 
 export interface IncomingCallData {
   bookingId: string;
+  sessionGeneration?: string;
   callerName: string;
   callerRole: string;
   videoRoomUrl: string;
   serviceName?: string;
   subtitle?: string;
+  callType?: "voice" | "video";
 }
 
 interface CallContextType {
@@ -87,16 +89,21 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
     let cleanup = () => {};
     let cancelled = false;
     initializeNativeCalls({
-      onAnswered: async (bookingId) => {
+      onAnswered: async (bookingId, sessionGeneration) => {
         const response = await apiFetch(`/api/call/accept/${bookingId}`, {
           method: "POST",
+          body: JSON.stringify({ sessionGeneration }),
         });
         if (!response.ok) throw new Error("Could not accept call");
+        const result: { callType?: "voice" | "video"; sessionGeneration?: string } = await response.json();
         setIncomingCall(null);
-        router.push(`/call/${bookingId}`);
+        router.push(`/call/${bookingId}?mode=${result.callType === "voice" ? "voice" : "video"}&generation=${result.sessionGeneration || ""}`);
       },
-      onDeclined: async (bookingId) => {
-        await apiFetch(`/api/call/decline/${bookingId}`, { method: "POST" });
+      onDeclined: async (bookingId, sessionGeneration) => {
+        await apiFetch(`/api/call/decline/${bookingId}`, {
+          method: "POST",
+          body: JSON.stringify({ sessionGeneration }),
+        });
         setIncomingCall(null);
       },
       onToken: async (token, tokenType) => {
@@ -122,7 +129,10 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
   }, [user]);
 
   const acceptCall = async (bookingId: string) => {
-    const response = await apiFetch(`/api/call/accept/${bookingId}`, { method: "POST" });
+    const response = await apiFetch(`/api/call/accept/${bookingId}`, {
+      method: "POST",
+      body: JSON.stringify({ sessionGeneration: incomingCall?.sessionGeneration }),
+    });
     if (!response.ok) {
       const data = await response.json().catch(() => ({}));
       throw new Error(data?.error || "Could not accept call");
@@ -131,7 +141,10 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
   };
 
   const declineCall = async (bookingId: string) => {
-    const response = await apiFetch(`/api/call/decline/${bookingId}`, { method: "POST" });
+    const response = await apiFetch(`/api/call/decline/${bookingId}`, {
+      method: "POST",
+      body: JSON.stringify({ sessionGeneration: incomingCall?.sessionGeneration }),
+    });
     if (!response.ok) {
       const data = await response.json().catch(() => ({}));
       throw new Error(data?.error || "Could not decline call");

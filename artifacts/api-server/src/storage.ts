@@ -1,4 +1,4 @@
-import { eq, and, desc, gte, lte, or, inArray } from "drizzle-orm";
+import { eq, and, desc, gte, lte, or, inArray, notInArray } from "drizzle-orm";
 import { db } from "./db";
 import {
   labs,
@@ -233,10 +233,16 @@ export interface IStorage {
   deleteAllPushSubscriptionsForUser(userId: string): Promise<void>;
 
   // Call Sessions
-  createCallSession(data: InsertDbCallSession): Promise<DbCallSession>;
+  createCallSession(data: InsertDbCallSession): Promise<DbCallSession | undefined>;
   getCallSession(bookingId: string): Promise<DbCallSession | undefined>;
-  updateCallSession(bookingId: string, data: Partial<InsertDbCallSession>): Promise<DbCallSession | undefined>;
-  deleteCallSession(bookingId: string): Promise<void>;
+  transitionCallSession(
+    bookingId: string,
+    generation: string,
+    fromStatuses: string[],
+    data: Partial<InsertDbCallSession>,
+  ): Promise<DbCallSession | undefined>;
+  expireRingingCallSession(bookingId: string, generation: string): Promise<DbCallSession | undefined>;
+  deleteCallSession(bookingId: string, generation: string, statuses: string[], onlyIfExpired?: boolean): Promise<void>;
   getActiveCallSessionsForRecipient(recipientUserId: string): Promise<DbCallSession[]>;
 }
 
@@ -947,9 +953,18 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Call Sessions
-  async createCallSession(data: InsertDbCallSession): Promise<DbCallSession> {
-    await db.delete(callSessionsTable).where(eq(callSessionsTable.bookingId, data.bookingId));
-    const [row] = await db.insert(callSessionsTable).values(data).returning();
+  async createCallSession(data: InsertDbCallSession): Promise<DbCallSession | undefined> {
+    const now = new Date();
+    const [row] = await db.insert(callSessionsTable).values(data).onConflictDoUpdate({
+      target: callSessionsTable.bookingId,
+      set: data,
+      // Never replace an unexpired ringing/accepted session. A terminal or
+      // expired row can be reused atomically without a delete/insert window.
+      setWhere: or(
+        notInArray(callSessionsTable.status, ["ringing", "accepted"]),
+        lte(callSessionsTable.expiresAt, now),
+      ),
+    }).returning();
     return row;
   }
 
@@ -959,13 +974,39 @@ export class DatabaseStorage implements IStorage {
     return row;
   }
 
-  async updateCallSession(bookingId: string, data: Partial<InsertDbCallSession>): Promise<DbCallSession | undefined> {
-    const [row] = await db.update(callSessionsTable).set(data).where(eq(callSessionsTable.bookingId, bookingId)).returning();
+  async transitionCallSession(
+    bookingId: string,
+    generation: string,
+    fromStatuses: string[],
+    data: Partial<InsertDbCallSession>,
+  ): Promise<DbCallSession | undefined> {
+    const [row] = await db.update(callSessionsTable).set(data).where(and(
+      eq(callSessionsTable.bookingId, bookingId),
+      eq(callSessionsTable.sessionGeneration, generation),
+      inArray(callSessionsTable.status, fromStatuses),
+      gte(callSessionsTable.expiresAt, new Date()),
+    )).returning();
     return row;
   }
 
-  async deleteCallSession(bookingId: string): Promise<void> {
-    await db.delete(callSessionsTable).where(eq(callSessionsTable.bookingId, bookingId));
+  async expireRingingCallSession(bookingId: string, generation: string): Promise<DbCallSession | undefined> {
+    const [row] = await db.update(callSessionsTable).set({ status: "timeout" }).where(and(
+      eq(callSessionsTable.bookingId, bookingId),
+      eq(callSessionsTable.sessionGeneration, generation),
+      eq(callSessionsTable.status, "ringing"),
+      lte(callSessionsTable.expiresAt, new Date()),
+    )).returning();
+    return row;
+  }
+
+  async deleteCallSession(bookingId: string, generation: string, statuses: string[], onlyIfExpired = false): Promise<void> {
+    const conditions = [
+      eq(callSessionsTable.bookingId, bookingId),
+      eq(callSessionsTable.sessionGeneration, generation),
+      inArray(callSessionsTable.status, statuses),
+    ];
+    if (onlyIfExpired) conditions.push(lte(callSessionsTable.expiresAt, new Date()));
+    await db.delete(callSessionsTable).where(and(...conditions));
   }
 
   async getActiveCallSessionsForRecipient(recipientUserId: string): Promise<DbCallSession[]> {

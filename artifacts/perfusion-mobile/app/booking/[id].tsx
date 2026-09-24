@@ -98,15 +98,18 @@ export default function BookingDetailScreen() {
 
   const ringMutation = useMutation({
     mutationFn: async () => {
-      const res = await apiFetch(`/api/call/ring/${id}`, { method: "POST" });
+      const res = await apiFetch(`/api/call/ring/${id}`, {
+        method: "POST",
+        body: JSON.stringify({ callType: "video" }),
+      });
       if (!res.ok) {
         const data = await res.json();
         throw new Error(data.error || data.reason || "Cannot start call");
       }
       return res.json();
     },
-    onSuccess: () => {
-      router.push(`/call/${id}`);
+    onSuccess: (result) => {
+      router.push(`/call/${id}?mode=video&generation=${result.session?.sessionGeneration || ""}`);
     },
     onError: (err: any) => {
       if (Platform.OS !== "web") {
@@ -333,7 +336,7 @@ export default function BookingDetailScreen() {
           ) : (
             <>
               <Ionicons name="videocam" size={22} color="#fff" />
-              <Text style={styles.joinButtonText}>Join Consultation</Text>
+              <Text style={styles.joinButtonText}>Video Call</Text>
             </>
           )}
         </Pressable>

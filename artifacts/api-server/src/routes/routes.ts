@@ -125,6 +125,7 @@ async function createDailyRoom(roomName: string): Promise<{ url: string; name: s
           enable_chat: true,
           enable_screenshare: true,
           enable_recording: "cloud",
+          enable_prejoin_ui: false,
           enable_cpu_warning_notifications: false,
           exp: Math.floor(Date.now() / 1000) + 30 * 24 * 3600, // Expires in 30 days
         },
@@ -162,6 +163,7 @@ async function configureDailyRoom(roomUrl: string): Promise<boolean> {
       body: JSON.stringify({
         privacy: "private",
         properties: {
+          enable_prejoin_ui: false,
           enable_cpu_warning_notifications: false,
         },
       }),
@@ -1098,9 +1100,6 @@ export async function registerRoutes(
   // by Daily when prejoinUI is disabled, and the browser caches names from previous sessions.
   app.get("/api/bookings/room/:roomUrl/daily-token", isAuthenticated, async (req: any, res) => {
     try {
-      const apiKey = process.env.DAILY_API_KEY;
-      if (!apiKey) return res.status(503).json({ message: "Daily not configured" });
-
       const roomUrl = decodeURIComponent(req.params.roomUrl);
       const booking = await storage.getBookingByVideoRoomUrl(roomUrl);
       if (!booking) return res.status(404).json({ message: "Booking not found" });
@@ -1112,6 +1111,14 @@ export async function registerRoutes(
       if (!isSeeker && !isProviderUser) {
         return res.status(403).json({ message: "Access denied" });
       }
+
+      const session = await storage.getCallSession(booking.id);
+      if (!session || session.status !== "accepted") {
+        return res.status(409).json({ message: "The call must be accepted before joining the video room" });
+      }
+
+      const apiKey = process.env.DAILY_API_KEY;
+      if (!apiKey) return res.status(503).json({ message: "Daily not configured" });
 
       const configured = await configureDailyRoom(roomUrl);
       if (!configured) {
@@ -1136,6 +1143,7 @@ export async function registerRoutes(
             room_name: roomName,
             user_name: userName,
             user_id: user.id,
+            start_video_off: session.callType === "voice",
             exp: Math.floor(Date.now() / 1000) + 4 * 3600, // valid 4 hours
           },
         }),
@@ -5542,8 +5550,10 @@ export async function registerRoutes(
       if (!session) return res.json(null);
       res.json({
         bookingId: session.bookingId,
+        sessionGeneration: session.sessionGeneration,
         callerName: session.callerName,
         callerRole: session.callerRole,
+        callType: session.callType,
         videoRoomUrl: session.videoRoomUrl,
         serviceName: session.serviceName,
         subtitle: session.subtitle,
@@ -5603,8 +5613,10 @@ export async function registerRoutes(
           res.write(`data: ${JSON.stringify({
             type: "incoming_call",
             bookingId: s.bookingId,
+            sessionGeneration: s.sessionGeneration,
             callerName: s.callerName,
             callerRole: s.callerRole,
+            callType: s.callType,
             videoRoomUrl: s.videoRoomUrl,
             serviceName: s.serviceName,
             subtitle: s.subtitle,
@@ -5665,6 +5677,13 @@ export async function registerRoutes(
         }
       }
 
+      // Fast-path conflict response; the guarded upsert below remains the
+      // authoritative cross-instance check for concurrent ring requests.
+      const existingSession = await storage.getCallSession(bookingId);
+      if (existingSession && (existingSession.status === "ringing" || existingSession.status === "accepted")) {
+        return res.status(409).json({ error: "A call session is already active", status: existingSession.status });
+      }
+
       // Get caller display name
       const callerUser = await storage.getUserById(callerId);
       const callerName =
@@ -5708,46 +5727,46 @@ export async function registerRoutes(
       const recipientUserId = isSeeker ? provider?.userId : booking.userId;
       if (!recipientUserId) return res.status(400).json({ error: "Cannot find recipient" });
 
-      // Guard: if the call is already accepted (both parties are in the room),
-      // skip re-ringing so the recipient doesn't get a ghost incoming-call alert.
-      const existingSession = await storage.getCallSession(bookingId);
-      if (existingSession && existingSession.status === "accepted") {
-        return res.json({ success: true, session: { bookingId, status: "accepted" } });
-      }
-
       // Persist call session to DB — shared across all autoscale instances
       const SESSION_TTL_MS = 300_000; // 5 minutes
-      await storage.createCallSession({
+      const sessionGeneration = randomUUID();
+      const createdSession = await storage.createCallSession({
         bookingId,
+        sessionGeneration,
         callerId,
         callerName,
         callerRole,
         recipientUserId,
         videoRoomUrl,
+        callType,
         serviceName: booking.serviceName || "",
         subtitle,
         status: "ringing",
         expiresAt: new Date(Date.now() + SESSION_TTL_MS),
       });
+      if (!createdSession) {
+        return res.status(409).json({ error: "A call session is already active" });
+      }
 
-      // Auto-timeout after 5 minutes (best-effort cleanup on this instance)
+      // Auto-timeout only the generation created by this request, and only
+      // after its persisted expiry time has elapsed.
       setTimeout(async () => {
         try {
-          const s = await storage.getCallSession(bookingId);
-          if (s && s.status === "ringing") {
-            await storage.updateCallSession(bookingId, { status: "timeout" });
-            if (s.twilioCallSid) cancelVoiceCall(s.twilioCallSid).catch(() => {});
-            broadcastCallEvent(callerId, { type: "call_timeout", bookingId });
-            broadcastCallEvent(recipientUserId, { type: "call_timeout", bookingId });
-            setTimeout(() => storage.deleteCallSession(bookingId), 5000);
+          const expired = await storage.expireRingingCallSession(bookingId, sessionGeneration);
+          if (expired) {
+            if (expired.twilioCallSid) cancelVoiceCall(expired.twilioCallSid).catch(() => {});
+            broadcastCallEvent(callerId, { type: "call_timeout", bookingId, sessionGeneration });
+            broadcastCallEvent(recipientUserId, { type: "call_timeout", bookingId, sessionGeneration });
+            setTimeout(() => storage.deleteCallSession(bookingId, sessionGeneration, ["timeout"]), 5000);
           }
         } catch {}
-      }, SESSION_TTL_MS);
+      }, SESSION_TTL_MS + 1000);
 
       // Notify recipient via SSE if they're online
       broadcastCallEvent(recipientUserId, {
         type: "incoming_call",
         bookingId,
+        sessionGeneration,
         callerName,
         callerRole,
         videoRoomUrl,
@@ -5785,6 +5804,7 @@ export async function registerRoutes(
 
       notifyMobileIncomingCall(recipientUserId, {
         bookingId,
+        sessionGeneration,
         callerId,
         callerName,
         callerRole,
@@ -5794,7 +5814,7 @@ export async function registerRoutes(
         subtitle,
       }).catch((error) => req.log.error({ err: error }, "Mobile incoming-call push failed"));
 
-      res.json({ success: true, session: { bookingId, status: "ringing" } });
+      res.json({ success: true, session: { bookingId, sessionGeneration, status: "ringing", callType } });
     } catch (error) {
       console.error("[Call] Ring error:", error);
       res.status(500).json({ error: "Failed to initiate ring" });
@@ -5810,6 +5830,9 @@ export async function registerRoutes(
       const { bookingId } = req.params;
       const session = await storage.getCallSession(bookingId);
       if (!session) return res.status(404).json({ error: "No active call session" });
+      if (req.body?.sessionGeneration && req.body.sessionGeneration !== session.sessionGeneration) {
+        return res.status(409).json({ error: "Call session has changed" });
+      }
 
       // Verify the acceptor is NOT the caller and IS a participant in the booking
       const booking = await storage.getBookingById(bookingId);
@@ -5820,9 +5843,19 @@ export async function registerRoutes(
       if (!isSeeker && !isProviderUser) return res.status(403).json({ error: "Not part of this booking" });
       if (session.callerId === userId) return res.status(403).json({ error: "Caller cannot accept their own call" });
 
-      if (session.status !== "ringing") return res.json({ success: true, status: session.status });
+      if (session.status !== "ringing") {
+        return res.status(409).json({ error: "Call is no longer ringing", status: session.status });
+      }
 
-      await storage.updateCallSession(bookingId, { status: "accepted" });
+      // Ring sessions expire after five minutes; an answered call must remain
+      // visible to both participants for the duration of the consultation.
+      const acceptedSession = await storage.transitionCallSession(bookingId, session.sessionGeneration, ["ringing"], {
+        status: "accepted",
+        expiresAt: new Date(Date.now() + 2 * 60 * 60 * 1000),
+      });
+      if (!acceptedSession) {
+        return res.status(409).json({ error: "Call is no longer ringing or has changed" });
+      }
 
       // Cancel the Twilio voice call if it's still ringing
       if (session.twilioCallSid) {
@@ -5833,14 +5866,21 @@ export async function registerRoutes(
       broadcastCallEvent(session.callerId, {
         type: "call_accepted",
         bookingId,
+        sessionGeneration: acceptedSession.sessionGeneration,
+        callType: session.callType,
         videoRoomUrl: session.videoRoomUrl,
       });
 
       // Keep the accepted session alive for 2 hours so the ring-guard can detect
       // it on page refresh — the 10 s window was too short and caused ghost re-rings.
-      setTimeout(() => storage.deleteCallSession(bookingId), 2 * 60 * 60 * 1000);
+      setTimeout(() => storage.deleteCallSession(bookingId, session.sessionGeneration, ["accepted"], true), 2 * 60 * 60 * 1000 + 1000);
 
-      res.json({ success: true, videoRoomUrl: session.videoRoomUrl });
+      res.json({
+        success: true,
+        videoRoomUrl: acceptedSession.videoRoomUrl,
+        callType: acceptedSession.callType,
+        sessionGeneration: acceptedSession.sessionGeneration,
+      });
     } catch (error) {
       res.status(500).json({ error: "Failed to accept call" });
     }
@@ -5855,6 +5895,9 @@ export async function registerRoutes(
       const { bookingId } = req.params;
       const session = await storage.getCallSession(bookingId);
       if (!session) return res.status(404).json({ error: "No active call session" });
+      if (req.body?.sessionGeneration && req.body.sessionGeneration !== session.sessionGeneration) {
+        return res.status(409).json({ error: "Call session has changed" });
+      }
 
       // Verify the decliner is NOT the caller and IS a participant in the booking
       const booking = await storage.getBookingById(bookingId);
@@ -5865,7 +5908,8 @@ export async function registerRoutes(
       if (!isSeeker && !isProviderUser) return res.status(403).json({ error: "Not part of this booking" });
       if (session.callerId === userId) return res.status(403).json({ error: "Caller should use cancel endpoint" });
 
-      await storage.updateCallSession(bookingId, { status: "declined" });
+      const declinedSession = await storage.transitionCallSession(bookingId, session.sessionGeneration, ["ringing"], { status: "declined" });
+      if (!declinedSession) return res.status(409).json({ error: "Call is no longer ringing or has changed" });
 
       // Cancel the Twilio voice call if it's still ringing
       if (session.twilioCallSid) {
@@ -5875,9 +5919,10 @@ export async function registerRoutes(
       broadcastCallEvent(session.callerId, {
         type: "call_declined",
         bookingId,
+        sessionGeneration: session.sessionGeneration,
       });
 
-      setTimeout(() => storage.deleteCallSession(bookingId), 5000);
+      setTimeout(() => storage.deleteCallSession(bookingId, session.sessionGeneration, ["declined"]), 5000);
 
       res.json({ success: true });
     } catch (error) {
@@ -5889,10 +5934,17 @@ export async function registerRoutes(
   app.post("/api/call/cancel/:bookingId", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user?.id;
+      if (!userId) return res.status(401).json({ error: "Not authenticated" });
       const { bookingId } = req.params;
       const session = await storage.getCallSession(bookingId);
-      if (session && session.callerId === userId) {
-        await storage.updateCallSession(bookingId, { status: "declined" });
+      if (!session) return res.status(404).json({ error: "No active call session" });
+      if (req.body?.sessionGeneration && req.body.sessionGeneration !== session.sessionGeneration) {
+        return res.status(409).json({ error: "Call session has changed" });
+      }
+      if (session.callerId !== userId) return res.status(403).json({ error: "Only the caller can cancel" });
+      {
+        const cancelledSession = await storage.transitionCallSession(bookingId, session.sessionGeneration, ["ringing"], { status: "declined" });
+        if (!cancelledSession) return res.status(409).json({ error: "Call is no longer ringing or has changed" });
         // Cancel the Twilio voice call if it's still ringing
         if (session.twilioCallSid) cancelVoiceCall(session.twilioCallSid).catch(() => {});
         // Find recipient to notify
@@ -5901,14 +5953,66 @@ export async function registerRoutes(
           const provider = await storage.getProviderById(booking.providerId!);
           const recipientUserId = session.callerRole === "seeker" ? provider?.userId : booking.userId;
           if (recipientUserId) {
-            broadcastCallEvent(recipientUserId, { type: "call_cancelled", bookingId });
+            broadcastCallEvent(recipientUserId, { type: "call_cancelled", bookingId, sessionGeneration: session.sessionGeneration });
           }
         }
-        setTimeout(() => storage.deleteCallSession(bookingId), 5000);
+        setTimeout(() => storage.deleteCallSession(bookingId, session.sessionGeneration, ["declined"]), 5000);
       }
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: "Failed to cancel call" });
+    }
+  });
+
+  // End an accepted call, or stop a ringing call for either participant.
+  app.post("/api/call/end/:bookingId", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) return res.status(401).json({ error: "Not authenticated" });
+
+      const { bookingId } = req.params;
+      const session = await storage.getCallSession(bookingId);
+      if (!session) return res.status(404).json({ error: "No active call session" });
+      if (req.body?.sessionGeneration && req.body.sessionGeneration !== session.sessionGeneration) {
+        return res.status(409).json({ error: "Call session has changed" });
+      }
+
+      const booking = await storage.getBookingById(bookingId);
+      if (!booking) return res.status(404).json({ error: "Booking not found" });
+      const provider = booking.providerId ? await storage.getProviderById(booking.providerId) : null;
+      const isSeeker = booking.userId === userId;
+      const isProviderUser = provider?.userId === userId;
+      if (!isSeeker && !isProviderUser) return res.status(403).json({ error: "Not part of this booking" });
+      if (session.callerId !== userId && session.recipientUserId !== userId) {
+        return res.status(403).json({ error: "Not a participant in this call" });
+      }
+
+      if (session.status === "ended") {
+        return res.json({ success: true, status: "ended" });
+      }
+      if (session.status !== "accepted" && session.status !== "ringing") {
+        return res.status(409).json({ error: "Call is no longer active", status: session.status });
+      }
+
+      const endedSession = await storage.transitionCallSession(bookingId, session.sessionGeneration, ["accepted", "ringing"], { status: "ended" });
+      if (!endedSession) return res.status(409).json({ error: "Call is no longer active or has changed" });
+      if (session.status === "ringing" && session.twilioCallSid) {
+        cancelVoiceCall(session.twilioCallSid).catch(() => {});
+      }
+
+      const otherParticipantId = session.callerId === userId
+        ? session.recipientUserId
+        : session.callerId;
+      broadcastCallEvent(otherParticipantId, { type: "call_ended", bookingId, sessionGeneration: session.sessionGeneration });
+
+      // Keep the ended status queryable briefly so both clients can observe it.
+      setTimeout(() => {
+        storage.deleteCallSession(bookingId, session.sessionGeneration, ["ended"]).catch(() => {});
+      }, 5000);
+
+      res.json({ success: true, status: "ended" });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to end call" });
     }
   });
 
@@ -5932,7 +6036,9 @@ export async function registerRoutes(
       if (!session) return res.json({ status: "none" });
       res.json({
         status: session.status,
+        sessionGeneration: session.sessionGeneration,
         videoRoomUrl: session.videoRoomUrl,
+        callType: session.callType,
         isCaller: session.callerId === userId,
       });
     } catch (error) {

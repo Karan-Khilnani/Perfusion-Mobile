@@ -23,7 +23,9 @@ type CallPhase =
   | "connected"
   | "declined"
   | "timeout"
-  | "window_closed";
+  | "window_closed"
+  | "ended"
+  | "unavailable";
 
 type MobilePanel = "video" | "docs" | "summary";
 
@@ -60,6 +62,7 @@ export default function VideoRoomPage() {
   // Tracks whether we've applied the initial accepted=true jump (avoid re-render loop)
   const joinedAsCalleeApplied = useRef(false);
   const ringStartedRef = useRef(false);
+  const ringAlreadyStartedRef = useRef(new URLSearchParams(window.location.search).get("initiated") === "true");
 
   const phaseRef = useRef<CallPhase>("precall");
   // Stable ref to latest booking so unmount cleanup can access it
@@ -71,7 +74,6 @@ export default function VideoRoomPage() {
   // If the user accepted an incoming call, skip precall and go straight to connected
   const joinedAsCallee = urlParams.get("accepted") === "true";
   const isVoiceCall = urlParams.get("voice") === "true";
-  const ringAlreadyStarted = urlParams.get("initiated") === "true";
 
   const { data: booking } = useQuery<VideoRoomBooking>({
     queryKey: ["/api/bookings/room", roomId],
@@ -195,10 +197,10 @@ export default function VideoRoomPage() {
   useCallEvents(handleCallEvent);
 
   const ringOtherParticipant = useCallback(async () => {
-    if (!booking || joinedAsCallee || ringAlreadyStarted || ringStartedRef.current) return;
+    if (!booking || joinedAsCallee || ringAlreadyStartedRef.current || ringStartedRef.current) return;
     ringStartedRef.current = true;
     try {
-      await apiRequest("POST", `/api/call/ring/${booking.id}`, { callType: "video" });
+      await apiRequest("POST", `/api/call/ring/${booking.id}`, { callType: isVoiceCall ? "voice" : "video" });
     } catch (error) {
       ringStartedRef.current = false;
       toast({
@@ -208,7 +210,47 @@ export default function VideoRoomPage() {
       });
       throw error;
     }
-  }, [booking, joinedAsCallee, ringAlreadyStarted, toast]);
+  }, [booking, joinedAsCallee, isVoiceCall, toast]);
+
+  // The call must be accepted by the other participant before either side enters
+  // Daily. Poll persisted status so this also works after a direct initiated link.
+  useEffect(() => {
+    if (phase !== "ringing" || !booking) return;
+    let stopped = false;
+    const checkStatus = async () => {
+      try {
+        const response = await fetch(`/api/call/status/${booking.id}`, { credentials: "include" });
+        if (!response.ok) return;
+        const data = await response.json();
+        if (stopped) return;
+        switch (data.status) {
+          case "accepted":
+            setPhase("connected");
+            break;
+          case "declined":
+            setPhase("declined");
+            break;
+          case "timeout":
+            setPhase("timeout");
+            break;
+          case "ended":
+            setPhase("ended");
+            break;
+          case "none":
+            setPhase("unavailable");
+            break;
+        }
+      } catch {
+        // Retry on the next interval when the status endpoint is temporarily unavailable.
+      }
+    };
+    void checkStatus();
+    const interval = window.setInterval(() => void checkStatus(), 2000);
+    return () => {
+      stopped = true;
+      window.clearInterval(interval);
+    };
+  }, [phase, booking?.id]);
 
   // Fetch a server-side Daily token when entering the call — this locks in the user's
   // real name and cannot be overridden by browser cache.
@@ -239,10 +281,14 @@ export default function VideoRoomPage() {
     return () => clearTimeout(timer);
   }, [phase]);
 
-  // Conference-room model: enter the room directly (no ring/accept handshake).
+  // Ring the other participant, then wait for their acceptance before entering.
   const handleEnterRoom = useCallback(async () => {
     if (!booking) return;
-    await ringOtherParticipant();
+    try {
+      await ringOtherParticipant();
+    } catch {
+      return;
+    }
 
     // Save on-call doctor info for seeker before entering
     if (!isProvider && onCallDoctorName.trim()) {
@@ -256,31 +302,59 @@ export default function VideoRoomPage() {
       }
     }
 
-    setPhase("connected");
+    setPhase("ringing");
   }, [booking, isProvider, onCallDoctorName, onCallDoctorDesignation, ringOtherParticipant]);
 
-  // Provider enters the room directly — no ring/accept step (conference-room model).
+  // Provider-initiated and already-rang routes both wait for the callee's answer.
   useEffect(() => {
     if (!isProvider || joinedAsCallee || phase !== "precall" || !booking) return;
-    void ringOtherParticipant().then(() => setPhase("connected"));
+    void ringOtherParticipant()
+      .then(() => setPhase("ringing"))
+      .catch(() => setPhase("unavailable"));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isProvider, joinedAsCallee, booking?.id, phase, ringOtherParticipant]);
 
   const handleCancelRing = async () => {
     clearRingTimer();
-    if (booking) {
-      try {
-        await apiRequest("POST", `/api/call/cancel/${booking.id}`, {});
-      } catch {}
+    if (!booking) {
+      toast({
+        title: "Could not cancel the call",
+        description: "The booking details are not available. Please try again.",
+        variant: "destructive",
+      });
+      return;
+    }
+    try {
+      await apiRequest("POST", `/api/call/cancel/${booking.id}`, {});
+    } catch {
+      toast({
+        title: "Could not cancel the call",
+        description: "The call is still active. Check your connection and try again.",
+        variant: "destructive",
+      });
+      return;
     }
     navigate(returnTo);
   };
 
   const handleRetry = () => {
+    ringStartedRef.current = false;
+    ringAlreadyStartedRef.current = false;
     setPhase("precall");
   };
 
-  const hangUp = () => {
+  const hangUp = async () => {
+    try {
+      if (!booking) throw new Error("Booking details are not available");
+      await apiRequest("POST", `/api/call/end/${booking.id}`, {});
+    } catch {
+      toast({
+        title: "Could not end the call",
+        description: "The call could not be ended on the server. Please check your connection and try again.",
+        variant: "destructive",
+      });
+      return;
+    }
     navigate(returnTo);
   };
 
@@ -446,6 +520,65 @@ export default function VideoRoomPage() {
         <Button onClick={() => navigate(returnTo)} data-testid="button-go-back">
           Go Back
         </Button>
+      </div>
+    );
+  }
+
+  if (phase === "ringing" || phase === "declined" || phase === "timeout" || phase === "ended" || phase === "unavailable") {
+    const terminalMessages: Partial<Record<CallPhase, string>> = {
+      declined: "The other participant declined the call.",
+      timeout: "The call timed out before it was answered.",
+      ended: "This call has ended.",
+      unavailable: "There is no active call session to join.",
+    };
+    const terminalMessage = terminalMessages[phase];
+    const canRetry = phase !== "ended";
+    return (
+      <div className="flex h-screen items-center justify-center bg-background p-4">
+        <Card className="w-full max-w-md">
+          <CardContent className="space-y-5 pt-8 text-center">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
+              {phase === "ringing"
+                ? <Phone className="h-7 w-7 animate-pulse text-primary" />
+                : <PhoneOff className="h-7 w-7 text-muted-foreground" />}
+            </div>
+            <div className="space-y-2">
+              <h2 className="text-xl font-semibold">
+                {phase === "ringing" ? `Calling ${otherParticipantName}` : "Call not connected"}
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                {phase === "ringing"
+                  ? "Waiting for the other participant to answer. The video room will open automatically when they accept."
+                  : terminalMessage}
+              </p>
+              {booking?.patientName && (
+                <p className="text-xs text-muted-foreground">Patient: {booking.patientName}</p>
+              )}
+            </div>
+            {phase === "ringing" ? (
+              <div className="flex justify-center gap-3">
+                <Button variant="outline" onClick={handleCancelRing} data-testid="button-cancel-ring">
+                  Cancel call
+                </Button>
+                <Button variant="ghost" onClick={handleCancelRing} data-testid="button-back-waiting">
+                  Back
+                </Button>
+              </div>
+            ) : (
+              <div className="flex justify-center gap-3">
+                {canRetry && (
+                  <Button onClick={handleRetry} data-testid="button-retry-call">
+                    <RefreshCw className="mr-2 h-4 w-4" />
+                    Try Again
+                  </Button>
+                )}
+                <Button variant="outline" onClick={() => navigate(returnTo)} data-testid="button-back-terminal">
+                  Back
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
     );
   }

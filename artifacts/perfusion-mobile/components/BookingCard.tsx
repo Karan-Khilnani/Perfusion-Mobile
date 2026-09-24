@@ -69,7 +69,8 @@ export function BookingCard({ booking, onPauseToggle }: Props) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error || data.reason || "Cannot start call");
       }
-      router.push(`/call/${booking.id}?mode=${callType}`);
+      const result: { session?: { sessionGeneration?: string } } = await res.json();
+      router.push(`/call/${booking.id}?mode=${callType}&generation=${result.session?.sessionGeneration || ""}`);
     } catch (error) {
       if (Platform.OS !== "web") {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);

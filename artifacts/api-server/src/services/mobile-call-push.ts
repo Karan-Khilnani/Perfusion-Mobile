@@ -7,6 +7,7 @@ import { logger } from "../lib/logger";
 
 interface IncomingCallPush {
   bookingId: string;
+  sessionGeneration: string;
   callerId: string;
   callerName: string;
   callerRole: "seeker" | "provider";
@@ -85,6 +86,8 @@ export async function notifyMobileIncomingCall(userId: string, call: IncomingCal
       caller: { id: call.callerId, displayName: call.callerName },
       metadata: {
         bookingId: call.bookingId,
+        callType: call.callType,
+        sessionGeneration: call.sessionGeneration,
         videoRoomUrl: call.videoRoomUrl,
         serviceName: call.serviceName,
         subtitle: call.subtitle,
@@ -135,6 +138,8 @@ export async function notifyMobileIncomingCall(userId: string, call: IncomingCal
         bookingId: call.bookingId,
         callerName: call.callerName,
         callerRole: call.callerRole,
+        callType: call.callType,
+        sessionGeneration: call.sessionGeneration,
         videoRoomUrl: call.videoRoomUrl,
         subtitle: call.subtitle,
       },
