@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { randomBytes } from "node:crypto";
 import passport from "passport";
 import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import { 
@@ -62,6 +63,48 @@ function getCallbackURL(req: any): string {
   return `${protocol}://${hostClean}/api/auth/google/callback`;
 }
 
+const MOBILE_GOOGLE_REDIRECT_URI = "perfusion-mobile://auth/callback";
+
+function getMobileGoogleErrorUrl(error: string): string {
+  return `${MOBILE_GOOGLE_REDIRECT_URI}?error=${encodeURIComponent(error)}`;
+}
+
+async function createMobileGoogleExchangeTicket(userId: string): Promise<string> {
+  const ticket = randomBytes(32).toString("hex");
+  const expiresAt = new Date(Date.now() + 2 * 60 * 1000);
+  await getPool().query(
+    `INSERT INTO "sessions" (sid, sess, expire)
+     VALUES ($1, $2::json, $3)`,
+    [
+      `google-mobile-${ticket}`,
+      JSON.stringify({ authType: "google-mobile-exchange", userId }),
+      expiresAt,
+    ],
+  );
+  return ticket;
+}
+
+async function consumeMobileGoogleExchangeTicket(
+  ticket: string,
+): Promise<string | null> {
+  const result = await getPool().query(
+    `DELETE FROM "sessions"
+     WHERE sid = $1 AND expire > NOW()
+     RETURNING sess`,
+    [`google-mobile-${ticket}`],
+  );
+  const payload = result.rows[0]?.sess as
+    | { authType?: unknown; userId?: unknown }
+    | undefined;
+  if (
+    payload?.authType !== "google-mobile-exchange" ||
+    typeof payload.userId !== "string"
+  ) {
+    return null;
+  }
+  return payload.userId;
+}
+
 export function registerAuthRoutes(app: Express): void {
   if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
     passport.use(
@@ -77,6 +120,9 @@ export function registerAuthRoutes(app: Express): void {
             const email = profile.emails?.[0]?.value;
             if (!email) {
               return done(new Error("No email found in Google profile"));
+            }
+            if (profile._json?.email_verified !== true) {
+              return done(new Error("Google account email is not verified"));
             }
 
             const googleId = profile.id;
@@ -138,8 +184,36 @@ export function registerAuthRoutes(app: Express): void {
       }
     );
 
+    app.get("/api/auth/google/mobile", (req: any, res, next) => {
+      const state = `mobile.${randomBytes(32).toString("hex")}`;
+      req.session.mobileGoogleOAuthState = state;
+      req.session.save((error: unknown) => {
+        if (error) {
+          console.error("Mobile Google OAuth state save error:", error);
+          return res.redirect(getMobileGoogleErrorUrl("session_failed"));
+        }
+        passport.authenticate("google", {
+          scope: ["profile", "email"],
+          state,
+          callbackURL: getCallbackURL(req),
+          prompt: "select_account",
+        } as any)(req, res, next);
+      });
+    });
+
     app.get(
       "/api/auth/google/callback",
+      (req: any, res, next) => {
+        const state = req.query.state;
+        if (typeof state !== "string" || !state.startsWith("mobile.")) {
+          return next();
+        }
+        if (req.session.mobileGoogleOAuthState !== state) {
+          return res.redirect(getMobileGoogleErrorUrl("invalid_state"));
+        }
+        res.locals.mobileGoogleOAuth = true;
+        next();
+      },
       (req, res, next) => {
         const callbackURL = getCallbackURL(req);
         console.log("Google OAuth callback with callbackURL:", callbackURL);
@@ -150,10 +224,16 @@ export function registerAuthRoutes(app: Express): void {
         } as any, (err: any, user: any, info: any) => {
           if (err) {
             console.error("Google OAuth authenticate error:", err);
+            if (res.locals.mobileGoogleOAuth) {
+              return res.redirect(getMobileGoogleErrorUrl("google_failed"));
+            }
             return res.redirect("/login?error=google_failed");
           }
           if (!user) {
             console.error("Google OAuth no user returned. Info:", info);
+            if (res.locals.mobileGoogleOAuth) {
+              return res.redirect(getMobileGoogleErrorUrl("google_failed"));
+            }
             return res.redirect("/login?error=google_failed");
           }
           req.user = user;
@@ -166,7 +246,18 @@ export function registerAuthRoutes(app: Express): void {
           console.log("Google callback processing user:", { id: googleUser?.id, isNew: googleUser?.isNew });
           if (!googleUser || !googleUser.id) {
             console.error("Google callback: no user id");
+            if (res.locals.mobileGoogleOAuth) {
+              return res.redirect(getMobileGoogleErrorUrl("google_failed"));
+            }
             return res.redirect("/login?error=google_failed");
+          }
+
+          if (res.locals.mobileGoogleOAuth) {
+            req.session.mobileGoogleOAuthState = undefined;
+            const ticket = await createMobileGoogleExchangeTicket(googleUser.id);
+            return res.redirect(
+              `${MOBILE_GOOGLE_REDIRECT_URI}?ticket=${encodeURIComponent(ticket)}`,
+            );
           }
 
           let role: string | undefined;
@@ -227,6 +318,54 @@ export function registerAuthRoutes(app: Express): void {
         }
       }
     );
+
+    app.post("/api/auth/google/mobile/exchange", async (req: any, res) => {
+      try {
+        const parsed = z.object({
+          ticket: z.string().regex(/^[a-f0-9]{64}$/),
+        }).safeParse(req.body);
+        if (!parsed.success) {
+          return res.status(400).json({ message: "Invalid sign-in ticket." });
+        }
+
+        const userId = await consumeMobileGoogleExchangeTicket(parsed.data.ticket);
+        if (!userId) {
+          return res.status(401).json({
+            message: "This Google sign-in expired or was already used. Please try again.",
+          });
+        }
+        const user = await getUserById(userId);
+        if (!user || !user.isActive) {
+          return res.status(401).json({ message: "This account is unavailable." });
+        }
+
+        await new Promise<void>((resolve, reject) => {
+          req.session.regenerate((error: unknown) => {
+            if (error) reject(error);
+            else resolve();
+          });
+        });
+        req.session.userId = user.id;
+        await new Promise<void>((resolve, reject) => {
+          req.session.save((error: unknown) => {
+            if (error) reject(error);
+            else resolve();
+          });
+        });
+
+        let requiresAgreement = false;
+        try {
+          requiresAgreement = await userRequiresAgreement(user as any);
+        } catch {
+          requiresAgreement =
+            user.role !== "admin" && user.approvalStatus === "approved";
+        }
+        return res.json({ ...user, requiresAgreement });
+      } catch (error) {
+        console.error("Mobile Google sign-in exchange error:", error);
+        return res.status(500).json({ message: "Could not complete Google sign-in." });
+      }
+    });
 
     console.log("Google OAuth configured successfully");
   } else {

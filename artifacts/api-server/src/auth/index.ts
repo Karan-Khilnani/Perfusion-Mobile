@@ -9,6 +9,7 @@ import { eq } from "drizzle-orm";
 declare module "express-session" {
   interface SessionData {
     userId?: string;
+    mobileGoogleOAuthState?: string;
   }
 }
 
