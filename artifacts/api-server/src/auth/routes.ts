@@ -69,6 +69,21 @@ function getMobileGoogleErrorUrl(error: string): string {
   return `${MOBILE_GOOGLE_REDIRECT_URI}?error=${encodeURIComponent(error)}`;
 }
 
+async function getMobileAuthUser(req: any, user: any): Promise<any> {
+  if (req.get?.("X-Mobile-Client") !== "1" || user?.role !== "provider") {
+    return user;
+  }
+  try {
+    const provider = await storage.getProviderByUserId(user.id);
+    return provider?.location
+      ? { ...user, location: provider.location }
+      : user;
+  } catch (error) {
+    console.error("Could not load provider location for mobile auth response:", error);
+    return user;
+  }
+}
+
 async function createMobileGoogleExchangeTicket(
   userId: string,
   codeChallenge: string,
@@ -402,8 +417,9 @@ export function registerAuthRoutes(app: Express): void {
           requiresAgreement =
             user.role !== "admin" && user.approvalStatus === "approved";
         }
+        const mobileUser = await getMobileAuthUser(req, user);
         return res.json({
-          ...user,
+          ...mobileUser,
           requiresAgreement,
           needsProfile: user.role !== "admin" && !user.hospitalName,
         });
@@ -416,6 +432,14 @@ export function registerAuthRoutes(app: Express): void {
     console.log("Google OAuth configured successfully");
   } else {
     console.log("Google OAuth not configured (missing GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET)");
+    app.get("/api/auth/google/mobile", (_req, res) => {
+      res.redirect(getMobileGoogleErrorUrl("google_unconfigured"));
+    });
+    app.post("/api/auth/google/mobile/exchange", (_req, res) => {
+      res.status(503).json({
+        message: "Google sign-in is not configured for this environment. Ask your administrator to enable it, or use email sign-in.",
+      });
+    });
   }
 
   app.post("/api/auth/register", async (req, res) => {
@@ -518,17 +542,23 @@ export function registerAuthRoutes(app: Express): void {
         requiresAgreement = user.role !== "admin" && user.approvalStatus === "approved";
       }
 
+      const {
+        password,
+        verificationCode,
+        verificationCodeExpiresAt,
+        ...safeUser
+      } = user;
+      const mobileUser = await getMobileAuthUser(req, safeUser);
       req.session.save((err) => {
         if (err) {
           console.error("Session save error:", err);
           return res.status(500).json({ message: "Failed to create session" });
         }
         
-        const { password, ...safeUser } = user;
         if (!user.emailVerified && !user.googleId) {
-          return res.json({ ...safeUser, needsVerification: true });
+          return res.json({ ...mobileUser, needsVerification: true });
         }
-        res.json({ ...safeUser, requiresAgreement });
+        res.json({ ...mobileUser, requiresAgreement });
       });
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -631,7 +661,7 @@ export function registerAuthRoutes(app: Express): void {
           (user as any).role !== "admin" &&
           (user as any).approvalStatus === "approved";
       }
-      res.json({ ...user, requiresAgreement });
+      res.json({ ...(await getMobileAuthUser(req, user)), requiresAgreement });
     } catch (error) {
       console.error("Error fetching user:", error);
       res.status(500).json({ message: "Failed to fetch user" });
@@ -735,7 +765,10 @@ export function registerAuthRoutes(app: Express): void {
         }
       }
 
-      res.json({ ...updated, needsApproval: true });
+      res.json({
+        ...(await getMobileAuthUser(req, updated)),
+        needsApproval: true,
+      });
     } catch (error) {
       console.error("Complete profile error:", error);
       res.status(500).json({ message: "Failed to complete profile" });

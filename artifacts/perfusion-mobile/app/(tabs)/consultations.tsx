@@ -14,6 +14,8 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { BookingCard } from "@/components/BookingCard";
+import { BrandMark } from "@/components/BrandMark";
+import { ScreenHeading } from "@/components/ScreenHeading";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiFetch } from "@/hooks/useApi";
 import { useColors } from "@/hooks/useColors";
@@ -48,8 +50,8 @@ export default function ConsultationsScreen() {
   return (
     <View style={[styles.screen, { backgroundColor: palette.background, paddingTop: Platform.OS === "web" ? 67 : insets.top }]}>
       <View style={styles.header}>
-        <Text style={[styles.title, { color: palette.foreground }]}>Consultations</Text>
-        <Text style={[styles.subtitle, { color: palette.mutedForeground }]}>Search and review the complete clinical history</Text>
+        <BrandMark compact />
+        <ScreenHeading title="Consultations" subtitle="Search and review the complete clinical history" />
         <View style={[styles.search, { backgroundColor: palette.card, borderColor: palette.border }]}>
           <Feather name="search" size={17} color={palette.mutedForeground} />
           <TextInput
@@ -95,8 +97,6 @@ export default function ConsultationsScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   header: { paddingHorizontal: 18, paddingTop: 18 },
-  title: { fontSize: 25, fontFamily: "Inter_700Bold", letterSpacing: -0.5 },
-  subtitle: { fontSize: 12, marginTop: 4, fontFamily: "Inter_400Regular" },
   search: { height: 46, marginTop: 18, borderRadius: 14, borderWidth: 1, flexDirection: "row", alignItems: "center", paddingHorizontal: 13, gap: 9 },
   searchInput: { flex: 1, fontSize: 13, fontFamily: "Inter_400Regular" },
   filters: { paddingHorizontal: 18, paddingVertical: 12, gap: 7 },

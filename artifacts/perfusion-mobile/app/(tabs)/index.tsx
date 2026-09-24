@@ -15,6 +15,8 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { BookingCard } from "@/components/BookingCard";
+import { BrandMark } from "@/components/BrandMark";
+import { ScreenHeading } from "@/components/ScreenHeading";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiFetch } from "@/hooks/useApi";
 import { useColors } from "@/hooks/useColors";
@@ -88,7 +90,7 @@ export default function DashboardScreen() {
       showsVerticalScrollIndicator={false}
     >
       <View style={styles.brandRow}>
-        <Text style={[styles.brand, { color: palette.foreground }]}>Perfusion</Text>
+        <BrandMark />
         <View style={styles.headerActions}>
           <Pressable style={[styles.headerIcon, { borderColor: palette.border }]} accessibilityLabel="Help">
             <Feather name="help-circle" size={18} color={palette.foreground} />
@@ -101,10 +103,10 @@ export default function DashboardScreen() {
       </View>
 
       <View style={styles.greetingBlock}>
-        <Text style={[styles.greeting, { color: palette.foreground }]}>{greeting()}, {seeker ? "Dr. " : "Dr. "}{name}</Text>
-        <Text style={[styles.date, { color: palette.mutedForeground }]}>
-          {date}{seeker && user?.hospitalName ? ` · ${user.hospitalName}` : ""}
-        </Text>
+        <ScreenHeading
+          title={`${greeting()}, Dr. ${name}`}
+          subtitle={`${date}${seeker && user?.hospitalName ? ` · ${user.hospitalName}` : ""}`}
+        />
       </View>
 
       {seeker ? (
@@ -174,7 +176,6 @@ export default function DashboardScreen() {
 const styles = StyleSheet.create({
   container: { paddingHorizontal: 18 },
   brandRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  brand: { fontSize: 18, fontFamily: "Sora_700Bold", letterSpacing: -0.3 },
   headerActions: { flexDirection: "row", gap: 8 },
   headerIcon: { width: 38, height: 38, borderRadius: 19, borderWidth: 1, alignItems: "center", justifyContent: "center" },
   notificationDot: { position: "absolute", top: 8, right: 8, width: 6, height: 6, borderRadius: 3 },

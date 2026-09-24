@@ -7,8 +7,18 @@ const COOKIE_KEY = "perfusion_session_cookie";
 let _webCookie: string | null = null;
 
 export function getBaseUrl(): string {
-  const domain = process.env.EXPO_PUBLIC_DOMAIN;
-  if (domain) return `https://${domain}`;
+  const domain = process.env.EXPO_PUBLIC_DOMAIN?.trim();
+  if (domain) {
+    const normalizedDomain = domain.replace(/\/+$/, "");
+    return /^https?:\/\//i.test(normalizedDomain)
+      ? normalizedDomain
+      : `https://${normalizedDomain}`;
+  }
+  if (Platform.OS !== "web") {
+    throw new Error(
+      "The mobile API address is missing. Rebuild the app with EXPO_PUBLIC_DOMAIN configured, then try again.",
+    );
+  }
   return "";
 }
 

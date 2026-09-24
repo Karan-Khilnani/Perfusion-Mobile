@@ -38,16 +38,15 @@ export function BookingCard({ booking, onPauseToggle }: Props) {
   });
   const terminal = isTerminalStatus(booking.status);
   const quietWindow = (booking.status === "ongoing" || booking.status === "in_progress") && !booking.videoRoomId;
-  const city = (booking.providerCity || booking.city || booking.providerHospital || "").slice(0, 3).toUpperCase();
+  const city = (booking.providerCity || booking.city || "").slice(0, 3).toUpperCase();
   const initials = seeker
     ? city || "—"
     : `${booking.patientAge || "—"}${booking.patientGender ? booking.patientGender.slice(0, 1).toUpperCase() : ""}`;
-  const title = seeker
-    ? `${booking.providerSpecialization || booking.serviceName || "Consultation"} · ${booking.providerName || "Consultant"}`
-    : booking.patientName || "Patient";
-  const place = seeker
-    ? booking.providerHospital || booking.hospitalName || "Specialist network"
-    : booking.seekerHospitalName || booking.hospitalName || "Hospital";
+  const service = booking.providerSpecialization || booking.serviceName || "Consultation";
+  const person = seeker ? booking.providerName : booking.patientName;
+  const hospital = seeker ? booking.providerHospital : booking.seekerHospitalName || booking.hospitalName;
+  const location = seeker ? booking.providerCity || booking.city : booking.city;
+  const patientContext = seeker ? booking.patientName : null;
   const time = formatTime(booking.appointmentSlot || booking.timeSlot || booking.scheduledDate);
   const remaining = formatRemainingWindow((booking as Booking & { postRxExpiresAt?: string }).postRxExpiresAt);
   const callsAvailable = !terminal && (booking.postRxCallsEnabled ?? true);
@@ -97,16 +96,20 @@ export function BookingCard({ booking, onPauseToggle }: Props) {
           accessibilityState={{ expanded }}
           testID={`consultation-row-${booking.id}`}
         >
-          <Text style={[styles.title, { color: palette.foreground }]}>{title}</Text>
-          <View style={styles.placeLine}>
-            <Text style={[styles.placeStrong, { color: palette.foreground }]}>{seeker ? place.split(",")[0] : place}</Text>
-            {seeker && place.includes(",") ? <Text style={[styles.place, { color: palette.mutedForeground }]}>{`, ${place.split(",").slice(1).join(",").trim()}`}</Text> : null}
+          <Text style={[styles.title, { color: palette.foreground }]}>{service}</Text>
+          <Text style={[styles.person, { color: palette.foreground }]}>{person || (seeker ? "Consultant" : "Patient")}</Text>
+          {patientContext ? <Text style={[styles.patientContext, { color: palette.mutedForeground }]}>For patient: {patientContext}</Text> : null}
+          {(hospital || location) ? (
+            <View style={styles.placeLine}>
+              {hospital ? <Text style={[styles.placeStrong, { color: palette.foreground }]}>{hospital}</Text> : null}
+              {location ? <Text style={[styles.place, { color: palette.mutedForeground }]}>{hospital ? ` · ${location}` : location}</Text> : null}
+            </View>
+          ) : null}
+          <View style={styles.scheduleLine}>
+            <Feather name="calendar" size={13} color={palette.mutedForeground} />
             <Text style={[styles.time, { color: palette.mutedForeground }]}>{time}</Text>
-          </View>
-          <View style={styles.patientLine}>
-            <Text style={[styles.patient, { color: palette.mutedForeground }]}>{seeker ? booking.patientName || "Patient" : place}</Text>
             <View style={styles.status}>
-              <View style={[styles.dot, { backgroundColor: status.dot }, status.label === "Ongoing" && !quietWindow ? styles.liveDot : undefined]} />
+               <View style={[styles.dot, { backgroundColor: status.dot }, status.label === "Ongoing" && !quietWindow ? [styles.liveDot, { borderColor: palette.primary }] : undefined]} />
               <Text style={[styles.statusText, { color: quietWindow ? palette.quiet : status.text }]}>
                 {quietWindow && remaining ? `Ongoing · ${remaining}` : status.label}
               </Text>
@@ -185,6 +188,7 @@ function Action({
   badge?: number;
   onPress: () => void;
 }) {
+  const palette = useColors();
   return (
     <Pressable
       style={({ pressed }) => [styles.action, { opacity: disabled ? 0.35 : pressed ? 0.65 : 1 }]}
@@ -195,7 +199,11 @@ function Action({
     >
       <View>
         <Feather name={icon} size={19} color={color} />
-        {!!badge && <View style={styles.badgeCount}><Text style={styles.badgeCountText}>{badge}</Text></View>}
+        {!!badge && (
+          <View style={[styles.badgeCount, { backgroundColor: palette.primary }]}>
+            <Text style={[styles.badgeCountText, { color: palette.primaryForeground }]}>{badge}</Text>
+          </View>
+        )}
       </View>
       <Text style={[styles.actionText, { color }]}>{label}</Text>
     </Pressable>
@@ -209,22 +217,23 @@ const styles = StyleSheet.create({
   badgeText: { fontSize: 13, fontFamily: "Inter_700Bold", letterSpacing: -0.2 },
   rowBody: { flex: 1, minWidth: 0, gap: 5 },
   title: { fontSize: 15, lineHeight: 20, fontFamily: "Inter_600SemiBold" },
+  person: { fontSize: 13, lineHeight: 18, fontFamily: "Inter_500Medium" },
+  patientContext: { fontSize: 12, lineHeight: 17, fontFamily: "Inter_400Regular" },
   placeLine: { flexDirection: "row", flexWrap: "wrap", alignItems: "baseline", gap: 2 },
   placeStrong: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
   place: { fontSize: 12, fontFamily: "Inter_400Regular" },
-  time: { fontSize: 12, fontFamily: "Inter_500Medium", marginLeft: 5 },
-  patientLine: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
-  patient: { flex: 1, fontSize: 13, fontFamily: "Inter_400Regular" },
-  status: { flexDirection: "row", alignItems: "center", gap: 5 },
+  time: { fontSize: 12, fontFamily: "Inter_600SemiBold", marginLeft: 1 },
+  scheduleLine: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 4, flexWrap: "wrap" },
+  status: { flexDirection: "row", alignItems: "center", gap: 5, marginLeft: "auto" },
   dot: { width: 7, height: 7, borderRadius: 4 },
-  liveDot: { borderWidth: 2, borderColor: "#DB2841", width: 9, height: 9, borderRadius: 5 },
+  liveDot: { borderWidth: 2, width: 9, height: 9, borderRadius: 5 },
   statusText: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
   expandButton: { padding: 7, marginRight: -5, marginTop: -4 },
   actions: { marginTop: 12, marginLeft: 60, paddingTop: 12, flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", borderTopWidth: StyleSheet.hairlineWidth },
   action: { alignItems: "center", gap: 5, minWidth: 53 },
   actionText: { fontSize: 11, fontFamily: "Inter_500Medium" },
-  badgeCount: { position: "absolute", top: -7, right: -9, minWidth: 16, height: 16, paddingHorizontal: 4, borderRadius: 8, backgroundColor: "#DB2841", alignItems: "center", justifyContent: "center" },
-  badgeCountText: { color: "#FFFFFF", fontSize: 10, fontFamily: "Inter_700Bold" },
+  badgeCount: { position: "absolute", top: -7, right: -9, minWidth: 16, height: 16, paddingHorizontal: 4, borderRadius: 8, alignItems: "center", justifyContent: "center" },
+  badgeCountText: { fontSize: 10, fontFamily: "Inter_700Bold" },
   pauseWord: { position: "absolute", left: 0, right: 0, top: 54, alignItems: "center" },
   pauseText: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
   pauseHint: { fontSize: 10, fontFamily: "Inter_400Regular", marginTop: 2 },

@@ -15,7 +15,9 @@ export default function TabLayout() {
       screenOptions={{
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.mutedForeground,
-        headerShown: true,
+        // Each tab owns its safe-area-aware heading. Keeping the navigator
+        // header hidden avoids a second, competing title bar on mobile.
+        headerShown: false,
         headerStyle: { backgroundColor: colors.background },
         headerTintColor: colors.foreground,
         headerTitleStyle: {

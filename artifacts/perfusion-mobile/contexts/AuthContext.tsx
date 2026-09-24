@@ -64,6 +64,9 @@ export interface User {
   approvalStatus?: string;
   requiresAgreement?: boolean;
   hospitalName?: string;
+  hospitalAddress?: string;
+  city?: string;
+  location?: string;
   needsProfile: boolean;
 }
 
@@ -104,6 +107,22 @@ function normalizeUser(data: Record<string, unknown>): User {
     typeof data.hospitalName === "string" && data.hospitalName.trim()
       ? data.hospitalName
       : undefined;
+  const hospitalAddress =
+    typeof data.hospitalAddress === "string" && data.hospitalAddress.trim()
+      ? data.hospitalAddress
+      : undefined;
+  const city =
+    typeof data.city === "string" && data.city.trim()
+      ? data.city
+      : typeof data.providerCity === "string" && data.providerCity.trim()
+        ? data.providerCity
+        : undefined;
+  const location =
+    typeof data.location === "string" && data.location.trim()
+      ? data.location
+      : typeof data.providerLocation === "string" && data.providerLocation.trim()
+        ? data.providerLocation
+        : undefined;
   const googleAccount =
     typeof data.googleId === "string" && data.googleId.length > 0;
 
@@ -121,10 +140,27 @@ function normalizeUser(data: Record<string, unknown>): User {
     approvalStatus,
     requiresAgreement: data.requiresAgreement === true,
     hospitalName,
+    hospitalAddress,
+    city,
+    location,
     needsProfile:
       data.needsProfile === true ||
       (googleAccount && role !== "admin" && !hospitalName),
   };
+}
+
+async function storeSessionFromResponse(response: Response): Promise<void> {
+  const setCookieHeader = response.headers.get("set-cookie");
+  const match = setCookieHeader?.match(/(?:^|,\s*)connect\.sid=([^;,\s]+)/i);
+  if (match) {
+    await storeCookie(`connect.sid=${match[1]}`);
+    return;
+  }
+  if (Platform.OS !== "web") {
+    throw new Error(
+      "The app could not securely save your sign-in session. Please try again.",
+    );
+  }
 }
 
 interface AuthContextType {
@@ -240,9 +276,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         typeof data.message === "string" ? data.message : "Login failed";
       throw new Error(msg);
     }
-    const setCookieHeader = res.headers.get("set-cookie");
-    const match = setCookieHeader?.match(/connect\.sid=[^;]+/);
-    if (match) await storeCookie(match[0]);
+    await storeSessionFromResponse(res);
     const authenticatedUser = await applyAuthenticatedUser(data);
     // Register Expo push token after successful login (non-blocking)
     registerMobilePushToken().catch(() => {});
@@ -253,7 +287,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (Platform.OS === "web") {
       throw new Error("Google mobile sign-in is available in the Android and iOS apps.");
     }
+    // The backend redirects to this fixed native URI. Do not derive it with
+    // createURL: Expo Go may generate an exp:// callback instead.
     const redirectUri = "perfusion-mobile://auth/callback";
+    const baseUrl = getBaseUrl();
     const codeVerifier = `${Crypto.randomUUID()}${Crypto.randomUUID()}`
       .replace(/-/g, "");
     const codeChallenge = (
@@ -267,7 +304,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .replace(/\//g, "_")
       .replace(/=+$/g, "");
     const result = await WebBrowser.openAuthSessionAsync(
-      `${getBaseUrl()}/api/auth/google/mobile?code_challenge=${encodeURIComponent(codeChallenge)}`,
+      `${baseUrl}/api/auth/google/mobile?code_challenge=${encodeURIComponent(codeChallenge)}`,
       redirectUri,
     );
     if (result.type === "cancel" || result.type === "dismiss") return null;
@@ -276,26 +313,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     const callback = Linking.parse(result.url);
+    const callbackParams = callback.queryParams ?? {};
+    const hasOnlyExpectedCallbackParam =
+      Object.keys(callbackParams).length === 1 &&
+      (typeof callbackParams.ticket === "string" ||
+        typeof callbackParams.error === "string");
+    if (
+      callback.scheme !== "perfusion-mobile" ||
+      callback.hostname !== "auth" ||
+      (callback.path !== "callback" && callback.path !== "/callback") ||
+      !hasOnlyExpectedCallbackParam
+    ) {
+      throw new Error("Google sign-in returned an unexpected callback. Please try again.");
+    }
     const oauthError =
-      typeof callback.queryParams?.error === "string"
-        ? callback.queryParams.error
+      typeof callbackParams.error === "string"
+        ? callbackParams.error
         : null;
     if (oauthError) {
+      if (oauthError === "google_unconfigured") {
+        throw new Error(
+          "Google sign-in is not configured for this environment. Ask your administrator to enable Google sign-in, or use email sign-in.",
+        );
+      }
       if (oauthError === "invalid_state") {
         throw new Error("Google sign-in expired. Please try again.");
       }
       throw new Error("Google sign-in was not completed. Please try again.");
     }
     const ticket =
-      typeof callback.queryParams?.ticket === "string"
-        ? callback.queryParams.ticket
+      typeof callbackParams.ticket === "string"
+        ? callbackParams.ticket
         : null;
-    if (!ticket) {
+    if (!ticket || !/^[a-f0-9]{64}$/.test(ticket)) {
       throw new Error("Google sign-in did not return a valid authorization.");
     }
 
     const response = await fetch(
-      `${getBaseUrl()}/api/auth/google/mobile/exchange`,
+      `${baseUrl}/api/auth/google/mobile/exchange`,
       {
         method: "POST",
         credentials: "include",
@@ -317,12 +372,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           : "Could not complete Google sign-in.",
       );
     }
-    const setCookieHeader = response.headers.get("set-cookie");
-    const match = setCookieHeader?.match(/connect\.sid=[^;]+/);
-    if (!match) {
-      throw new Error("The app could not save your sign-in session.");
-    }
-    await storeCookie(match[0]);
+    await storeSessionFromResponse(response);
     const authenticatedUser = await applyAuthenticatedUser(data);
     registerMobilePushToken().catch(() => {});
     return authenticatedUser;
@@ -349,9 +399,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!res.ok) {
       throw new Error(typeof data.message === "string" ? data.message : "Registration failed");
     }
-    const setCookieHeader = res.headers.get("set-cookie");
-    const match = setCookieHeader?.match(/connect\.sid=[^;]+/);
-    if (match) await storeCookie(match[0]);
+    await storeSessionFromResponse(res);
     await applyAuthenticatedUser(data);
     setCallbackDevice(null);
     setCallbackDeviceLoading(false);

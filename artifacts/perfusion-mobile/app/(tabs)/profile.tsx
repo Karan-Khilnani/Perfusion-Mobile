@@ -14,6 +14,8 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useAuth } from "@/contexts/AuthContext";
+import { BrandMark } from "@/components/BrandMark";
+import { ScreenHeading } from "@/components/ScreenHeading";
 import { useColors } from "@/hooks/useColors";
 
 function ProfileRow({
@@ -97,6 +99,8 @@ export default function ProfileScreen() {
       ]}
       showsVerticalScrollIndicator={false}
     >
+      <View style={styles.brandRow}><BrandMark compact /></View>
+      <ScreenHeading title="Profile" subtitle="Account and hospital details" />
       <View style={styles.avatarSection}>
         <View
           style={[
@@ -160,7 +164,7 @@ export default function ProfileScreen() {
         <ProfileRow
           icon="business-outline"
           label="Hospital"
-          value={user?.hospitalName}
+          value={[user?.hospitalName, user?.hospitalAddress || user?.location || user?.city].filter(Boolean).join(" · ")}
           colors={colors}
         />
         <View style={[styles.row, { borderBottomWidth: 0 }]}>
@@ -234,6 +238,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     gap: 20,
   },
+  brandRow: { alignItems: "flex-start", marginBottom: 2 },
   avatarSection: {
     alignItems: "center",
     gap: 8,

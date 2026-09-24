@@ -5,6 +5,8 @@ import { ActivityIndicator, Platform, ScrollView, StyleSheet, Text, View } from 
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useAuth } from "@/contexts/AuthContext";
+import { BrandMark } from "@/components/BrandMark";
+import { ScreenHeading } from "@/components/ScreenHeading";
 import { apiFetch } from "@/hooks/useApi";
 import { useColors } from "@/hooks/useColors";
 import { isSeekerRole } from "@/lib/mobile-models";
@@ -34,8 +36,8 @@ export default function BillingScreen() {
       style={{ flex: 1, backgroundColor: palette.background }}
       contentContainerStyle={[styles.container, { paddingTop: Platform.OS === "web" ? 78 : insets.top + 20, paddingBottom: Platform.OS === "web" ? 125 : insets.bottom + 100 }]}
     >
-      <Text style={[styles.title, { color: palette.foreground }]}>Billing</Text>
-      <Text style={[styles.subtitle, { color: palette.mutedForeground }]}>{seeker ? "Invoices and payment history" : "Consultation earnings and payouts"}</Text>
+      <View style={styles.brandRow}><BrandMark compact /></View>
+      <ScreenHeading title="Billing" subtitle={seeker ? "Invoices and payment history" : "Consultation earnings and payouts"} />
       {!seeker && (
         <View style={styles.stats}>
           <Stat label="Completed" value={String(completed)} icon="check-circle" />
@@ -82,8 +84,7 @@ function Stat({ label, value, icon }: { label: string; value: string; icon: keyo
 
 const styles = StyleSheet.create({
   container: { paddingHorizontal: 18 },
-  title: { fontSize: 25, fontFamily: "Inter_700Bold", letterSpacing: -0.5 },
-  subtitle: { fontSize: 12, marginTop: 4, fontFamily: "Inter_400Regular" },
+  brandRow: { marginBottom: 22 },
   stats: { flexDirection: "row", gap: 8, marginTop: 22 },
   stat: { flex: 1, borderRadius: 14, borderWidth: 1, padding: 11, minWidth: 0 },
   statValue: { fontSize: 16, fontFamily: "Inter_700Bold", marginTop: 9 },

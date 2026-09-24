@@ -17,6 +17,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useAuth } from "@/contexts/AuthContext";
 import { useColors } from "@/hooks/useColors";
+import { BrandMark } from "@/components/BrandMark";
 
 export default function LoginScreen() {
   const colors = useColors();
@@ -116,17 +117,7 @@ export default function LoginScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.header}>
-          <View
-            style={[
-              styles.logoContainer,
-              { backgroundColor: `${colors.primary}12` },
-            ]}
-          >
-            <Ionicons name="medical" size={36} color={colors.primary} />
-          </View>
-          <Text style={[styles.appName, { color: colors.foreground }]}>
-            Perfusion
-          </Text>
+          <BrandMark large />
           <Text style={[styles.tagline, { color: colors.mutedForeground }]}>
             Healthcare Platform
           </Text>
