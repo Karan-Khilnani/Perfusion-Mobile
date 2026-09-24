@@ -176,14 +176,14 @@ export default function CaseFileScreen() {
   const gender = booking.patientGender ? booking.patientGender.slice(0, 1).toUpperCase() : "";
 
   return (
-    <KeyboardAvoidingView behavior="padding" style={[styles.screen, { backgroundColor: palette.background }]}>
-      <View style={[styles.header, { paddingTop: Platform.OS === "web" ? 68 : insets.top + 8, borderBottomColor: palette.border, backgroundColor: palette.card }]}>
+    <KeyboardAvoidingView behavior="padding" style={[styles.screen, { backgroundColor: palette.conversationBackground }]}>
+      <View style={[styles.header, { paddingTop: Platform.OS === "web" ? 68 : insets.top + 8, borderBottomColor: palette.conversationBorder, backgroundColor: palette.conversationCard }]}>
         <Pressable onPress={() => router.back()} style={styles.iconButton} accessibilityLabel="Back">
           <Feather name="arrow-left" size={21} color={palette.foreground} />
         </Pressable>
         <Pressable style={styles.identity} onPress={() => setSheet("summary")}>
-          <View style={[styles.patientBadge, { backgroundColor: palette.accent }]}>
-            <Text style={[styles.patientBadgeText, { color: palette.foreground }]}>{booking.patientAge}{gender}</Text>
+          <View style={[styles.patientBadge, { backgroundColor: palette.conversationSoft }]}>
+            <Text style={[styles.patientBadgeText, { color: palette.conversationPrimary }]}>{booking.patientAge}{gender}</Text>
           </View>
           <View style={{ flex: 1 }}>
             <Text style={[styles.patientName, { color: palette.foreground }]}>{booking.patientName}</Text>
@@ -202,9 +202,9 @@ export default function CaseFileScreen() {
         </View>
       </View>
 
-      <View style={[styles.statusBar, { backgroundColor: palette.card, borderBottomColor: palette.border }]}>
+      <View style={[styles.statusBar, { backgroundColor: palette.conversationSoft, borderBottomColor: palette.conversationBorder }]}>
         <View style={[styles.statusDot, { backgroundColor: status.dot }]} />
-        <Text style={[styles.statusLabel, { color: status.text }]}>{status.label}</Text>
+        <Text style={[styles.statusLabel, { color: status.text }]}>{status.label} consultation</Text>
         {seeker ? (
           <Text style={[styles.readOnly, { color: palette.mutedForeground }]}>Case File</Text>
         ) : capabilities.canToggleFollowUp ? (
@@ -214,7 +214,7 @@ export default function CaseFileScreen() {
         )}
       </View>
 
-      <View style={[styles.clinicalContext, { backgroundColor: palette.card, borderBottomColor: palette.border }]}>
+      <View style={[styles.clinicalContext, { backgroundColor: palette.conversationCard, borderBottomColor: palette.conversationBorder }]}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
           {!!caseFile.summary.allergies && (
             <Pressable onPress={() => setSheet("summary")} style={[styles.chip, { backgroundColor: `${palette.primary}0D`, borderColor: `${palette.primary}28` }]}>
@@ -223,12 +223,12 @@ export default function CaseFileScreen() {
             </Pressable>
           )}
           {!!caseFile.summary.comorbidities && caseFile.summary.comorbidities.split(",").map((item) => (
-            <Pressable key={item} onPress={() => setSheet("summary")} style={[styles.chip, { backgroundColor: palette.accent, borderColor: palette.border }]}>
+            <Pressable key={item} onPress={() => setSheet("summary")} style={[styles.chip, { backgroundColor: palette.conversationSoft, borderColor: palette.conversationBorder }]}>
               <Text style={[styles.chipText, { color: palette.foreground }]}>{item.trim()}</Text>
             </Pressable>
           ))}
         </ScrollView>
-        <Pressable onPress={() => setSheet("summary")} style={[styles.complaint, { borderTopColor: palette.border }]}>
+        <Pressable onPress={() => setSheet("summary")} style={[styles.complaint, { backgroundColor: palette.conversationSoft }]}>
           <View style={{ flex: 1 }}>
             <Text style={[styles.eyebrow, { color: palette.mutedForeground }]}>PRESENTING COMPLAINT</Text>
             <Text style={[styles.complaintText, { color: palette.foreground }]} numberOfLines={2}>
@@ -239,17 +239,18 @@ export default function CaseFileScreen() {
         </Pressable>
       </View>
 
-      <View style={[styles.vitalsDock, { backgroundColor: palette.card, borderBottomColor: palette.border }]}>
+      <View style={[styles.vitalsDock, { backgroundColor: palette.conversationCard, borderBottomColor: palette.conversationBorder }]}>
         <Pressable style={{ flex: 1 }} onPress={() => setSheet("vitals")}>
           <View style={styles.vitalsTitle}>
             <View style={[styles.freshness, { backgroundColor: freshnessColor }]} />
-            <Text style={[styles.eyebrow, { color: palette.mutedForeground }]}>LATEST VITALS · I/O · GCS</Text>
+            <Text style={[styles.eyebrow, { color: palette.conversationMuted }]}>LATEST VITALS</Text>
             <Text style={[styles.chartLink, { color: palette.foreground }]}>Full chart</Text>
           </View>
           <View style={styles.vitalGrid}>
-            <VitalCell label="Vitals" value={latest?.systolicBp ? `${latest.systolicBp}/${latest.diastolicBp || "—"}` : "—"} detail={`HR ${latest?.heartRate ?? "—"} · RR ${latest?.respiratoryRate ?? "—"}`} />
-            <VitalCell label="Intake / Output" value={latest?.intake != null || latest?.output != null ? `${(latest?.intake || 0) - (latest?.output || 0)} mL` : "—"} detail={`UO ${latest?.hourlyUrineOutput ?? "—"} mL/hr`} />
-            <VitalCell label="GCS" value={latest?.gcs != null ? `${latest.gcs} / 15` : "—"} detail={latest?.observedAt ? new Date(latest.observedAt).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" }) : "Not recorded"} />
+            <VitalCell label="BP" value={latest?.systolicBp ? `${latest.systolicBp}/${latest.diastolicBp || "—"}` : "—"} detail={`RR ${latest?.respiratoryRate ?? "—"} /min`} />
+            <VitalCell label="HR" value={latest?.heartRate != null ? `${latest.heartRate}` : "—"} detail="bpm" />
+            <VitalCell label="I/O" value={latest?.intake != null || latest?.output != null ? `${(latest?.intake || 0) - (latest?.output || 0)} mL` : "—"} detail={`UO ${latest?.hourlyUrineOutput ?? "—"} mL/hr`} />
+            <VitalCell label="GCS" value={latest?.gcs != null ? `${latest.gcs}/15` : "—"} detail={latest?.observedAt ? new Date(latest.observedAt).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" }) : "Not recorded"} />
           </View>
         </Pressable>
         {capabilities.canAddVitals && (
@@ -267,6 +268,15 @@ export default function CaseFileScreen() {
         contentContainerStyle={styles.chatContent}
         keyboardDismissMode="interactive"
         keyboardShouldPersistTaps="handled"
+        ListFooterComponent={sortedMessages.length > 0 ? (
+          <View style={styles.dateDivider}>
+            <View style={[styles.dateLine, { backgroundColor: palette.conversationBorder }]} />
+            <Text style={[styles.dateText, { color: palette.conversationMuted }]}>
+              {new Date(sortedMessages[sortedMessages.length - 1].createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" }).toUpperCase()}
+            </Text>
+            <View style={[styles.dateLine, { backgroundColor: palette.conversationBorder }]} />
+          </View>
+        ) : null}
         renderItem={({ item }) => (
           <MessageBubble
             message={item}
@@ -287,7 +297,7 @@ export default function CaseFileScreen() {
       />
 
       {!capabilities.readOnly && (
-        <View style={[styles.composer, { paddingBottom: Platform.OS === "web" ? 34 : Math.max(insets.bottom, 10), backgroundColor: palette.card, borderTopColor: palette.border }]}>
+        <View style={[styles.composer, { paddingBottom: Platform.OS === "web" ? 34 : Math.max(insets.bottom, 10), backgroundColor: palette.conversationCard, borderTopColor: palette.conversationBorder }]}>
           {capabilities.canAttach && (
             <Pressable onPress={() => setSheet("source")} style={styles.composeIcon} accessibilityLabel="Attach clinical file">
               <Feather name="paperclip" size={21} color={palette.foreground} />
@@ -301,15 +311,15 @@ export default function CaseFileScreen() {
           <TextInput
             value={message}
             onChangeText={setMessage}
-            placeholder="Message or attach a report…"
+            placeholder="Message care team…"
             placeholderTextColor={palette.mutedForeground}
-            style={[styles.messageInput, { color: palette.foreground, backgroundColor: palette.background, borderColor: palette.border }]}
+            style={[styles.messageInput, { color: palette.foreground, backgroundColor: palette.conversationBackground, borderColor: palette.conversationBorder }]}
             multiline
           />
           <Pressable
             disabled={!message.trim() || sendMessage.isPending}
             onPress={() => sendMessage.mutate(message.trim())}
-            style={[styles.send, { backgroundColor: message.trim() ? palette.primary : palette.muted }]}
+            style={[styles.send, { backgroundColor: message.trim() ? palette.conversationPrimary : palette.conversationBorder }]}
           >
             {sendMessage.isPending ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Feather name="arrow-up" size={19} color={message.trim() ? "#FFFFFF" : palette.mutedForeground} />}
           </Pressable>
@@ -374,34 +384,71 @@ function FollowUpControl({ bookingId, active }: { bookingId: string; active: boo
 function MessageBubble({ message, own, bookingId, onAdvisory }: { message: CaseFileMessage; own: boolean; bookingId: string; onAdvisory: () => void }) {
   const palette = useColors();
   const advisory = message.kind === "advisory";
+  const senderLabel = own
+    ? "You"
+    : message.senderRole === "provider"
+      ? "Consultant"
+      : "Treating team";
+  const time = new Date(message.createdAt).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" });
   return (
-    <View style={[styles.messageRow, { justifyContent: own ? "flex-end" : "flex-start" }]}>
+    <View style={[styles.messageRow, { alignItems: own ? "flex-end" : "flex-start" }]}>
+      {!advisory && (
+        <View style={[styles.senderLine, own && styles.senderLineOwn]}>
+          {!own && (
+            <View style={[styles.senderAvatar, { backgroundColor: palette.conversationSoft }]}>
+              <Text style={[styles.senderInitials, { color: palette.conversationPrimary }]}>
+                {senderLabel.slice(0, 2).toUpperCase()}
+              </Text>
+            </View>
+          )}
+          <Text style={[styles.senderLabel, { color: palette.conversationMuted }]}>
+            {senderLabel} · {time}
+          </Text>
+        </View>
+      )}
       <Pressable
         disabled={!advisory && !message.attachment}
         onPress={advisory ? onAdvisory : undefined}
         style={[
           styles.bubble,
-          advisory && { backgroundColor: `${palette.quiet}0E`, borderColor: `${palette.quiet}50` },
-          !advisory && { backgroundColor: own ? palette.foreground : palette.card, borderColor: own ? palette.foreground : palette.border },
+          own && !advisory ? styles.ownBubble : styles.otherBubble,
+          advisory && { backgroundColor: palette.advisoryBackground, borderColor: palette.advisoryBorder },
+          !advisory && { backgroundColor: own ? palette.conversationPrimary : palette.conversationCard, borderColor: own ? palette.conversationPrimary : palette.conversationBorder },
         ]}
       >
         {advisory && (
           <View style={styles.advisoryHeading}>
-            <Feather name="edit-3" size={15} color={palette.quiet} />
-            <Text style={[styles.advisoryTitle, { color: palette.quiet }]}>Clinical Advisory</Text>
+            <Feather name="shield" size={15} color={palette.advisoryForeground} />
+            <Text style={[styles.advisoryTitle, { color: palette.advisoryForeground }]}>Clinical Advisory</Text>
+            <View style={[styles.signedBadge, { backgroundColor: `${palette.advisoryForeground}18` }]}>
+              <Text style={[styles.signedBadgeText, { color: palette.advisoryForeground }]}>SIGNED</Text>
+            </View>
           </View>
         )}
         {message.attachment && (
           <View style={styles.attachmentHeading}>
-            <Feather name="file-text" size={17} color={own ? "#FFFFFF" : palette.foreground} />
-            <Text style={[styles.attachmentName, { color: own ? "#FFFFFF" : palette.foreground }]}>{message.attachment.originalFilename || "Clinical file"}</Text>
+            <View style={[styles.attachmentIcon, { backgroundColor: own ? "rgba(255,255,255,.14)" : palette.conversationSoft }]}>
+              <Feather name="file-text" size={16} color={own ? palette.conversationPrimaryForeground : palette.conversationPrimary} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.attachmentName, { color: own ? palette.conversationPrimaryForeground : palette.foreground }]}>{message.attachment.originalFilename || "Clinical file"}</Text>
+              <Text style={[styles.attachmentMeta, { color: own ? "rgba(255,255,255,.68)" : palette.conversationMuted }]}>
+                {message.attachment.category?.replace("_", " ") || "Clinical attachment"}
+                {message.attachment.byteSize ? ` · ${Math.max(1, Math.round(message.attachment.byteSize / 1024))} KB` : ""}
+              </Text>
+            </View>
           </View>
         )}
-        {!!message.body && <Text style={[styles.messageText, { color: own && !advisory ? "#FFFFFF" : palette.foreground }]}>{message.body}</Text>}
-        {advisory && <Text style={[styles.fullAdvisory, { color: palette.quiet }]}>View full advisory →</Text>}
-        <Text style={[styles.messageTime, { color: own && !advisory ? "rgba(255,255,255,.65)" : palette.mutedForeground }]}>
-          {new Date(message.createdAt).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" })}
-        </Text>
+        {!!message.body && <Text style={[styles.messageText, { color: own && !advisory ? palette.conversationPrimaryForeground : palette.foreground }]}>{message.body}</Text>}
+        {message.attachment && <Text style={[styles.attachmentAction, { color: own ? palette.conversationPrimaryForeground : palette.conversationPrimary }]}>Tap to preview</Text>}
+        {advisory && (
+          <View style={styles.advisoryFooter}>
+            <Feather name="lock" size={11} color={palette.advisoryForeground} />
+            <Text style={[styles.advisoryMeta, { color: palette.advisoryForeground }]}>Permanent signed record · {time}</Text>
+            <Text style={[styles.fullAdvisory, { color: palette.advisoryForeground }]}>View full</Text>
+          </View>
+        )}
+        {!advisory && <Text style={[styles.messageTime, { color: own ? "rgba(255,255,255,.65)" : palette.conversationMuted }]}>{time}</Text>}
       </Pressable>
     </View>
   );
@@ -671,7 +718,7 @@ const styles = StyleSheet.create({
   header: { flexDirection: "row", alignItems: "center", minHeight: 64, paddingHorizontal: 10, paddingBottom: 8, borderBottomWidth: StyleSheet.hairlineWidth },
   iconButton: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center" },
   identity: { flex: 1, flexDirection: "row", alignItems: "center", gap: 10, minWidth: 0 },
-  patientBadge: { width: 38, height: 38, borderRadius: 19, alignItems: "center", justifyContent: "center" },
+  patientBadge: { width: 38, height: 38, borderRadius: 13, alignItems: "center", justifyContent: "center" },
   patientBadgeText: { fontSize: 11, fontFamily: "Inter_700Bold" },
   patientName: { fontSize: 15, fontFamily: "Inter_700Bold" },
   patientMeta: { fontSize: 11, marginTop: 2, fontFamily: "Inter_400Regular" },
@@ -681,33 +728,50 @@ const styles = StyleSheet.create({
   statusLabel: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
   readOnly: { marginLeft: "auto", fontSize: 11, fontFamily: "Inter_500Medium" },
   followUp: { fontSize: 12, fontFamily: "Inter_700Bold", marginLeft: 5 },
-  clinicalContext: { borderBottomWidth: StyleSheet.hairlineWidth },
-  chips: { paddingHorizontal: 14, paddingVertical: 9, gap: 6 },
+  clinicalContext: { borderBottomWidth: StyleSheet.hairlineWidth, paddingBottom: 9 },
+  chips: { paddingHorizontal: 14, paddingTop: 9, paddingBottom: 7, gap: 6 },
   chip: { borderWidth: 1, borderRadius: 14, paddingHorizontal: 9, paddingVertical: 5, flexDirection: "row", alignItems: "center", gap: 5 },
   chipText: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
-  complaint: { borderTopWidth: StyleSheet.hairlineWidth, paddingHorizontal: 15, paddingVertical: 9, flexDirection: "row", alignItems: "center", gap: 8 },
-  eyebrow: { fontSize: 9, letterSpacing: 0.8, fontFamily: "Inter_700Bold" },
-  complaintText: { fontSize: 12, lineHeight: 17, marginTop: 4, fontFamily: "Inter_500Medium" },
-  vitalsDock: { minHeight: 94, flexDirection: "row", borderBottomWidth: 1, paddingHorizontal: 14, paddingVertical: 8 },
+  complaint: { marginHorizontal: 14, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8, flexDirection: "row", alignItems: "center", gap: 8 },
+  eyebrow: { fontSize: 8, letterSpacing: 1, fontFamily: "Inter_700Bold" },
+  complaintText: { fontSize: 11, lineHeight: 16, marginTop: 3, fontFamily: "Inter_500Medium" },
+  vitalsDock: { minHeight: 82, flexDirection: "row", borderBottomWidth: 1, paddingHorizontal: 14, paddingVertical: 8 },
   vitalsTitle: { flexDirection: "row", alignItems: "center", gap: 6 },
   freshness: { width: 7, height: 7, borderRadius: 4 },
   chartLink: { marginLeft: "auto", fontSize: 10, fontFamily: "Inter_600SemiBold", textDecorationLine: "underline" },
   vitalGrid: { flexDirection: "row", marginTop: 7 },
-  vitalCell: { flex: 1, paddingRight: 8 },
-  vitalLabel: { fontSize: 9, fontFamily: "Inter_500Medium" },
-  vitalValue: { fontSize: 15, marginTop: 2, fontFamily: "Inter_700Bold" },
-  vitalDetail: { fontSize: 9, marginTop: 2, fontFamily: "Inter_400Regular" },
+  vitalCell: { flex: 1, paddingRight: 6 },
+  vitalLabel: { fontSize: 8, fontFamily: "Inter_500Medium" },
+  vitalValue: { fontSize: 14, marginTop: 2, fontFamily: "Inter_700Bold" },
+  vitalDetail: { fontSize: 8, marginTop: 1, fontFamily: "Inter_400Regular" },
   addVital: { width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center", marginLeft: 4, alignSelf: "center" },
   chat: { flex: 1 },
-  chatContent: { padding: 14, gap: 8 },
-  messageRow: { flexDirection: "row", marginVertical: 4 },
-  bubble: { maxWidth: "84%", borderRadius: 15, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 9 },
+  chatContent: { paddingHorizontal: 14, paddingVertical: 12, gap: 10 },
+  dateDivider: { transform: [{ scaleY: -1 }], flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 6 },
+  dateLine: { height: StyleSheet.hairlineWidth, width: 42 },
+  dateText: { fontSize: 9, letterSpacing: 0.5, fontFamily: "Inter_500Medium" },
+  messageRow: { marginVertical: 3 },
+  senderLine: { flexDirection: "row", alignItems: "center", gap: 5, marginBottom: 4, marginLeft: 4 },
+  senderLineOwn: { marginRight: 4, marginLeft: 0 },
+  senderAvatar: { width: 17, height: 17, borderRadius: 9, alignItems: "center", justifyContent: "center" },
+  senderInitials: { fontSize: 7, fontFamily: "Inter_700Bold" },
+  senderLabel: { fontSize: 9, fontFamily: "Inter_600SemiBold" },
+  bubble: { maxWidth: "84%", borderWidth: 1, paddingHorizontal: 12, paddingVertical: 10 },
+  ownBubble: { borderTopRightRadius: 4, borderTopLeftRadius: 16, borderBottomLeftRadius: 16, borderBottomRightRadius: 16 },
+  otherBubble: { borderTopLeftRadius: 4, borderTopRightRadius: 16, borderBottomLeftRadius: 16, borderBottomRightRadius: 16 },
   advisoryHeading: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 7 },
-  advisoryTitle: { fontSize: 12, fontFamily: "Inter_700Bold" },
-  attachmentHeading: { flexDirection: "row", alignItems: "center", gap: 7, marginBottom: 5 },
-  attachmentName: { flex: 1, fontSize: 12, fontFamily: "Inter_600SemiBold" },
-  messageText: { fontSize: 13, lineHeight: 19, fontFamily: "Inter_400Regular" },
-  fullAdvisory: { fontSize: 11, fontFamily: "Inter_600SemiBold", marginTop: 7 },
+  advisoryTitle: { fontSize: 11, fontFamily: "Inter_700Bold" },
+  signedBadge: { marginLeft: "auto", paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8 },
+  signedBadgeText: { fontSize: 8, fontFamily: "Inter_700Bold" },
+  attachmentHeading: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 5 },
+  attachmentIcon: { width: 32, height: 32, borderRadius: 8, alignItems: "center", justifyContent: "center" },
+  attachmentName: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
+  attachmentMeta: { fontSize: 9, marginTop: 2, fontFamily: "Inter_400Regular", textTransform: "capitalize" },
+  attachmentAction: { fontSize: 10, marginTop: 6, fontFamily: "Inter_600SemiBold" },
+  messageText: { fontSize: 12, lineHeight: 18, fontFamily: "Inter_400Regular" },
+  advisoryFooter: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 8 },
+  advisoryMeta: { fontSize: 9, fontFamily: "Inter_500Medium" },
+  fullAdvisory: { marginLeft: "auto", fontSize: 9, fontFamily: "Inter_600SemiBold", textDecorationLine: "underline" },
   messageTime: { fontSize: 9, marginTop: 5, alignSelf: "flex-end", fontFamily: "Inter_400Regular" },
   emptyChat: { transform: [{ scaleY: -1 }], alignItems: "center", paddingVertical: 54, gap: 8 },
   emptyChatTitle: { fontSize: 15, fontFamily: "Inter_600SemiBold" },
