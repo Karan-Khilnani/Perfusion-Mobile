@@ -1,0 +1,19 @@
+:root {
+  --perfusion-bg: #f7f7f9;
+  --perfusion-fg: #2a2a2a;
+  --perfusion-card: #ffffff;
+  --perfusion-primary: #db2841;
+  --perfusion-muted: #ecedf0;
+  --perfusion-muted-fg: #7a7f8a;
+  --perfusion-accent: #f0f1f4;
+  --perfusion-border: #ecedf0;
+  --perfusion-success: #17a672;
+  --perfusion-warning: #e08a2e;
+  --perfusion-quiet: #8c5b6e;
+}
+
+.case-file-mockup {
+  font-family: Inter, system-ui, sans-serif;
+  color: var(--perfusion-fg);
+  background: var(--perfusion-bg);
+}
