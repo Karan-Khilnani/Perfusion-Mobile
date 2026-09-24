@@ -1,7 +1,8 @@
 import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React, { useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Alert, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import * as Haptics from "expo-haptics";
 
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -13,6 +14,7 @@ import {
   statusPresentation,
 } from "@/lib/mobile-models";
 import { useColors } from "@/hooks/useColors";
+import { apiFetch } from "@/hooks/useApi";
 
 export type { Booking };
 
@@ -25,6 +27,7 @@ export function BookingCard({ booking, onPauseToggle }: Props) {
   const palette = useColors();
   const { user } = useAuth();
   const [expanded, setExpanded] = useState(false);
+  const [startingCall, setStartingCall] = useState<"voice" | "video" | null>(null);
   const seeker = isSeekerRole(user?.role);
   const status = statusPresentation(booking.status, {
     success: palette.success,
@@ -49,6 +52,36 @@ export function BookingCard({ booking, onPauseToggle }: Props) {
   const remaining = formatRemainingWindow((booking as Booking & { postRxExpiresAt?: string }).postRxExpiresAt);
   const callsAvailable = !terminal && (booking.postRxCallsEnabled ?? true);
   const videoAvailable = !terminal && (booking.postRxVideoEnabled ?? true);
+
+  const startCall = async (callType: "voice" | "video") => {
+    if (startingCall) return;
+    setStartingCall(callType);
+    try {
+      if (Platform.OS !== "web") {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      }
+      const res = await apiFetch(`/api/call/ring/${booking.id}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ callType }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || data.reason || "Cannot start call");
+      }
+      router.push(`/call/${booking.id}?mode=${callType}`);
+    } catch (error) {
+      if (Platform.OS !== "web") {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      }
+      Alert.alert(
+        "Cannot start call",
+        error instanceof Error ? error.message : "The call window may not be open yet."
+      );
+    } finally {
+      setStartingCall(null);
+    }
+  };
 
   return (
     <View style={[styles.row, { borderBottomColor: palette.border }]}>
@@ -92,17 +125,17 @@ export function BookingCard({ booking, onPauseToggle }: Props) {
         <View style={[styles.actions, { borderTopColor: palette.border }]}>
           <Action
             icon="phone"
-            label="Call"
-            disabled={!callsAvailable}
+            label={startingCall === "voice" ? "Calling…" : "Call"}
+            disabled={!callsAvailable || !!startingCall}
             color={palette.foreground}
-            onPress={() => router.push(`/call/${booking.id}?mode=voice`)}
+            onPress={() => startCall("voice")}
           />
           <Action
             icon="video"
-            label="Video"
-            disabled={!videoAvailable}
+            label={startingCall === "video" ? "Calling…" : "Video"}
+            disabled={!videoAvailable || !!startingCall}
             color={palette.foreground}
-            onPress={() => router.push(`/call/${booking.id}?mode=video`)}
+            onPress={() => startCall("video")}
           />
           <Action
             icon="folder"

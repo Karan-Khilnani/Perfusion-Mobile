@@ -3,9 +3,11 @@ import { useQuery } from "@tanstack/react-query";
 import * as Haptics from "expo-haptics";
 import { router, useLocalSearchParams } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
-import React, { useEffect } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  Linking,
+  PermissionsAndroid,
   Platform,
   Pressable,
   StyleSheet,
@@ -13,6 +15,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { WebView } from "react-native-webview";
 
 import { apiFetch } from "@/hooks/useApi";
 import { useColors } from "@/hooks/useColors";
@@ -31,7 +34,14 @@ interface CallStatus {
 export default function CallScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { bookingId } = useLocalSearchParams<{ bookingId: string }>();
+  const { bookingId, mode } = useLocalSearchParams<{
+    bookingId: string;
+    mode?: "voice" | "video";
+  }>();
+  const callMode = mode === "voice" ? "voice" : "video";
+  const [permissionsReady, setPermissionsReady] = useState(Platform.OS !== "android");
+  const [permissionDenied, setPermissionDenied] = useState(false);
+  const [roomError, setRoomError] = useState(false);
 
   const { data: booking, isLoading } = useQuery<CallInfo>({
     queryKey: ["booking", bookingId],
@@ -66,14 +76,44 @@ export default function CallScreen() {
     enabled: !!bookingId,
   });
 
+  useEffect(() => {
+    if (Platform.OS !== "android") return;
+
+    const requestMediaPermissions = async () => {
+      const permissions = [PermissionsAndroid.PERMISSIONS.RECORD_AUDIO];
+      if (callMode === "video") {
+        permissions.push(PermissionsAndroid.PERMISSIONS.CAMERA);
+      }
+      const results = await PermissionsAndroid.requestMultiple(permissions);
+      const granted = permissions.every(
+        (permission) => results[permission] === PermissionsAndroid.RESULTS.GRANTED
+      );
+      setPermissionsReady(granted);
+      setPermissionDenied(!granted);
+    };
+
+    requestMediaPermissions().catch(() => setPermissionDenied(true));
+  }, [callMode]);
+
+  const roomUrl = useMemo(() => {
+    if (!booking?.videoRoomId || !tokenData?.token) return null;
+    const separator = booking.videoRoomId.includes("?") ? "&" : "?";
+    const params = [
+      `t=${encodeURIComponent(tokenData.token)}`,
+      "prejoinUI=false",
+      callMode === "voice" ? "startVideoOff=true" : null,
+    ]
+      .filter(Boolean)
+      .join("&");
+    return `${booking.videoRoomId}${separator}${params}`;
+  }, [booking?.videoRoomId, callMode, tokenData?.token]);
+
   const handleOpenRoom = async () => {
-    if (!booking?.videoRoomId || !tokenData?.token) return;
+    if (!roomUrl) return;
     if (Platform.OS !== "web") {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     }
-    const separator = booking.videoRoomId.includes("?") ? "&" : "?";
-    const url = `${booking.videoRoomId}${separator}t=${encodeURIComponent(tokenData.token)}&prejoinUI=false`;
-    await WebBrowser.openBrowserAsync(url, {
+    await WebBrowser.openBrowserAsync(roomUrl, {
       presentationStyle:
         WebBrowser.WebBrowserPresentationStyle.FULL_SCREEN,
     });
@@ -89,10 +129,75 @@ export default function CallScreen() {
     router.back();
   };
 
-  if (isLoading) {
+  if (isLoading || !roomUrl || (Platform.OS === "android" && !permissionsReady && !permissionDenied)) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <ActivityIndicator color={colors.primary} size="large" />
+      </View>
+    );
+  }
+
+  if (Platform.OS !== "web" && permissionDenied) {
+    return (
+      <View style={[styles.permissionScreen, { backgroundColor: colors.background }]}>
+        <Ionicons
+          name={callMode === "voice" ? "mic-off-outline" : "videocam-off-outline"}
+          size={48}
+          color={colors.primary}
+        />
+        <Text style={[styles.permissionTitle, { color: colors.foreground }]}>
+          {callMode === "voice" ? "Microphone access is required" : "Camera and microphone access are required"}
+        </Text>
+        <Text style={[styles.permissionText, { color: colors.mutedForeground }]}>
+          Allow access in device settings to join this consultation in the app.
+        </Text>
+        <Pressable
+          onPress={() => Linking.openSettings()}
+          style={[styles.settingsButton, { backgroundColor: colors.primary }]}
+        >
+          <Text style={styles.settingsButtonText}>Open Settings</Text>
+        </Pressable>
+        <Pressable onPress={handleEndCall} style={styles.endBtn}>
+          <Text style={[styles.endBtnText, { color: colors.destructive }]}>Leave</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  if (Platform.OS !== "web") {
+    return (
+      <View style={styles.roomContainer}>
+        <WebView
+          source={{ uri: roomUrl }}
+          style={styles.webView}
+          javaScriptEnabled
+          domStorageEnabled
+          allowsInlineMediaPlayback
+          mediaPlaybackRequiresUserAction={false}
+          mediaCapturePermissionGrantType="grantIfSameHostElsePrompt"
+          setSupportMultipleWindows={false}
+          onError={() => setRoomError(true)}
+          onHttpError={() => setRoomError(true)}
+          testID="in-app-call-room"
+        />
+        <View style={[styles.roomHeader, { top: insets.top + 8 }]}>
+          <Pressable
+            onPress={handleEndCall}
+            style={styles.leaveRoomButton}
+            accessibilityLabel="Leave consultation"
+            testID="leave-in-app-call"
+          >
+            <Ionicons name="close" size={24} color="#FFFFFF" />
+          </Pressable>
+        </View>
+        {roomError && (
+          <View style={styles.roomError}>
+            <Text style={styles.roomErrorText}>The secure call could not be loaded.</Text>
+            <Pressable onPress={() => setRoomError(false)}>
+              <Text style={[styles.retryText, { color: colors.primary }]}>Try again</Text>
+            </Pressable>
+          </View>
+        )}
       </View>
     );
   }
@@ -135,7 +240,7 @@ export default function CallScreen() {
           <Text style={styles.patientName}>{booking.patientName}</Text>
         )}
         <Text style={styles.hint}>
-          Tap below to join the video consultation
+          Tap below to join the {callMode} consultation
         </Text>
       </View>
 
@@ -154,9 +259,9 @@ export default function CallScreen() {
           ]}
           testID="open-video-room"
         >
-          <Ionicons name="videocam" size={22} color="#fff" />
+          <Ionicons name={callMode === "voice" ? "call" : "videocam"} size={22} color="#fff" />
           <Text style={styles.joinBtnText}>
-            {tokenData?.token ? "Join Video Call" : "Preparing Secure Call…"}
+            {tokenData?.token ? `Join ${callMode === "voice" ? "Voice" : "Video"} Call` : "Preparing Secure Call…"}
           </Text>
         </Pressable>
 
@@ -176,6 +281,75 @@ export default function CallScreen() {
 }
 
 const styles = StyleSheet.create({
+  roomContainer: {
+    flex: 1,
+    backgroundColor: "#0A0A0A",
+  },
+  webView: {
+    flex: 1,
+    backgroundColor: "#0A0A0A",
+  },
+  roomHeader: {
+    position: "absolute",
+    left: 12,
+  },
+  leaveRoomButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(10,10,10,0.72)",
+  },
+  roomError: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 14,
+    paddingHorizontal: 32,
+    backgroundColor: "#0A0A0A",
+  },
+  roomErrorText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontFamily: "Inter_500Medium",
+    textAlign: "center",
+  },
+  retryText: {
+    fontSize: 16,
+    fontFamily: "Inter_600SemiBold",
+  },
+  permissionScreen: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 16,
+    paddingHorizontal: 28,
+  },
+  permissionTitle: {
+    fontSize: 20,
+    fontFamily: "Inter_700Bold",
+    textAlign: "center",
+  },
+  permissionText: {
+    fontSize: 15,
+    lineHeight: 22,
+    fontFamily: "Inter_400Regular",
+    textAlign: "center",
+  },
+  settingsButton: {
+    minHeight: 50,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 8,
+  },
+  settingsButtonText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontFamily: "Inter_600SemiBold",
+  },
   container: {
     flex: 1,
     justifyContent: "space-between",
