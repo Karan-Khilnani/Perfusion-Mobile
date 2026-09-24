@@ -7,4 +7,4 @@ Use the existing server-side Google OAuth account-linking flow for mobile. Retur
 
 **Why:** The configured web OAuth client can serve Android and iOS without adding native Google SDK credentials. Custom URL schemes can be intercepted by another app, so the callback ticket alone must not be sufficient to create a session.
 
-**How to apply:** Preserve OAuth state validation in the browser session, atomic ticket consumption, PKCE verification, normal approval rules, and in-app profile completion for first-time Google users. Treat real installed-device callback testing as required before release.
+**How to apply:** Preserve OAuth state validation in the browser session, atomic ticket consumption, PKCE verification, normal approval rules, and in-app profile completion for first-time Google users. Expo Go cannot verify delivery of the app-specific `perfusion-mobile://` callback; use an installed development or preview build with a real Google account before release.

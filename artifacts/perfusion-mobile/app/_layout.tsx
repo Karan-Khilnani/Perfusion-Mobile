@@ -25,6 +25,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { IncomingCallOverlay } from "@/components/IncomingCallOverlay";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { CallProvider } from "@/contexts/CallContext";
+import { useColors } from "@/hooks/useColors";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -37,11 +38,9 @@ const queryClient = new QueryClient({
   },
 });
 
-const PRIMARY = "#B73434";
-const BG = "#FAFAFA";
-
 function RootLayoutNav() {
   const { user, loading, callbackDevice, callbackDeviceLoading, callbackDeviceError } = useAuth();
+  const colors = useColors();
   const pathname = usePathname();
 
   if (loading || (user?.role !== "admin" && user && callbackDeviceLoading)) {
@@ -49,12 +48,12 @@ function RootLayoutNav() {
       <View
         style={{
           flex: 1,
-          backgroundColor: BG,
+          backgroundColor: colors.background,
           alignItems: "center",
           justifyContent: "center",
         }}
       >
-        <ActivityIndicator size="large" color={PRIMARY} />
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }

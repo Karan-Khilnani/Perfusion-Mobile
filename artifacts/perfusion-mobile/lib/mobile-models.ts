@@ -18,6 +18,7 @@ export type Booking = {
   providerCity?: string | null;
   providerHospital?: string | null;
   seekerHospitalName?: string | null;
+  seekerHospitalLocation?: string | null;
   city?: string | null;
   hospitalName?: string | null;
   videoRoomId?: string | null;

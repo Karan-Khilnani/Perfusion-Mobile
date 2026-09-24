@@ -45,7 +45,9 @@ export function BookingCard({ booking, onPauseToggle }: Props) {
   const service = booking.providerSpecialization || booking.serviceName || "Consultation";
   const person = seeker ? booking.providerName : booking.patientName;
   const hospital = seeker ? booking.providerHospital : booking.seekerHospitalName || booking.hospitalName;
-  const location = seeker ? booking.providerCity || booking.city : booking.city;
+  const location = seeker
+    ? booking.providerCity || booking.city
+    : booking.seekerHospitalLocation || booking.city;
   const patientContext = seeker ? booking.patientName : null;
   const time = formatTime(booking.appointmentSlot || booking.timeSlot || booking.scheduledDate);
   const remaining = formatRemainingWindow((booking as Booking & { postRxExpiresAt?: string }).postRxExpiresAt);

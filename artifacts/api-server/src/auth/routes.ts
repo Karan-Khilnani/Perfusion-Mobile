@@ -75,9 +75,8 @@ async function getMobileAuthUser(req: any, user: any): Promise<any> {
   }
   try {
     const provider = await storage.getProviderByUserId(user.id);
-    return provider?.location
-      ? { ...user, location: provider.location }
-      : user;
+    const location = provider?.location || provider?.address;
+    return location ? { ...user, location } : user;
   } catch (error) {
     console.error("Could not load provider location for mobile auth response:", error);
     return user;

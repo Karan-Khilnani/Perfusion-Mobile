@@ -75,6 +75,7 @@ export default function DashboardScreen() {
   const liveCount = bookings.filter((item) => ["ongoing", "in_progress", "processing"].includes(item.status)).length;
   const name = user?.firstName || user?.name?.split(" ")[0] || "there";
   const date = new Date().toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long" });
+  const hospitalPlace = user?.hospitalAddress || user?.location || user?.city;
 
   return (
     <ScrollView
@@ -105,7 +106,7 @@ export default function DashboardScreen() {
       <View style={styles.greetingBlock}>
         <ScreenHeading
           title={`${greeting()}, Dr. ${name}`}
-          subtitle={`${date}${seeker && user?.hospitalName ? ` · ${user.hospitalName}` : ""}`}
+          subtitle={`${date}${seeker && user?.hospitalName ? ` · ${user.hospitalName}${hospitalPlace ? ` · ${hospitalPlace}` : ""}` : ""}`}
         />
       </View>
 

@@ -982,6 +982,20 @@ export async function registerRoutes(
       const enriched = await Promise.all(bookings.map(async (b) => {
         if (b.bookingType === "consultation" && b.serviceId) {
           const consultant = await storage.getConsultantById(b.serviceId);
+          const provider = b.providerId
+            ? await storage.getProviderById(b.providerId)
+            : null;
+          if (req.get("X-Mobile-Client") === "1") {
+            return {
+              ...b,
+              providerName: consultant?.name || null,
+              providerSpecialization: consultant?.specialization || null,
+              providerHospital:
+                provider?.name || consultant?.affiliatedInstitution || null,
+              providerCity: provider?.location || provider?.address || null,
+              specialization: consultant?.specialization || null,
+            };
+          }
           return { ...b, specialization: consultant?.specialization || null };
         }
         return b;
@@ -2713,7 +2727,7 @@ export async function registerRoutes(
       const providerModalities = await storage.getProviderModalitiesByProvider(provider.id);
       
       // Enrich bookings with provider's price
-      const enrichedBookings = bookings.map(booking => {
+      const enrichedBookings = await Promise.all(bookings.map(async booking => {
         let providerPrice = null;
         
         if (booking.bookingType === "lab" && booking.serviceId) {
@@ -2727,12 +2741,23 @@ export async function registerRoutes(
             providerPrice = assignment.price;
           }
         }
+
+        let seekerHospitalDetails = {};
+        if (req.get("X-Mobile-Client") === "1") {
+          const seeker = await storage.getUserById(booking.userId);
+          seekerHospitalDetails = {
+            seekerHospitalName: seeker?.hospitalName || undefined,
+            seekerHospitalLocation:
+              seeker?.hospitalAddress || seeker?.location || seeker?.city || undefined,
+          };
+        }
         
         return {
           ...booking,
           providerPrice,
+          ...seekerHospitalDetails,
         };
-      });
+      }));
       
       res.json(enrichedBookings);
     } catch (error) {
