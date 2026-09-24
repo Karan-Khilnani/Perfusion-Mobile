@@ -4,7 +4,6 @@ import { router } from "expo-router";
 import React, { useState } from "react";
 import {
   ActivityIndicator,
-  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -22,13 +21,30 @@ import { useColors } from "@/hooks/useColors";
 export default function LoginScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { login } = useAuth();
+  const { login, loginWithGoogle } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [googleAccount, setGoogleAccount] = useState(false);
+
+  const routeAfterLogin = (authenticatedUser: {
+    needsProfile: boolean;
+    approvalStatus?: string;
+  }) => {
+    if (authenticatedUser.needsProfile) {
+      router.replace("/complete-profile");
+    } else if (
+      authenticatedUser.approvalStatus === "pending" ||
+      authenticatedUser.approvalStatus === "rejected"
+    ) {
+      router.replace("/account-status");
+    } else {
+      router.replace("/(tabs)");
+    }
+  };
 
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
@@ -39,11 +55,11 @@ export default function LoginScreen() {
     setError(null);
     setGoogleAccount(false);
     try {
-      await login(email.trim(), password);
+      const authenticatedUser = await login(email.trim(), password);
       if (Platform.OS !== "web") {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
-      router.replace("/(tabs)");
+      routeAfterLogin(authenticatedUser);
     } catch (e: any) {
       const message = e?.message || "Login failed. Please try again.";
       setError(message);
@@ -53,6 +69,31 @@ export default function LoginScreen() {
       }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleGoogleLogin = async () => {
+    setGoogleLoading(true);
+    setError(null);
+    setGoogleAccount(false);
+    try {
+      const authenticatedUser = await loginWithGoogle();
+      if (!authenticatedUser) return;
+      if (Platform.OS !== "web") {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
+      routeAfterLogin(authenticatedUser);
+    } catch (cause) {
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : "Google sign-in failed. Please try again.",
+      );
+      if (Platform.OS !== "web") {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      }
+    } finally {
+      setGoogleLoading(false);
     }
   };
 
@@ -98,6 +139,41 @@ export default function LoginScreen() {
           <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>
             Access your healthcare dashboard
           </Text>
+
+          <Pressable
+            onPress={handleGoogleLogin}
+            disabled={googleLoading || loading}
+            accessibilityRole="button"
+            accessibilityLabel="Sign in with Google"
+            style={({ pressed }) => [
+              styles.googleButton,
+              {
+                backgroundColor: colors.card,
+                borderColor: colors.border,
+                opacity: pressed || googleLoading ? 0.75 : 1,
+              },
+            ]}
+            testID="google-login-button"
+          >
+            {googleLoading ? (
+              <ActivityIndicator color={colors.foreground} size="small" />
+            ) : (
+              <>
+                <Text style={styles.googleMark}>G</Text>
+                <Text style={[styles.googleButtonText, { color: colors.foreground }]}>
+                  Sign in with Google
+                </Text>
+              </>
+            )}
+          </Pressable>
+
+          <View style={styles.dividerRow}>
+            <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
+            <Text style={[styles.dividerText, { color: colors.mutedForeground }]}>
+              OR CONTINUE WITH EMAIL
+            </Text>
+            <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
+          </View>
 
           {error && (
             <View
@@ -198,7 +274,7 @@ export default function LoginScreen() {
 
           <Pressable
             onPress={handleLogin}
-            disabled={loading}
+            disabled={loading || googleLoading}
             style={({ pressed }) => [
               styles.loginButton,
               {
@@ -285,6 +361,37 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontFamily: "Inter_400Regular",
     marginTop: -12,
+  },
+  googleButton: {
+    height: 50,
+    borderRadius: 10,
+    borderWidth: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+  },
+  googleMark: {
+    color: "#4285F4",
+    fontSize: 20,
+    fontFamily: "Sora_700Bold",
+  },
+  googleButtonText: {
+    fontSize: 15,
+    fontFamily: "Inter_500Medium",
+  },
+  dividerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  dividerLine: {
+    flex: 1,
+    height: StyleSheet.hairlineWidth,
+  },
+  dividerText: {
+    fontSize: 11,
+    fontFamily: "Inter_500Medium",
   },
   errorBox: {
     flexDirection: "row",

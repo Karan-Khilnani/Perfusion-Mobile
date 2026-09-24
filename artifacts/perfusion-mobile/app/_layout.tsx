@@ -11,7 +11,7 @@ import {
   Sora_700Bold,
 } from "@expo-google-fonts/sora";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Redirect, Stack, usePathname } from "expo-router";
+import { Redirect, Stack, usePathname, type Href } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect } from "react";
 import {
@@ -59,6 +59,41 @@ function RootLayoutNav() {
     );
   }
 
+  const publicPaths = ["/login", "/register", "/set-password", "/verify-email"];
+  const onboardingPaths = [
+    ...publicPaths,
+    "/complete-profile",
+    "/account-status",
+  ];
+  let redirectHref: Href | null = null;
+  if (!user && !publicPaths.includes(pathname)) {
+    redirectHref = "/login";
+  } else if (user?.needsProfile && pathname !== "/complete-profile") {
+    redirectHref = "/complete-profile";
+  } else if (
+    user &&
+    !user.needsProfile &&
+    (user.approvalStatus === "pending" ||
+      user.approvalStatus === "rejected") &&
+    pathname !== "/account-status"
+  ) {
+    redirectHref = "/account-status";
+  } else if (
+    user &&
+    user.role !== "admin" &&
+    user.approvalStatus === "approved" &&
+    (!callbackDevice || callbackDeviceError) &&
+    pathname !== "/callback-device"
+  ) {
+    redirectHref = "/callback-device";
+  } else if (
+    user &&
+    (user.role === "admin" || user.approvalStatus === "approved") &&
+    onboardingPaths.includes(pathname)
+  ) {
+    redirectHref = "/(tabs)";
+  }
+
   return (
     <>
       <Stack screenOptions={{ headerBackTitle: "Back" }}>
@@ -77,6 +112,14 @@ function RootLayoutNav() {
         />
         <Stack.Screen
           name="verify-email"
+          options={{ headerShown: false, gestureEnabled: false }}
+        />
+        <Stack.Screen
+          name="complete-profile"
+          options={{ headerShown: false, gestureEnabled: false }}
+        />
+        <Stack.Screen
+          name="account-status"
           options={{ headerShown: false, gestureEnabled: false }}
         />
         <Stack.Screen
@@ -100,8 +143,7 @@ function RootLayoutNav() {
           options={{ headerShown: false, gestureEnabled: false }}
         />
       </Stack>
-      {!user && !["/login", "/register", "/set-password"].includes(pathname) && <Redirect href="/login" />}
-      {user && user.role !== "admin" && (!callbackDevice || callbackDeviceError) && pathname !== "/callback-device" && pathname !== "/verify-email" && <Redirect href="/callback-device" />}
+      {redirectHref && <Redirect href={redirectHref} />}
       {user && <IncomingCallOverlay />}
     </>
   );

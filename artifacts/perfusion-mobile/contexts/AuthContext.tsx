@@ -1,4 +1,7 @@
 import * as Notifications from "expo-notifications";
+import * as Crypto from "expo-crypto";
+import * as Linking from "expo-linking";
+import * as WebBrowser from "expo-web-browser";
 import { Platform } from "react-native";
 import React, { createContext, useContext, useEffect, useState } from "react";
 
@@ -10,6 +13,8 @@ import {
 } from "@/hooks/useApi";
 import { deregisterNativeCallToken } from "@/lib/native-calls";
 import { getPushDeviceId } from "@/lib/push-device";
+
+WebBrowser.maybeCompleteAuthSession();
 
 async function registerMobilePushToken(): Promise<void> {
   if (Platform.OS === "web") return;
@@ -59,6 +64,7 @@ export interface User {
   approvalStatus?: string;
   requiresAgreement?: boolean;
   hospitalName?: string;
+  needsProfile: boolean;
 }
 
 export interface CallbackDevice {
@@ -74,6 +80,18 @@ export interface RegistrationInput {
   lastName: string;
 }
 
+export interface ProfileCompletionInput {
+  role: "care_seeker" | "provider";
+  hospitalName: string;
+  hospitalAddress: string;
+  hospitalRegistrationNo: string;
+  hospitalRegisteredOrg: string;
+  phone?: string;
+  providerType?: "lab" | "consultant" | "hospital" | "transport" | "teleradiology";
+  description?: string;
+  location?: string;
+}
+
 function normalizeUser(data: Record<string, unknown>): User {
   const firstName = typeof data.firstName === "string" ? data.firstName : "";
   const lastName = typeof data.lastName === "string" ? data.lastName : "";
@@ -81,6 +99,13 @@ function normalizeUser(data: Record<string, unknown>): User {
   const approvalStatus =
     typeof data.approvalStatus === "string" ? data.approvalStatus : undefined;
   const fullName = `${firstName} ${lastName}`.trim();
+  const role = typeof data.role === "string" ? data.role : "care_seeker";
+  const hospitalName =
+    typeof data.hospitalName === "string" && data.hospitalName.trim()
+      ? data.hospitalName
+      : undefined;
+  const googleAccount =
+    typeof data.googleId === "string" && data.googleId.length > 0;
 
   return {
     id: String(data.id ?? ""),
@@ -89,14 +114,16 @@ function normalizeUser(data: Record<string, unknown>): User {
       (typeof data.name === "string" && data.name.trim()) ||
       fullName ||
       email,
-    role: typeof data.role === "string" ? data.role : "care_seeker",
+    role,
     approved: data.approved === true || approvalStatus === "approved",
     firstName: firstName || undefined,
     lastName: lastName || undefined,
     approvalStatus,
     requiresAgreement: data.requiresAgreement === true,
-    hospitalName:
-      typeof data.hospitalName === "string" ? data.hospitalName : undefined,
+    hospitalName,
+    needsProfile:
+      data.needsProfile === true ||
+      (googleAccount && role !== "admin" && !hospitalName),
   };
 }
 
@@ -108,8 +135,10 @@ interface AuthContextType {
   callbackDeviceError: string | null;
   refreshCallbackDevice: () => Promise<void>;
   saveCallbackDevice: (deviceName: string, phoneNumber: string) => Promise<void>;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<User>;
+  loginWithGoogle: () => Promise<User | null>;
   register: (input: RegistrationInput) => Promise<void>;
+  completeProfile: (input: ProfileCompletionInput) => Promise<User>;
   verifyEmail: (code: string) => Promise<void>;
   resendVerification: () => Promise<void>;
   logout: () => Promise<void>;
@@ -154,14 +183,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setCallbackDeviceError(null);
   };
 
+  const applyAuthenticatedUser = async (
+    data: Record<string, unknown>,
+  ): Promise<User> => {
+    const authenticatedUser = normalizeUser(data);
+    setUser(authenticatedUser);
+    if (
+      authenticatedUser.role === "admin" ||
+      authenticatedUser.needsProfile ||
+      authenticatedUser.approvalStatus !== "approved"
+    ) {
+      setCallbackDevice(null);
+      setCallbackDeviceError(null);
+      setCallbackDeviceLoading(false);
+    } else {
+      await refreshCallbackDevice();
+    }
+    return authenticatedUser;
+  };
+
   const refreshUser = async () => {
     try {
       const res = await apiFetch("/api/auth/user");
       if (res.ok) {
         const data = (await res.json()) as Record<string, unknown>;
-        setUser(normalizeUser(data));
-        if (data.role !== "admin") await refreshCallbackDevice();
-        else setCallbackDeviceLoading(false);
+        await applyAuthenticatedUser(data);
       } else {
         setUser(null);
         setCallbackDevice(null);
@@ -178,7 +224,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     refreshUser().finally(() => setLoading(false));
   }, []);
 
-  const login = async (email: string, password: string) => {
+  const login = async (email: string, password: string): Promise<User> => {
     const res = await fetch(`${getBaseUrl()}/api/auth/login`, {
       method: "POST",
       credentials: "include",
@@ -197,11 +243,89 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const setCookieHeader = res.headers.get("set-cookie");
     const match = setCookieHeader?.match(/connect\.sid=[^;]+/);
     if (match) await storeCookie(match[0]);
-    setUser(normalizeUser(data));
-    if (data.role !== "admin") await refreshCallbackDevice();
-    else setCallbackDeviceLoading(false);
+    const authenticatedUser = await applyAuthenticatedUser(data);
     // Register Expo push token after successful login (non-blocking)
     registerMobilePushToken().catch(() => {});
+    return authenticatedUser;
+  };
+
+  const loginWithGoogle = async (): Promise<User | null> => {
+    if (Platform.OS === "web") {
+      throw new Error("Google mobile sign-in is available in the Android and iOS apps.");
+    }
+    const redirectUri = "perfusion-mobile://auth/callback";
+    const codeVerifier = `${Crypto.randomUUID()}${Crypto.randomUUID()}`
+      .replace(/-/g, "");
+    const codeChallenge = (
+      await Crypto.digestStringAsync(
+        Crypto.CryptoDigestAlgorithm.SHA256,
+        codeVerifier,
+        { encoding: Crypto.CryptoEncoding.BASE64 },
+      )
+    )
+      .replace(/\+/g, "-")
+      .replace(/\//g, "_")
+      .replace(/=+$/g, "");
+    const result = await WebBrowser.openAuthSessionAsync(
+      `${getBaseUrl()}/api/auth/google/mobile?code_challenge=${encodeURIComponent(codeChallenge)}`,
+      redirectUri,
+    );
+    if (result.type === "cancel" || result.type === "dismiss") return null;
+    if (result.type !== "success" || !result.url) {
+      throw new Error("Google sign-in could not be completed.");
+    }
+
+    const callback = Linking.parse(result.url);
+    const oauthError =
+      typeof callback.queryParams?.error === "string"
+        ? callback.queryParams.error
+        : null;
+    if (oauthError) {
+      if (oauthError === "invalid_state") {
+        throw new Error("Google sign-in expired. Please try again.");
+      }
+      throw new Error("Google sign-in was not completed. Please try again.");
+    }
+    const ticket =
+      typeof callback.queryParams?.ticket === "string"
+        ? callback.queryParams.ticket
+        : null;
+    if (!ticket) {
+      throw new Error("Google sign-in did not return a valid authorization.");
+    }
+
+    const response = await fetch(
+      `${getBaseUrl()}/api/auth/google/mobile/exchange`,
+      {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Mobile-Client": "1",
+        },
+        body: JSON.stringify({ ticket, codeVerifier }),
+      },
+    );
+    const data = (await response.json().catch(() => ({}))) as Record<
+      string,
+      unknown
+    >;
+    if (!response.ok) {
+      throw new Error(
+        typeof data.message === "string"
+          ? data.message
+          : "Could not complete Google sign-in.",
+      );
+    }
+    const setCookieHeader = response.headers.get("set-cookie");
+    const match = setCookieHeader?.match(/connect\.sid=[^;]+/);
+    if (!match) {
+      throw new Error("The app could not save your sign-in session.");
+    }
+    await storeCookie(match[0]);
+    const authenticatedUser = await applyAuthenticatedUser(data);
+    registerMobilePushToken().catch(() => {});
+    return authenticatedUser;
   };
 
   const register = async (input: RegistrationInput) => {
@@ -228,7 +352,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const setCookieHeader = res.headers.get("set-cookie");
     const match = setCookieHeader?.match(/connect\.sid=[^;]+/);
     if (match) await storeCookie(match[0]);
-    setUser(normalizeUser(data));
+    await applyAuthenticatedUser(data);
     setCallbackDevice(null);
     setCallbackDeviceLoading(false);
     setCallbackDeviceError(null);
@@ -243,8 +367,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!res.ok) {
       throw new Error(typeof data.message === "string" ? data.message : "Verification failed");
     }
-    setUser(normalizeUser(data));
-    await refreshCallbackDevice();
+    await applyAuthenticatedUser(data);
   };
 
   const resendVerification = async () => {
@@ -253,6 +376,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!res.ok) {
       throw new Error(typeof data.message === "string" ? data.message : "Could not resend the code");
     }
+  };
+
+  const completeProfile = async (
+    input: ProfileCompletionInput,
+  ): Promise<User> => {
+    const response = await apiFetch("/api/auth/complete-profile", {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+    const data = (await response.json().catch(() => ({}))) as Record<
+      string,
+      unknown
+    >;
+    if (!response.ok) {
+      throw new Error(
+        typeof data.message === "string"
+          ? data.message
+          : "Could not complete your profile.",
+      );
+    }
+    return applyAuthenticatedUser({ ...data, needsProfile: false });
   };
 
   const logout = async () => {
@@ -270,7 +414,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthContext.Provider value={{
-      user, loading, login, register, verifyEmail, resendVerification, logout, refreshUser,
+      user, loading, login, loginWithGoogle, register, completeProfile,
+      verifyEmail, resendVerification, logout, refreshUser,
       callbackDevice, callbackDeviceLoading, callbackDeviceError,
       refreshCallbackDevice, saveCallbackDevice,
     }}>

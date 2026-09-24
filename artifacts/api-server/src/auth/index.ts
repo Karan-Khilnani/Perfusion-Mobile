@@ -10,6 +10,7 @@ declare module "express-session" {
   interface SessionData {
     userId?: string;
     mobileGoogleOAuthState?: string;
+    mobileGoogleCodeChallenge?: string;
   }
 }
 
@@ -76,6 +77,7 @@ export async function createUser(data: {
   firstName: string;
   lastName: string;
   role?: UserRole;
+  phone?: string;
   verificationCode?: string;
   verificationCodeExpiresAt?: Date;
   hospitalName?: string;
@@ -94,6 +96,7 @@ export async function createUser(data: {
       firstName: data.firstName,
       lastName: data.lastName,
       role: data.role || "care_seeker",
+      phone: data.phone,
       emailVerified: false,
       verificationCode: data.verificationCode,
       verificationCodeExpiresAt: data.verificationCodeExpiresAt,

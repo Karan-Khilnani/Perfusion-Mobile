@@ -63,11 +63,12 @@
   "dependencies": {
     "@expo-google-fonts/sora": "^0.4.2",
     "@livekit/react-native-webrtc": "^144.2.0",
+    "expo": "~54.0.37",
     "expo-callkit-telecom": "^0.5.0",
+    "expo-crypto": "^15.0.9",
     "expo-document-picker": "~14.0.8",
     "expo-file-system": "~19.0.24",
     "expo-image-manipulator": "~14.0.8",
-    "expo": "~54.0.37",
     "react": "19.1.0",
     "react-native": "0.81.5"
   }

@@ -1,5 +1,5 @@
 import type { Express } from "express";
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import passport from "passport";
 import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import { 
@@ -69,7 +69,10 @@ function getMobileGoogleErrorUrl(error: string): string {
   return `${MOBILE_GOOGLE_REDIRECT_URI}?error=${encodeURIComponent(error)}`;
 }
 
-async function createMobileGoogleExchangeTicket(userId: string): Promise<string> {
+async function createMobileGoogleExchangeTicket(
+  userId: string,
+  codeChallenge: string,
+): Promise<string> {
   const ticket = randomBytes(32).toString("hex");
   const expiresAt = new Date(Date.now() + 2 * 60 * 1000);
   await getPool().query(
@@ -77,7 +80,11 @@ async function createMobileGoogleExchangeTicket(userId: string): Promise<string>
      VALUES ($1, $2::json, $3)`,
     [
       `google-mobile-${ticket}`,
-      JSON.stringify({ authType: "google-mobile-exchange", userId }),
+      JSON.stringify({
+        authType: "google-mobile-exchange",
+        userId,
+        codeChallenge,
+      }),
       expiresAt,
     ],
   );
@@ -86,12 +93,15 @@ async function createMobileGoogleExchangeTicket(userId: string): Promise<string>
 
 async function consumeMobileGoogleExchangeTicket(
   ticket: string,
+  codeChallenge: string,
 ): Promise<string | null> {
   const result = await getPool().query(
     `DELETE FROM "sessions"
-     WHERE sid = $1 AND expire > NOW()
+     WHERE sid = $1
+       AND expire > NOW()
+       AND sess->>'codeChallenge' = $2
      RETURNING sess`,
-    [`google-mobile-${ticket}`],
+    [`google-mobile-${ticket}`, codeChallenge],
   );
   const payload = result.rows[0]?.sess as
     | { authType?: unknown; userId?: unknown }
@@ -185,8 +195,16 @@ export function registerAuthRoutes(app: Express): void {
     );
 
     app.get("/api/auth/google/mobile", (req: any, res, next) => {
+      const codeChallenge = req.query.code_challenge;
+      if (
+        typeof codeChallenge !== "string" ||
+        !/^[A-Za-z0-9_-]{43,128}$/.test(codeChallenge)
+      ) {
+        return res.redirect(getMobileGoogleErrorUrl("invalid_request"));
+      }
       const state = `mobile.${randomBytes(32).toString("hex")}`;
       req.session.mobileGoogleOAuthState = state;
+      req.session.mobileGoogleCodeChallenge = codeChallenge;
       req.session.save((error: unknown) => {
         if (error) {
           console.error("Mobile Google OAuth state save error:", error);
@@ -253,11 +271,25 @@ export function registerAuthRoutes(app: Express): void {
           }
 
           if (res.locals.mobileGoogleOAuth) {
-            req.session.mobileGoogleOAuthState = undefined;
-            const ticket = await createMobileGoogleExchangeTicket(googleUser.id);
-            return res.redirect(
-              `${MOBILE_GOOGLE_REDIRECT_URI}?ticket=${encodeURIComponent(ticket)}`,
+            const codeChallenge = req.session.mobileGoogleCodeChallenge;
+            if (
+              typeof codeChallenge !== "string" ||
+              !/^[A-Za-z0-9_-]{43,128}$/.test(codeChallenge)
+            ) {
+              return res.redirect(getMobileGoogleErrorUrl("invalid_state"));
+            }
+            const ticket = await createMobileGoogleExchangeTicket(
+              googleUser.id,
+              codeChallenge,
             );
+            const redirectUrl =
+              `${MOBILE_GOOGLE_REDIRECT_URI}?ticket=${encodeURIComponent(ticket)}`;
+            return req.session.destroy((error: unknown) => {
+              if (error) {
+                console.error("Mobile Google OAuth session cleanup error:", error);
+              }
+              res.redirect(redirectUrl);
+            });
           }
 
           let role: string | undefined;
@@ -314,6 +346,9 @@ export function registerAuthRoutes(app: Express): void {
           });
         } catch (error) {
           console.error("Google callback error:", error);
+          if (res.locals.mobileGoogleOAuth) {
+            return res.redirect(getMobileGoogleErrorUrl("google_failed"));
+          }
           res.redirect("/login?error=google_failed");
         }
       }
@@ -323,12 +358,19 @@ export function registerAuthRoutes(app: Express): void {
       try {
         const parsed = z.object({
           ticket: z.string().regex(/^[a-f0-9]{64}$/),
+          codeVerifier: z.string().regex(/^[A-Za-z0-9._~-]{43,128}$/),
         }).safeParse(req.body);
         if (!parsed.success) {
           return res.status(400).json({ message: "Invalid sign-in ticket." });
         }
 
-        const userId = await consumeMobileGoogleExchangeTicket(parsed.data.ticket);
+        const codeChallenge = createHash("sha256")
+          .update(parsed.data.codeVerifier)
+          .digest("base64url");
+        const userId = await consumeMobileGoogleExchangeTicket(
+          parsed.data.ticket,
+          codeChallenge,
+        );
         if (!userId) {
           return res.status(401).json({
             message: "This Google sign-in expired or was already used. Please try again.",
@@ -360,7 +402,11 @@ export function registerAuthRoutes(app: Express): void {
           requiresAgreement =
             user.role !== "admin" && user.approvalStatus === "approved";
         }
-        return res.json({ ...user, requiresAgreement });
+        return res.json({
+          ...user,
+          requiresAgreement,
+          needsProfile: user.role !== "admin" && !user.hospitalName,
+        });
       } catch (error) {
         console.error("Mobile Google sign-in exchange error:", error);
         return res.status(500).json({ message: "Could not complete Google sign-in." });
@@ -602,13 +648,54 @@ export function registerAuthRoutes(app: Express): void {
         return res.status(401).json({ message: "User not found" });
       }
 
-      const { role, hospitalName, hospitalAddress, hospitalRegistrationNo, hospitalRegisteredOrg, registrationDocumentUrl, phone, providerType, description, location } = req.body;
-      if (!role || !["care_seeker", "provider"].includes(role)) {
-        return res.status(400).json({ message: "Valid role is required" });
+      const profileSchema = z.object({
+        role: z.enum(["care_seeker", "provider"]),
+        hospitalName: z.string().trim().min(2).max(255),
+        hospitalAddress: z.string().trim().min(5).max(500),
+        hospitalRegistrationNo: z.string().trim().min(1).max(100),
+        hospitalRegisteredOrg: z.string().trim().min(2).max(255),
+        registrationDocumentUrl: z.string().trim().max(500).optional().nullable(),
+        phone: z.string().trim().max(25).optional(),
+        providerType: z.enum(["lab", "consultant", "hospital", "transport", "teleradiology"]).optional(),
+        description: z.string().trim().max(1000).optional(),
+        location: z.string().trim().max(255).optional(),
+      }).superRefine((data, ctx) => {
+        if (data.role !== "provider") return;
+        if (!data.providerType) {
+          ctx.addIssue({
+            code: "custom",
+            path: ["providerType"],
+            message: "Provider type is required",
+          });
+        }
+        if (!data.phone || !/^\+?[\d\s\-().]{7,25}$/.test(data.phone) ||
+            data.phone.replace(/\D/g, "").length < 7) {
+          ctx.addIssue({
+            code: "custom",
+            path: ["phone"],
+            message: "A valid phone number is required",
+          });
+        }
+        if (!data.location || data.location.length < 2) {
+          ctx.addIssue({
+            code: "custom",
+            path: ["location"],
+            message: "Location is required",
+          });
+        }
+      });
+      const parsed = profileSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({
+          message: parsed.error.issues[0]?.message || "Invalid profile details",
+          errors: parsed.error.issues,
+        });
       }
-      if (!hospitalName || !hospitalAddress || !hospitalRegistrationNo) {
-        return res.status(400).json({ message: "Hospital name, address, and registration number are required" });
-      }
+      const {
+        role, hospitalName, hospitalAddress, hospitalRegistrationNo,
+        hospitalRegisteredOrg, registrationDocumentUrl, phone, providerType,
+        description, location,
+      } = parsed.data;
 
       const updated = await completeUserProfile(req.session.userId, {
         role,
@@ -616,7 +703,7 @@ export function registerAuthRoutes(app: Express): void {
         hospitalAddress,
         hospitalRegistrationNo,
         hospitalRegisteredOrg,
-        registrationDocumentUrl,
+        registrationDocumentUrl: registrationDocumentUrl || undefined,
         phone,
       });
 
