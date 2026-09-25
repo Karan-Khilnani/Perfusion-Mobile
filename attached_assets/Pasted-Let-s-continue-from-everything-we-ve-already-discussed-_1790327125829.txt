@@ -1,0 +1,93 @@
+Let's continue from everything we've already discussed and discovered in this Replit conversation. DO NOT reset, forget, or reinterpret the existing project context.
+
+We have now finalized the Git/workflow side:
+
+- Current branch: feature/mobile-clinical-advisory
+- Working tree is clean.
+- Do NOT switch to or modify main.
+- Do NOT commit unless I explicitly ask you to.
+
+We have also finalized the product behavior:
+
+The existing mobile journey and Advisory button should remain essentially unchanged.
+
+Target flow:
+
+Dashboard
+→ Active Consultation
+→ Advisory
+→ structured Clinical Advisory
+→ Download Clinical Advisory PDF
+
+The PDF must combine:
+
+1. Provisional Diagnosis
+   - Automatically taken from the Seeker Hospital's existing booking data
+   - Provider must NOT manually enter it
+   - Label: "(Provided by Seeker Hospital)"
+
+2. Clinical Details
+   - Automatically taken from the Seeker Hospital's existing clinical information
+   - Provider must NOT manually enter it
+   - Label: "(Provided by Seeker Hospital)"
+
+3. Clinical Advisory
+   - Provider's own clinical assessment/recommendation
+
+Important discoveries from our investigation:
+
+- Mobile relevant screen: artifacts/perfusion-mobile/app/case-file/[bookingId].tsx
+- Provider advisory endpoint:
+  POST /api/bookings/{bookingId}/case-file/advisories
+- Existing advisory retrieval:
+  GET /api/bookings/{bookingId}/case-file/advisories
+- Booking data already contains:
+  booking.provisionalDiagnosis
+  booking.clinicalSummary
+- Backend maps these to:
+  workingDiagnosis
+  clinicalHistory
+- Existing PDF infrastructure already exists:
+  artifacts/api-server/src/services/prescription-pdf.ts
+- Existing PDF generator:
+  generateAndStorePrescriptionPdf(...)
+- Existing PDF data structure already supports clinicalHistory, diagnosis, physicianNotes, advice, followUp, etc.
+
+Therefore, DO NOT create a new PDF generation system before determining whether the existing one can be reused.
+
+Also, do NOT redesign the dashboard or create a new user journey.
+
+Terminology:
+The user-facing feature and generated document must use "Clinical Advisory".
+Do not introduce "Prescription" terminology into the mobile UI or generated document.
+
+There are legacy backend/database identifiers containing "prescription". Do NOT perform a broad rename/migration just for terminology. Preserve compatibility unless a specific change is technically required.
+
+Before implementation, briefly inspect the existing relevant code paths and tell me:
+
+1. How the current mobile Advisory screen works.
+2. How the provider advisory is stored.
+3. How provisionalDiagnosis and clinicalSummary reach the case file.
+4. How the existing PDF generator is currently invoked.
+5. Whether the existing PDF/download workflow can be reused.
+6. The exact files you intend to change.
+
+Then implement the smallest safe change.
+
+Scope:
+- Prefer artifacts/perfusion-mobile/**.
+- Backend changes only if genuinely necessary.
+- Do NOT modify artifacts/perfusion-web/** unless absolutely unavoidable.
+- Do NOT restructure the architecture.
+- Do NOT create duplicate PDF/document systems.
+- Do NOT create duplicate database fields.
+
+After implementation, verify:
+
+git status --short
+git diff --stat
+git diff
+
+Specifically check that no unexpected web files or unrelated backend files changed.
+
+Do not start by rewriting the architecture. Continue from the existing context and investigation we've already done.
