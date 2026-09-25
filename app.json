@@ -1,0 +1,12 @@
+{
+  "expo": {
+    "extra": {
+      "eas": {
+        "projectId": "f9894705-e7fe-494e-af72-5adb2308283e"
+      }
+    },
+    "android": {
+      "package": "com.perfusion.workspace"
+    }
+  }
+}
