@@ -45,7 +45,7 @@ export function isSupabaseUrl(url: string): boolean {
   return url.startsWith("https://") && url.includes("supabase");
 }
 
-async function ensureCaseFileBucket(client: ReturnType<typeof createClient>) {
+async function ensureCaseFileBucket(client: ReturnType<typeof getClient>) {
   const { data, error } = await client.storage.getBucket(CASE_FILE_BUCKET);
   if (data) {
     if (data.public) throw new Error(`Private Case File bucket ${CASE_FILE_BUCKET} is configured as public`);
@@ -83,6 +83,29 @@ export async function downloadPrivateCaseFile(objectPath: string): Promise<Blob>
   const { data, error } = await client.storage.from(CASE_FILE_BUCKET).download(objectPath);
   if (error || !data) throw new Error(`Private Case File download failed: ${error?.message || "empty response"}`);
   return data;
+}
+
+export async function createPrivateCaseFileSignedUrl(
+  objectPath: string,
+  expiresInSeconds = 300,
+  downloadName?: string,
+): Promise<string> {
+  const client = getClient();
+  await ensureCaseFileBucket(client);
+  const { data, error } = await client.storage
+    .from(CASE_FILE_BUCKET)
+    .createSignedUrl(objectPath, expiresInSeconds, downloadName ? { download: downloadName } : undefined);
+  if (error || !data?.signedUrl) {
+    throw new Error(`Private Case File download link failed: ${error?.message || "empty signed URL"}`);
+  }
+  return data.signedUrl;
+}
+
+export async function deletePrivateCaseFile(objectPath: string): Promise<void> {
+  const client = getClient();
+  await ensureCaseFileBucket(client);
+  const { error } = await client.storage.from(CASE_FILE_BUCKET).remove([objectPath]);
+  if (error) throw new Error(`Private Case File cleanup failed: ${error.message}`);
 }
 
 export async function downloadLegacyCaseFile(publicUrl: string): Promise<Blob> {

@@ -514,11 +514,33 @@ function CaseFileSheet({
   const palette = useColors();
   const insets = useSafeAreaInsets();
   const [advisory, setAdvisory] = useState("");
+  const [downloadingAdvisoryId, setDownloadingAdvisoryId] = useState<string | null>(null);
   const [vitalForm, setVitalForm] = useState({ bp: "", hr: "", rr: "", gcs: "", intake: "", output: "", urine: "" });
+
+  const openAdvisoryPdf = async (item: Advisory) => {
+    const attachmentId = item.attachmentIds?.[0];
+    if (!attachmentId) {
+      Alert.alert("PDF unavailable", "This Clinical Advisory does not have a PDF attachment.");
+      return;
+    }
+    setDownloadingAdvisoryId(item.id);
+    try {
+      const { url } = await requestJson<{ url: string }>(
+        `/api/bookings/${bookingId}/case-file/attachments/${attachmentId}/signed-url`,
+      );
+      await Linking.openURL(url);
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : "Could not open the PDF.";
+      Alert.alert("Could not open PDF", reason);
+    } finally {
+      setDownloadingAdvisoryId(null);
+    }
+  };
+
   const mutation = useMutation({
     mutationFn: async () => {
       if (type === "advisory") {
-        return requestJson(`/api/bookings/${bookingId}/case-file/advisories`, { method: "POST", body: JSON.stringify({ narrative: advisory.trim() }) });
+        return requestJson<Advisory>(`/api/bookings/${bookingId}/case-file/advisories`, { method: "POST", body: JSON.stringify({ narrative: advisory.trim() }) });
       }
       const [systolic, diastolic] = vitalForm.bp.split("/").map((value) => value ? Number(value) : null);
       return requestJson(`/api/bookings/${bookingId}/case-file/vitals`, {
@@ -536,7 +558,16 @@ function CaseFileSheet({
         }),
       });
     },
-    onSuccess: () => { onRefresh(); onClose(); setAdvisory(""); },
+    onSuccess: (result) => {
+      onRefresh();
+      onClose();
+      setAdvisory("");
+      if (type === "advisory") {
+        const savedAdvisory = result as Advisory;
+        if (savedAdvisory.attachmentIds?.[0]) void openAdvisoryPdf(savedAdvisory);
+        else Alert.alert("Clinical Advisory saved", "The record was saved, but its PDF is not available.");
+      }
+    },
   });
   if (!type) return null;
   const title = type === "summary" ? "Clinical Summary" : type === "profile" ? "Patient Profile" : type === "vitals" ? "Vitals · I/O · GCS" : type === "add-vitals" ? "Add Vitals" : type === "advisory" ? "Add Clinical Advisory" : type === "trail" ? "Clinical Advisory" : type === "attach" ? "Review attachment" : "Attach";
@@ -603,13 +634,43 @@ function CaseFileSheet({
                   <View key={item.id} style={[styles.trailEntry, { borderLeftColor: palette.quiet }]}>
                     <Text style={[styles.trailTime, { color: palette.mutedForeground }]}>{new Date(item.authoredAt).toLocaleString("en-IN")}</Text>
                     <Text style={[styles.trailText, { color: palette.foreground }]}>{item.narrative}</Text>
+                    {item.attachmentIds?.[0] && (
+                      <Pressable
+                        disabled={downloadingAdvisoryId === item.id}
+                        onPress={() => void openAdvisoryPdf(item)}
+                        accessibilityRole="button"
+                        accessibilityLabel="Download Clinical Advisory PDF"
+                        testID={`download-advisory-pdf-${item.id}`}
+                        style={({ pressed }) => ({
+                          alignSelf: "flex-start",
+                          flexDirection: "row",
+                          alignItems: "center",
+                          gap: 7,
+                          marginTop: 10,
+                          paddingVertical: 7,
+                          paddingHorizontal: 10,
+                          borderRadius: 9,
+                          backgroundColor: pressed ? palette.background : palette.conversationBackground,
+                          borderWidth: 1,
+                          borderColor: palette.conversationBorder,
+                          opacity: downloadingAdvisoryId === item.id ? 0.65 : 1,
+                        })}
+                      >
+                        {downloadingAdvisoryId === item.id
+                          ? <ActivityIndicator size="small" color={palette.foreground} />
+                          : <Feather name="download" size={15} color={palette.foreground} />}
+                        <Text style={{ color: palette.foreground, fontSize: 12, fontWeight: "600" }}>Download Clinical Advisory PDF</Text>
+                      </Pressable>
+                    )}
                   </View>
                 ))}
               </>
             )}
             {type === "advisory" && (
               <>
-                <Text style={[styles.sheetHint, { color: palette.mutedForeground }]}>Adds a permanent entry to this patient&apos;s Clinical Advisory record.</Text>
+                <InfoSection label="PROVISIONAL DIAGNOSIS · (Provided by Seeker Hospital)" value={aggregate.summary.workingDiagnosis} />
+                <InfoSection label="CLINICAL DETAILS · (Provided by Seeker Hospital)" value={aggregate.summary.clinicalHistory} />
+                <Text style={[styles.sheetHint, { color: palette.mutedForeground }]}>The hospital-provided details above are included automatically. Add your own clinical assessment and recommendations below.</Text>
                 <TextInput
                   value={advisory}
                   onChangeText={setAdvisory}

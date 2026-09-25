@@ -290,6 +290,55 @@ paths:
         "302": { description: Legacy attachment redirect }
         "403": { description: Access denied }
         "404": { description: Attachment not found }
+  /bookings/{bookingId}/case-file/attachments/{attachmentId}/signed-url:
+    get:
+      operationId: getCaseFileAttachmentSignedUrl
+      tags: [case-file]
+      summary: Get a short-lived authorized URL for a private Case File attachment
+      parameters:
+        - $ref: "#/components/parameters/BookingId"
+        - name: attachmentId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Short-lived download URL
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [url, expiresIn]
+                properties:
+                  url: { type: string, format: uri }
+                  expiresIn: { type: integer, description: Seconds until the URL expires }
+        "403": { description: Access denied }
+        "404": { description: Attachment not found }
+  /verify/case-file-advisory/{advisoryId}:
+    get:
+      operationId: verifyCaseFileAdvisory
+      tags: [case-file]
+      summary: Verify that an immutable Clinical Advisory exists
+      parameters:
+        - name: advisoryId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Verified Clinical Advisory metadata
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [document, advisoryId, authoredAt, isVerified]
+                properties:
+                  document: { type: string, const: Clinical Advisory }
+                  advisoryId: { type: string }
+                  authorName: { type: ["string", "null"] }
+                  authoredAt: { type: string, format: date-time }
+                  isVerified: { type: boolean, const: true }
+        "404": { description: Clinical Advisory not found }
 components:
   parameters:
     BookingId:
@@ -438,7 +487,7 @@ components:
         authorUserId: { type: string }
         narrative: { type: string }
         attachmentIds:
-          type: array
+          type: [array, "null"]
           items: { type: string }
         authoredAt: { type: string, format: date-time }
     CaseFileAdvisoryInput:

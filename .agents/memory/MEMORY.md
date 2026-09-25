@@ -14,3 +14,4 @@
 - [Mobile Google-account recovery](mobile-google-account-recovery.md) — Google-only mobile accounts need verified email password setup; never bypass password verification.
 - [Mobile Google OAuth handoff](mobile-google-oauth-handoff.md) — reuse server Google OAuth; return a short-lived one-time ticket protected by PKCE, never provider tokens.
 - [Case File visual direction](case-file-visual-direction.md) — keep the mobile Case File conversation-first and calm; signed Clinical Advisories remain visually distinct permanent records.
+- [Clinical Advisory PDF privacy](clinical-advisory-pdf-privacy.md) — keep Case File PDFs private; authorized readers use signed links, while public verification exposes metadata only.

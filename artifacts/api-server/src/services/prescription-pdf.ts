@@ -2,7 +2,7 @@ import { PDFDocument, rgb, StandardFonts, PDFPage, PDFFont } from "pdf-lib";
 import fs from "fs";
 import path from "path";
 import QRCode from "qrcode";
-import { uploadFile as supabaseUpload } from "./supabase-storage";
+import { uploadFile as supabaseUpload, uploadPrivateCaseFile } from "./supabase-storage";
 
 export interface PrescriptionPdfData {
   bookingId: string;
@@ -37,6 +37,8 @@ export interface PrescriptionPdfData {
   treatmentPlan: string | null;
   followUp: string | null;
   advice?: string | null;
+  documentMode?: "case-file-advisory";
+  verificationUrl?: string;
   prescriptionTrail?: Array<{
     label: string;
     approvedAt: Date;
@@ -190,13 +192,18 @@ function needsNewPage(doc: PDFDocument, pages: PDFPage[], curPage: PDFPage, y: n
   return [curPage, y];
 }
 
-export async function generateAndStorePrescriptionPdf(data: PrescriptionPdfData, verificationBaseUrl: string): Promise<string> {
+export async function generateAndStorePrescriptionPdf(
+  data: PrescriptionPdfData,
+  verificationBaseUrl: string,
+  options: { storage?: "public" | "private-case-file" } = {},
+): Promise<string> {
   const doc = await PDFDocument.create();
   const font = await doc.embedFont(StandardFonts.Helvetica);
   const fontBold = await doc.embedFont(StandardFonts.HelveticaBold);
   const fontItalic = await doc.embedFont(StandardFonts.HelveticaOblique);
 
-  const verificationUrl = `${verificationBaseUrl}/verify/prescription/${data.bookingId}`;
+  const verificationUrl = data.verificationUrl || `${verificationBaseUrl}/verify/prescription/${data.bookingId}`;
+  const isCaseFileAdvisory = data.documentMode === "case-file-advisory";
   const approvalDateStr = data.approvedAt.toLocaleString("en-IN", { dateStyle: "long", timeStyle: "medium", timeZone: "Asia/Kolkata" });
   const isReview = typeof data.reviewNumber === "number";
   const summaryId = isReview
@@ -324,10 +331,19 @@ export async function generateAndStorePrescriptionPdf(data: PrescriptionPdfData,
   y -= 8;
 
   // ── Clinical sections ─────────────────────────────────────────────────────────
-  if (data.clinicalHistory) {
+  if (data.clinicalHistory || isCaseFileAdvisory) {
     [page, y] = needsNewPage(doc, pages, page, y, 50);
-    y = drawSectionTitle(page, "CLINICAL HISTORY", y, fontBold);
-    y = drawMultilineText(page, data.clinicalHistory, y, font);
+    y = drawSectionTitle(page, isCaseFileAdvisory ? "CLINICAL DETAILS" : "CLINICAL HISTORY", y, fontBold);
+    if (isCaseFileAdvisory) {
+      page.drawText("(Provided by Seeker Hospital)", { x: MARGIN + 10, y, size: 7.5, font: fontItalic, color: GREY });
+      y -= 11;
+    }
+    y = drawMultilineText(
+      page,
+      data.clinicalHistory || (isCaseFileAdvisory ? "Not provided in the Seeker Hospital booking." : ""),
+      y,
+      font,
+    );
     y -= 4;
   }
 
@@ -376,10 +392,19 @@ export async function generateAndStorePrescriptionPdf(data: PrescriptionPdfData,
       drawHLine(page, y);
       y -= 16;
     }
-  } else if (data.diagnosis) {
+  } else if (data.diagnosis || isCaseFileAdvisory) {
     [page, y] = needsNewPage(doc, pages, page, y, 50);
-    y = drawSectionTitle(page, "DIAGNOSIS", y, fontBold);
-    y = drawMultilineText(page, data.diagnosis, y, font);
+    y = drawSectionTitle(page, isCaseFileAdvisory ? "PROVISIONAL DIAGNOSIS" : "DIAGNOSIS", y, fontBold);
+    if (isCaseFileAdvisory) {
+      page.drawText("(Provided by Seeker Hospital)", { x: MARGIN + 10, y, size: 7.5, font: fontItalic, color: GREY });
+      y -= 11;
+    }
+    y = drawMultilineText(
+      page,
+      data.diagnosis || (isCaseFileAdvisory ? "Not provided in the Seeker Hospital booking." : ""),
+      y,
+      font,
+    );
     y -= 4;
   }
 
@@ -399,7 +424,7 @@ export async function generateAndStorePrescriptionPdf(data: PrescriptionPdfData,
 
   if (!data.prescriptionTrail?.length && data.advice) {
     [page, y] = needsNewPage(doc, pages, page, y, 50);
-    y = drawSectionTitle(page, "ADVICE", y, fontBold);
+    y = drawSectionTitle(page, isCaseFileAdvisory ? "CLINICAL ADVISORY" : "ADVICE", y, fontBold);
     y = drawMultilineText(page, data.advice, y, font);
     y -= 4;
   }
@@ -516,6 +541,11 @@ export async function generateAndStorePrescriptionPdf(data: PrescriptionPdfData,
       : `review-summary-${data.bookingId}-r${data.reviewNumber}-${Date.now()}.pdf`
     : `consultation-summary-${data.bookingId}-${Date.now()}.pdf`;
   const buffer = Buffer.from(pdfBytes);
+
+  if (options.storage === "private-case-file") {
+    const objectPath = await uploadPrivateCaseFile(buffer, fileName, "application/pdf");
+    return objectPath;
+  }
 
   const publicUrl = await supabaseUpload(buffer, fileName, "prescriptions", "application/pdf");
   console.log(`[ConsultationSummaryPDF] Uploaded to Supabase: ${publicUrl}`);

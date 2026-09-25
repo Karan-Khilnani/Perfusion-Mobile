@@ -154,7 +154,8 @@ export interface CaseFileAdvisory {
   bookingId: string;
   authorUserId: string;
   narrative: string;
-  attachmentIds?: string[];
+  /** @nullable */
+  attachmentIds?: string[] | null;
   authoredAt: string;
 }
 
@@ -282,5 +283,20 @@ cursor?: string;
  * @maximum 100
  */
 limit?: number;
+};
+
+export type GetCaseFileAttachmentSignedUrl200 = {
+  url: string;
+  /** Seconds until the URL expires */
+  expiresIn: number;
+};
+
+export type VerifyCaseFileAdvisory200 = {
+  document: 'Clinical Advisory';
+  advisoryId: string;
+  /** @nullable */
+  authorName?: string | null;
+  authoredAt: string;
+  isVerified: true;
 };
 

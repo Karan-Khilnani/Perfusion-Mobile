@@ -151,7 +151,7 @@ export const GetCaseFileResponse = zod.object({
   "bookingId": zod.string(),
   "authorUserId": zod.string(),
   "narrative": zod.string(),
-  "attachmentIds": zod.array(zod.string()).optional(),
+  "attachmentIds": zod.array(zod.string()).nullish(),
   "authoredAt": zod.coerce.date()
 })).optional()
 })
@@ -276,7 +276,7 @@ export const GetCaseFileAdvisoriesResponseItem = zod.object({
   "bookingId": zod.string(),
   "authorUserId": zod.string(),
   "narrative": zod.string(),
-  "attachmentIds": zod.array(zod.string()).optional(),
+  "attachmentIds": zod.array(zod.string()).nullish(),
   "authoredAt": zod.coerce.date()
 })
 export const GetCaseFileAdvisoriesResponse = zod.array(GetCaseFileAdvisoriesResponseItem)
@@ -343,6 +343,36 @@ export const UpdateCaseFileFollowUpAccessResponse = zod.object({
 export const DownloadCaseFileAttachmentParams = zod.object({
   "bookingId": zod.coerce.string(),
   "attachmentId": zod.coerce.string()
+})
+
+
+/**
+ * @summary Get a short-lived authorized URL for a private Case File attachment
+ */
+export const GetCaseFileAttachmentSignedUrlParams = zod.object({
+  "bookingId": zod.coerce.string(),
+  "attachmentId": zod.coerce.string()
+})
+
+export const GetCaseFileAttachmentSignedUrlResponse = zod.object({
+  "url": zod.string().url(),
+  "expiresIn": zod.number().describe('Seconds until the URL expires')
+})
+
+
+/**
+ * @summary Verify that an immutable Clinical Advisory exists
+ */
+export const VerifyCaseFileAdvisoryParams = zod.object({
+  "advisoryId": zod.coerce.string()
+})
+
+export const VerifyCaseFileAdvisoryResponse = zod.object({
+  "document": zod.literal("Clinical Advisory"),
+  "advisoryId": zod.string(),
+  "authorName": zod.string().nullish(),
+  "authoredAt": zod.coerce.date(),
+  "isVerified": zod.boolean()
 })
 
 

@@ -28,5 +28,7 @@ export * from './caseFileProfile';
 export * from './caseFileSummary';
 export * from './caseFileVital';
 export * from './caseFileVitalInput';
+export * from './getCaseFileAttachmentSignedUrl200';
 export * from './getCaseFileMessagesParams';
 export * from './healthStatus';
+export * from './verifyCaseFileAdvisory200';

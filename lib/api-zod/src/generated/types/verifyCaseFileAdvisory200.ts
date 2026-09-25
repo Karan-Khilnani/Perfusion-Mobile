@@ -6,12 +6,11 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface CaseFileAdvisory {
-  id: string;
-  bookingId: string;
-  authorUserId: string;
-  narrative: string;
+export type VerifyCaseFileAdvisory200 = {
+  document: 'Clinical Advisory';
+  advisoryId: string;
   /** @nullable */
-  attachmentIds?: string[] | null;
+  authorName?: string | null;
   authoredAt: Date;
-}
+  isVerified: true;
+};

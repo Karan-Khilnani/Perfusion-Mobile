@@ -11,7 +11,7 @@ import { fireOneBooking } from "../services/consultation-scheduler";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
-import { uploadFile as supabaseUpload, uploadPrivateCaseFile, downloadPrivateCaseFile, downloadLegacyCaseFile } from "../services/supabase-storage";
+import { uploadFile as supabaseUpload, uploadPrivateCaseFile, downloadPrivateCaseFile, downloadLegacyCaseFile, createPrivateCaseFileSignedUrl, deletePrivateCaseFile } from "../services/supabase-storage";
 import { notifyAdminLabBooking, notifyAdminConsultantBooking, notifyUserReportReady, cancelVoiceCall, triggerVoiceCall, triggerBridgeCall, formatPhoneNumber } from "../services/msg91";
 import { generateBookingNumber } from "../services/booking-number";
 import { calculateCustomerPrice, deriveMarginFromPrice, derivePriceFromMargin } from "../services/pricing";
@@ -1207,10 +1207,16 @@ export async function registerRoutes(
       if (!access.allowed) return res.status(403).json({ message: "Access denied" });
       const pool = getPool();
       const booking = access.booking as any;
-      const summary = (await pool.query(`SELECT allergies, comorbidities, presenting_complaint AS "presentingComplaint",
+      const storedSummary = (await pool.query(`SELECT allergies, comorbidities, presenting_complaint AS "presentingComplaint",
         working_diagnosis AS "workingDiagnosis", clinical_history AS "clinicalHistory",
         submitted_by_user_id AS "submittedByUserId", submitted_at AS "submittedAt"
-        FROM case_file_summaries WHERE booking_id = $1`, [booking.id])).rows[0] || {
+        FROM case_file_summaries WHERE booking_id = $1`, [booking.id])).rows[0];
+      const summary = storedSummary ? {
+        ...storedSummary,
+        presentingComplaint: booking.clinicalSummary || null,
+        workingDiagnosis: booking.provisionalDiagnosis || null,
+        clinicalHistory: booking.clinicalSummary || null,
+      } : {
         allergies: booking.patientAllergyNotSpecified ? null : booking.patientAllergies,
         comorbidities: null,
         presentingComplaint: booking.clinicalSummary || null,
@@ -1433,6 +1439,30 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/bookings/:bookingId/case-file/attachments/:attachmentId/signed-url", isAuthenticated, async (req: any, res) => {
+    try {
+      const access = await getCaseFileParticipant(req.params.bookingId, req.user);
+      if (!access.booking) return res.status(404).json({ message: "Booking not found" });
+      if (!access.allowed) return res.status(403).json({ message: "Access denied" });
+      const row = (await getPool().query(
+        "SELECT object_path, original_filename FROM case_file_attachments WHERE id = $1 AND booking_id = $2",
+        [req.params.attachmentId, access.booking.id],
+      )).rows[0];
+      if (!row?.object_path) return res.status(404).json({ message: "Private attachment not found" });
+      const expiresIn = 300;
+      const downloadName = String(row.original_filename || "clinical-advisory.pdf").replace(/["\r\n\\/]/g, "_");
+      const url = await createPrivateCaseFileSignedUrl(
+        String(row.object_path),
+        expiresIn,
+        downloadName,
+      );
+      res.json({ url, expiresIn });
+    } catch (error) {
+      req.log?.error({ err: error }, "Case File signed download link failed");
+      res.status(500).json({ message: "Failed to create a private download link" });
+    }
+  });
+
   app.post("/api/bookings/:bookingId/case-file/advisories", isAuthenticated, async (req: any, res) => {
     try {
       const access = await getCaseFileParticipant(req.params.bookingId, req.user);
@@ -1443,28 +1473,128 @@ export async function registerRoutes(
       if (!narrative) return res.status(400).json({ message: "Narrative is required" });
       if (narrative.length > 20000) return res.status(400).json({ message: "Narrative must be 20,000 characters or fewer" });
       const id = randomUUID();
-      const attachmentIds = Array.isArray(req.body?.attachmentIds) ? req.body.attachmentIds : [];
+      const pdfAttachmentId = randomUUID();
+      const requestedAttachmentIds = Array.isArray(req.body?.attachmentIds)
+        ? req.body.attachmentIds.filter((attachmentId: unknown): attachmentId is string => typeof attachmentId === "string")
+        : [];
+      const attachmentIds = [...new Set([pdfAttachmentId, ...requestedAttachmentIds])];
       const messageId = randomUUID();
+      const authoredAt = new Date();
+      const booking = access.booking as any;
+      const consultant = booking.serviceId ? await storage.getConsultantById(booking.serviceId) : null;
+      const bookingUser = await storage.getUserById(booking.userId);
+      const providerDisplayName = [req.user.firstName, req.user.lastName].filter(Boolean).join(" ")
+        || req.user.email
+        || consultant?.name
+        || booking.providerName
+        || "Perfusion Provider";
+      const protocol = req.headers["x-forwarded-proto"] || "https";
+      const host = req.headers.host || "localhost:5000";
+      const baseUrl = process.env.REPLIT_DEV_DOMAIN
+        ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+        : `${protocol}://${host}`;
+      const bookingNumber = booking.bookingNumber || `PFN-${String(booking.id).substring(0, 8).toUpperCase()}`;
+      const originalFilename = `clinical-advisory-${String(bookingNumber).replace(/[^a-zA-Z0-9._-]/g, "_")}.pdf`;
+      let privateObjectPath: string | null = null;
+      try {
+        const pdfData: PrescriptionPdfData = {
+          bookingId: booking.id,
+          bookingNumber,
+          approvedAt: authoredAt,
+          approverIp: req.ip || req.socket?.remoteAddress || "unknown",
+          referringFacility: bookingUser?.hospitalName || null,
+          referringPhysician: booking.referringPhysician || null,
+          onCallDoctorName: booking.onCallDoctorName || null,
+          onCallDoctorDesignation: booking.onCallDoctorDesignation || null,
+          patientName: booking.patientName,
+          patientAge: Number(booking.patientAge) || 0,
+          patientGender: booking.patientGender || null,
+          uhidIpNumber: booking.uhidIpNumber || null,
+          patientContact: booking.patientContact || null,
+          patientWeight: booking.patientWeight || null,
+          patientAllergies: booking.patientAllergyNotSpecified ? null : booking.patientAllergies || null,
+          patientAllergyNotSpecified: booking.patientAllergyNotSpecified ?? true,
+          consultantName: consultant?.name || providerDisplayName,
+          consultantSpecialization: consultant?.specialization || null,
+          consultantQualification: consultant?.qualification || booking.providerName || null,
+          consultantRegistrationNo: consultant?.registrationNumber || null,
+          consultantYearsExperience: consultant?.yearsExperience || null,
+          consultantAffiliation: consultant?.affiliatedInstitution || null,
+          consultantSignatureUrl: consultant?.digitalSignatureUrl || null,
+          clinicalHistory: booking.clinicalSummary || null,
+          examination: null,
+          investigations: null,
+          diagnosis: booking.provisionalDiagnosis || null,
+          physicianNotes: null,
+          treatmentPlan: null,
+          followUp: null,
+          advice: narrative,
+          documentMode: "case-file-advisory",
+          verificationUrl: `${baseUrl}/api/verify/case-file-advisory/${id}`,
+        };
+        privateObjectPath = await generateAndStorePrescriptionPdf(
+          pdfData,
+          baseUrl,
+          { storage: "private-case-file" },
+        );
+      } catch (error) {
+        req.log?.error({ err: error }, "Private Clinical Advisory PDF generation failed");
+        return res.status(503).json({ message: "Private PDF storage is unavailable. The Clinical Advisory was not saved." });
+      }
+
       const pool = getPool();
-      const client = await pool.connect();
+      let client: any = null;
       let result: any;
       try {
+        client = await pool.connect();
         await client.query("BEGIN");
-        result = (await client.query(`INSERT INTO case_file_advisories (id, booking_id, author_user_id, narrative, attachment_ids) VALUES ($1,$2,$3,$4,$5) RETURNING id, booking_id AS "bookingId", author_user_id AS "authorUserId", narrative, attachment_ids AS "attachmentIds", authored_at AS "authoredAt"`, [id, access.booking.id, req.user.id, narrative, attachmentIds])).rows[0];
-        await client.query("INSERT INTO case_file_messages (id, booking_id, sender_user_id, sender_role, kind, body) VALUES ($1,$2,$3,$4,'clinical_advisory_reference',$5)", [messageId, access.booking.id, req.user.id, req.user.role, JSON.stringify({ advisoryId: id, narrative })]);
+        result = (await client.query(`INSERT INTO case_file_advisories (id, booking_id, author_user_id, narrative, attachment_ids, authored_at) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id, booking_id AS "bookingId", author_user_id AS "authorUserId", narrative, attachment_ids AS "attachmentIds", authored_at AS "authoredAt"`, [id, booking.id, req.user.id, narrative, attachmentIds, authoredAt])).rows[0];
+        await client.query("INSERT INTO case_file_messages (id, booking_id, sender_user_id, sender_role, kind, body, created_at) VALUES ($1,$2,$3,$4,'clinical_advisory_reference',$5,$6)", [messageId, booking.id, req.user.id, req.user.role, JSON.stringify({ advisoryId: id, narrative }), authoredAt]);
+        await client.query(
+          "INSERT INTO case_file_attachments (id, booking_id, message_id, uploader_user_id, uploader_role, original_filename, mime_type, byte_size, object_path, source, category, created_at) VALUES ($1,$2,NULL,$3,$4,$5,'application/pdf',NULL,$6,'document','uncategorized',$7)",
+          [pdfAttachmentId, booking.id, req.user.id, req.user.role, originalFilename, privateObjectPath, authoredAt],
+        );
         await client.query("COMMIT");
       } catch (error) {
-        await client.query("ROLLBACK");
+        if (client) await client.query("ROLLBACK").catch(() => {});
+        if (privateObjectPath) {
+          await deletePrivateCaseFile(privateObjectPath).catch((cleanupError) => {
+            req.log?.error({ err: cleanupError, objectPath: privateObjectPath }, "Failed to clean up unlinked Clinical Advisory PDF");
+          });
+        }
         throw error;
       } finally {
-        client.release();
+        client?.release();
       }
-      broadcastCaseFileUpdate(access.booking, { type: "case_file_updated", bookingId: access.booking.id, change: "advisory_added", advisoryId: id });
-      broadcastCaseFileUpdate(access.booking, { type: "case_file_updated", bookingId: access.booking.id, change: "message_created", messageId });
+      broadcastCaseFileUpdate(booking, { type: "case_file_updated", bookingId: booking.id, change: "advisory_added", advisoryId: id });
+      broadcastCaseFileUpdate(booking, { type: "case_file_updated", bookingId: booking.id, change: "message_created", messageId });
       res.status(201).json(result);
     } catch (error) {
       req.log?.error({ err: error }, "Case File Advisory failed");
       res.status(500).json({ message: "Failed to add Clinical Advisory" });
+    }
+  });
+
+  app.get("/api/verify/case-file-advisory/:advisoryId", async (req: any, res) => {
+    try {
+      const advisory = (await getPool().query(
+        `SELECT id, author_user_id AS "authorUserId", authored_at AS "authoredAt"
+         FROM case_file_advisories WHERE id = $1`,
+        [req.params.advisoryId],
+      )).rows[0];
+      if (!advisory) return res.status(404).json({ message: "Clinical Advisory not found" });
+      const author = await storage.getUserById(advisory.authorUserId);
+      const authorName = [author?.firstName, author?.lastName].filter(Boolean).join(" ") || null;
+      res.json({
+        document: "Clinical Advisory",
+        advisoryId: advisory.id,
+        authorName,
+        authoredAt: advisory.authoredAt,
+        isVerified: true,
+      });
+    } catch (error) {
+      req.log?.error({ err: error }, "Case File Clinical Advisory verification failed");
+      res.status(500).json({ message: "Failed to verify Clinical Advisory" });
     }
   });
 

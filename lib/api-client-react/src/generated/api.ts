@@ -35,8 +35,10 @@ import type {
   CaseFileMessagesResponse,
   CaseFileVital,
   CaseFileVitalInput,
+  GetCaseFileAttachmentSignedUrl200,
   GetCaseFileMessagesParams,
-  HealthStatus
+  HealthStatus,
+  VerifyCaseFileAdvisory200
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
@@ -1189,6 +1191,165 @@ export function useDownloadCaseFileAttachment<TData = Awaited<ReturnType<typeof 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getDownloadCaseFileAttachmentQueryOptions(bookingId,attachmentId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetCaseFileAttachmentSignedUrlUrl = (bookingId: string,
+    attachmentId: string,) => {
+
+
+
+
+  return `/api/bookings/${bookingId}/case-file/attachments/${attachmentId}/signed-url`
+}
+
+/**
+ * @summary Get a short-lived authorized URL for a private Case File attachment
+ */
+export const getCaseFileAttachmentSignedUrl = async (bookingId: string,
+    attachmentId: string, options?: RequestInit): Promise<GetCaseFileAttachmentSignedUrl200> => {
+
+  return customFetch<GetCaseFileAttachmentSignedUrl200>(getGetCaseFileAttachmentSignedUrlUrl(bookingId,attachmentId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetCaseFileAttachmentSignedUrlQueryKey = (bookingId: string,
+    attachmentId: string,) => {
+    return [
+    `/api/bookings/${bookingId}/case-file/attachments/${attachmentId}/signed-url`
+    ] as const;
+    }
+
+
+export const getGetCaseFileAttachmentSignedUrlQueryOptions = <TData = Awaited<ReturnType<typeof getCaseFileAttachmentSignedUrl>>, TError = ErrorType<void>>(bookingId: string,
+    attachmentId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCaseFileAttachmentSignedUrl>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCaseFileAttachmentSignedUrlQueryKey(bookingId,attachmentId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCaseFileAttachmentSignedUrl>>> = ({ signal }) => getCaseFileAttachmentSignedUrl(bookingId,attachmentId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(bookingId && attachmentId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCaseFileAttachmentSignedUrl>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetCaseFileAttachmentSignedUrlQueryResult = NonNullable<Awaited<ReturnType<typeof getCaseFileAttachmentSignedUrl>>>
+export type GetCaseFileAttachmentSignedUrlQueryError = ErrorType<void>
+
+
+/**
+ * @summary Get a short-lived authorized URL for a private Case File attachment
+ */
+
+export function useGetCaseFileAttachmentSignedUrl<TData = Awaited<ReturnType<typeof getCaseFileAttachmentSignedUrl>>, TError = ErrorType<void>>(
+ bookingId: string,
+    attachmentId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCaseFileAttachmentSignedUrl>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetCaseFileAttachmentSignedUrlQueryOptions(bookingId,attachmentId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getVerifyCaseFileAdvisoryUrl = (advisoryId: string,) => {
+
+
+
+
+  return `/api/verify/case-file-advisory/${advisoryId}`
+}
+
+/**
+ * @summary Verify that an immutable Clinical Advisory exists
+ */
+export const verifyCaseFileAdvisory = async (advisoryId: string, options?: RequestInit): Promise<VerifyCaseFileAdvisory200> => {
+
+  return customFetch<VerifyCaseFileAdvisory200>(getVerifyCaseFileAdvisoryUrl(advisoryId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getVerifyCaseFileAdvisoryQueryKey = (advisoryId: string,) => {
+    return [
+    `/api/verify/case-file-advisory/${advisoryId}`
+    ] as const;
+    }
+
+
+export const getVerifyCaseFileAdvisoryQueryOptions = <TData = Awaited<ReturnType<typeof verifyCaseFileAdvisory>>, TError = ErrorType<void>>(advisoryId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof verifyCaseFileAdvisory>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getVerifyCaseFileAdvisoryQueryKey(advisoryId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof verifyCaseFileAdvisory>>> = ({ signal }) => verifyCaseFileAdvisory(advisoryId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(advisoryId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof verifyCaseFileAdvisory>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type VerifyCaseFileAdvisoryQueryResult = NonNullable<Awaited<ReturnType<typeof verifyCaseFileAdvisory>>>
+export type VerifyCaseFileAdvisoryQueryError = ErrorType<void>
+
+
+/**
+ * @summary Verify that an immutable Clinical Advisory exists
+ */
+
+export function useVerifyCaseFileAdvisory<TData = Awaited<ReturnType<typeof verifyCaseFileAdvisory>>, TError = ErrorType<void>>(
+ advisoryId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof verifyCaseFileAdvisory>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getVerifyCaseFileAdvisoryQueryOptions(advisoryId,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

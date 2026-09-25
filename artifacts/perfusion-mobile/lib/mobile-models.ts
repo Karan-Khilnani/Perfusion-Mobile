@@ -94,6 +94,7 @@ export type Advisory = {
   narrative: string;
   authoredAt: string;
   authorUserId?: string;
+  attachmentIds?: string[] | null;
 };
 
 export type CaseFileAggregate = {
