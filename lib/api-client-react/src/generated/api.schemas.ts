@@ -243,6 +243,23 @@ export const CaseFileAggregateLatestVitalsFreshness = {
   stale: 'stale',
 } as const;
 
+export type CaseFileAggregateBookingStatus = typeof CaseFileAggregateBookingStatus[keyof typeof CaseFileAggregateBookingStatus];
+
+
+export const CaseFileAggregateBookingStatus = {
+  booked: 'booked',
+  scheduled: 'scheduled',
+  ongoing: 'ongoing',
+  paused: 'paused',
+  sample_collected: 'sample_collected',
+  processing: 'processing',
+  report_ready: 'report_ready',
+  completed: 'completed',
+  cancelled: 'cancelled',
+  in_transit: 'in_transit',
+  arrived: 'arrived',
+} as const;
+
 export interface CaseFileAggregateBooking {
   id: string;
   /** @nullable */
@@ -256,7 +273,7 @@ export interface CaseFileAggregateBooking {
   serviceName: string;
   /** @nullable */
   appointmentSlot: string | null;
-  status: string;
+  status: CaseFileAggregateBookingStatus;
   bookingType: string;
   userId: string;
   /** @nullable */
@@ -275,6 +292,26 @@ export interface CaseFileAggregate {
   latestVitalsFreshness?: CaseFileAggregateLatestVitalsFreshness;
   advisories?: CaseFileAdvisory[];
 }
+
+export type UpdateBookingStatusBodyStatus = typeof UpdateBookingStatusBodyStatus[keyof typeof UpdateBookingStatusBodyStatus];
+
+
+export const UpdateBookingStatusBodyStatus = {
+  booked: 'booked',
+  ongoing: 'ongoing',
+  paused: 'paused',
+  sample_collected: 'sample_collected',
+  processing: 'processing',
+  report_ready: 'report_ready',
+  completed: 'completed',
+  cancelled: 'cancelled',
+  in_transit: 'in_transit',
+  arrived: 'arrived',
+} as const;
+
+export type UpdateBookingStatusBody = {
+  status: UpdateBookingStatusBodyStatus;
+};
 
 export type GetCaseFileMessagesParams = {
 cursor?: string;

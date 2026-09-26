@@ -242,7 +242,7 @@ export const transportServices = pgTable("transport_services", {
 });
 
 // Booking status type
-export type BookingStatus = "booked" | "sample_collected" | "processing" | "report_ready" | "completed" | "cancelled" | "in_transit" | "arrived";
+export type BookingStatus = "booked" | "ongoing" | "paused" | "sample_collected" | "processing" | "report_ready" | "completed" | "cancelled" | "in_transit" | "arrived";
 export type BookingType = "lab" | "consultation" | "teleradiology";
 export type PatientGender = "male" | "female" | "other";
 export type UrgencyType = "routine" | "emergency";

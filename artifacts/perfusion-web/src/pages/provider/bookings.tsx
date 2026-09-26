@@ -668,24 +668,9 @@ export default function ProviderBookingsPage() {
               <PostRxToggles booking={booking} />
             </div>
 
-            <Select
-              value={booking.status}
-              onValueChange={(value) =>
-                updateStatusMutation.mutate({ id: booking.id, status: value as BookingStatus })
-              }
-              disabled={updateStatusMutation.isPending}
-            >
-              <SelectTrigger className="w-full sm:w-auto mt-2" data-testid={`select-status-consultation-${booking.id}`}>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {statusOptions.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Consultation status follows its schedule.
+            </p>
           </div>
         )}
 

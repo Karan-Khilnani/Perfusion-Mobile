@@ -184,13 +184,15 @@ export default function CaseFileScreen() {
   }
 
   const caseFile = aggregate.data!;
-  const status = statusPresentation(booking.status, {
-    success: palette.success,
-    terminal: palette.terminal,
-    warning: palette.warning,
-    quiet: palette.quiet,
-    blue: palette.blue,
-  });
+  const status = booking.consultationLifecycleAvailable === false
+    ? { label: "Schedule unavailable", dot: palette.warning, text: palette.warning }
+    : statusPresentation(booking.status, {
+        success: palette.success,
+        terminal: palette.terminal,
+        warning: palette.warning,
+        quiet: palette.quiet,
+        blue: palette.blue,
+      });
   const latest = caseFile.latestVitals;
   const staleness = caseFile.latestVitalsFreshness || "stale";
   const freshnessColor = staleness === "fresh" ? palette.success : staleness === "aging" ? palette.warning : palette.primary;
@@ -225,14 +227,16 @@ export default function CaseFileScreen() {
 
       <View style={[styles.statusBar, { backgroundColor: palette.conversationSoft, borderBottomColor: palette.conversationBorder }]}>
         <View style={[styles.statusDot, { backgroundColor: status.dot }]} />
-        <Text style={[styles.statusLabel, { color: status.text }]}>{status.label} consultation</Text>
-        {seeker ? (
-          <Text style={[styles.readOnly, { color: palette.mutedForeground }]}>Case File</Text>
-        ) : capabilities.canToggleFollowUp ? (
-          <FollowUpControl bookingId={bookingId} active={booking.postRxCallsEnabled || booking.postRxVideoEnabled} />
-        ) : (
-          <Text style={[styles.readOnly, { color: palette.mutedForeground }]}>Read only</Text>
-        )}
+        <Text style={[styles.statusLabel, { color: status.text }]}>
+          {booking.consultationLifecycleAvailable === false ? "Schedule unavailable" : `${status.label} consultation`}
+        </Text>
+        <Text style={[styles.readOnly, { color: palette.mutedForeground }]}>
+          {booking.consultationLifecycleAvailable === false
+            ? "Time needs review"
+            : capabilities.readOnly
+              ? "Read only"
+              : "Case File"}
+        </Text>
       </View>
       {callError && <Text style={[styles.callError, { color: palette.primary, backgroundColor: palette.conversationCard }]} accessibilityRole="alert">{callError}</Text>}
 
@@ -383,23 +387,6 @@ function VitalCell({ label, value, detail }: { label: string; value: string; det
       <Text style={[styles.vitalValue, { color: palette.foreground }]}>{value}</Text>
       <Text style={[styles.vitalDetail, { color: palette.mutedForeground }]}>{detail}</Text>
     </View>
-  );
-}
-
-function FollowUpControl({ bookingId, active }: { bookingId: string; active: boolean }) {
-  const palette = useColors();
-  const queryClient = useQueryClient();
-  const mutation = useMutation({
-    mutationFn: () => requestJson(`/api/bookings/${bookingId}/case-file/follow-up-access`, {
-      method: "PATCH",
-      body: JSON.stringify({ callsEnabled: !active, videoEnabled: !active }),
-    }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["case-file", bookingId] }),
-  });
-  return (
-    <Pressable onPress={() => mutation.mutate()} disabled={mutation.isPending}>
-      <Text style={[styles.followUp, { color: active ? palette.quiet : palette.warning }]}>{active ? "Ongoing" : "Paused"}</Text>
-    </Pressable>
   );
 }
 

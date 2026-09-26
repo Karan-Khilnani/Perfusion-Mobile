@@ -38,6 +38,7 @@ import type {
   GetCaseFileAttachmentSignedUrl200,
   GetCaseFileMessagesParams,
   HealthStatus,
+  UpdateBookingStatusBody,
   VerifyCaseFileAdvisory200
 } from './api.schemas';
 
@@ -355,6 +356,78 @@ export function useGetBookingById<TData = Awaited<ReturnType<typeof getBookingBy
 
 
 
+
+export const getUpdateBookingStatusUrl = (id: string,) => {
+
+
+
+
+  return `/api/bookings/${id}/status`
+}
+
+/**
+ * @summary Update a booking status; consultations only allow pause or resume
+ */
+export const updateBookingStatus = async (id: string,
+    updateBookingStatusBody: UpdateBookingStatusBody, options?: RequestInit): Promise<BookingCallInfo> => {
+
+  return customFetch<BookingCallInfo>(getUpdateBookingStatusUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      updateBookingStatusBody,)
+  }
+);}
+
+
+
+
+export const getUpdateBookingStatusMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateBookingStatus>>, TError,{id: string;data: BodyType<UpdateBookingStatusBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateBookingStatus>>, TError,{id: string;data: BodyType<UpdateBookingStatusBody>}, TContext> => {
+
+const mutationKey = ['updateBookingStatus'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateBookingStatus>>, {id: string;data: BodyType<UpdateBookingStatusBody>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateBookingStatus(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateBookingStatusMutationResult = NonNullable<Awaited<ReturnType<typeof updateBookingStatus>>>
+    export type UpdateBookingStatusMutationBody = BodyType<UpdateBookingStatusBody>
+    export type UpdateBookingStatusMutationError = ErrorType<void>
+
+    /**
+ * @summary Update a booking status; consultations only allow pause or resume
+ */
+export const useUpdateBookingStatus = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateBookingStatus>>, TError,{id: string;data: BodyType<UpdateBookingStatusBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateBookingStatus>>,
+        TError,
+        {id: string;data: BodyType<UpdateBookingStatusBody>},
+        TContext
+      > => {
+      return useMutation(getUpdateBookingStatusMutationOptions(options));
+    }
 
 export const getGetCallStatusUrl = (bookingId: string,) => {
 

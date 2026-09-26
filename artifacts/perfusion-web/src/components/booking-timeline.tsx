@@ -16,7 +16,9 @@ const labSteps = [
 
 const consultationSteps = [
   { key: "booked", label: "Appointment Booked" },
-  { key: "processing", label: "In Progress" },
+  { key: "scheduled", label: "Scheduled" },
+  { key: "ongoing", label: "Ongoing" },
+  { key: "paused", label: "Paused" },
   { key: "completed", label: "Completed" },
 ];
 

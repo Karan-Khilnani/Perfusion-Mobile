@@ -6,6 +6,7 @@
 - [Code backup scope](code-backup-policy.md) — code snapshots include source and project assets, but exclude runtime uploads, historical backups, dependencies, secrets, and Git metadata.
 - [Shared mobile backend](shared-mobile-backend.md) — web and mobile use one API and database; clients never connect directly to PostgreSQL or maintain parallel user/booking data.
 - [Consultation call routing](consultation-call-routing.md) — web voice/video calls use the in-app ring and Daily room flow; Ward Contacts and cellular bridge remain dormant fallback data.
+- [Consultation lifecycle authority](consultation-lifecycle-authority.md) — server derives status from an explicit IST schedule; pause is stored in booking status, and unresolved schedules fail closed.
 - [Mobile Callback Device](mobile-callback-device.md) — keep account-level fallback phone separate from patient emergency contacts, ward contacts, and booking-specific callback numbers.
 - [Android EAS Gradle logs](android-eas-gradle-logs.md) — EAS build log files may be Brotli-encoded despite a .txt extension; decode before diagnosing native failures.
 - [Expo native startup](expo-native-startup.md) — native OnCreate can run before JavaScript imports or login; inspect APK configuration and lifecycle, not just build success.

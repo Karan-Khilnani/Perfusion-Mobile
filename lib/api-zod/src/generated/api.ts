@@ -66,6 +66,26 @@ export const GetBookingByIdResponse = zod.object({
 
 
 /**
+ * @summary Update a booking status; consultations only allow pause or resume
+ */
+export const UpdateBookingStatusParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const UpdateBookingStatusBody = zod.object({
+  "status": zod.enum(['booked', 'ongoing', 'paused', 'sample_collected', 'processing', 'report_ready', 'completed', 'cancelled', 'in_transit', 'arrived'])
+})
+
+export const UpdateBookingStatusResponse = zod.object({
+  "id": zod.string(),
+  "serviceName": zod.string().nullish(),
+  "patientName": zod.string().nullish(),
+  "videoRoomId": zod.string().nullish(),
+  "status": zod.string()
+})
+
+
+/**
  * @summary Get the current call-session status
  */
 export const GetCallStatusParams = zod.object({
@@ -96,7 +116,7 @@ export const GetCaseFileResponse = zod.object({
   "providerName": zod.string().nullable(),
   "serviceName": zod.string(),
   "appointmentSlot": zod.string().nullable(),
-  "status": zod.string(),
+  "status": zod.enum(['booked', 'scheduled', 'ongoing', 'paused', 'sample_collected', 'processing', 'report_ready', 'completed', 'cancelled', 'in_transit', 'arrived']),
   "bookingType": zod.string(),
   "userId": zod.string(),
   "providerId": zod.string().nullable(),

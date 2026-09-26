@@ -80,6 +80,38 @@ paths:
           description: Access denied
         "404":
           description: Booking not found
+  /bookings/{id}/status:
+    patch:
+      operationId: updateBookingStatus
+      tags: [bookings]
+      summary: Update a booking status; consultations only allow pause or resume
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [booked, ongoing, paused, sample_collected, processing, report_ready, completed, cancelled, in_transit, arrived]
+      responses:
+        "200":
+          description: Updated booking status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookingCallInfo"
+        "400": { description: Invalid consultation status }
+        "403": { description: Only the assigned Provider may pause or resume }
+        "409": { description: Consultation is not within its active window }
   /call/status/{bookingId}:
     get:
       operationId: getCallStatus
@@ -557,7 +589,9 @@ components:
         providerName: { type: ["string", "null"] }
         serviceName: { type: string }
         appointmentSlot: { type: ["string", "null"] }
-        status: { type: string }
+        status:
+          type: string
+          enum: [booked, scheduled, ongoing, paused, sample_collected, processing, report_ready, completed, cancelled, in_transit, arrived]
         bookingType: { type: string }
         userId: { type: string }
         providerId: { type: ["string", "null"] }

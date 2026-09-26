@@ -22,6 +22,7 @@ export type Booking = {
   city?: string | null;
   hospitalName?: string | null;
   videoRoomId?: string | null;
+  consultationLifecycleAvailable?: boolean;
   amount?: string | null;
   isFollowUp?: boolean;
   prescriptionApprovedAt?: string | null;
@@ -130,6 +131,9 @@ export function statusPresentation(status: string, colors: Record<string, string
   }
   if (normalized === "missed") {
     return { label: "Missed", dot: colors.warning, text: colors.warning };
+  }
+  if (normalized === "paused") {
+    return { label: "Paused", dot: colors.warning, text: colors.warning };
   }
   if (normalized === "ongoing" || normalized === "in_progress" || normalized === "processing") {
     return { label: "Ongoing", dot: colors.quiet, text: colors.quiet };

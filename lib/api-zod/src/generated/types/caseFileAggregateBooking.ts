@@ -5,6 +5,7 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { CaseFileAggregateBookingStatus } from './caseFileAggregateBookingStatus';
 
 export interface CaseFileAggregateBooking {
   id: string;
@@ -19,7 +20,7 @@ export interface CaseFileAggregateBooking {
   serviceName: string;
   /** @nullable */
   appointmentSlot: string | null;
-  status: string;
+  status: CaseFileAggregateBookingStatus;
   bookingType: string;
   userId: string;
   /** @nullable */

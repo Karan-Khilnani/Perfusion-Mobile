@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
 import React from "react";
 import {
+  Alert,
   ActivityIndicator,
   Platform,
   Pressable,
@@ -59,17 +60,24 @@ export default function DashboardScreen() {
     })
     .slice(0, 20);
 
-  const followUp = useMutation({
+  const consultationStatus = useMutation({
     mutationFn: async (booking: Booking) => {
-      const enabled = !(booking.postRxCallsEnabled !== false || booking.postRxVideoEnabled !== false);
-      const response = await apiFetch(`/api/bookings/${booking.id}/case-file/follow-up-access`, {
+      const status = booking.status.toLowerCase() === "paused" ? "ongoing" : "paused";
+      const response = await apiFetch(`/api/bookings/${booking.id}/status`, {
         method: "PATCH",
-        body: JSON.stringify({ callsEnabled: enabled, videoEnabled: enabled }),
+        body: JSON.stringify({ status }),
       });
-      if (!response.ok) throw new Error("Could not update follow-up access");
-      return response.json();
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error || result.message || "Could not update consultation status");
+      return result;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["consultations", user?.role] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["consultations", user?.role] });
+      queryClient.invalidateQueries({ queryKey: ["case-file"] });
+    },
+    onError: (error) => {
+      Alert.alert("Status not updated", error instanceof Error ? error.message : "Please try again.");
+    },
   });
 
   const liveCount = bookings.filter((item) => ["ongoing", "in_progress", "processing"].includes(item.status)).length;
@@ -166,7 +174,12 @@ export default function DashboardScreen() {
           </View>
         ) : (
           bookings.map((booking) => (
-            <BookingCard key={booking.id} booking={booking} onPauseToggle={seeker ? undefined : (value) => followUp.mutate(value)} />
+            <BookingCard
+              key={booking.id}
+              booking={booking}
+              onStatusToggle={user?.role === "provider" ? (value) => consultationStatus.mutate(value) : undefined}
+              statusTogglePending={consultationStatus.isPending}
+            />
           ))
         )}
       </View>

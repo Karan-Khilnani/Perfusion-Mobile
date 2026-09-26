@@ -22,6 +22,7 @@ import { generateAndStoreAgreementPdf, type AgreementPdfData } from "../services
 import { AGREEMENT_VERSION, AGREEMENT_FULL_TEXT, partnerTypeLabel } from "../services/agreement-text";
 import { sendPushNotification, getVapidPublicKey, type PushPayload } from "../services/push-notifications";
 import { getCallWindow } from "../services/call-window";
+import { resolveConsultationLifecycle } from "../services/consultation-lifecycle";
 import { notifyMobileIncomingCall } from "../services/mobile-call-push";
 import { randomUUID } from "crypto";
 
@@ -57,7 +58,23 @@ async function getCaseFileParticipant(bookingId: string, user: any) {
 }
 
 function caseFileReadOnly(booking: any) {
-  return CASE_FILE_CLOSED_STATUSES.has(String(booking?.status || "").toLowerCase());
+  const storedStatus = String(booking?.status || "").toLowerCase();
+  if (CASE_FILE_CLOSED_STATUSES.has(storedStatus)) return true;
+  if (booking?.bookingType !== "consultation") return false;
+  const lifecycle = resolveConsultationLifecycle(booking);
+  return !lifecycle.scheduleAvailable || lifecycle.status === "completed" || lifecycle.status === "cancelled";
+}
+
+function withConsultationLifecycle(booking: any) {
+  if (booking?.bookingType !== "consultation") return booking;
+  const lifecycle = resolveConsultationLifecycle(booking);
+  return {
+    ...booking,
+    status: lifecycle.status,
+    consultationLifecycleAvailable: lifecycle.scheduleAvailable,
+    postRxCallsEnabled: lifecycle.scheduleAvailable && lifecycle.status === "ongoing",
+    postRxVideoEnabled: lifecycle.scheduleAvailable && lifecycle.status === "ongoing",
+  };
 }
 
 function caseFileFreshness(observedAt: Date | string | null) {
@@ -1000,7 +1017,7 @@ export async function registerRoutes(
         }
         return b;
       }));
-      res.json(enriched);
+      res.json(enriched.map(withConsultationLifecycle));
     } catch (error) {
       console.error("Error fetching bookings:", error);
       res.status(500).json({ message: "Failed to fetch bookings" });
@@ -1039,7 +1056,11 @@ export async function registerRoutes(
           (b.status === "report_ready" || !!b.processedReportUrl)
       );
 
-      res.json({ activeConsultations, readyReports, signedPrescriptions: [] });
+      res.json({
+        activeConsultations: activeConsultations.map(withConsultationLifecycle),
+        readyReports,
+        signedPrescriptions: [],
+      });
     } catch (error) {
       console.error("Error fetching dashboard data:", error);
       res.status(500).json({ message: "Failed to fetch dashboard data" });
@@ -1192,7 +1213,7 @@ export async function registerRoutes(
         return res.status(403).json({ message: "Access denied" });
       }
 
-      return res.json(booking);
+      return res.json(withConsultationLifecycle(booking));
     } catch (error) {
       return res.status(500).json({ message: "Failed to fetch booking" });
     }
@@ -1207,6 +1228,9 @@ export async function registerRoutes(
       if (!access.allowed) return res.status(403).json({ message: "Access denied" });
       const pool = getPool();
       const booking = access.booking as any;
+      const lifecycle = booking.bookingType === "consultation"
+        ? resolveConsultationLifecycle(booking)
+        : null;
       const storedSummary = (await pool.query(`SELECT allergies, comorbidities, presenting_complaint AS "presentingComplaint",
         working_diagnosis AS "workingDiagnosis", clinical_history AS "clinicalHistory",
         submitted_by_user_id AS "submittedByUserId", submitted_at AS "submittedAt"
@@ -1247,12 +1271,17 @@ export async function registerRoutes(
         providerName: booking.providerName || null,
         serviceName: booking.serviceName,
         appointmentSlot: booking.appointmentSlot || null,
-        status: booking.status,
+        status: lifecycle?.status || booking.status,
+        consultationLifecycleAvailable: lifecycle?.scheduleAvailable,
         bookingType: booking.bookingType,
         userId: booking.userId,
         providerId: booking.providerId || null,
-        postRxCallsEnabled: Boolean(booking.postRxCallsEnabled),
-        postRxVideoEnabled: Boolean(booking.postRxVideoEnabled),
+        postRxCallsEnabled: lifecycle
+          ? lifecycle.scheduleAvailable && lifecycle.status === "ongoing"
+          : Boolean(booking.postRxCallsEnabled),
+        postRxVideoEnabled: lifecycle
+          ? lifecycle.scheduleAvailable && lifecycle.status === "ongoing"
+          : Boolean(booking.postRxVideoEnabled),
       };
       res.json({
         booking: caseFileBooking,
@@ -1268,8 +1297,12 @@ export async function registerRoutes(
           canComposeAdvisory: !readOnly && access.isProvider,
           canToggleFollowUp: !readOnly && access.isProvider,
           readOnly,
-          callsEnabled: !!booking.postRxCallsEnabled,
-          videoEnabled: !!booking.postRxVideoEnabled,
+          callsEnabled: lifecycle
+            ? lifecycle.scheduleAvailable && lifecycle.status === "ongoing"
+            : !!booking.postRxCallsEnabled,
+          videoEnabled: lifecycle
+            ? lifecycle.scheduleAvailable && lifecycle.status === "ongoing"
+            : !!booking.postRxVideoEnabled,
           providerUserId: providerUser || null,
         },
       });
@@ -1648,6 +1681,37 @@ export async function registerRoutes(
       if (!access.booking) return res.status(404).json({ message: "Booking not found" });
       if (!access.allowed || !access.isProvider) return res.status(403).json({ message: "Only the assigned Provider may update follow-up access" });
       if (caseFileReadOnly(access.booking)) return res.status(403).json({ message: "This Case File is read-only" });
+      if (access.booking.bookingType === "consultation") {
+        const callsEnabled = req.body?.callsEnabled;
+        const videoEnabled = req.body?.videoEnabled;
+        if (typeof callsEnabled !== "boolean" && typeof videoEnabled !== "boolean") {
+          return res.status(400).json({ message: "callsEnabled or videoEnabled is required" });
+        }
+        if (typeof callsEnabled === "boolean" && typeof videoEnabled === "boolean" && callsEnabled !== videoEnabled) {
+          return res.status(400).json({ message: "Consultation calls and video share one lifecycle status." });
+        }
+
+        const lifecycle = resolveConsultationLifecycle(access.booking);
+        if (!lifecycle.scheduleAvailable || !["ongoing", "paused"].includes(lifecycle.status)) {
+          return res.status(409).json({ message: "Only an active consultation can be paused or resumed." });
+        }
+        const shouldEnableCalls = callsEnabled ?? videoEnabled;
+        const nextStatus = shouldEnableCalls ? "ongoing" : "paused";
+        const updated = await storage.updateBooking(access.booking.id, { status: nextStatus });
+        if (!updated) return res.status(404).json({ message: "Booking not found" });
+        broadcastCaseFileUpdate(updated, { type: "case_file_updated", bookingId: updated.id, change: "consultation_status_changed" });
+        const isOngoing = resolveConsultationLifecycle(updated).status === "ongoing";
+        return res.json({
+          canMessage: true,
+          canAttach: true,
+          canAddVitals: false,
+          canComposeAdvisory: true,
+          canToggleFollowUp: true,
+          readOnly: false,
+          callsEnabled: isOngoing,
+          videoEnabled: isOngoing,
+        });
+      }
       const patch: Record<string, boolean> = {};
       if (typeof req.body?.callsEnabled === "boolean") patch.postRxCallsEnabled = req.body.callsEnabled;
       if (typeof req.body?.videoEnabled === "boolean") patch.postRxVideoEnabled = req.body.videoEnabled;
@@ -1845,6 +1909,37 @@ export async function registerRoutes(
       const existingBooking = await storage.getBookingById(req.params.id);
       if (!existingBooking) {
         return res.status(404).json({ message: "Booking not found" });
+      }
+
+      if (existingBooking.bookingType === "consultation") {
+        if (user.role !== "provider") {
+          return res.status(403).json({ message: "Only the assigned Provider may pause or resume a consultation." });
+        }
+        const requestedStatus = req.body?.status;
+        if (requestedStatus !== "ongoing" && requestedStatus !== "paused") {
+          return res.status(400).json({ message: "Consultation status must be ongoing or paused." });
+        }
+        const provider = await storage.getProviderByUserId(user.id);
+        if (!provider || existingBooking.providerId !== provider.id) {
+          return res.status(403).json({ message: "You can only update consultations assigned to you." });
+        }
+
+        const lifecycle = resolveConsultationLifecycle(existingBooking);
+        if (!lifecycle.scheduleAvailable) {
+          return res.status(409).json({ message: "The consultation schedule does not contain a usable start time." });
+        }
+        if (lifecycle.status !== "ongoing" && lifecycle.status !== "paused") {
+          return res.status(409).json({ message: "Only an ongoing consultation can be paused or resumed." });
+        }
+
+        const updatedBooking = await storage.updateBooking(req.params.id, { status: requestedStatus });
+        if (!updatedBooking) return res.status(404).json({ message: "Booking not found" });
+        broadcastCaseFileUpdate(updatedBooking, {
+          type: "case_file_updated",
+          bookingId: updatedBooking.id,
+          change: "consultation_status_changed",
+        });
+        return res.json(withConsultationLifecycle(updatedBooking));
       }
       
       // If provider, verify they have access to this booking
@@ -2889,7 +2984,7 @@ export async function registerRoutes(
         };
       }));
       
-      res.json(enrichedBookings);
+      res.json(enrichedBookings.map(withConsultationLifecycle));
     } catch (error) {
       console.error("Error fetching provider bookings:", error);
       res.status(500).json({ message: "Failed to fetch bookings" });
@@ -3450,7 +3545,8 @@ export async function registerRoutes(
         .where(
           and(
             isNotNull(bookings.reminderFiredAt),
-            notInArray(bookings.status, ["completed", "cancelled"])
+            notInArray(bookings.status, ["completed", "cancelled"]),
+            notInArray(bookings.bookingType, ["consultation"])
           )
         )
         .returning({ id: bookings.id, bookingNumber: bookings.bookingNumber });
@@ -5805,31 +5901,23 @@ export async function registerRoutes(
 
       const callerRole: "seeker" | "provider" = isSeeker ? "seeker" : "provider";
 
-      // Enforce access gate — post-advisory uses post-rx toggles; pre-advisory uses slot window
-      const prescriptionApprovedAtRing = (booking as any).prescriptionApprovedAt;
-      if (prescriptionApprovedAtRing) {
-        const expiresAt = (booking as any).postRxExpiresAt ? new Date((booking as any).postRxExpiresAt) : null;
-        const inWindow = !!(expiresAt && new Date() < expiresAt);
-        const channelEnabled = callType === "voice"
-          ? !!(booking as any).postRxCallsEnabled
-          : !!(booking as any).postRxVideoEnabled;
-        if (!inWindow || !channelEnabled) {
-          return res.status(403).json({
-            error: inWindow
-              ? `${callType === "voice" ? "Voice" : "Video"} calls are currently disabled for this consultation`
-              : "Post-consultation 24-hour window has expired",
-          });
-        }
-      } else {
-        const window = getCallWindow(booking);
-        if (!window.open) {
-          return res.status(403).json({
-            error: "Call window is not active",
-            reason: window.reason,
-            windowStart: window.windowStart,
-            windowEnd: window.windowEnd,
-          });
-        }
+      const lifecycle = resolveConsultationLifecycle(booking);
+      if (!lifecycle.scheduleAvailable || lifecycle.status !== "ongoing") {
+        const error = !lifecycle.scheduleAvailable
+          ? "The consultation schedule does not contain a usable start time"
+          : lifecycle.status === "paused"
+            ? "Calls are paused for this consultation"
+            : lifecycle.status === "completed"
+              ? "The consultation call window has expired"
+              : lifecycle.status === "cancelled"
+                ? "This consultation has been cancelled"
+                : "The consultation has not started";
+        return res.status(403).json({
+          error,
+          status: lifecycle.status,
+          windowStart: lifecycle.startsAt,
+          windowEnd: lifecycle.expiresAt,
+        });
       }
 
       // Fast-path conflict response; the guarded upsert below remains the
@@ -5997,6 +6085,18 @@ export async function registerRoutes(
       const isProviderUser = provider?.userId === userId;
       if (!isSeeker && !isProviderUser) return res.status(403).json({ error: "Not part of this booking" });
       if (session.callerId === userId) return res.status(403).json({ error: "Caller cannot accept their own call" });
+
+      if (booking.bookingType === "consultation") {
+        const lifecycle = resolveConsultationLifecycle(booking);
+        if (!lifecycle.scheduleAvailable || lifecycle.status !== "ongoing") {
+          return res.status(403).json({
+            error: lifecycle.status === "paused"
+              ? "Calls are paused for this consultation"
+              : "This consultation is not currently available for calls",
+            status: lifecycle.status,
+          });
+        }
+      }
 
       if (session.status !== "ringing") {
         return res.status(409).json({ error: "Call is no longer ringing", status: session.status });
@@ -6219,6 +6319,28 @@ export async function registerRoutes(
         return res.status(403).json({ error: "Not authorised" });
       }
 
+      if (booking.bookingType === "consultation") {
+        const lifecycle = resolveConsultationLifecycle(booking);
+        const reason = !lifecycle.scheduleAvailable
+          ? "schedule_unavailable"
+          : lifecycle.status === "scheduled"
+            ? "before_window"
+            : lifecycle.status === "ongoing"
+              ? "active"
+              : lifecycle.status === "paused"
+                ? "paused"
+                : lifecycle.status === "cancelled"
+                  ? "cancelled"
+                  : "expired";
+        return res.json({
+          open: lifecycle.scheduleAvailable && lifecycle.status === "ongoing",
+          reason,
+          windowStart: lifecycle.startsAt,
+          windowEnd: lifecycle.expiresAt,
+          extendedUntil: null,
+        });
+      }
+
       const status = getCallWindow(booking);
       res.json({
         open: status.open,
@@ -6243,6 +6365,9 @@ export async function registerRoutes(
 
       const booking = await storage.getBookingById(id);
       if (!booking) return res.status(404).json({ error: "Booking not found" });
+      if (booking.bookingType === "consultation") {
+        return res.status(400).json({ error: "Consultation call windows are fixed at 24 hours from the scheduled start." });
+      }
 
       const extendedUntil = new Date(Date.now() + durationMinutes * 60 * 1000);
       await storage.updateBooking(id, { callWindowExtendedUntil: extendedUntil } as any);
@@ -6263,6 +6388,55 @@ export async function registerRoutes(
       const booking = await storage.getBookingById(req.params.id);
       if (!booking) return res.status(404).json({ error: "Booking not found" });
       if (caseFileReadOnly(booking)) return res.status(403).json({ error: "This Case File is read-only" });
+      const requestedFeatures = req.body as {
+        videoEnabled?: boolean;
+        callsEnabled?: boolean;
+        uploadsEnabled?: boolean;
+      };
+      if (
+        booking.bookingType === "consultation" &&
+        (requestedFeatures.videoEnabled !== undefined || requestedFeatures.callsEnabled !== undefined)
+      ) {
+        const { videoEnabled, callsEnabled, uploadsEnabled } = requestedFeatures;
+        if (
+          (videoEnabled !== undefined && typeof videoEnabled !== "boolean") ||
+          (callsEnabled !== undefined && typeof callsEnabled !== "boolean") ||
+          (uploadsEnabled !== undefined && typeof uploadsEnabled !== "boolean")
+        ) {
+          return res.status(400).json({ error: "Feature values must be boolean" });
+        }
+        if (videoEnabled !== undefined && callsEnabled !== undefined && videoEnabled !== callsEnabled) {
+          return res.status(400).json({ error: "Consultation calls and video share one lifecycle status." });
+        }
+
+        const provider = await storage.getProviderByUserId(user.id);
+        if (!provider || booking.providerId !== provider.id) {
+          return res.status(403).json({ error: "You can only update consultations assigned to you" });
+        }
+        const consultant = await storage.getConsultantById(booking.serviceId);
+        if (consultant?.providerId && consultant.providerId !== provider.id) {
+          return res.status(403).json({ error: "You can only update consultations assigned to you" });
+        }
+
+        const lifecycle = resolveConsultationLifecycle(booking);
+        if (!lifecycle.scheduleAvailable || !["ongoing", "paused"].includes(lifecycle.status)) {
+          return res.status(409).json({ error: "Only an active consultation can be paused or resumed" });
+        }
+        if (uploadsEnabled !== undefined) {
+          const expiresAt = (booking as any).postRxExpiresAt ? new Date((booking as any).postRxExpiresAt) : null;
+          if (!(booking as any).prescriptionApprovedAt || !expiresAt || new Date() > expiresAt) {
+            return res.status(400).json({ error: "The post-advisory upload window is unavailable or expired" });
+          }
+        }
+
+        const shouldEnableCalls = callsEnabled ?? videoEnabled;
+        const updated = await storage.updateBooking(booking.id, {
+          status: shouldEnableCalls ? "ongoing" : "paused",
+          ...(uploadsEnabled !== undefined ? { postRxUploadsEnabled: uploadsEnabled } : {}),
+        } as any);
+        if (!updated) return res.status(404).json({ error: "Booking not found" });
+        return res.json(withConsultationLifecycle(updated));
+      }
       if (!(booking as any).prescriptionApprovedAt) {
         return res.status(400).json({ error: "Clinical Advisory must be confirmed before toggling post-advisory features" });
       }
@@ -6281,11 +6455,7 @@ export async function registerRoutes(
       if (consultant?.providerId && consultant.providerId !== provider.id) {
         return res.status(403).json({ error: "You can only update features for your own bookings" });
       }
-      const { videoEnabled, callsEnabled, uploadsEnabled } = req.body as {
-        videoEnabled?: boolean;
-        callsEnabled?: boolean;
-        uploadsEnabled?: boolean;
-      };
+      const { videoEnabled, callsEnabled, uploadsEnabled } = requestedFeatures;
       const patch: Record<string, boolean> = {};
       if (videoEnabled !== undefined) patch.postRxVideoEnabled = videoEnabled;
       if (callsEnabled !== undefined) patch.postRxCallsEnabled = callsEnabled;
@@ -6404,28 +6574,18 @@ export async function registerRoutes(
       if (booking.bookingType !== "consultation") {
         return res.status(400).json({ error: "Phone calls are only available for consultation bookings" });
       }
-      if (booking.status !== "booked") {
-        return res.status(400).json({ error: "Calls are only available for active (booked) consultations" });
-      }
-
-      // After Clinical Advisory: gate on post-rx calls toggle within 24h window
-      const prescriptionApprovedAtCall = (booking as any).prescriptionApprovedAt;
-      if (prescriptionApprovedAtCall) {
-        const expiresAt = (booking as any).postRxExpiresAt ? new Date((booking as any).postRxExpiresAt) : null;
-        const inWindow = !!(expiresAt && new Date() < expiresAt);
-        const callsEnabled = !!(booking as any).postRxCallsEnabled;
-        if (!inWindow) {
-          return res.status(403).json({ error: "Post-consultation 24-hour window has expired" });
-        }
-        if (!callsEnabled) {
-          return res.status(403).json({ error: "Phone calls are currently disabled for this consultation" });
-        }
-      } else {
-        // Before Clinical Advisory: check slot window
-        const win = getCallWindow(booking);
-        if (!win.open) {
-          return res.status(403).json({ error: "Call window is not active", reason: win.reason });
-        }
+      const lifecycle = resolveConsultationLifecycle(booking);
+      if (!lifecycle.scheduleAvailable || lifecycle.status !== "ongoing") {
+        const error = !lifecycle.scheduleAvailable
+          ? "The consultation schedule does not contain a usable start time"
+          : lifecycle.status === "paused"
+            ? "Phone calls are paused for this consultation"
+            : lifecycle.status === "completed"
+              ? "The consultation call window has expired"
+              : lifecycle.status === "cancelled"
+                ? "This consultation has been cancelled"
+                : "The consultation has not started";
+        return res.status(403).json({ error, status: lifecycle.status });
       }
 
       const isSeeker = booking.userId === userId;
