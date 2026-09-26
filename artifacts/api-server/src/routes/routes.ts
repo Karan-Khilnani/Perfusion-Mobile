@@ -25,6 +25,7 @@ import { getCallWindow } from "../services/call-window";
 import { resolveConsultationLifecycle } from "../services/consultation-lifecycle";
 import { notifyMobileIncomingCall } from "../services/mobile-call-push";
 import { getConsultantAvailabilityPreview } from "../services/consultant-availability";
+import { normalizeComorbidities } from "../services/patient-comorbidities";
 import { randomUUID } from "crypto";
 
 function sanitizeUserForClient<T extends Record<string, any> | undefined>(user: T) {
@@ -1749,9 +1750,16 @@ export async function registerRoutes(
       if (!userId) {
         return res.status(401).json({ message: "Unauthorized" });
       }
-      
+
+      const { comorbidities: rawComorbidities, ...bookingFields } = req.body || {};
+      if (rawComorbidities != null && typeof rawComorbidities !== "string") {
+        res.status(400).json({ message: "Comorbidities / Past Illness must be text." });
+        return;
+      }
+      const comorbidities = normalizeComorbidities(rawComorbidities);
+
       const bookingData = {
-        ...req.body,
+        ...bookingFields,
         userId,
       };
 
@@ -1878,7 +1886,9 @@ export async function registerRoutes(
       
       bookingData.bookingNumber = await generateBookingNumber(bookingData.bookingType);
 
-      const booking = await storage.createBooking(bookingData);
+      const booking = bookingData.bookingType === "consultation"
+        ? await storage.createConsultationBooking(bookingData, comorbidities)
+        : await storage.createBooking(bookingData);
 
       if (booking.bookingType === "lab") {
         const seekerProvider = await storage.getProviderByUserId(userId);

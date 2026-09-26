@@ -34,6 +34,13 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 
+function getComorbidityEntries(value: string | null | undefined): string[] {
+  return (value || "")
+    .split(/\r\n|\n|\r/)
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+}
+
 export default function CaseFilePage() {
   const { bookingId: paramBookingId } = useParams();
   const queryClient = useQueryClient();
@@ -284,6 +291,7 @@ export default function CaseFilePage() {
   if (!caseFile) return <div className="p-8 text-center text-muted-foreground">Case file not found.</div>;
 
   const caps = caseFile.capabilities;
+  const comorbidityEntries = getComorbidityEntries(caseFile.summary.comorbidities);
 
   const vts = vitals || [];
   const advs = advisories || [];
@@ -342,13 +350,34 @@ export default function CaseFilePage() {
         </div>
       </header>
 
+      <section data-testid="section-comorbidities" className="flex-none border-b bg-card px-4 py-2.5">
+        <h2 className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+          Comorbidities / Past Illness
+        </h2>
+        {comorbidityEntries.length ? (
+          <div className="flex flex-wrap gap-1.5">
+            {comorbidityEntries.map((entry, index) => (
+              <Badge
+                key={`${index}-${entry}`}
+                variant="secondary"
+                className="whitespace-normal text-left"
+                data-testid={`case-file-comorbidity-${index}`}
+              >
+                {entry}
+              </Badge>
+            ))}
+          </div>
+        ) : (
+          <p className="text-xs italic text-muted-foreground" data-testid="empty-comorbidities">
+            Not provided
+          </p>
+        )}
+      </section>
+
       {/* Context Strip */}
       <div className="flex-none bg-muted/40 border-b px-4 py-1.5 flex items-center gap-3 text-xs overflow-x-auto whitespace-nowrap cursor-pointer hover:bg-muted/60 transition-colors" onClick={() => setActiveTab("overview")}>
         {caseFile.profile.allergies && caseFile.profile.allergies.toLowerCase() !== "none noted" && (
           <Badge variant="destructive" className="h-5 px-1.5 text-[10px] uppercase font-bold shrink-0">{caseFile.profile.allergies}</Badge>
-        )}
-        {caseFile.profile.comorbidities && caseFile.profile.comorbidities.toLowerCase() !== "none noted" && (
-          <Badge variant="outline" className="h-5 px-1.5 text-[10px] uppercase font-bold text-amber-700 border-amber-500/30 bg-amber-500/10 shrink-0">{caseFile.profile.comorbidities}</Badge>
         )}
         <span className="text-muted-foreground font-medium shrink-0">Complaint:</span>
         <span className="font-medium text-foreground truncate">{caseFile.summary.presentingComplaint || "Not recorded"}</span>
@@ -419,7 +448,7 @@ export default function CaseFilePage() {
                           <p className="mt-0.5 font-medium text-destructive">{caseFile.profile.allergies || "None noted"}</p>
                         </div>
                         <div>
-                          <span className="text-xs font-semibold text-muted-foreground uppercase">Comorbidities</span>
+                          <span className="text-xs font-semibold text-muted-foreground uppercase">Patient-wide Comorbidities</span>
                           <p className="mt-0.5 font-medium">{caseFile.profile.comorbidities || "None noted"}</p>
                         </div>
                       </div>

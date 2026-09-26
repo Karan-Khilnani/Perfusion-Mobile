@@ -54,7 +54,7 @@ export default function NewConsultationScreen() {
   const [allergyNotSpecified, setAllergyNotSpecified] = useState(true);
   const [form, setForm] = useState({
     patientName: "", patientAge: "", patientGender: "", patientPhone: "", patientWeight: "", uhidIpNumber: "",
-    allergies: "", clinicalSummary: "", provisionalDiagnosis: "", investigations: "",
+    allergies: "", comorbidities: "", clinicalSummary: "", provisionalDiagnosis: "", investigations: "",
   });
 
   const consultants = useQuery<Consultant[]>({
@@ -92,6 +92,7 @@ export default function NewConsultationScreen() {
           uhidIpNumber: form.uhidIpNumber.trim() || undefined,
           patientAllergyNotSpecified: allergyNotSpecified,
           patientAllergies: allergyNotSpecified ? undefined : form.allergies.trim(),
+          comorbidities: form.comorbidities,
           clinicalHistory: form.clinicalSummary.trim(),
           provisionalDiagnosis: form.provisionalDiagnosis.trim() || undefined,
           investigations: form.investigations.trim() || undefined,
@@ -194,6 +195,17 @@ export default function NewConsultationScreen() {
             <Text style={[styles.checkboxText, { color: palette.foreground }]}>No known allergies / Not specified</Text>
           </Pressable>
           {!allergyNotSpecified && <Input label="Allergies*" value={form.allergies} onChangeText={(value) => update("allergies", value)} />}
+          <Input
+            multiline
+            label="Comorbidities / Past Illness"
+            value={form.comorbidities}
+            placeholder="Enter one condition per line"
+            onChangeText={(value) => update("comorbidities", value)}
+            testID="input-comorbidities"
+          />
+          <Text style={{ color: palette.mutedForeground, fontSize: 11, marginTop: -7 }}>
+            Optional. Duplicate entries are saved once, ignoring case.
+          </Text>
           <Text style={[styles.sectionTitle, { color: palette.foreground }]}>Clinical details</Text>
           <Input multiline label="Clinical Summary*" value={form.clinicalSummary} placeholder="Complaint, history, examination findings…" onChangeText={(value) => update("clinicalSummary", value)} />
           <Input multiline label="Provisional Diagnosis" value={form.provisionalDiagnosis} onChangeText={(value) => update("provisionalDiagnosis", value)} />

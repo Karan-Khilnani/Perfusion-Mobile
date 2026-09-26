@@ -29,6 +29,7 @@ const bookingSchema = z.object({
   patientWeight: z.string().optional(),
   allergyNotSpecified: z.boolean().default(true),
   patientAllergies: z.string().optional(),
+  comorbidities: z.string().optional(),
   uhidIpNumber: z.string().optional(),
   clinicalSummary: z.string().min(10, "Please provide clinical summary"),
   provisionalDiagnosis: z.string().optional(),
@@ -49,6 +50,7 @@ const followUpBookingSchema = z.object({
   patientWeight: z.string().optional(),
   allergyNotSpecified: z.boolean().default(true),
   patientAllergies: z.string().optional(),
+  comorbidities: z.string().optional(),
   uhidIpNumber: z.string().optional(),
   clinicalSummary: z.string().min(10, "Please describe the patient's current status"),
   provisionalDiagnosis: z.string().optional(),
@@ -248,6 +250,7 @@ export default function ConsultationBookingPage() {
       patientWeight: "",
       allergyNotSpecified: true,
       patientAllergies: "",
+      comorbidities: "",
       uhidIpNumber: "",
       clinicalSummary: "",
       provisionalDiagnosis: "",
@@ -310,6 +313,7 @@ export default function ConsultationBookingPage() {
           patientAllergyNotSpecified: data.allergyNotSpecified,
           uhidIpNumber: data.uhidIpNumber || null,
         } : {}),
+        comorbidities: data.comorbidities || null,
         clinicalSummary: data.clinicalSummary,
         provisionalDiagnosis: data.provisionalDiagnosis || null,
         referringPhysician: data.orderingPhysician || null,
@@ -795,6 +799,26 @@ export default function ConsultationBookingPage() {
                   )}
 
                   {/* Current status — required */}
+                  <FormField
+                    control={form.control}
+                    name="comorbidities"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Comorbidities / Past Illness (Optional)</FormLabel>
+                        <FormControl>
+                          <Textarea
+                            placeholder="Enter one condition per line"
+                            className="min-h-[88px]"
+                            {...field}
+                            data-testid="input-comorbidities"
+                          />
+                        </FormControl>
+                        <p className="text-xs text-muted-foreground">Duplicate entries are saved once, ignoring case.</p>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
                   <FormField
                     control={form.control}
                     name="clinicalSummary"
@@ -1403,6 +1427,26 @@ export default function ConsultationBookingPage() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
+                  <FormField
+                    control={form.control}
+                    name="comorbidities"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Comorbidities / Past Illness (Optional)</FormLabel>
+                        <FormControl>
+                          <Textarea
+                            placeholder="Enter one condition per line"
+                            className="min-h-[88px]"
+                            {...field}
+                            data-testid="input-comorbidities"
+                          />
+                        </FormControl>
+                        <p className="text-xs text-muted-foreground">Duplicate entries are saved once, ignoring case.</p>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
                   <FormField
                     control={form.control}
                     name="clinicalSummary"

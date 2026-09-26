@@ -1,4 +1,5 @@
 import { eq, and, desc, gte, lte, or, inArray, notInArray } from "drizzle-orm";
+import { randomUUID } from "crypto";
 import { db } from "./db";
 import {
   labs,
@@ -16,6 +17,7 @@ import {
   referralHospitals,
   transportServices,
   bookings,
+  caseFileSummaries,
   providers,
   users,
   platformSettings,
@@ -170,6 +172,7 @@ export interface IStorage {
   getBookingById(id: string): Promise<Booking | undefined>;
   getBookingByVideoRoomUrl(videoRoomUrl: string): Promise<Booking | undefined>;
   createBooking(booking: InsertBooking): Promise<Booking>;
+  createConsultationBooking(booking: InsertBooking, comorbidities: string | null): Promise<Booking>;
   updateBooking(id: string, data: Partial<InsertBooking>): Promise<Booking | undefined>;
   updateBookingStatus(id: string, status: BookingStatus): Promise<Booking | undefined>;
   getAllBookings(): Promise<Booking[]>;
@@ -646,6 +649,23 @@ export class DatabaseStorage implements IStorage {
   async createBooking(booking: InsertBooking): Promise<Booking> {
     const [created] = await db.insert(bookings).values([booking as any]).returning();
     return created;
+  }
+
+  async createConsultationBooking(booking: InsertBooking, comorbidities: string | null): Promise<Booking> {
+    return db.transaction(async (tx) => {
+      const [created] = await tx.insert(bookings).values([booking as any]).returning();
+      await tx.insert(caseFileSummaries).values({
+        id: randomUUID(),
+        bookingId: created.id,
+        allergies: created.patientAllergyNotSpecified ? null : created.patientAllergies ?? null,
+        comorbidities,
+        presentingComplaint: created.clinicalSummary ?? null,
+        workingDiagnosis: created.provisionalDiagnosis ?? null,
+        clinicalHistory: created.clinicalSummary ?? null,
+        submittedByUserId: created.userId,
+      });
+      return created;
+    });
   }
 
   async updateBooking(id: string, data: Partial<InsertBooking>): Promise<Booking | undefined> {

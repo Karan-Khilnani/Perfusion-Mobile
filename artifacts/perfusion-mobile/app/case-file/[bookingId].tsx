@@ -54,6 +54,13 @@ async function requestJson<T>(path: string, options?: RequestInit): Promise<T> {
   return response.json();
 }
 
+function getComorbidityEntries(value: string | null | undefined): string[] {
+  return (value || "")
+    .split(/\r\n|\n|\r/)
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+}
+
 export default function CaseFileScreen() {
   const { bookingId, focus } = useLocalSearchParams<{ bookingId: string; focus?: string }>();
   const palette = useColors();
@@ -184,6 +191,7 @@ export default function CaseFileScreen() {
   }
 
   const caseFile = aggregate.data!;
+  const comorbidityEntries = getComorbidityEntries(caseFile.summary.comorbidities);
   const status = booking.consultationLifecycleAvailable === false
     ? { label: "Schedule unavailable", dot: palette.warning, text: palette.warning }
     : statusPresentation(booking.status, {
@@ -241,19 +249,35 @@ export default function CaseFileScreen() {
       {callError && <Text style={[styles.callError, { color: palette.primary, backgroundColor: palette.conversationCard }]} accessibilityRole="alert">{callError}</Text>}
 
       <View style={[styles.clinicalContext, { backgroundColor: palette.conversationCard, borderBottomColor: palette.conversationBorder }]}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
-          {!!caseFile.summary.allergies && (
-            <Pressable onPress={() => setSheet("summary")} style={[styles.chip, { backgroundColor: `${palette.primary}0D`, borderColor: `${palette.primary}28` }]}>
-              <Feather name="alert-triangle" size={12} color={palette.primary} />
-              <Text style={[styles.chipText, { color: palette.primary }]}>{caseFile.summary.allergies}</Text>
-            </Pressable>
-          )}
-          {!!caseFile.summary.comorbidities && caseFile.summary.comorbidities.split(",").map((item) => (
-            <Pressable key={item} onPress={() => setSheet("summary")} style={[styles.chip, { backgroundColor: palette.conversationSoft, borderColor: palette.conversationBorder }]}>
-              <Text style={[styles.chipText, { color: palette.foreground }]}>{item.trim()}</Text>
-            </Pressable>
-          ))}
-        </ScrollView>
+        <Text style={[styles.eyebrow, { color: palette.mutedForeground, marginHorizontal: 14, marginTop: 8 }]}>
+          COMORBIDITIES / PAST ILLNESS
+        </Text>
+        {comorbidityEntries.length ? (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
+            {comorbidityEntries.map((item, index) => (
+              <Pressable
+                key={`${index}-${item}`}
+                onPress={() => setSheet("summary")}
+                testID={`case-file-comorbidity-${index}`}
+                accessibilityRole="button"
+                accessibilityLabel={item}
+                style={[styles.chip, { backgroundColor: palette.conversationSoft, borderColor: palette.conversationBorder }]}
+              >
+                <Text style={[styles.chipText, { color: palette.foreground }]}>{item}</Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+        ) : (
+          <Text style={[styles.contextEmpty, { color: palette.mutedForeground }]} testID="empty-comorbidities">
+            Not provided
+          </Text>
+        )}
+        {!!caseFile.summary.allergies && (
+          <Pressable onPress={() => setSheet("summary")} style={[styles.chip, { alignSelf: "flex-start", marginHorizontal: 14, backgroundColor: `${palette.primary}0D`, borderColor: `${palette.primary}28` }]}>
+            <Feather name="alert-triangle" size={12} color={palette.primary} />
+            <Text style={[styles.chipText, { color: palette.primary }]}>{caseFile.summary.allergies}</Text>
+          </Pressable>
+        )}
         <Pressable onPress={() => setSheet("summary")} style={[styles.complaint, { backgroundColor: palette.conversationSoft }]}>
           <View style={{ flex: 1 }}>
             <Text style={[styles.eyebrow, { color: palette.mutedForeground }]}>PRESENTING COMPLAINT</Text>
@@ -575,7 +599,7 @@ function CaseFileSheet({
             {type === "summary" && (
               <>
                 <InfoSection label="ALLERGIES" value={aggregate.summary.allergies} warning />
-                <InfoSection label="COMORBIDITIES" value={aggregate.summary.comorbidities} />
+                <InfoSection label="COMORBIDITIES / PAST ILLNESS" value={aggregate.summary.comorbidities} />
                 <InfoSection label="PRESENTING COMPLAINT" value={aggregate.summary.presentingComplaint} />
                 <InfoSection label="WORKING DIAGNOSIS AT REFERRAL" value={aggregate.summary.workingDiagnosis} />
                 <InfoSection label="CLINICAL HISTORY" value={aggregate.summary.clinicalHistory} />
@@ -588,7 +612,7 @@ function CaseFileSheet({
             {type === "profile" && (
               <>
                 <InfoSection label="ALLERGIES" value={aggregate.profile.allergies} warning />
-                <InfoSection label="COMORBIDITIES" value={aggregate.profile.comorbidities} />
+                <InfoSection label="PATIENT-WIDE COMORBIDITIES" value={aggregate.profile.comorbidities} />
                 <InfoSection label="BASELINE MEDICATIONS" value={aggregate.profile.baselineMedications} />
                 <InfoSection label="BASELINE PARAMETERS" value={aggregate.profile.baselineParameters} />
                 <InfoSection label="PAST ADMISSIONS" value={aggregate.profile.pastAdmissions} />
@@ -800,6 +824,7 @@ const styles = StyleSheet.create({
   followUp: { fontSize: 12, fontFamily: "Inter_700Bold", marginLeft: 5 },
   callError: { paddingHorizontal: 16, paddingVertical: 7, fontSize: 11, fontFamily: "Inter_500Medium" },
   clinicalContext: { borderBottomWidth: StyleSheet.hairlineWidth, paddingBottom: 9 },
+  contextEmpty: { marginHorizontal: 14, marginTop: 6, fontSize: 11, fontFamily: "Inter_400Regular" },
   chips: { paddingHorizontal: 14, paddingTop: 9, paddingBottom: 7, gap: 6 },
   chip: { borderWidth: 1, borderRadius: 14, paddingHorizontal: 9, paddingVertical: 5, flexDirection: "row", alignItems: "center", gap: 5 },
   chipText: { fontSize: 11, fontFamily: "Inter_600SemiBold" },

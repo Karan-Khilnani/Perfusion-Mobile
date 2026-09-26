@@ -1,3 +1,4 @@
+import { randomUUID } from "crypto";
 import { eq, desc, and } from "drizzle-orm";
 import { db } from "./db";
 import {
@@ -10,6 +11,7 @@ import {
   referralHospitals,
   transportServices,
   bookings,
+  caseFileSummaries,
   providers,
   users,
   type Lab,
@@ -291,6 +293,23 @@ export class DatabaseStorage implements IStorage {
   async createBooking(insertBooking: InsertBooking): Promise<Booking> {
     const [booking] = await db.insert(bookings).values(insertBooking as any).returning();
     return booking;
+  }
+
+  async createConsultationBooking(insertBooking: InsertBooking, comorbidities: string | null): Promise<Booking> {
+    return db.transaction(async (tx) => {
+      const [booking] = await tx.insert(bookings).values(insertBooking as any).returning();
+      await tx.insert(caseFileSummaries).values({
+        id: randomUUID(),
+        bookingId: booking.id,
+        allergies: booking.patientAllergyNotSpecified ? null : booking.patientAllergies ?? null,
+        comorbidities,
+        presentingComplaint: booking.clinicalSummary ?? null,
+        workingDiagnosis: booking.provisionalDiagnosis ?? null,
+        clinicalHistory: booking.clinicalSummary ?? null,
+        submittedByUserId: booking.userId,
+      });
+      return booking;
+    });
   }
 
   async updateBooking(id: string, data: Partial<InsertBooking>): Promise<Booking | undefined> {
