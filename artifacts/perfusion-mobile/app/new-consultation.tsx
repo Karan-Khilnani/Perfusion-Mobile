@@ -54,7 +54,8 @@ export default function NewConsultationScreen() {
   const [allergyNotSpecified, setAllergyNotSpecified] = useState(true);
   const [form, setForm] = useState({
     patientName: "", patientAge: "", patientGender: "", patientPhone: "", patientWeight: "", uhidIpNumber: "",
-    allergies: "", comorbidities: "", clinicalSummary: "", provisionalDiagnosis: "", investigations: "",
+    allergies: "", comorbidities: "", presentingComplaint: "", presentIllness: "",
+    provisionalDiagnosis: "", examination: "", investigations: "",
   });
 
   const consultants = useQuery<Consultant[]>({
@@ -93,8 +94,10 @@ export default function NewConsultationScreen() {
           patientAllergyNotSpecified: allergyNotSpecified,
           patientAllergies: allergyNotSpecified ? undefined : form.allergies.trim(),
           comorbidities: form.comorbidities,
-          clinicalHistory: form.clinicalSummary.trim(),
+          presentingComplaint: form.presentingComplaint.trim(),
+          presentIllness: form.presentIllness.trim() || undefined,
           provisionalDiagnosis: form.provisionalDiagnosis.trim() || undefined,
+          examination: form.examination.trim() || undefined,
           investigations: form.investigations.trim() || undefined,
           amount: selected.consultant.computedCustomerPrice || selected.consultant.consultationFee || "0",
           urgency: "routine",
@@ -112,7 +115,7 @@ export default function NewConsultationScreen() {
     },
   });
 
-  const valid = !!selected && !!form.patientName.trim() && !!form.patientAge && !!form.patientGender && !!form.patientPhone.trim() && !!form.clinicalSummary.trim() && (allergyNotSpecified || !!form.allergies.trim());
+  const valid = !!selected && !!form.patientName.trim() && !!form.patientAge && !!form.patientGender && !!form.patientPhone.trim() && !!form.presentingComplaint.trim() && (allergyNotSpecified || !!form.allergies.trim());
   const update = (key: keyof typeof form, value: string) => setForm((current) => ({ ...current, [key]: value }));
 
   return (
@@ -206,10 +209,12 @@ export default function NewConsultationScreen() {
           <Text style={{ color: palette.mutedForeground, fontSize: 11, marginTop: -7 }}>
             Optional. Duplicate entries are saved once, ignoring case.
           </Text>
-          <Text style={[styles.sectionTitle, { color: palette.foreground }]}>Clinical details</Text>
-          <Input multiline label="Clinical Summary*" value={form.clinicalSummary} placeholder="Complaint, history, examination findings…" onChangeText={(value) => update("clinicalSummary", value)} />
+          <Input multiline label="Presenting Complaint*" value={form.presentingComplaint} placeholder="Main complaint or reason for seeking medical attention" onChangeText={(value) => update("presentingComplaint", value)} />
+          <Input multiline label="Present Illness" value={form.presentIllness} placeholder="History and details of the current illness or episode" onChangeText={(value) => update("presentIllness", value)} />
+          <Text style={[styles.sectionTitle, { color: palette.foreground }]}>Clinical Details</Text>
+          <Input multiline label="Examination" value={form.examination} placeholder="Physical examination findings, vitals, systemic examination…" onChangeText={(value) => update("examination", value)} />
+          <Input multiline label="Investigations" value={form.investigations} placeholder="Lab results, imaging findings, ECG…" onChangeText={(value) => update("investigations", value)} />
           <Input multiline label="Provisional Diagnosis" value={form.provisionalDiagnosis} onChangeText={(value) => update("provisionalDiagnosis", value)} />
-          <Input multiline label="Investigations" value={form.investigations} placeholder="Lab, imaging, ECG…" onChangeText={(value) => update("investigations", value)} />
           <View style={styles.uploadRow}>
             <UploadPrompt label="Upload Reports" icon="file-text" />
             <UploadPrompt label="Treatment Chart" icon="clipboard" />

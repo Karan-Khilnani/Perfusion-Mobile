@@ -249,9 +249,15 @@ export interface CaseFileSummary {
   /** @nullable */
   presentingComplaint?: string | null;
   /** @nullable */
+  presentIllness?: string | null;
+  /** @nullable */
   workingDiagnosis?: string | null;
   /** @nullable */
-  clinicalHistory?: string | null;
+  clinicalSummary?: string | null;
+  /** @nullable */
+  examination?: string | null;
+  /** @nullable */
+  investigations?: string | null;
   /** @nullable */
   submittedByUserId?: string | null;
   /** @nullable */

@@ -46,8 +46,11 @@ export type CaseFileSummary = {
   allergies?: string | null;
   comorbidities?: string | null;
   presentingComplaint?: string | null;
+  presentIllness?: string | null;
   workingDiagnosis?: string | null;
-  clinicalHistory?: string | null;
+  clinicalSummary?: string | null;
+  examination?: string | null;
+  investigations?: string | null;
   submittedByUserId?: string | null;
   submittedAt?: string | null;
 };

@@ -735,8 +735,11 @@ components:
         allergies: { type: ["string", "null"] }
         comorbidities: { type: ["string", "null"] }
         presentingComplaint: { type: ["string", "null"] }
+        presentIllness: { type: ["string", "null"] }
         workingDiagnosis: { type: ["string", "null"] }
-        clinicalHistory: { type: ["string", "null"] }
+        clinicalSummary: { type: ["string", "null"] }
+        examination: { type: ["string", "null"] }
+        investigations: { type: ["string", "null"] }
         submittedByUserId: { type: ["string", "null"] }
         submittedAt: { type: ["string", "null"], format: date-time }
     CaseFileProfile:

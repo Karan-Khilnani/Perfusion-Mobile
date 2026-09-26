@@ -601,8 +601,12 @@ function CaseFileSheet({
                 <InfoSection label="ALLERGIES" value={aggregate.summary.allergies} warning />
                 <InfoSection label="COMORBIDITIES / PAST ILLNESS" value={aggregate.summary.comorbidities} />
                 <InfoSection label="PRESENTING COMPLAINT" value={aggregate.summary.presentingComplaint} />
-                <InfoSection label="WORKING DIAGNOSIS AT REFERRAL" value={aggregate.summary.workingDiagnosis} />
-                <InfoSection label="CLINICAL HISTORY" value={aggregate.summary.clinicalHistory} />
+                <InfoSection label="PRESENT ILLNESS" value={aggregate.summary.presentIllness} />
+                <Text style={[styles.eyebrow, { color: palette.mutedForeground, marginTop: 6 }]}>CLINICAL DETAILS</Text>
+                <InfoSection label="EXAMINATION" value={aggregate.summary.examination} />
+                <InfoSection label="INVESTIGATIONS" value={aggregate.summary.investigations} />
+                <InfoSection label="PROVISIONAL DIAGNOSIS" value={aggregate.summary.workingDiagnosis} />
+                <InfoSection label="CLINICAL SUMMARY" value={aggregate.summary.clinicalSummary} />
                 <Pressable onPress={onOpenProfile} style={[styles.primaryOutline, { borderColor: palette.border }]}>
                   <Text style={[styles.primaryOutlineText, { color: palette.foreground }]}>View Patient Profile & Past Records</Text>
                   <Feather name="arrow-right" size={17} color={palette.foreground} />
@@ -680,7 +684,11 @@ function CaseFileSheet({
             {type === "advisory" && (
               <>
                 <InfoSection label="PROVISIONAL DIAGNOSIS · (Provided by Seeker Hospital)" value={aggregate.summary.workingDiagnosis} />
-                <InfoSection label="CLINICAL DETAILS · (Provided by Seeker Hospital)" value={aggregate.summary.clinicalHistory} />
+                <InfoSection label="PRESENTING COMPLAINT · (Provided by Seeker Hospital)" value={aggregate.summary.presentingComplaint} />
+                <InfoSection label="PRESENT ILLNESS · (Provided by Seeker Hospital)" value={aggregate.summary.presentIllness} />
+                <Text style={[styles.eyebrow, { color: palette.mutedForeground, marginTop: 6 }]}>CLINICAL DETAILS · (PROVIDED BY SEEKER HOSPITAL)</Text>
+                <InfoSection label="EXAMINATION" value={aggregate.summary.examination} />
+                <InfoSection label="INVESTIGATIONS" value={aggregate.summary.investigations} />
                 <Text style={[styles.sheetHint, { color: palette.mutedForeground }]}>The hospital-provided details above are included automatically. Add your own clinical assessment and recommendations below.</Text>
                 <TextInput
                   value={advisory}

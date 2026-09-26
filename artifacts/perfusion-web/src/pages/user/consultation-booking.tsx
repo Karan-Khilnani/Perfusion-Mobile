@@ -31,7 +31,8 @@ const bookingSchema = z.object({
   patientAllergies: z.string().optional(),
   comorbidities: z.string().optional(),
   uhidIpNumber: z.string().optional(),
-  clinicalSummary: z.string().min(10, "Please provide clinical summary"),
+  presentingComplaint: z.string().min(10, "Please describe the presenting complaint"),
+  presentIllness: z.string().optional(),
   provisionalDiagnosis: z.string().optional(),
   orderingPhysician: z.string().optional(),
   examination: z.string().optional(),
@@ -52,7 +53,8 @@ const followUpBookingSchema = z.object({
   patientAllergies: z.string().optional(),
   comorbidities: z.string().optional(),
   uhidIpNumber: z.string().optional(),
-  clinicalSummary: z.string().min(10, "Please describe the patient's current status"),
+  presentingComplaint: z.string().optional(),
+  presentIllness: z.string().min(10, "Please describe the patient's current illness or follow-up status"),
   provisionalDiagnosis: z.string().optional(),
   orderingPhysician: z.string().optional(),
   examination: z.string().optional(),
@@ -252,7 +254,8 @@ export default function ConsultationBookingPage() {
       patientAllergies: "",
       comorbidities: "",
       uhidIpNumber: "",
-      clinicalSummary: "",
+      presentingComplaint: "",
+      presentIllness: "",
       provisionalDiagnosis: "",
       orderingPhysician: "",
       examination: "",
@@ -314,7 +317,8 @@ export default function ConsultationBookingPage() {
           uhidIpNumber: data.uhidIpNumber || null,
         } : {}),
         comorbidities: data.comorbidities || null,
-        clinicalSummary: data.clinicalSummary,
+        presentingComplaint: data.presentingComplaint || null,
+        presentIllness: data.presentIllness || null,
         provisionalDiagnosis: data.provisionalDiagnosis || null,
         referringPhysician: data.orderingPhysician || null,
         examination: data.examination || null,
@@ -400,7 +404,7 @@ export default function ConsultationBookingPage() {
 
       return formValid;
     } else if (step === "clinical") {
-      return form.trigger(["clinicalSummary"]);
+      return form.trigger(["presentingComplaint"]);
     }
     return Promise.resolve(true);
   };
@@ -558,7 +562,7 @@ export default function ConsultationBookingPage() {
     const hasSlots = !isEmergencyTeam && (consultantAvailableSlots.length > 0 || isCalendarMode);
 
     const handleFollowUpSubmit = async () => {
-      const isValid = await form.trigger(["clinicalSummary", ...(hasSlots ? ["appointmentSlot" as const] : [])]);
+      const isValid = await form.trigger(["presentIllness", ...(hasSlots ? ["appointmentSlot" as const] : [])]);
       if (!isValid) return;
       bookingMutation.mutate(form.getValues());
     };
@@ -821,17 +825,87 @@ export default function ConsultationBookingPage() {
 
                   <FormField
                     control={form.control}
-                    name="clinicalSummary"
+                    name="presentingComplaint"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Current Status / Update *</FormLabel>
+                        <FormLabel>Presenting Complaint (Optional)</FormLabel>
                         <FormControl>
                           <Textarea
-                            placeholder="Describe current symptoms, response to treatment, any new complaints or changes since last consultation..."
+                            placeholder="Main complaint or reason for this follow-up"
+                            className="min-h-[88px]"
+                            {...field}
+                            data-testid="input-presenting-complaint"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="presentIllness"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Present Illness / Current Status *</FormLabel>
+                        <FormControl>
+                          <Textarea
+                            placeholder="Describe the current episode, symptoms, response to treatment, or changes since the last consultation"
                             className="min-h-[120px]"
                             {...field}
-                            data-testid="input-clinical-summary"
+                            data-testid="input-present-illness"
                           />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <h3 className="pt-1 text-sm font-semibold">Clinical Details</h3>
+                  <FormField
+                    control={form.control}
+                    name="examination"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Examination (Optional)</FormLabel>
+                        <FormControl>
+                          <Textarea
+                            placeholder="Physical examination findings, vitals, systemic examination..."
+                            className="min-h-[80px]"
+                            {...field}
+                            data-testid="input-examination"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="investigations"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Investigations (Optional)</FormLabel>
+                        <FormControl>
+                          <Textarea
+                            placeholder="Lab results, imaging findings, ECG findings..."
+                            className="min-h-[80px]"
+                            {...field}
+                            data-testid="input-investigations"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="provisionalDiagnosis"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Provisional Diagnosis (Optional)</FormLabel>
+                        <FormControl>
+                          <Input placeholder="E.g., Suspected CAD, R/O TB" {...field} data-testid="input-diagnosis" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -1449,18 +1523,74 @@ export default function ConsultationBookingPage() {
 
                   <FormField
                     control={form.control}
-                    name="clinicalSummary"
+                    name="presentingComplaint"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>{isFollowUpMode ? "Current Status / Update *" : "Clinical Summary *"}</FormLabel>
+                        <FormLabel>Presenting Complaint *</FormLabel>
                         <FormControl>
                           <Textarea
-                            placeholder={isFollowUpMode
-                              ? "Describe current symptoms, response to treatment, any new complaints or changes since last consultation..."
-                              : "Describe chief complaints, history of present illness, relevant past history, examination findings..."}
+                            placeholder="The patient's main complaint or reason for seeking medical attention"
+                            className="min-h-[88px]"
+                            {...field}
+                            data-testid="input-presenting-complaint"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="presentIllness"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Present Illness (Optional)</FormLabel>
+                        <FormControl>
+                          <Textarea
+                            placeholder="History and details of the current illness or episode"
                             className="min-h-[120px]"
                             {...field}
-                            data-testid="input-clinical-summary"
+                            data-testid="input-present-illness"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <h3 className="pt-1 text-sm font-semibold">Clinical Details</h3>
+                  <FormField
+                    control={form.control}
+                    name="examination"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Examination (Optional)</FormLabel>
+                        <FormControl>
+                          <Textarea
+                            placeholder="Physical examination findings, vitals, systemic examination..."
+                            className="min-h-[80px]"
+                            {...field}
+                            data-testid="input-examination"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="investigations"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Investigations (Optional)</FormLabel>
+                        <FormControl>
+                          <Textarea
+                            placeholder="Lab results, imaging findings, ECG findings..."
+                            className="min-h-[80px]"
+                            {...field}
+                            data-testid="input-investigations"
                           />
                         </FormControl>
                         <FormMessage />
@@ -1497,44 +1627,6 @@ export default function ConsultationBookingPage() {
                             placeholder="Dr. Name, Qualification"
                             {...field}
                             data-testid="input-physician"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="examination"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Examination (Optional)</FormLabel>
-                        <FormControl>
-                          <Textarea
-                            placeholder="Physical examination findings, vitals, systemic examination..."
-                            className="min-h-[80px]"
-                            {...field}
-                            data-testid="input-examination"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="investigations"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Investigations (Optional)</FormLabel>
-                        <FormControl>
-                          <Textarea
-                            placeholder="Lab results, imaging findings, ECG findings..."
-                            className="min-h-[80px]"
-                            {...field}
-                            data-testid="input-investigations"
                           />
                         </FormControl>
                         <FormMessage />

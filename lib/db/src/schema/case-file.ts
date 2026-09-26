@@ -21,6 +21,7 @@ export const caseFileSummaries = pgTable("case_file_summaries", {
   allergies: text("allergies"),
   comorbidities: text("comorbidities"),
   presentingComplaint: text("presenting_complaint"),
+  presentIllness: text("present_illness"),
   workingDiagnosis: text("working_diagnosis"),
   clinicalHistory: text("clinical_history"),
   submittedByUserId: varchar("submitted_by_user_id"),

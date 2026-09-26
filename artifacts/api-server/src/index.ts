@@ -167,12 +167,14 @@ async function startServer() {
       allergies text,
       comorbidities text,
       presenting_complaint text,
+      present_illness text,
       working_diagnosis text,
       clinical_history text,
       submitted_by_user_id varchar,
       submitted_at timestamptz DEFAULT now(),
       created_at timestamptz DEFAULT now()
     )`);
+    await pool.query(`ALTER TABLE case_file_summaries ADD COLUMN IF NOT EXISTS present_illness text`);
     await pool.query(`CREATE TABLE IF NOT EXISTS case_file_messages (
       id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
       booking_id varchar NOT NULL,
@@ -225,18 +227,28 @@ async function startServer() {
       created_at timestamptz DEFAULT now()
     )`);
     await pool.query(`CREATE INDEX IF NOT EXISTS case_file_advisories_booking_authored_idx ON case_file_advisories(booking_id, authored_at)`);
+    // Old writes derived the complaint from the generic summary. Keep that text as a
+    // legacy clinical summary, but stop presenting the duplicate as a verified complaint.
+    await pool.query(`
+      UPDATE case_file_summaries s
+      SET presenting_complaint = NULL
+      FROM bookings b
+      WHERE s.booking_id = b.id
+        AND b.booking_type = 'consultation'
+        AND s.presenting_complaint IS NOT NULL
+        AND s.presenting_complaint = b.clinical_summary
+    `);
     // Safe, repeatable legacy backfill for encounter summaries and URL attachments.
     await pool.query(`
-      INSERT INTO case_file_summaries (booking_id, allergies, presenting_complaint, working_diagnosis, clinical_history, submitted_by_user_id)
+      INSERT INTO case_file_summaries (booking_id, allergies, presenting_complaint, present_illness, working_diagnosis, clinical_history, submitted_by_user_id)
       SELECT b.id, CASE WHEN COALESCE(b.patient_allergy_not_specified, true) THEN NULL ELSE b.patient_allergies END,
-        b.clinical_summary, b.provisional_diagnosis, b.clinical_summary, b.user_id
+        NULL, NULL, b.provisional_diagnosis, b.clinical_summary, b.user_id
       FROM bookings b
       WHERE b.booking_type = 'consultation'
       ON CONFLICT (booking_id) DO UPDATE SET
         allergies = EXCLUDED.allergies,
-        presenting_complaint = EXCLUDED.presenting_complaint,
         working_diagnosis = EXCLUDED.working_diagnosis,
-        clinical_history = EXCLUDED.clinical_history,
+        clinical_history = COALESCE(EXCLUDED.clinical_history, case_file_summaries.clinical_history),
         submitted_by_user_id = EXCLUDED.submitted_by_user_id,
         submitted_at = COALESCE(case_file_summaries.submitted_at, EXCLUDED.submitted_at)
       WHERE NOT EXISTS (

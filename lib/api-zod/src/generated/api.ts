@@ -333,8 +333,11 @@ export const GetCaseFileResponse = zod.object({
   "allergies": zod.string().nullish(),
   "comorbidities": zod.string().nullish(),
   "presentingComplaint": zod.string().nullish(),
+  "presentIllness": zod.string().nullish(),
   "workingDiagnosis": zod.string().nullish(),
-  "clinicalHistory": zod.string().nullish(),
+  "clinicalSummary": zod.string().nullish(),
+  "examination": zod.string().nullish(),
+  "investigations": zod.string().nullish(),
   "submittedByUserId": zod.string().nullish(),
   "submittedAt": zod.coerce.date().nullish()
 }),

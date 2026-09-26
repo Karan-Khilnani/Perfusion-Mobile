@@ -408,26 +408,35 @@ export default function CaseFilePage() {
                       <FileText className="h-4 w-4" /> Clinical Summary
                     </h3>
                     <div className="bg-card rounded-xl p-4 border text-sm space-y-3 shadow-sm">
-                      {caseFile.summary.presentingComplaint ? (
+                      <div>
+                        <span className="text-xs font-semibold text-muted-foreground uppercase">Presenting Complaint</span>
+                        <p className="mt-1 whitespace-pre-wrap">{caseFile.summary.presentingComplaint || "Not provided."}</p>
+                      </div>
+                      <div>
+                        <span className="text-xs font-semibold text-muted-foreground uppercase">Present Illness</span>
+                        <p className="mt-1 whitespace-pre-wrap">{caseFile.summary.presentIllness || "Not provided."}</p>
+                      </div>
+                      <div className="space-y-2">
+                        <span className="text-xs font-semibold text-muted-foreground uppercase">Clinical Details</span>
                         <div>
-                          <span className="text-xs font-semibold text-muted-foreground uppercase">Presenting Complaint</span>
-                          <p className="mt-1">{caseFile.summary.presentingComplaint}</p>
+                          <span className="text-[11px] font-medium text-muted-foreground uppercase">Examination</span>
+                          <p className="mt-0.5 whitespace-pre-wrap">{caseFile.summary.examination || "Not provided."}</p>
                         </div>
-                      ) : (
-                        <p className="text-muted-foreground italic">No presenting complaint recorded.</p>
-                      )}
-                      {caseFile.summary.clinicalHistory && (
                         <div>
-                          <span className="text-xs font-semibold text-muted-foreground uppercase">Clinical History</span>
-                          <p className="mt-1 whitespace-pre-wrap">{caseFile.summary.clinicalHistory}</p>
+                          <span className="text-[11px] font-medium text-muted-foreground uppercase">Investigations</span>
+                          <p className="mt-0.5 whitespace-pre-wrap">{caseFile.summary.investigations || "Not provided."}</p>
                         </div>
-                      )}
+                      </div>
                       {caseFile.summary.workingDiagnosis && (
                         <div className="bg-primary/5 p-2 rounded border border-primary/10">
-                          <span className="text-xs font-semibold text-primary uppercase">Working Diagnosis</span>
+                          <span className="text-xs font-semibold text-primary uppercase">Provisional Diagnosis</span>
                           <p className="mt-0.5 font-medium text-primary-foreground">{caseFile.summary.workingDiagnosis}</p>
                         </div>
                       )}
+                      <div>
+                        <span className="text-xs font-semibold text-muted-foreground uppercase">Clinical Summary</span>
+                        <p className="mt-1 whitespace-pre-wrap">{caseFile.summary.clinicalSummary || "Not recorded."}</p>
+                      </div>
                       {(caseFile.summary.submittedByUserId || caseFile.summary.submittedAt) && (
                         <div className="pt-2 border-t text-[10px] text-muted-foreground uppercase tracking-wider">
                           Submitted {caseFile.summary.submittedAt && `on ${format(new Date(caseFile.summary.submittedAt), "MMM d, yyyy h:mm a")}`}

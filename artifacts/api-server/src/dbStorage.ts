@@ -2,6 +2,10 @@ import { randomUUID } from "crypto";
 import { eq, desc, and } from "drizzle-orm";
 import { db } from "./db";
 import {
+  buildConsultationCaseFileSummaryValues,
+  type ConsultationClinicalFields,
+} from "./services/consultation-clinical-information";
+import {
   labs,
   labTests,
   consultants,
@@ -295,18 +299,13 @@ export class DatabaseStorage implements IStorage {
     return booking;
   }
 
-  async createConsultationBooking(insertBooking: InsertBooking, comorbidities: string | null): Promise<Booking> {
+  async createConsultationBooking(insertBooking: InsertBooking, clinicalFields: ConsultationClinicalFields): Promise<Booking> {
     return db.transaction(async (tx) => {
       const [booking] = await tx.insert(bookings).values(insertBooking as any).returning();
       await tx.insert(caseFileSummaries).values({
         id: randomUUID(),
         bookingId: booking.id,
-        allergies: booking.patientAllergyNotSpecified ? null : booking.patientAllergies ?? null,
-        comorbidities,
-        presentingComplaint: booking.clinicalSummary ?? null,
-        workingDiagnosis: booking.provisionalDiagnosis ?? null,
-        clinicalHistory: booking.clinicalSummary ?? null,
-        submittedByUserId: booking.userId,
+        ...buildConsultationCaseFileSummaryValues(booking, clinicalFields),
       });
       return booking;
     });

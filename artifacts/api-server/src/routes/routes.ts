@@ -88,13 +88,14 @@ function caseFileFreshness(observedAt: Date | string | null) {
 async function syncLegacyCaseFileSummary(booking: any) {
   if (booking?.bookingType !== "consultation" || caseFileReadOnly(booking) || booking?.prescriptionApprovedAt) return;
   await getPool().query(`UPDATE case_file_summaries
-    SET allergies = $2, presenting_complaint = $3, working_diagnosis = $4,
-        clinical_history = $3, submitted_by_user_id = $5, submitted_at = COALESCE(submitted_at, now())
+    SET allergies = $2, working_diagnosis = $3,
+        clinical_history = COALESCE($4, clinical_history), submitted_by_user_id = $5,
+        submitted_at = COALESCE(submitted_at, now())
     WHERE booking_id = $1`, [
     booking.id,
     booking.patientAllergyNotSpecified ? null : booking.patientAllergies,
-    booking.clinicalSummary || null,
     booking.provisionalDiagnosis || null,
+    booking.clinicalSummary || null,
     booking.userId,
   ]);
 }
@@ -1252,20 +1253,27 @@ export async function registerRoutes(
         ? resolveConsultationLifecycle(booking)
         : null;
       const storedSummary = (await pool.query(`SELECT allergies, comorbidities, presenting_complaint AS "presentingComplaint",
-        working_diagnosis AS "workingDiagnosis", clinical_history AS "clinicalHistory",
+        present_illness AS "presentIllness", working_diagnosis AS "workingDiagnosis",
+        clinical_history AS "clinicalSummary",
         submitted_by_user_id AS "submittedByUserId", submitted_at AS "submittedAt"
         FROM case_file_summaries WHERE booking_id = $1`, [booking.id])).rows[0];
       const summary = storedSummary ? {
         ...storedSummary,
-        presentingComplaint: booking.clinicalSummary || null,
-        workingDiagnosis: booking.provisionalDiagnosis || null,
-        clinicalHistory: booking.clinicalSummary || null,
+        presentingComplaint: storedSummary.presentingComplaint || null,
+        presentIllness: storedSummary.presentIllness || null,
+        workingDiagnosis: booking.provisionalDiagnosis || storedSummary.workingDiagnosis || null,
+        clinicalSummary: booking.clinicalSummary || storedSummary.clinicalSummary || null,
+        examination: booking.examination || null,
+        investigations: booking.investigations || null,
       } : {
         allergies: booking.patientAllergyNotSpecified ? null : booking.patientAllergies,
         comorbidities: null,
-        presentingComplaint: booking.clinicalSummary || null,
+        presentingComplaint: null,
+        presentIllness: null,
         workingDiagnosis: booking.provisionalDiagnosis || null,
-        clinicalHistory: booking.clinicalSummary || null,
+        clinicalSummary: booking.clinicalSummary || null,
+        examination: booking.examination || null,
+        investigations: booking.investigations || null,
         submittedByUserId: booking.userId,
         submittedAt: booking.createdAt,
       };
@@ -1751,12 +1759,31 @@ export async function registerRoutes(
         return res.status(401).json({ message: "Unauthorized" });
       }
 
-      const { comorbidities: rawComorbidities, ...bookingFields } = req.body || {};
+      const {
+        comorbidities: rawComorbidities,
+        presentingComplaint: rawPresentingComplaint,
+        presentIllness: rawPresentIllness,
+        ...bookingFields
+      } = req.body || {};
       if (rawComorbidities != null && typeof rawComorbidities !== "string") {
         res.status(400).json({ message: "Comorbidities / Past Illness must be text." });
         return;
       }
+      if (rawPresentingComplaint != null && typeof rawPresentingComplaint !== "string") {
+        res.status(400).json({ message: "Presenting Complaint must be text." });
+        return;
+      }
+      if (rawPresentIllness != null && typeof rawPresentIllness !== "string") {
+        res.status(400).json({ message: "Present Illness must be text." });
+        return;
+      }
       const comorbidities = normalizeComorbidities(rawComorbidities);
+      const presentingComplaint = typeof rawPresentingComplaint === "string"
+        ? rawPresentingComplaint.trim() || null
+        : null;
+      const presentIllness = typeof rawPresentIllness === "string"
+        ? rawPresentIllness.trim() || null
+        : null;
 
       const bookingData = {
         ...bookingFields,
@@ -1887,7 +1914,11 @@ export async function registerRoutes(
       bookingData.bookingNumber = await generateBookingNumber(bookingData.bookingType);
 
       const booking = bookingData.bookingType === "consultation"
-        ? await storage.createConsultationBooking(bookingData, comorbidities)
+        ? await storage.createConsultationBooking(bookingData, {
+          comorbidities,
+          presentingComplaint,
+          presentIllness,
+        })
         : await storage.createBooking(bookingData);
 
       if (booking.bookingType === "lab") {

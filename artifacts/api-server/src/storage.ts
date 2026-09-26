@@ -2,6 +2,10 @@ import { eq, and, desc, gte, lte, or, inArray, notInArray } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { db } from "./db";
 import {
+  buildConsultationCaseFileSummaryValues,
+  type ConsultationClinicalFields,
+} from "./services/consultation-clinical-information";
+import {
   labs,
   labTests,
   consultants,
@@ -172,7 +176,7 @@ export interface IStorage {
   getBookingById(id: string): Promise<Booking | undefined>;
   getBookingByVideoRoomUrl(videoRoomUrl: string): Promise<Booking | undefined>;
   createBooking(booking: InsertBooking): Promise<Booking>;
-  createConsultationBooking(booking: InsertBooking, comorbidities: string | null): Promise<Booking>;
+  createConsultationBooking(booking: InsertBooking, clinicalFields: ConsultationClinicalFields): Promise<Booking>;
   updateBooking(id: string, data: Partial<InsertBooking>): Promise<Booking | undefined>;
   updateBookingStatus(id: string, status: BookingStatus): Promise<Booking | undefined>;
   getAllBookings(): Promise<Booking[]>;
@@ -651,18 +655,13 @@ export class DatabaseStorage implements IStorage {
     return created;
   }
 
-  async createConsultationBooking(booking: InsertBooking, comorbidities: string | null): Promise<Booking> {
+  async createConsultationBooking(booking: InsertBooking, clinicalFields: ConsultationClinicalFields): Promise<Booking> {
     return db.transaction(async (tx) => {
       const [created] = await tx.insert(bookings).values([booking as any]).returning();
       await tx.insert(caseFileSummaries).values({
         id: randomUUID(),
         bookingId: created.id,
-        allergies: created.patientAllergyNotSpecified ? null : created.patientAllergies ?? null,
-        comorbidities,
-        presentingComplaint: created.clinicalSummary ?? null,
-        workingDiagnosis: created.provisionalDiagnosis ?? null,
-        clinicalHistory: created.clinicalSummary ?? null,
-        submittedByUserId: created.userId,
+        ...buildConsultationCaseFileSummaryValues(created, clinicalFields),
       });
       return created;
     });
