@@ -30,6 +30,11 @@ type Consultant = {
   city?: string;
   consultationFee?: string;
   computedCustomerPrice?: string;
+  availabilityPreview?: {
+    label: string | null;
+    date: string | null;
+    windows: { from: string; to: string; appointmentSlot: string }[];
+  };
   availability?: Record<string, string[]>;
   availableSlots?: string[];
 };
@@ -54,6 +59,7 @@ export default function NewConsultationScreen() {
 
   const consultants = useQuery<Consultant[]>({
     queryKey: ["mobile-consultants"],
+    refetchOnMount: "always",
     queryFn: async () => {
       const response = await apiFetch("/api/consultants");
       if (!response.ok) throw new Error("Unable to load consultants");
@@ -63,8 +69,9 @@ export default function NewConsultationScreen() {
   const filtered = useMemo(() => (consultants.data || []).filter((item) => {
     const text = `${item.displayName || item.name || ""} ${item.specialization || ""} ${item.hospital || item.institute || ""}`.toLowerCase();
     const specialtyMatch = specialty === "All" || (item.specialization || "").toLowerCase().includes(specialty.toLowerCase());
-    return specialtyMatch && text.includes(search.trim().toLowerCase());
-  }), [consultants.data, search, specialty]);
+    const availabilityMatch = !todayOnly || item.availabilityPreview?.label === "Available Today";
+    return specialtyMatch && text.includes(search.trim().toLowerCase()) && availabilityMatch;
+  }), [consultants.data, search, specialty, todayOnly]);
 
   const book = useMutation({
     mutationFn: async () => {
@@ -137,9 +144,28 @@ export default function NewConsultationScreen() {
             </View>
             <Switch value={todayOnly} onValueChange={setTodayOnly} trackColor={{ false: palette.muted, true: `${palette.primary}70` }} thumbColor={todayOnly ? palette.primary : palette.card} />
           </View>
-          {consultants.isLoading ? <ActivityIndicator color={palette.primary} style={{ marginTop: 40 }} /> : filtered.map((consultant) => (
+          {consultants.isLoading ? (
+            <ActivityIndicator color={palette.primary} style={{ marginTop: 40 }} />
+          ) : consultants.isError ? (
+            <View style={{ alignItems: "center", gap: 10, marginTop: 32, paddingHorizontal: 24 }}>
+              <Text style={{ color: palette.destructive, textAlign: "center" }}>
+                {consultants.error instanceof Error ? consultants.error.message : "Unable to load current availability."}
+              </Text>
+              <Pressable onPress={() => consultants.refetch()} accessibilityRole="button">
+                <Text style={{ color: palette.primary, fontWeight: "600" }}>Try again</Text>
+              </Pressable>
+            </View>
+          ) : filtered.length ? filtered.map((consultant) => (
             <ConsultantCard key={consultant.id} consultant={consultant} onChoose={(slot) => { setSelected({ consultant, slot }); setStep("details"); }} />
-          ))}
+          )) : (
+            <Text style={{ color: palette.mutedForeground, textAlign: "center", marginTop: 28 }}>
+              {todayOnly
+                ? "No consultants have eligible slots today."
+                : consultants.data?.length
+                  ? "No consultants match your search."
+                  : "No consultants have upcoming availability."}
+            </Text>
+          )}
         </ScrollView>
       ) : (
         <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 28 }]} keyboardShouldPersistTaps="handled">
@@ -208,7 +234,8 @@ export default function NewConsultationScreen() {
 
 function ConsultantCard({ consultant, onChoose }: { consultant: Consultant; onChoose: (slot: string) => void }) {
   const palette = useColors();
-  const slots = consultant.availableSlots?.slice(0, 3) || Object.values(consultant.availability || {}).flat().slice(0, 3);
+  const preview = consultant.availabilityPreview;
+  const windows = preview?.windows.slice(0, 3) ?? [];
   return (
     <View style={[styles.consultantCard, { backgroundColor: palette.card, borderColor: palette.border }]}>
       <View style={styles.consultantMain}>
@@ -220,11 +247,24 @@ function ConsultantCard({ consultant, onChoose }: { consultant: Consultant; onCh
         </View>
       </View>
       <View style={styles.slots}>
-        {slots.length ? slots.map((slot) => (
-          <Pressable key={slot} onPress={() => onChoose(slot)} style={[styles.slot, { backgroundColor: palette.accent }]}>
-            <Text style={[styles.slotText, { color: palette.foreground }]}>{slot}</Text>
+        {preview?.label && (
+          <Text style={[styles.tomorrowText, { color: palette.primary, marginBottom: 4 }]}>
+            {preview.label}{preview.date ? ` · ${preview.date}` : ""}
+          </Text>
+        )}
+        {windows.length ? windows.map((window) => (
+          <Pressable
+            key={window.appointmentSlot}
+            onPress={() => onChoose(window.appointmentSlot)}
+            style={[styles.slot, { backgroundColor: palette.accent }]}
+          >
+            <Text style={[styles.slotText, { color: palette.foreground }]}>{window.from}{window.to ? ` – ${window.to}` : ""}</Text>
           </Pressable>
-        )) : <View style={[styles.tomorrow, { backgroundColor: `${palette.warning}15` }]}><Text style={[styles.tomorrowText, { color: palette.warning }]}>Available Tomorrow</Text></View>}
+        )) : <View style={[styles.tomorrow, { backgroundColor: `${palette.warning}15` }]}>
+          <Text style={[styles.tomorrowText, { color: palette.warning }]}>
+            {preview?.label ?? "No upcoming availability"}
+          </Text>
+        </View>}
       </View>
     </View>
   );

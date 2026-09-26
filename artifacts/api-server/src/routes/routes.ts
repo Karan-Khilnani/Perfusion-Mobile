@@ -24,6 +24,7 @@ import { sendPushNotification, getVapidPublicKey, type PushPayload } from "../se
 import { getCallWindow } from "../services/call-window";
 import { resolveConsultationLifecycle } from "../services/consultation-lifecycle";
 import { notifyMobileIncomingCall } from "../services/mobile-call-push";
+import { getConsultantAvailabilityPreview } from "../services/consultant-availability";
 import { randomUUID } from "crypto";
 
 function sanitizeUserForClient<T extends Record<string, any> | undefined>(user: T) {
@@ -540,16 +541,28 @@ export async function registerRoutes(
 
   app.patch("/api/provider/consultants/:id", isAuthenticated, async (req: any, res) => {
     try {
+      if (req.user?.role !== "provider") {
+        res.status(403).json({ message: "Only providers can update their consultant profile." });
+        return;
+      }
       const userId = req.user?.id;
       const provider = await storage.getProviderByUserId(userId);
       if (!provider) {
         return res.status(403).json({ message: "Provider profile required" });
       }
+      if (provider.type !== "consultant") {
+        res.status(403).json({ message: "Only consultant providers can update consultant availability." });
+        return;
+      }
       
       const consultant = await storage.getConsultantById(req.params.id);
       if (!consultant) return res.status(404).json({ message: "Consultant not found" });
-      if (consultant.providerId && consultant.providerId !== provider.id) {
+      if (consultant.providerId !== provider.id) {
         return res.status(403).json({ message: "Consultant not found or access denied" });
+      }
+      if (req.body?.status !== undefined && !["active", "paused"].includes(req.body.status)) {
+        res.status(400).json({ message: "Availability status must be active or paused." });
+        return;
       }
       
       const updated = await storage.updateConsultant(req.params.id, req.body);
@@ -861,6 +874,8 @@ export async function registerRoutes(
       const enriched = await Promise.all(allConsultants.map(async c => {
         const baseCost = parseFloat(c.consultationFee);
         const pricing = calculateCustomerPrice(baseCost, c.customerPrice, c.marginOverride, defaultMargin);
+        const slotOverrides = await storage.getSlotOverrides(c.id);
+        const availabilityPreview = getConsultantAvailabilityPreview(c, slotOverrides);
         let photoUrl = c.photoUrl;
 
         // Files saved under the server's local uploads directory by older
@@ -894,6 +909,7 @@ export async function registerRoutes(
           providerBaseCost: baseCost.toFixed(2),
           computedCustomerPrice: pricing.customerPrice.toFixed(2),
           computedMarginPercent: pricing.marginPercent.toFixed(2),
+          availabilityPreview,
         };
       }));
       res.json(enriched);
@@ -909,6 +925,8 @@ export async function registerRoutes(
       if (!consultant) {
         return res.status(404).json({ message: "Consultant not found" });
       }
+      const slotOverrides = await storage.getSlotOverrides(consultant.id);
+      const availabilityPreview = getConsultantAvailabilityPreview(consultant, slotOverrides);
       const defaultMarginSetting = await storage.getPlatformSetting("default_margin_percent");
       const defaultMargin = parseFloat(defaultMarginSetting?.settingValue || "15");
       const baseCost = parseFloat(consultant.consultationFee);
@@ -933,6 +951,7 @@ export async function registerRoutes(
         ...consultant,
         photoUrl,
         computedCustomerPrice: pricing.customerPrice.toFixed(2),
+        availabilityPreview,
       });
     } catch (error) {
       console.error("Error fetching consultant:", error);
@@ -1764,6 +1783,10 @@ export async function registerRoutes(
       // For consultation bookings, link to the provider who owns the consultant
       if (bookingData.bookingType === "consultation" && bookingData.serviceId) {
         const consultant = await storage.getConsultantById(bookingData.serviceId);
+        if (consultant && consultant.status !== "active") {
+          res.status(409).json({ message: "This consultant is currently unavailable for new bookings." });
+          return;
+        }
         if (consultant && consultant.providerId) {
           bookingData.providerId = consultant.providerId;
         }

@@ -1,13 +1,16 @@
 import { Feather, Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import { router } from "expo-router";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { router, useFocusEffect } from "expo-router";
 import React, { useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   Platform,
   Pressable,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   View,
 } from "react-native";
@@ -16,7 +19,15 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "@/contexts/AuthContext";
 import { BrandMark } from "@/components/BrandMark";
 import { ScreenHeading } from "@/components/ScreenHeading";
+import { apiFetch } from "@/hooks/useApi";
 import { useColors } from "@/hooks/useColors";
+
+type ProviderConsultant = {
+  id: string;
+  name?: string;
+  displayName?: string;
+  status?: "active" | "paused" | "deleted" | string;
+};
 
 function ProfileRow({
   icon,
@@ -54,7 +65,43 @@ export default function ProfileScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { user, logout, callbackDevice } = useAuth();
+  const queryClient = useQueryClient();
   const [loggingOut, setLoggingOut] = useState(false);
+  const providerConsultants = useQuery<ProviderConsultant[]>({
+    queryKey: ["mobile-provider-consultants", user?.id],
+    enabled: user?.role === "provider",
+    refetchOnMount: "always",
+    queryFn: async () => {
+      const response = await apiFetch("/api/provider/my-consultants");
+      if (!response.ok) throw new Error("Unable to load provider availability.");
+      return response.json();
+    },
+  });
+  const availabilityMutation = useMutation({
+    mutationFn: async ({ id, status }: { id: string; status: "active" | "paused" }) => {
+      const response = await apiFetch(`/api/provider/consultants/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ status }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.message || "Unable to update availability.");
+      return data as ProviderConsultant;
+    },
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["mobile-provider-consultants", user?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["mobile-consultants"] }),
+      ]);
+    },
+    onError: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["mobile-provider-consultants", user?.id] });
+    },
+  });
+  useFocusEffect(
+    React.useCallback(() => {
+      if (user?.role === "provider") void providerConsultants.refetch();
+    }, [providerConsultants.refetch, user?.role]),
+  );
 
   const handleLogout = () => {
     if (Platform.OS === "web") {
@@ -190,6 +237,109 @@ export default function ProfileScreen() {
           </View>
         </View>
       </View>
+
+      {user?.role === "provider" && (
+        <View
+          style={[
+            styles.card,
+            { backgroundColor: colors.card, borderColor: colors.border },
+          ]}
+        >
+          <Text style={[styles.cardTitle, { color: colors.foreground }]}>
+            Availability
+          </Text>
+          <Text style={[styles.rowValue, { color: colors.mutedForeground, marginBottom: 12 }]}>
+            Choose whether seekers can book your consultant profile.
+          </Text>
+          {providerConsultants.isLoading ? (
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 8 }}>
+              <ActivityIndicator color={colors.primary} />
+              <Text style={{ color: colors.mutedForeground }}>Loading availability…</Text>
+            </View>
+          ) : providerConsultants.isError ? (
+            <View style={{ gap: 8 }}>
+              <Text style={{ color: colors.destructive }}>
+                {providerConsultants.error instanceof Error
+                  ? providerConsultants.error.message
+                  : "Unable to load availability."}
+              </Text>
+              <Pressable onPress={() => providerConsultants.refetch()} accessibilityRole="button">
+                <Text style={{ color: colors.primary, fontWeight: "600" }}>Try again</Text>
+              </Pressable>
+            </View>
+          ) : providerConsultants.data?.length ? (
+            <View>
+              {providerConsultants.data.map((consultant, index) => {
+                const canToggle = consultant.status === "active" || consultant.status === "paused";
+                const isAvailable = consultant.status === "active";
+                const updating = availabilityMutation.isPending
+                  && availabilityMutation.variables?.id === consultant.id;
+                return (
+                  <View
+                    key={consultant.id}
+                    style={[
+                      styles.row,
+                      {
+                        borderBottomColor: colors.border,
+                        borderBottomWidth: index === providerConsultants.data!.length - 1 ? 0 : StyleSheet.hairlineWidth,
+                        paddingVertical: 13,
+                      },
+                    ]}
+                  >
+                    <View style={[styles.rowContent, { paddingRight: 10 }]}>
+                      <Text style={[styles.rowLabel, { color: colors.mutedForeground }]}>
+                        {consultant.displayName || consultant.name || "Consultant"}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.rowValue,
+                          { color: canToggle ? (isAvailable ? colors.success : colors.mutedForeground) : colors.warning },
+                        ]}
+                      >
+                        {consultant.status === "active"
+                          ? "Available"
+                          : consultant.status === "paused"
+                            ? "Unavailable"
+                            : "Status unavailable"}
+                      </Text>
+                    </View>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                      {updating && <ActivityIndicator size="small" color={colors.primary} />}
+                      <Switch
+                        value={isAvailable}
+                        disabled={!canToggle || availabilityMutation.isPending}
+                        onValueChange={(available) => {
+                          availabilityMutation.reset();
+                          availabilityMutation.mutate({
+                            id: consultant.id,
+                            status: available ? "active" : "paused",
+                          });
+                        }}
+                        trackColor={{ false: colors.border, true: `${colors.success}99` }}
+                        thumbColor={isAvailable ? colors.success : colors.mutedForeground}
+                        accessibilityRole="switch"
+                        accessibilityLabel={`Availability for ${consultant.displayName || consultant.name || "consultant"}`}
+                        accessibilityState={{ checked: isAvailable, disabled: !canToggle || availabilityMutation.isPending }}
+                      />
+                    </View>
+                  </View>
+                );
+              })}
+              {availabilityMutation.isError && (
+                <Text style={{ color: colors.destructive, marginTop: 10 }}>
+                  {availabilityMutation.error instanceof Error
+                    ? availabilityMutation.error.message
+                    : "Unable to update availability. The saved state was restored."}
+                </Text>
+              )}
+            </View>
+          ) : (
+            <Text style={[styles.rowValue, { color: colors.mutedForeground }]}>
+              No consultant profile is connected to this provider account yet.
+            </Text>
+          )}
+        </View>
+      )}
 
       {user?.role !== "admin" && (
         <Pressable

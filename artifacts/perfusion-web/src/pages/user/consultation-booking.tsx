@@ -63,6 +63,40 @@ type BookingFormData = z.infer<typeof bookingSchema>;
 const SLOT_DAY_ORDER: Record<string, number> = {
   Mon: 0, Tue: 1, Wed: 2, Thu: 3, Fri: 4, Sat: 5, Sun: 6,
 };
+const IST_TIME_ZONE = "Asia/Kolkata";
+const IST_DAYS_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+function getIstClock(now = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: IST_TIME_ZONE,
+    weekday: "short",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(now);
+  const value = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((part) => part.type === type)?.value ?? "";
+  const year = Number(value("year"));
+  const month = Number(value("month"));
+  const day = Number(value("day"));
+  return {
+    year,
+    month,
+    day,
+    weekday: value("weekday"),
+    minutes: Number(value("hour")) * 60 + Number(value("minute")),
+    date: `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`,
+  };
+}
+
+function getIstWeekday(dateString: string): string {
+  const [year, month, day] = dateString.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return IST_DAYS_SHORT[date.getUTCDay()];
+}
 
 function parseTimeToMinutes(timeStr: string): number {
   const m = timeStr.match(/(\d+):(\d+)\s*(AM|PM)/i);
@@ -90,9 +124,9 @@ function sortLegacySlots(slots: string[]): string[] {
  *  remaining. For range slots (e.g. "Mon 9:00 AM–1:00 PM") the end time is used;
  *  for start-time-only slots the start time is used (legacy fallback). */
 function filterPastLegacySlots(slots: string[]): string[] {
-  const now = new Date();
-  const todayName = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][now.getDay()];
-  const nowMin = now.getHours() * 60 + now.getMinutes();
+  const now = getIstClock();
+  const todayName = now.weekday;
+  const nowMin = now.minutes;
   return slots.filter((slot) => {
     const [dayName, ...timeParts] = slot.split(" ");
     if (dayName !== todayName) return true;
@@ -115,11 +149,9 @@ function filterPastTimeWindows(
   windows: { from: string; to: string }[],
   dateStr: string,
 ): { from: string; to: string }[] {
-  const now = new Date();
-  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
-  const nowMin = now.getHours() * 60 + now.getMinutes();
-  const filtered = dateStr === todayStr
-    ? windows.filter((w) => parseTimeToMinutes(w.to) - 15 > nowMin)
+  const now = getIstClock();
+  const filtered = dateStr === now.date
+    ? windows.filter((w) => parseTimeToMinutes(w.to) - 15 > now.minutes)
     : windows;
   return [...filtered].sort((a, b) => parseTimeToMinutes(a.from) - parseTimeToMinutes(b.from));
 }
@@ -139,11 +171,12 @@ export default function ConsultationBookingPage() {
   const [chartUrls, setChartUrls] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<"pay_now" | "pay_later">("pay_later");
-  const [calendarMonth, setCalendarMonth] = useState(() => { const d = new Date(); d.setDate(1); return d; });
+  const [calendarMonth, setCalendarMonth] = useState(() => {
+    const now = getIstClock();
+    return new Date(now.year, now.month - 1, 1);
+  });
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const { openCheckout } = useRazorpay();
-
-  const DAYS_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
   const { data: consultant, isLoading } = useQuery<Consultant>({
     queryKey: ["/api/consultants", id],
@@ -412,6 +445,24 @@ export default function ConsultationBookingPage() {
     );
   }
 
+  if (consultant && consultant.status !== "active") {
+    return (
+      <Card>
+        <CardContent className="py-12 text-center">
+          <h2 className="text-xl font-semibold">Consultant unavailable</h2>
+          <p className="mt-2 text-muted-foreground">
+            This consultant is not accepting new consultations right now.
+          </p>
+          <Link href="/user/consultation">
+            <Button variant="outline" className="mt-4">
+              Back to Consultants
+            </Button>
+          </Link>
+        </CardContent>
+      </Card>
+    );
+  }
+
   if (step === "confirmation") {
     return (
       <div className="mx-auto max-w-2xl space-y-6">
@@ -614,7 +665,7 @@ export default function ConsultationBookingPage() {
                         const daysInMonth = new Date(calYear, calMonthNum + 1, 0).getDate();
                         const cells: (number | null)[] = Array(firstDow).fill(null);
                         for (let d = 1; d <= daysInMonth; d++) cells.push(d);
-                        const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+                        const istTodayDate = getIstClock().date;
                         const toDateStr = (day: number) => {
                           const m = String(calMonthNum + 1).padStart(2, "0");
                           return `${calYear}-${m}-${String(day).padStart(2, "0")}`;
@@ -623,9 +674,9 @@ export default function ConsultationBookingPage() {
                           slotOverrides.find(o => o.date === dateStr);
                         const isDaySelectable = (day: number) => {
                           if (slotOverridesLoading) return false;
-                          const d = new Date(calYear, calMonthNum, day);
-                          if (d < todayStart) return false;
-                          const dayName = DAYS_SHORT[d.getDay()];
+                          const dateString = toDateStr(day);
+                          if (dateString < istTodayDate) return false;
+                          const dayName = getIstWeekday(dateString);
                           const coveredBySchedule = consultantSlotSeries.length > 0
                             ? consultantSlotSeries.some(s => s.days.includes(dayName))
                             : consultantAvailableDays.includes(dayName);
@@ -635,15 +686,20 @@ export default function ConsultationBookingPage() {
                           return true;
                         };
                         const formatDateLabel = (dateStr: string) => {
-                          const d = new Date(dateStr + "T00:00:00");
-                          return d.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short", year: "numeric" });
+                          const d = new Date(dateStr + "T12:00:00Z");
+                          return new Intl.DateTimeFormat("en-IN", {
+                            timeZone: IST_TIME_ZONE,
+                            weekday: "short",
+                            day: "numeric",
+                            month: "short",
+                            year: "numeric",
+                          }).format(d);
                         };
                         const getTimeWindowsForDate = (dateStr: string): { from: string; to: string }[] => {
                           const ov = getOverride(dateStr);
                           if (ov && !ov.isPaused) return [{ from: ov.customFrom || consultantFrom, to: ov.customTo || consultantTo }];
                           if (consultantSlotSeries.length > 0) {
-                            const d = new Date(dateStr + "T00:00:00");
-                            const dayName = DAYS_SHORT[d.getDay()];
+                            const dayName = getIstWeekday(dateStr);
                             return consultantSlotSeries.filter(s => s.days.includes(dayName)).map(s => ({ from: s.from, to: s.to }));
                           }
                           return [{ from: consultantFrom, to: consultantTo }];
@@ -673,7 +729,7 @@ export default function ConsultationBookingPage() {
                                   const dateStr = toDateStr(day);
                                   const selectable = isDaySelectable(day);
                                   const isSelected = selectedDate === dateStr;
-                                  const isToday = new Date(calYear, calMonthNum, day).getTime() === todayStart.getTime();
+                          const isToday = toDateStr(day) === istTodayDate;
                                   return (
                                     <button key={dateStr} type="button" data-testid={`cal-date-${dateStr}`} disabled={!selectable}
                                       onClick={() => { setSelectedDate(dateStr); field.onChange(""); }}
@@ -972,8 +1028,7 @@ export default function ConsultationBookingPage() {
                         const cells: (number | null)[] = Array(firstDow).fill(null);
                         for (let d = 1; d <= daysInMonth; d++) cells.push(d);
 
-                        const todayStart = new Date();
-                        todayStart.setHours(0, 0, 0, 0);
+                        const istTodayDate = getIstClock().date;
 
                         const toDateStr = (day: number) => {
                           const m = String(calMonthNum + 1).padStart(2, "0");
@@ -985,9 +1040,9 @@ export default function ConsultationBookingPage() {
 
                         const isDaySelectable = (day: number) => {
                           if (slotOverridesLoading) return false; // block all until overrides are confirmed
-                          const d = new Date(calYear, calMonthNum, day);
-                          if (d < todayStart) return false;
-                          const dayName = DAYS_SHORT[d.getDay()];
+                          const dateString = toDateStr(day);
+                          if (dateString < istTodayDate) return false;
+                          const dayName = getIstWeekday(dateString);
                           // Check against slotSeries first, then legacy availableDays
                           const coveredBySchedule = consultantSlotSeries.length > 0
                             ? consultantSlotSeries.some(s => s.days.includes(dayName))
@@ -999,10 +1054,11 @@ export default function ConsultationBookingPage() {
                         };
 
                         const formatDateLabel = (dateStr: string) => {
-                          const d = new Date(dateStr + "T00:00:00");
-                          return d.toLocaleDateString("en-IN", {
+                          const d = new Date(dateStr + "T12:00:00Z");
+                          return new Intl.DateTimeFormat("en-IN", {
+                            timeZone: IST_TIME_ZONE,
                             weekday: "short", day: "numeric", month: "short", year: "numeric",
-                          });
+                          }).format(d);
                         };
 
                         // Returns all available time windows for a given date
@@ -1014,8 +1070,7 @@ export default function ConsultationBookingPage() {
                           }
                           // slotSeries → return all series that cover this weekday
                           if (consultantSlotSeries.length > 0) {
-                            const d = new Date(dateStr + "T00:00:00");
-                            const dayName = DAYS_SHORT[d.getDay()];
+                            const dayName = getIstWeekday(dateStr);
                             return consultantSlotSeries
                               .filter(s => s.days.includes(dayName))
                               .map(s => ({ from: s.from, to: s.to }));
@@ -1069,7 +1124,7 @@ export default function ConsultationBookingPage() {
                                   const dateStr = toDateStr(day);
                                   const selectable = isDaySelectable(day);
                                   const isSelected = selectedDate === dateStr;
-                                  const isToday = new Date(calYear, calMonthNum, day).getTime() === todayStart.getTime();
+                                  const isToday = toDateStr(day) === istTodayDate;
                                   return (
                                     <button
                                       key={dateStr}

@@ -120,6 +120,132 @@ export const FinishPasswordResetResponse = zod.object({
 
 
 /**
+ * @summary List consultants owned by the signed-in provider
+ */
+export const GetMyConsultantsResponseItem = zod.object({
+  "id": zod.string(),
+  "status": zod.enum(['active', 'paused', 'deleted']),
+  "approvalStatus": zod.string().nullish(),
+  "availabilityFrom": zod.string().nullish(),
+  "availabilityTo": zod.string().nullish(),
+  "availableDays": zod.array(zod.string()).nullish(),
+  "availableSlots": zod.array(zod.string()).nullish(),
+  "slotSeries": zod.array(zod.object({
+  "days": zod.array(zod.string()),
+  "from": zod.string(),
+  "to": zod.string()
+})).nullish(),
+  "availabilityPreview": zod.object({
+  "label": zod.string().nullable(),
+  "date": zod.coerce.date().nullable(),
+  "windows": zod.array(zod.object({
+  "from": zod.string(),
+  "to": zod.string(),
+  "appointmentSlot": zod.string()
+}))
+})
+})
+export const GetMyConsultantsResponse = zod.array(GetMyConsultantsResponseItem)
+
+
+/**
+ * @summary Update the signed-in provider's consultant profile or availability
+ */
+export const UpdateProviderConsultantParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const UpdateProviderConsultantBody = zod.object({
+  "status": zod.enum(['active', 'paused']).optional()
+})
+
+export const UpdateProviderConsultantResponse = zod.object({
+  "id": zod.string(),
+  "status": zod.enum(['active', 'paused', 'deleted']),
+  "approvalStatus": zod.string().nullish(),
+  "availabilityFrom": zod.string().nullish(),
+  "availabilityTo": zod.string().nullish(),
+  "availableDays": zod.array(zod.string()).nullish(),
+  "availableSlots": zod.array(zod.string()).nullish(),
+  "slotSeries": zod.array(zod.object({
+  "days": zod.array(zod.string()),
+  "from": zod.string(),
+  "to": zod.string()
+})).nullish(),
+  "availabilityPreview": zod.object({
+  "label": zod.string().nullable(),
+  "date": zod.coerce.date().nullable(),
+  "windows": zod.array(zod.object({
+  "from": zod.string(),
+  "to": zod.string(),
+  "appointmentSlot": zod.string()
+}))
+})
+})
+
+
+/**
+ * @summary List approved consultants and their next eligible availability
+ */
+export const ListConsultantsResponseItem = zod.object({
+  "id": zod.string(),
+  "status": zod.enum(['active', 'paused', 'deleted']),
+  "approvalStatus": zod.string().nullish(),
+  "availabilityFrom": zod.string().nullish(),
+  "availabilityTo": zod.string().nullish(),
+  "availableDays": zod.array(zod.string()).nullish(),
+  "availableSlots": zod.array(zod.string()).nullish(),
+  "slotSeries": zod.array(zod.object({
+  "days": zod.array(zod.string()),
+  "from": zod.string(),
+  "to": zod.string()
+})).nullish(),
+  "availabilityPreview": zod.object({
+  "label": zod.string().nullable(),
+  "date": zod.coerce.date().nullable(),
+  "windows": zod.array(zod.object({
+  "from": zod.string(),
+  "to": zod.string(),
+  "appointmentSlot": zod.string()
+}))
+})
+})
+export const ListConsultantsResponse = zod.array(ListConsultantsResponseItem)
+
+
+/**
+ * @summary Get a consultant, including current availability
+ */
+export const GetConsultantParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const GetConsultantResponse = zod.object({
+  "id": zod.string(),
+  "status": zod.enum(['active', 'paused', 'deleted']),
+  "approvalStatus": zod.string().nullish(),
+  "availabilityFrom": zod.string().nullish(),
+  "availabilityTo": zod.string().nullish(),
+  "availableDays": zod.array(zod.string()).nullish(),
+  "availableSlots": zod.array(zod.string()).nullish(),
+  "slotSeries": zod.array(zod.object({
+  "days": zod.array(zod.string()),
+  "from": zod.string(),
+  "to": zod.string()
+})).nullish(),
+  "availabilityPreview": zod.object({
+  "label": zod.string().nullable(),
+  "date": zod.coerce.date().nullable(),
+  "windows": zod.array(zod.object({
+  "from": zod.string(),
+  "to": zod.string(),
+  "appointmentSlot": zod.string()
+}))
+})
+})
+
+
+/**
  * @summary Get an authorized booking
  */
 export const GetBookingByIdParams = zod.object({

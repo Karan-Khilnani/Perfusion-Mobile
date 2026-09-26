@@ -138,6 +138,76 @@ paths:
               schema:
                 $ref: "#/components/schemas/MessageResponse"
         "401": { description: Recovery session is not valid }
+  /provider/my-consultants:
+    get:
+      operationId: getMyConsultants
+      tags: [consultants]
+      summary: List consultants owned by the signed-in provider
+      responses:
+        "200":
+          description: The provider's consultant profiles and shared availability state
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ConsultantAvailability" }
+        "401": { description: Not authenticated }
+        "403": { description: Provider profile required }
+  /provider/consultants/{id}:
+    patch:
+      operationId: updateProviderConsultant
+      tags: [consultants]
+      summary: Update the signed-in provider's consultant profile or availability
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ConsultantAvailabilityUpdate" }
+      responses:
+        "200":
+          description: Updated consultant
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ConsultantAvailability" }
+        "400": { description: Invalid availability status }
+        "401": { description: Not authenticated }
+        "403": { description: Provider role or ownership check failed }
+        "404": { description: Consultant not found }
+  /consultants:
+    get:
+      operationId: listConsultants
+      tags: [consultants]
+      summary: List approved consultants and their next eligible availability
+      responses:
+        "200":
+          description: Public consultant list
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ConsultantAvailability" }
+  /consultants/{id}:
+    get:
+      operationId: getConsultant
+      tags: [consultants]
+      summary: Get a consultant, including current availability
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Consultant profile and next eligible availability
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ConsultantAvailability" }
+        "404": { description: Consultant not found }
   /bookings/{id}:
     get:
       operationId: getBookingById
@@ -712,4 +782,53 @@ components:
         providerId: { type: ["string", "null"] }
         postRxCallsEnabled: { type: boolean }
         postRxVideoEnabled: { type: boolean }
+    ConsultantAvailabilityPreviewWindow:
+      type: object
+      required: [from, to, appointmentSlot]
+      properties:
+        from: { type: string }
+        to: { type: string }
+        appointmentSlot: { type: string }
+    ConsultantAvailabilityPreview:
+      type: object
+      required: [label, date, windows]
+      properties:
+        label: { type: ["string", "null"] }
+        date: { type: ["string", "null"], format: date }
+        windows:
+          type: array
+          items: { $ref: "#/components/schemas/ConsultantAvailabilityPreviewWindow" }
+    ConsultantAvailability:
+      type: object
+      required: [id, status, availabilityPreview]
+      properties:
+        id: { type: string }
+        status: { type: string, enum: [active, paused, deleted] }
+        approvalStatus: { type: ["string", "null"] }
+        availabilityFrom: { type: ["string", "null"] }
+        availabilityTo: { type: ["string", "null"] }
+        availableDays:
+          type: ["array", "null"]
+          items: { type: string }
+        availableSlots:
+          type: ["array", "null"]
+          items: { type: string }
+        slotSeries:
+          type: ["array", "null"]
+          items:
+            type: object
+            required: [days, from, to]
+            properties:
+              days:
+                type: array
+                items: { type: string }
+              from: { type: string }
+              to: { type: string }
+        availabilityPreview: { $ref: "#/components/schemas/ConsultantAvailabilityPreview" }
+      additionalProperties: true
+    ConsultantAvailabilityUpdate:
+      type: object
+      properties:
+        status: { type: string, enum: [active, paused] }
+      additionalProperties: true
 

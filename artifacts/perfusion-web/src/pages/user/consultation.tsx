@@ -11,77 +11,26 @@ import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Separator } from "@/components/ui/separator";
 import { Search, Stethoscope, ArrowUpDown, Briefcase, Calendar, AlertTriangle, Users, Building2, BookOpen, Clock, User } from "lucide-react";
-import type { Consultant, SlotSeries } from "@shared/schema";
+import type { Consultant } from "@shared/schema";
 import ConsultantAvatar from "@/components/consultant-avatar";
 
-// ── Availability smart-label helpers ─────────────────────────────────────────
-function parseTimeMinutes(t: string): number {
-  const m = t.match(/(\d+):(\d+)\s*(AM|PM)/i);
-  if (!m) return -1;
-  let h = parseInt(m[1]), min = parseInt(m[2]);
-  const ap = m[3].toUpperCase();
-  if (ap === "PM" && h !== 12) h += 12;
-  if (ap === "AM" && h === 12) h = 0;
-  return h * 60 + min;
-}
-
-function getNextAvailability(consultant: Consultant & { computedCustomerPrice?: string }): string | null {
-  const SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-  const FULL  = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-
-  // Track the LATEST slot time per day — a day is only "past" when its last slot has passed.
-  // Using earliest caused: if 10 AM slot passed but 8 PM slot remained, the whole day was skipped.
-  const dayLatest: Record<string, number> = {};
-
-  const slotSeries   = (consultant as any).slotSeries  as SlotSeries[] | null | undefined;
-  const fixedSlots   = consultant.availableSlots        ?? [];
-  const legacyDays   = (consultant as any).availableDays as string[] | null ?? [];
-  const legacyFrom   = consultant.availabilityFrom      ?? "";
-
-  if (slotSeries && slotSeries.length > 0) {
-    for (const s of slotSeries) {
-      // Use booking cutoff = slot end − 15 min so the day stays visible while bookable.
-      const toMins = parseTimeMinutes(s.to);
-      const cutoff = toMins >= 0 ? toMins - 15 : parseTimeMinutes(s.from);
-      for (const d of s.days) {
-        if (!(d in dayLatest) || (cutoff >= 0 && cutoff > dayLatest[d]))
-          dayLatest[d] = cutoff >= 0 ? cutoff : 0;
-      }
-    }
-  } else if (fixedSlots.length > 0) {
-    for (const slot of fixedSlots) {
-      const m = slot.match(/^(Sun|Mon|Tue|Wed|Thu|Fri|Sat)[,\s]+(.+?)(?:\s*[–\-].+)?$/i);
-      if (m) {
-        const day = m[1], mins = parseTimeMinutes(m[2].trim());
-        if (!(day in dayLatest) || (mins >= 0 && mins > dayLatest[day]))
-          dayLatest[day] = mins >= 0 ? mins : 0;
-      }
-    }
-  } else if (legacyDays.length > 0 && legacyFrom) {
-    const mins = parseTimeMinutes(legacyFrom);
-    for (const d of legacyDays) dayLatest[d] = mins >= 0 ? mins : 0;
-  }
-
-  if (Object.keys(dayLatest).length === 0) return null;
-
-  const istNow     = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
-  const todayIdx   = istNow.getDay();
-  const nowMins    = istNow.getHours() * 60 + istNow.getMinutes();
-
-  for (let offset = 0; offset < 14; offset++) {
-    const idx  = (todayIdx + offset) % 7;
-    const day  = SHORT[idx];
-    if (!(day in dayLatest)) continue;
-    if (offset === 0 && dayLatest[day] >= 0 && dayLatest[day] <= nowMins) continue;
-    if (offset === 0) return "Available Today";
-    if (offset === 1) return "Available Tomorrow";
-    return `Available next ${FULL[idx]}`;
-  }
-  return null;
-}
+// Availability previews are calculated by the shared API so web and mobile use
+// the same timezone, schedule, and date-override rules.
+type AvailabilityPreview = {
+  label: string | null;
+  date: string | null;
+  windows: { from: string; to: string; appointmentSlot: string }[];
+};
 
 type SortOption = "cost" | "availability";
-type ConsultantWithPrice = Consultant & { computedCustomerPrice?: string };
+type ConsultantWithPrice = Consultant & {
+  computedCustomerPrice?: string;
+  availabilityPreview?: AvailabilityPreview;
+};
+
+function getNextAvailability(consultant: ConsultantWithPrice): string | null {
+  return consultant.availabilityPreview?.label ?? null;
+}
 
 function ConsultantProfileSheet({
   consultant,

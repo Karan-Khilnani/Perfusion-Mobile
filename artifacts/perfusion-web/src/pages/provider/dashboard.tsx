@@ -46,6 +46,7 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { Switch } from "@/components/ui/switch";
 import type { Booking, PrescriptionReview } from "@shared/schema";
 import { ConsultantSlotEditor } from "@/components/consultant-slot-editor";
 
@@ -766,7 +767,31 @@ function ConsultationsSection({
 }
 
 function AvailabilityEditor({ consultant }: { consultant: DashboardData["consultant"] }) {
+  const providerConsultants = useQuery<Array<{ id: string; status?: string }>>({
+    queryKey: ["/api/provider/my-consultants"],
+    enabled: !!consultant,
+    refetchOnMount: "always",
+  });
+  const statusMutation = useMutation({
+    mutationFn: async ({ consultantId, status }: { consultantId: string; status: "active" | "paused" }) => {
+      const response = await apiRequest("PATCH", `/api/provider/consultants/${consultantId}`, { status });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.message || "Could not update availability.");
+      return data;
+    },
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["/api/provider/dashboard"] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/provider/my-consultants"] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/consultants"] }),
+      ]);
+    },
+  });
   if (!consultant) return null;
+  const availabilityProfile = providerConsultants.data?.find((item) => item.id === consultant.id);
+  const availabilityStatus = availabilityProfile?.status;
+  const canToggle = availabilityStatus === "active" || availabilityStatus === "paused";
+  const isAvailable = availabilityStatus === "active";
   return (
     <Card data-testid="card-availability">
       <CardHeader className="pb-3">
@@ -776,6 +801,42 @@ function AvailabilityEditor({ consultant }: { consultant: DashboardData["consult
         </CardTitle>
       </CardHeader>
       <CardContent>
+        <div className="mb-4 flex items-center justify-between gap-4 rounded-lg border p-3">
+          <div className="min-w-0">
+            <p className="text-sm font-medium">Accepting new bookings</p>
+            <p className="text-xs text-muted-foreground">
+              This setting is shared with mobile. Existing consultations are not changed.
+            </p>
+            <p className={`mt-1 text-sm font-semibold ${isAvailable ? "text-emerald-600" : "text-muted-foreground"}`}>
+              {availabilityStatus === "active"
+                ? "Available"
+                : availabilityStatus === "paused"
+                  ? "Unavailable"
+                  : providerConsultants.isLoading
+                    ? "Loading availability…"
+                    : "Status unavailable"}
+            </p>
+          </div>
+          <Switch
+            checked={isAvailable}
+            disabled={!canToggle || statusMutation.isPending || providerConsultants.isLoading}
+            onCheckedChange={(available) => statusMutation.mutate({
+              consultantId: consultant.id,
+              status: available ? "active" : "paused",
+            })}
+            aria-label="Accept new consultation bookings"
+          />
+        </div>
+        {statusMutation.isError && (
+          <p className="mb-3 text-sm text-destructive" role="alert">
+            {statusMutation.error instanceof Error ? statusMutation.error.message : "Could not update availability."}
+          </p>
+        )}
+        {providerConsultants.isError && (
+          <p className="mb-3 text-sm text-destructive" role="alert">
+            Could not load the current availability. Refresh this page to try again.
+          </p>
+        )}
         <ConsultantSlotEditor
           consultantId={consultant.id}
           initialFrom={consultant.availabilityFrom}

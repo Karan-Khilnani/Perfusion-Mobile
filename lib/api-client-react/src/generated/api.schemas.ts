@@ -335,6 +335,67 @@ export interface CaseFileAggregate {
   advisories?: CaseFileAdvisory[];
 }
 
+export interface ConsultantAvailabilityPreviewWindow {
+  from: string;
+  to: string;
+  appointmentSlot: string;
+}
+
+export interface ConsultantAvailabilityPreview {
+  /** @nullable */
+  label: string | null;
+  /** @nullable */
+  date: string | null;
+  windows: ConsultantAvailabilityPreviewWindow[];
+}
+
+export type ConsultantAvailabilityStatus = typeof ConsultantAvailabilityStatus[keyof typeof ConsultantAvailabilityStatus];
+
+
+export const ConsultantAvailabilityStatus = {
+  active: 'active',
+  paused: 'paused',
+  deleted: 'deleted',
+} as const;
+
+export type ConsultantAvailabilitySlotSeriesItem = {
+  days: string[];
+  from: string;
+  to: string;
+};
+
+export interface ConsultantAvailability {
+  id: string;
+  status: ConsultantAvailabilityStatus;
+  /** @nullable */
+  approvalStatus?: string | null;
+  /** @nullable */
+  availabilityFrom?: string | null;
+  /** @nullable */
+  availabilityTo?: string | null;
+  /** @nullable */
+  availableDays?: string[] | null;
+  /** @nullable */
+  availableSlots?: string[] | null;
+  /** @nullable */
+  slotSeries?: ConsultantAvailabilitySlotSeriesItem[] | null;
+  availabilityPreview: ConsultantAvailabilityPreview;
+  [key: string]: unknown;
+ }
+
+export type ConsultantAvailabilityUpdateStatus = typeof ConsultantAvailabilityUpdateStatus[keyof typeof ConsultantAvailabilityUpdateStatus];
+
+
+export const ConsultantAvailabilityUpdateStatus = {
+  active: 'active',
+  paused: 'paused',
+} as const;
+
+export interface ConsultantAvailabilityUpdate {
+  status?: ConsultantAvailabilityUpdateStatus;
+  [key: string]: unknown;
+ }
+
 export type UpdateBookingStatusBodyStatus = typeof UpdateBookingStatusBodyStatus[keyof typeof UpdateBookingStatusBodyStatus];
 
 
