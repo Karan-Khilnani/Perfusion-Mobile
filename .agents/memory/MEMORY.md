@@ -18,3 +18,4 @@
 - [Clinical Advisory PDF privacy](clinical-advisory-pdf-privacy.md) — keep Case File PDFs private; authorized readers use signed links, while public verification exposes metadata only.
 - [Mobile password recovery](password-recovery.md) — verify and consume the email code before creating a session; restrict password changes to the short recovery window.
 - [Clinical field separation](clinical-field-separation.md) — keep complaint, present illness, structured details, and legacy summaries distinct; never reclassify old summary text.
+- [Bundled API imports](bundled-api-imports.md) — avoid runtime-relative imports for internal modules in the single-file API bundle; a dev-only success can hide production failures.

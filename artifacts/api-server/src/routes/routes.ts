@@ -5824,7 +5824,6 @@ export async function registerRoutes(
       if (deviceId != null && (typeof deviceId !== "string" || deviceId.length > 120 || deviceId.length < 8)) {
         return res.status(400).json({ error: "Invalid device ID" });
       }
-      const { getPool } = await import("./db");
       const pool = getPool();
       await pool.query(
         `INSERT INTO mobile_push_tokens (user_id, token, platform, token_type, device_id, updated_at)
@@ -5846,7 +5845,6 @@ export async function registerRoutes(
       if (!userId) return res.status(401).json({ error: "Not authenticated" });
       const { token } = req.body;
       if (!token) return res.status(400).json({ error: "Missing token" });
-      const { getPool } = await import("./db");
       const pool = getPool();
       await pool.query(`DELETE FROM mobile_push_tokens WHERE token = $1 AND user_id = $2`, [token, userId]);
       res.json({ success: true });
