@@ -1,0 +1,662 @@
+We need to implement the Provider/Doctor Availability functionality in the Perfusion MOBILE APP.
+
+IMPORTANT:
+The Perfusion WEB APP already has the Availability feature implemented.
+
+The mobile app currently does NOT have the Provider Availability control.
+
+The web and mobile applications MUST use the SAME backend, database, API endpoints, and availability data.
+
+DO NOT create a separate mobile-only availability system.
+
+The goal is:
+
+WEB AVAILABILITY
+        ↕
+SAME BACKEND / DATABASE / API
+        ↕
+MOBILE AVAILABILITY
+
+A Provider changing availability from Web should be reflected in Mobile.
+
+A Provider changing availability from Mobile should be reflected in Web and in the Seeker booking experience.
+
+==================================================
+1. FIRST INSPECT THE EXISTING WEB IMPLEMENTATION
+==================================================
+
+Before writing any new code, inspect the existing WEB application's Availability implementation.
+
+Find and understand:
+
+- Availability UI/control
+- Provider availability state
+- API endpoint(s)
+- Request/response structure
+- Backend service/function
+- Database table/model/field
+- Available / Unavailable values
+- How availability is fetched
+- How availability is updated
+- How the Seeker booking screen uses Provider availability
+- How available dates/slots are calculated
+- Any timezone/date handling
+- Any validation/business rules already implemented
+
+IMPORTANT:
+
+Do NOT assume how the backend works.
+
+Do NOT create new API endpoints if the existing web implementation already has suitable endpoints.
+
+Do NOT create a new database field if the existing availability field can be reused.
+
+The mobile app should consume the same availability system already used by Web.
+
+==================================================
+2. ADD AVAILABILITY CONTROL TO MOBILE PROVIDER PROFILE
+==================================================
+
+Add an Availability control in the Provider's Profile section.
+
+The Provider should be able to see their current availability.
+
+Example:
+
+Availability
+
+[ Available ]
+
+or
+
+Availability
+
+[ Unavailable ]
+
+The exact visual design should follow the existing Perfusion mobile design system.
+
+If the web application already uses specific terminology, states, colors, or behavior for availability, follow the existing implementation rather than inventing a new one.
+
+==================================================
+3. AVAILABLE / UNAVAILABLE
+==================================================
+
+The Provider must be able to switch between:
+
+AVAILABLE
+and
+UNAVAILABLE
+
+When the Provider changes this setting:
+
+1. Mobile sends the change to the existing backend/API.
+2. Backend updates the Provider's actual availability.
+3. Mobile reflects the confirmed backend state.
+4. Web should see the same updated state.
+5. Seeker booking should use the updated state.
+
+Do NOT make the mobile UI the source of truth.
+
+The backend/database must remain the source of truth.
+
+==================================================
+4. DO NOT CREATE LOCAL-ONLY AVAILABILITY
+==================================================
+
+Do NOT store Provider availability only in:
+
+- React state
+- AsyncStorage
+- SecureStore
+- local JSON
+- local configuration
+- hardcoded values
+
+Local state may be used temporarily for UI display, but the authoritative value must come from the existing backend.
+
+For example:
+
+Provider changes:
+
+Available → Unavailable
+
+The mobile UI may immediately show a loading/updating state, but after the API response it must reflect the actual backend result.
+
+If the API request fails:
+
+- Do not falsely leave the UI showing the change as successfully saved.
+- Show an appropriate error.
+- Restore the actual backend state.
+
+==================================================
+5. PROVIDER PROFILE FLOW
+==================================================
+
+Expected mobile flow:
+
+Provider logs in
+        ↓
+Profile
+        ↓
+Availability
+        ↓
+Current state:
+Available / Unavailable
+        ↓
+Provider changes state
+        ↓
+Existing backend/API
+        ↓
+Backend confirms update
+        ↓
+Mobile displays updated state
+
+The Provider should not need to log out or restart the app for the change to take effect.
+
+==================================================
+6. WEB ↔ MOBILE SYNCHRONIZATION
+==================================================
+
+This is a critical requirement.
+
+The same Provider account must have one availability state.
+
+Example:
+
+Provider is Available on Web.
+
+Mobile Profile should show:
+Available
+
+Provider changes Mobile:
+Available → Unavailable
+
+After successful backend update:
+
+Web should show:
+Unavailable
+
+Seeker booking should also treat the Provider as:
+Unavailable
+
+The reverse must also work:
+
+Provider changes Web:
+Unavailable → Available
+
+Mobile should reflect:
+Available
+
+Seeker booking should reflect:
+Available
+
+Do NOT implement separate Web and Mobile availability states.
+
+==================================================
+7. SEEKER BOOKING SCREEN
+==================================================
+
+The existing Seeker booking functionality must continue using the Provider availability stored in the shared backend.
+
+Do not replace the existing booking system.
+
+Instead, inspect how the web booking screen currently determines:
+
+- Provider availability
+- Available dates
+- Available slots
+- Whether today has eligible slots
+- Whether to show "Available Tomorrow"
+
+Then make sure the mobile/backend flow uses the SAME logic.
+
+==================================================
+8. FIX "AVAILABLE TOMORROW" BUG
+==================================================
+
+There is currently a bug where:
+
+A Provider is available today and has active/eligible slots,
+
+but the Seeker booking screen displays:
+
+"Available Tomorrow"
+
+instead of displaying today's available slots.
+
+This must be corrected.
+
+Required behavior:
+
+IF Provider is available
+AND there are eligible slots TODAY:
+
+→ Show today's date/slots.
+
+Do NOT show "Available Tomorrow".
+
+IF Provider is available
+BUT there are NO eligible slots TODAY:
+
+→ The system may show the next eligible available date, such as "Available Tomorrow", according to the existing booking design.
+
+IF Provider is unavailable:
+
+→ Follow the existing booking behavior for unavailable Providers.
+
+Do not simply replace the text "Available Tomorrow" with today's date.
+
+The actual slot availability must be checked.
+
+==================================================
+9. TODAY'S SLOTS
+==================================================
+
+If the Provider has eligible slots today, the Seeker must be able to see those slots.
+
+For example:
+
+Provider availability:
+Available
+
+Today:
+September 26
+
+Eligible slots:
+2:00 PM
+3:30 PM
+5:00 PM
+
+The Seeker booking screen should show:
+
+Today
+2:00 PM
+3:30 PM
+5:00 PM
+
+It must NOT incorrectly display:
+
+Available Tomorrow
+
+==================================================
+10. WHAT COUNTS AS AN ELIGIBLE SLOT
+==================================================
+
+Do not invent new slot rules.
+
+Inspect the existing Web implementation and reuse its current logic for determining whether a slot is eligible.
+
+Pay particular attention to:
+
+- Current date
+- Current time
+- Slot start time
+- Slot end time
+- Provider availability
+- Existing booking status
+- Already-booked slots
+- Timezone
+- Any existing buffer/business rules
+
+The mobile app should follow the same rules as the existing Web application.
+
+If Web already calculates eligible slots correctly, reuse the same backend/API result rather than implementing a second calculation in Mobile.
+
+==================================================
+11. DATE / TIME HANDLING
+==================================================
+
+This is important.
+
+Inspect the existing Web implementation to determine which timezone is used for:
+
+- Provider availability
+- Slot dates
+- Slot times
+- Today's date
+- Booking availability
+
+Do not introduce a separate mobile timezone calculation.
+
+Do not rely blindly on the phone's local date if the backend already defines the application's timezone.
+
+The Web and Mobile booking experiences must agree on:
+
+- Today
+- Tomorrow
+- Available slots
+- Slot expiration
+- Provider availability
+
+==================================================
+12. SHARED BACKEND SOURCE OF TRUTH
+==================================================
+
+Before implementation, identify the existing backend data model/API used by Web.
+
+Document:
+
+Provider
+    ↓
+Availability field/model
+    ↓
+Existing API
+    ↓
+Seeker booking availability
+    ↓
+Available dates/slots
+
+Then connect Mobile to that same flow.
+
+If the Web app already has an API such as:
+
+GET provider availability
+UPDATE provider availability
+
+use those existing endpoints.
+
+Do NOT create:
+
+mobileProviderAvailability
+
+or another duplicate availability field/system.
+
+Use the existing Provider availability.
+
+==================================================
+13. CACHING / REFRESH
+==================================================
+
+Inspect whether the existing Web app uses caching/query caching for availability.
+
+Mobile should not display stale availability indefinitely.
+
+After Provider changes availability:
+
+- Update the local UI appropriately.
+- Refresh/invalidate the relevant availability query/cache.
+- Ensure the next fetch gets the current backend state.
+
+When the Seeker opens the booking screen:
+
+- Availability should reflect the current backend state.
+- Do not rely on stale hardcoded/mock availability.
+
+If the existing project uses React Query/TanStack Query or another data-fetching system, follow the existing pattern.
+
+Do not introduce a second caching system unnecessarily.
+
+==================================================
+14. PROVIDER ROLE ONLY
+==================================================
+
+Only authenticated Providers/Doctors should be able to change their own availability.
+
+A Seeker must NOT be able to modify Provider availability.
+
+The mobile UI should only expose the Availability control where appropriate for the Provider role.
+
+But do not rely only on hiding the UI.
+
+The backend authorization already used by the Web application must remain the authority for who can modify availability.
+
+Reuse the existing authorization mechanism.
+
+==================================================
+15. LOADING / ERROR STATES
+==================================================
+
+When Provider changes availability:
+
+Show an appropriate loading/updating state.
+
+Prevent accidental repeated submissions while the update is processing.
+
+If the backend update fails:
+
+- Do not falsely report success.
+- Show an appropriate error.
+- Display the actual current availability.
+
+If fetching availability fails:
+
+- Do not invent a default Available/Unavailable value.
+- Show an appropriate unavailable/error state according to the existing application pattern.
+
+==================================================
+16. DO NOT CHANGE THE EXISTING WEB FEATURE
+==================================================
+
+The Web Availability feature is already implemented.
+
+Do NOT rewrite it simply to make Mobile work.
+
+First determine whether Mobile can directly consume the existing APIs.
+
+Only modify the backend/Web implementation if absolutely necessary to fix a genuine shared backend problem.
+
+If you discover that the Web implementation itself has a bug causing the "Available Tomorrow" issue, identify the root cause first and make the smallest necessary shared fix.
+
+Do not unnecessarily alter working Web UI.
+
+==================================================
+17. IMPLEMENTATION PROCESS
+==================================================
+
+Before editing any code:
+
+1. Locate the Web Provider Availability implementation.
+2. Locate the Web API calls related to availability.
+3. Locate the backend availability model/database field.
+4. Locate the backend availability endpoints/services.
+5. Locate the Web Seeker booking availability calculation.
+6. Locate the logic responsible for displaying "Available Tomorrow".
+7. Locate the Mobile Provider Profile.
+8. Determine the appropriate location for the new Availability control.
+9. Determine the Mobile API/data-fetching architecture.
+10. Connect Mobile to the existing shared backend.
+
+Only after understanding the existing architecture should you implement the changes.
+
+==================================================
+18. TESTING — PROVIDER MOBILE
+==================================================
+
+TEST 1:
+Provider opens Mobile Profile.
+
+Expected:
+- Current backend availability is displayed correctly.
+
+TEST 2:
+Provider changes:
+
+Available → Unavailable
+
+Expected:
+- Backend updates successfully.
+- Mobile displays Unavailable.
+- Web reflects Unavailable.
+- Seeker booking reflects Provider as unavailable.
+
+TEST 3:
+Provider changes:
+
+Unavailable → Available
+
+Expected:
+- Backend updates successfully.
+- Mobile displays Available.
+- Web reflects Available.
+- Seeker booking reflects Provider as available.
+
+==================================================
+19. TESTING — WEB ↔ MOBILE
+==================================================
+
+TEST 4:
+
+Change availability on Web:
+
+Available → Unavailable
+
+Then open Mobile.
+
+Expected:
+Mobile shows:
+Unavailable
+
+TEST 5:
+
+Change availability on Mobile:
+
+Unavailable → Available
+
+Then open Web.
+
+Expected:
+Web shows:
+Available
+
+There must be no conflicting availability states.
+
+==================================================
+20. TESTING — TODAY'S SLOTS
+==================================================
+
+TEST 6:
+
+Use a Provider who:
+- Is Available.
+- Has valid slots today.
+
+Open Seeker booking.
+
+Expected:
+- Today's date is shown.
+- Today's eligible slots are displayed.
+- "Available Tomorrow" is NOT shown when today's eligible slots exist.
+
+==================================================
+21. TESTING — NO SLOTS TODAY
+==================================================
+
+TEST 7:
+
+Provider is Available but has no eligible slots remaining today.
+
+Expected:
+- Today's unavailable state is handled correctly.
+- Next eligible availability can be shown.
+- "Available Tomorrow" should only appear if tomorrow is actually the next eligible availability according to the existing booking logic.
+
+==================================================
+22. TESTING — FUTURE AVAILABILITY
+==================================================
+
+TEST 8:
+
+Provider is Available but has no eligible slots today and has availability on a future date.
+
+Expected:
+- Booking shows the correct next available date according to the existing system.
+
+Do not hardcode "Tomorrow".
+
+==================================================
+23. TESTING — CURRENT TIME
+==================================================
+
+TEST 9:
+
+If a slot has already passed today:
+
+Expected:
+- That slot must not be presented as an available booking slot.
+
+If valid future slots remain today:
+
+Expected:
+- Those remaining slots should be displayed.
+- Do NOT show "Available Tomorrow".
+
+==================================================
+24. TESTING — PROVIDER UNAVAILABLE
+==================================================
+
+TEST 10:
+
+Provider changes to Unavailable.
+
+Expected:
+- Seeker booking must not offer new slots for that Provider while unavailable.
+- Existing booking/history data must NOT be deleted or modified.
+- Do not cancel existing consultations unless that behavior already exists in the application and is explicitly triggered by the existing business logic.
+
+==================================================
+25. FINAL VERIFICATION
+==================================================
+
+After implementation, verify all of the following:
+
+[ ] Mobile Provider Profile has Availability control.
+
+[ ] Provider can switch Available ↔ Unavailable.
+
+[ ] Availability is persisted to the SAME backend used by Web.
+
+[ ] Mobile does not create a separate availability state.
+
+[ ] Web and Mobile show the same availability.
+
+[ ] Seeker booking uses the same backend availability.
+
+[ ] Today's eligible slots are shown when available.
+
+[ ] "Available Tomorrow" is not shown when eligible slots exist today.
+
+[ ] "Available Tomorrow" only appears when there are no eligible slots today and tomorrow is actually the appropriate next availability.
+
+[ ] Past slots are not offered.
+
+[ ] Provider-only permissions are preserved.
+
+[ ] Loading and API failure states are handled.
+
+[ ] No unrelated features were changed.
+
+==================================================
+26. FINAL REPORT
+==================================================
+
+After implementation, report:
+
+1. Existing Web Availability architecture discovered.
+2. Existing backend/API endpoints used by Web.
+3. Existing database/model/field representing availability.
+4. How Mobile was connected to the existing backend.
+5. Files changed in Mobile.
+6. Any backend files changed, and why.
+7. How Web ↔ Mobile synchronization works.
+8. Root cause of the "Available Tomorrow" bug.
+9. How today's slot calculation now works.
+10. How timezone/date handling is implemented.
+11. Tests performed and results.
+12. Any issue that could not be verified.
+
+IMPORTANT FINAL RULE:
+
+Do not create a new Mobile-only availability system.
+
+The final architecture must be:
+
+WEB
+   │
+   ├──────────────┐
+   ↓              ↓
+SAME BACKEND / DATABASE / API
+   ↑              ↑
+   │
+MOBILE
+
+There must be ONE authoritative Provider availability state shared across Web, Mobile, and Seeker booking.
