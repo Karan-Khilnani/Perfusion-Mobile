@@ -83,7 +83,9 @@ export function IncomingCallOverlay({ callEvent, onDismiss }: Props) {
         </div>
 
         <div className="space-y-2">
-          <h2 className="text-2xl font-bold tracking-wide">Perfusion</h2>
+          <h2 className="text-2xl font-bold tracking-wide">
+            {callEvent.callerRole === "seeker" ? callEvent.callerName || "Care Seeker" : "Perfusion"}
+          </h2>
           <p className="text-base text-white/80">
             {callEvent.subtitle || callEvent.callerName}
           </p>

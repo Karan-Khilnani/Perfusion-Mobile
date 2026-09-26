@@ -126,7 +126,7 @@ export function IncomingCallOverlay() {
           {incomingCall.subtitle && (
             <Text style={styles.subtitle}>{incomingCall.subtitle}</Text>
           )}
-          {incomingCall.serviceName && (
+          {incomingCall.serviceName && incomingCall.callerRole !== "seeker" && (
             <View style={styles.servicePill}>
               <Ionicons name="calendar-outline" size={13} color="rgba(255,255,255,0.7)" />
               <Text style={styles.servicePillText}>

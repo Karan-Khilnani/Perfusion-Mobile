@@ -76,6 +76,60 @@ module.exports = (config, options) =>
 
         postNotification(ctx, callId, displayName, "incoming call")`,
       );
+
+      // The native incoming-call screen runs without JS when the app is closed.
+      // Use the authenticated server's patient label instead of a generic subtitle.
+      replaceExactlyOnce(
+        path.join(javaDir, "IncomingCallActivity.kt"),
+        `        bindCallerInfo(caller?.displayName, session.options.hasVideo)`,
+        `        bindCallerInfo(
+            caller?.displayName,
+            session.incomingCallEvent?.metadata?.get("patientName") as? String,
+            session.options.hasVideo,
+        )`,
+      );
+      replaceExactlyOnce(
+        path.join(javaDir, "IncomingCallActivity.kt"),
+        `    private fun bindCallerInfo(displayName: String?, hasVideo: Boolean) {`,
+        `    private fun bindCallerInfo(displayName: String?, patientName: String?, hasVideo: Boolean) {`,
+      );
+      replaceExactlyOnce(
+        path.join(javaDir, "IncomingCallActivity.kt"),
+        `        findViewById<TextView>(R.id.expo_callkit_telecom_subtitle).text =
+            if (hasVideo) "Incoming video call" else "Incoming call"`,
+        `        findViewById<TextView>(R.id.expo_callkit_telecom_subtitle).text =
+            patientName?.takeIf { it.isNotBlank() }
+                ?: if (hasVideo) "Incoming video call" else "Incoming call"`,
+      );
+      replaceExactlyOnce(
+        path.join(javaDir, "managers/CallManager.kt"),
+        `            event.caller.displayName,
+            event.hasVideo,
+        )
+
+        val attributes =`,
+        `            event.caller.displayName,
+            event.hasVideo,
+            event.metadata?.get("patientName") as? String,
+        )
+
+        val attributes =`,
+      );
+      replaceExactlyOnce(
+        path.join(javaDir, "managers/CallNotificationManager.kt"),
+        `    fun showIncomingCall(context: Context, callId: UUID, callerName: String?, hasVideo: Boolean) {`,
+        `    fun showIncomingCall(context: Context, callId: UUID, callerName: String?, hasVideo: Boolean, patientName: String?) {`,
+      );
+      replaceExactlyOnce(
+        path.join(javaDir, "managers/CallNotificationManager.kt"),
+        `                    if (hasVideo) "Incoming video call" else "Incoming call",
+                )
+                .setStyle(`,
+        `                    patientName?.takeIf { it.isNotBlank() }
+                        ?: if (hasVideo) "Incoming video call" else "Incoming call",
+                )
+                .setStyle(`,
+      );
       return config;
     },
   ]);

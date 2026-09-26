@@ -31,6 +31,7 @@ type MobilePanel = "video" | "docs" | "summary";
 
 type VideoRoomBooking = Booking & {
   seekerName?: string | null;
+  seekerHospitalName?: string | null;
   providerName?: string | null;
   participantRole?: "seeker" | "provider";
   otherParticipantName?: string | null;
@@ -93,6 +94,9 @@ export default function VideoRoomPage() {
     (isProvider
       ? booking?.seekerName || "Care Seeker"
       : booking?.providerName || booking?.serviceName || "Consultant");
+  const waitingForName = isProvider && booking?.patientName
+    ? `${otherParticipantName} — ${booking.patientName}`
+    : otherParticipantName;
 
   // Fetch the currently logged-in user so we can show their real name in the call
   const { data: authUser } = useQuery<{ firstName?: string; lastName?: string; email?: string }>({
@@ -544,7 +548,7 @@ export default function VideoRoomPage() {
             </div>
             <div className="space-y-2">
               <h2 className="text-xl font-semibold">
-                {phase === "ringing" ? `Calling ${otherParticipantName}` : "Call not connected"}
+                {phase === "ringing" ? `Calling ${waitingForName}` : "Call not connected"}
               </h2>
               <p className="text-sm text-muted-foreground">
                 {phase === "ringing"

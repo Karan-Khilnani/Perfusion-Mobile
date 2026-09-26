@@ -91,6 +91,7 @@ export async function notifyMobileIncomingCall(userId: string, call: IncomingCal
         videoRoomUrl: call.videoRoomUrl,
         serviceName: call.serviceName,
         subtitle: call.subtitle,
+        patientName: call.callerRole === "seeker" ? call.subtitle : undefined,
       },
     });
     // FCM multicast accepts at most 500 tokens per batch.
@@ -131,7 +132,7 @@ export async function notifyMobileIncomingCall(userId: string, call: IncomingCal
     .map((row) => ({
       to: row.token,
       sound: "default",
-      title: "Incoming Consultation",
+      title: call.callerRole === "seeker" ? call.callerName : "Incoming Consultation",
       body: call.subtitle,
       data: {
         type: "incoming_call",
@@ -142,6 +143,7 @@ export async function notifyMobileIncomingCall(userId: string, call: IncomingCal
         sessionGeneration: call.sessionGeneration,
         videoRoomUrl: call.videoRoomUrl,
         subtitle: call.subtitle,
+        patientName: call.callerRole === "seeker" ? call.subtitle : undefined,
       },
       priority: "high",
     }));

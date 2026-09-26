@@ -1137,14 +1137,16 @@ export async function registerRoutes(
       }
       const seekerName =
         `${(seekerUser as any)?.firstName ?? ""} ${(seekerUser as any)?.lastName ?? ""}`.trim() || null;
+      const seekerHospitalName = seekerUser?.hospitalName?.trim() || seekerName || "Care Seeker";
       const resolvedProviderName = providerName || (booking as any).serviceName || null;
       const participantRole = isProviderUser ? "provider" : "seeker";
       res.json({
         ...booking,
         seekerName,
+        seekerHospitalName,
         providerName: resolvedProviderName,
         participantRole,
-        otherParticipantName: participantRole === "provider" ? seekerName : resolvedProviderName,
+        otherParticipantName: participantRole === "provider" ? seekerHospitalName : resolvedProviderName,
       });
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch booking" });
@@ -1234,7 +1236,15 @@ export async function registerRoutes(
         return res.status(403).json({ message: "Access denied" });
       }
 
-      return res.json(withConsultationLifecycle(booking));
+      const isProviderUser = provider?.userId === userId;
+      const seekerUser = isProviderUser ? await storage.getUserById(booking.userId) : null;
+      const seekerName = seekerUser
+        ? `${seekerUser.firstName || ""} ${seekerUser.lastName || ""}`.trim()
+        : "";
+      return res.json({
+        ...withConsultationLifecycle(booking),
+        ...(isProviderUser ? { seekerHospitalName: seekerUser?.hospitalName?.trim() || seekerName || "Care Seeker" } : {}),
+      });
     } catch (error) {
       return res.status(500).json({ message: "Failed to fetch booking" });
     }
@@ -5996,9 +6006,8 @@ export async function registerRoutes(
         callerUser?.email ||
         "Unknown";
 
-      // Build a clean subtitle for the notification/overlay:
-      // - Provider calling seeker → "Dr. Name (Specialization)"
-      // - Seeker calling provider → "Hospital Name"
+      // The recipient always sees the other side: seekers see the consultant,
+      // while doctors see the seeker's hospital and the booked patient.
       let subtitle = callerName;
       if (callerRole === "provider") {
         const consultant = await storage.getConsultantById(booking.serviceId);
@@ -6010,8 +6019,11 @@ export async function registerRoutes(
           subtitle = booking.serviceName || callerName;
         }
       } else {
-        subtitle = callerUser?.hospitalName || callerName;
+        subtitle = booking.patientName?.trim() || "Patient";
       }
+      const displayCallerName = callerRole === "seeker"
+        ? callerUser?.hospitalName?.trim() || callerName
+        : callerName;
 
       let videoRoomUrl = booking.videoRoomId || "";
       if (!videoRoomUrl) return res.status(400).json({ error: "No video room for this booking" });
@@ -6039,7 +6051,7 @@ export async function registerRoutes(
         bookingId,
         sessionGeneration,
         callerId,
-        callerName,
+        callerName: displayCallerName,
         callerRole,
         recipientUserId,
         videoRoomUrl,
@@ -6072,7 +6084,7 @@ export async function registerRoutes(
         type: "incoming_call",
         bookingId,
         sessionGeneration,
-        callerName,
+        callerName: displayCallerName,
         callerRole,
         videoRoomUrl,
         serviceName: booking.serviceName,
@@ -6090,12 +6102,12 @@ export async function registerRoutes(
       const payload: PushPayload = {
         type: "incoming_call",
         bookingId,
-        callerName,
+        callerName: displayCallerName,
         callerRole,
         recipientRole,
         videoRoomUrl,
         subtitle,
-        title: "Perfusion",
+        title: callerRole === "seeker" ? displayCallerName : "Perfusion",
         body: subtitle,
       };
       for (const sub of subscriptions) {
@@ -6111,7 +6123,7 @@ export async function registerRoutes(
         bookingId,
         sessionGeneration,
         callerId,
-        callerName,
+        callerName: displayCallerName,
         callerRole,
         callType,
         videoRoomUrl,

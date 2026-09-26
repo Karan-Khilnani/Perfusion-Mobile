@@ -1,6 +1,6 @@
 - [Click-wrap agreement system](agreement-system.md) — server-owned version/text (single source); /api/auth/user returns requiresAgreement; gate redirects to /agreement page; PDF generated async post-response.
 - [Persistent upload fallback](persistent-upload-fallback.md) — deployed uploads must not silently fall back to local disk; return an explicit error when durable storage is unavailable.
-- [Call participant labels](call-participant-labels.md) — waiting prompts use the opposite participant’s account name, resolved by the server; generic role labels are fallbacks only.
+- [Call participant labels](call-participant-labels.md) — doctors see seeker hospital plus booked patient on both call directions; seekers see provider identity, server-resolved.
 - [Admin credential sharing](admin-credential-sharing.md) — admin booking exports may include login IDs and access guidance, never passwords or hashes; sensitive exports require auditing.
 - [Clinical Advisory history](prescription-history.md) — user-facing records use advisory terminology; signed follow-ups stay immutable and cumulative PDFs show the complete chronological trail.
 - [Code backup scope](code-backup-policy.md) — code snapshots include source and project assets, but exclude runtime uploads, historical backups, dependencies, secrets, and Git metadata.

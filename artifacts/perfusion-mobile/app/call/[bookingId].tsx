@@ -22,6 +22,7 @@ interface CallInfo {
   videoRoomId?: string;
   serviceName?: string;
   patientName?: string;
+  seekerHospitalName?: string;
 }
 
 interface CallStatus {
@@ -56,6 +57,7 @@ export default function CallScreen() {
     },
     enabled: !!bookingId,
   });
+  const callTitle = booking?.seekerHospitalName || booking?.serviceName || "Consultation";
 
   const { data: callStatus, isLoading: statusLoading, isError: statusError } = useQuery<CallStatus>({
     queryKey: ["call-status", bookingId],
@@ -226,7 +228,7 @@ export default function CallScreen() {
           <Ionicons name="arrow-back" size={22} color={colors.callForeground} />
         </Pressable>
         <Text style={styles.topTitle}>
-          {booking?.serviceName || "Consultation"}
+          {callTitle}
         </Text>
         <View style={{ width: 40 }} />
       </View>
@@ -241,7 +243,7 @@ export default function CallScreen() {
           <Ionicons name={callMode === "voice" ? "call-outline" : "videocam-outline"} size={58} color={colors.conversationPrimary} />
         </View>
         <Text style={[styles.consultTitle, { color: colors.callForeground }]}>
-          {booking?.serviceName || "Consultation"}
+          {callTitle}
         </Text>
         {booking?.patientName && (
           <Text style={styles.patientName}>{booking.patientName}</Text>

@@ -15,6 +15,7 @@ export interface NativeIncomingCall {
   videoRoomUrl: string;
   serviceName?: string;
   subtitle?: string;
+  patientName?: string;
   callType?: "voice" | "video";
 }
 
@@ -122,6 +123,7 @@ export async function reportNativeIncomingCall(
       videoRoomUrl: incomingCall.videoRoomUrl,
       serviceName: incomingCall.serviceName,
       subtitle: incomingCall.subtitle,
+      patientName: incomingCall.callerRole === "seeker" ? incomingCall.patientName || incomingCall.subtitle : undefined,
       callType: incomingCall.callType,
     },
   };
