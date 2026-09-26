@@ -1,0 +1,78 @@
+We have now identified the exact issue.
+
+The current Replit Expo build-start action fails BEFORE compilation with:
+
+`GraphQL error: No repository found for appId 152f3e2b-ef3c-485d-b808-6d017eb2f925`
+
+The existing project itself is valid:
+
+* `expo config --type public --json` succeeds
+* Firebase configuration resolves correctly
+* `google-services.json` matches `com.perfusion.mobile`
+* The previous successful Android build already included Firebase Google Services and the VoIP plugin
+* Therefore Firebase/native configuration is NOT the current blocker.
+
+Do NOT modify the application.
+
+Do NOT create a GitHub repository.
+
+Do NOT use the Replit repository-based Expo build-start action that produced the above GraphQL error.
+
+Instead, use the EAS CLI directly from the current Replit project directory.
+
+### TASK
+
+Check whether EAS CLI is available.
+
+If necessary, install/use the local EAS CLI in the project environment.
+
+Then authenticate using the Expo credentials already configured for this project.
+
+Verify the current Expo project association using the project's existing `app.json`/`app.config` and Expo project ID.
+
+Then run the EAS CLI directly against the CURRENT SOURCE for an Android internal distribution build.
+
+Use the existing `preview` profile.
+
+The intended command is equivalent to:
+
+`eas build --platform android --profile preview`
+
+Do NOT use a repository-based build-start API.
+
+### BEFORE BUILDING
+
+Run and report the results of:
+
+`pnpm exec expo config --type public --json`
+
+and verify the resolved:
+
+* Expo project ID
+* Android package/application ID
+* build profile
+* Firebase Google Services configuration
+* VoIP config plugin
+
+Then run the EAS CLI build.
+
+### IMPORTANT
+
+If the direct EAS CLI also fails, show me the EXACT EAS CLI error.
+
+Do not convert the error into "GitHub is required."
+
+We are specifically testing whether:
+
+CURRENT REPLIT SOURCE
+→ EAS CLI
+→ EAS Android build
+→ internal APK
+
+works independently of the Replit repository build-start action.
+
+Do not make any code/UI/backend/Firebase changes unless the actual EAS CLI error proves that a configuration change is required.
+
+If the build succeeds, give me the EAS build URL and APK installation link.
+
+If EAS CLI is unavailable in this Replit environment, tell me exactly why and provide the exact command that I can run in Replit Shell to execute the build.
