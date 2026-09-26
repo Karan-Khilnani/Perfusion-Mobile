@@ -1,0 +1,192 @@
+We are fixing the **Perfusion Mobile App — Provider Journey**.
+
+IMPORTANT SCOPE:
+
+* This task is for the **MOBILE APP ONLY**.
+* Do NOT modify the web app.
+* Do NOT change backend logic, APIs, database structure, authentication, calling functionality, booking logic, or other unrelated functionality.
+* Do NOT redesign the app from scratch.
+* Preserve all currently working functionality.
+* Before making changes, inspect the existing mobile app structure, shared components, theme/design system, navigation, and relevant screens.
+* Reuse existing components/styles where possible instead of creating duplicate implementations.
+
+## TASK: Fix the following UI / VISUAL issues
+
+### 1. Logo Uniformity
+
+The Perfusion logo should be consistent across all mobile app screens.
+
+Requirements:
+
+* Inspect all screens where the logo is displayed.
+* Use the existing/finalized Perfusion logo asset already present in the project.
+* Ensure the same logo, proportions, sizing behavior, and appropriate placement are used consistently.
+* Do not create a new logo or replace the existing branding with a placeholder.
+* Make sure the logo does not become distorted on different screen sizes.
+
+### 2. Color Uniformity
+
+Use the finalized Perfusion color system consistently throughout the mobile app.
+
+Requirements:
+
+* Inspect the existing theme/colors before changing anything.
+* Identify inconsistent colors across Provider Dashboard, Case File, Chat, Consultation, Billing, Patient Profile, buttons, cards, text, backgrounds, borders, and status elements.
+* Replace inconsistent hardcoded colors with the existing centralized theme/design tokens where appropriate.
+* Do not arbitrarily invent new colors.
+* Preserve semantic meaning of status/warning/error colors.
+
+### 3. Font & Sizing Uniformity
+
+Standardize typography across the mobile app.
+
+Requirements:
+
+* Inspect the existing typography system/theme first.
+* Ensure consistent font family, font sizes, weights, line heights, and hierarchy.
+* Headings, section labels, body text, captions, buttons, status text, and navigation text should follow a consistent hierarchy.
+* Do not make everything the same size.
+* Preserve readability and avoid text truncation or overflow.
+* Make sure typography works correctly on different mobile screen sizes.
+
+### 4. Unnecessary Top Headers
+
+The following screens do NOT require a separate top header:
+
+* Provider Dashboard
+* Billing
+* Consultation
+
+Requirements:
+
+* Inspect the current navigation/header implementation.
+* Remove only the unnecessary duplicate/separate top header from these screens.
+* Do not remove required navigation controls, back buttons, menu controls, or other necessary functionality.
+* Ensure the resulting screen still has the correct spacing and visual hierarchy.
+* Do not affect headers on screens where they are actually required.
+
+### 5. Scheduled Time & Status Placement
+
+The current placement of scheduled time and consultation status is incorrect.
+
+Requirements:
+
+* Inspect the existing Provider Dashboard/consultation UI and the current component hierarchy.
+* Reposition the scheduled time and status according to the existing planned UI hierarchy/design already present in the project.
+* Keep the information clearly readable.
+* Ensure the layout works on smaller mobile screens without overlap or clipping.
+* Do not change the underlying consultation status logic in this task.
+
+### 6. Hospital Name & Location
+
+The mobile app currently displays only "Hospital".
+
+Requirements:
+
+* Display the actual hospital name together with its place/location wherever this information is shown in the Provider journey.
+* Use the existing hospital data already available from the application/backend.
+* Do NOT hardcode a hospital name or location.
+* If the existing data structure already contains separate hospital-name and location fields, render them correctly.
+* If the required data is already available but not being displayed, fix the UI/data mapping.
+* Do not modify backend/database structure unless absolutely necessary; first inspect the existing data flow.
+
+### 7. Provider Dashboard Colors
+
+The Provider Dashboard colors currently do not match the finalized planned design.
+
+Requirements:
+
+* Bring the dashboard into consistency with the existing finalized Perfusion color system.
+* Inspect existing shared theme/design tokens before changing individual components.
+* Fix cards, backgrounds, text, buttons, status indicators, and other dashboard elements that use inconsistent colors.
+* Do not introduce an unrelated visual style.
+
+### 8. Chat Uploaded-File Formatting
+
+Uploaded files in the Chat/Case File currently have formatting/display issues.
+
+Requirements:
+
+* Inspect the existing uploaded-file/chat attachment component.
+* Fix its visual formatting so uploaded files are clearly displayed and aligned with the existing Perfusion UI.
+* Ensure filename, file type/report type, metadata, icons, spacing, borders/backgrounds, and text hierarchy are visually consistent.
+* Do NOT change the underlying file upload or opening functionality in this task.
+* This task is only for the visual formatting of the existing uploaded-file UI.
+
+### 9. Patient Profile Screen
+
+Patient Profile should be a separate dedicated screen.
+
+Requirements:
+
+* Inspect the current Patient Profile implementation and navigation flow.
+* Patient Profile must have its own dedicated mobile screen.
+* It should display the planned patient photo/icon and patient information using the existing data.
+* It should NOT open the same popup/modal currently used for Clinical Summary.
+* Preserve existing patient data and navigation behavior.
+* Do not duplicate the Clinical Summary component as a workaround.
+* Reuse existing patient-related components/data where appropriate.
+
+### 10. Chat Font Size
+
+The Chat screen's overall font size is currently too small.
+
+Requirements:
+
+* Increase Chat typography to a comfortable/readable mobile size.
+* Maintain the established typography hierarchy.
+* Apply the change consistently to messages, labels, timestamps, attachment text, and relevant Chat UI.
+* Avoid making the UI unnecessarily large or causing overflow/truncation.
+* Follow the centralized typography system rather than introducing arbitrary font sizes.
+
+## IMPLEMENTATION PROCESS
+
+Before changing code:
+
+1. Inspect the mobile project structure.
+2. Identify the relevant screens/components for all 10 issues.
+3. Identify the existing theme/design tokens, typography system, logo assets, and reusable UI components.
+4. Check whether some of these issues share the same root component/theme instead of fixing each screen independently.
+
+Then implement the fixes.
+
+IMPORTANT:
+
+* Do not make speculative architectural changes.
+* Do not rewrite unrelated components.
+* Do not remove functionality simply to make the UI look correct.
+* Do not hardcode backend data.
+* Do not create duplicate components when an existing shared component can be fixed.
+* Keep changes limited to the mobile app.
+* Maintain responsive behavior across different mobile screen sizes.
+
+## VERIFICATION
+
+After implementation, verify each of the 10 issues individually.
+
+For each issue, report:
+
+1. What was wrong.
+2. Which file/component was responsible.
+3. What you changed.
+4. How you verified the fix.
+5. Whether any limitation remains.
+
+Also check for regressions in:
+
+* Provider Dashboard
+* Billing
+* Consultation
+* Case File
+* Chat
+* Patient Profile
+
+Do not simply report that the implementation "looks correct". Inspect the actual code and verify the affected screens/components.
+
+At the end, provide:
+
+* A concise list of files changed.
+* A concise summary of the changes.
+* Any issues that could not be completely fixed because required assets/data/design specifications are missing.
+
+DO NOT start working on functionality bugs from the larger bug list yet. This task is strictly the **Mobile UI / Visual fixes** listed above.
