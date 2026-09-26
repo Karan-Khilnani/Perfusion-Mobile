@@ -1,0 +1,117 @@
+We have an existing Perfusion Android mobile app in this Replit project.
+
+IMPORTANT CONTEXT:
+
+Before Firebase/VoIP was added, this exact project was successfully building Android APKs through Expo/EAS from Replit.
+
+The problem started only AFTER we added Firebase configuration for VoIP/calling.
+
+Therefore, DO NOT assume that GitHub or an external repository is the problem.
+
+I want you to diagnose what changed in the project after the Firebase/VoIP integration and fix the EAS Android build configuration.
+
+### DO NOT:
+
+* create a GitHub repository
+* ask me to connect GitHub
+* migrate the project to GitHub
+* create a new app
+* rebuild the application
+* remove Firebase
+* remove VoIP
+* change the existing UI
+* change the existing Provider/Seeker functionality
+
+### FIRST, COMPARE THE CURRENT PROJECT CONFIGURATION
+
+Inspect the current project and specifically check:
+
+1. package.json
+2. app.json / app.config.js / app.config.ts
+3. eas.json
+4. Expo project ID
+5. Android application ID/package name
+6. presence of an `android/` directory
+7. `google-services.json`
+8. Firebase-related npm packages
+9. Expo config plugins
+10. notification/messaging configuration
+11. Firebase/VoIP native configuration
+12. environment variables relevant to Firebase
+13. whether the project is still Expo-managed or has moved to a prebuild/bare/native configuration
+
+Determine exactly what changed or what configuration is now preventing the previous EAS APK workflow from working.
+
+### IMPORTANT TECHNICAL POINT
+
+We previously built the APK successfully from this Replit project.
+
+So first attempt to reproduce the normal EAS workflow using the CURRENT PROJECT SOURCE.
+
+Do not introduce a GitHub/repository workflow unless the actual EAS CLI error explicitly demonstrates that it is required.
+
+### TARGET
+
+I want an Android INTERNAL DISTRIBUTION APK.
+
+Not:
+
+* Play Store
+* App Store
+* AAB for Play Store
+* production publishing
+
+Target:
+
+CURRENT REPLIT SOURCE
+→ EAS Android build
+→ APK
+→ direct installation on Android phone
+
+### FIREBASE MUST REMAIN
+
+Firebase/VoIP was deliberately added because the app requires calling functionality.
+
+Do not remove Firebase or disable VoIP simply to make the build succeed.
+
+If Firebase requires a specific Expo/EAS configuration, configure it correctly.
+
+If `google-services.json` needs to be referenced through Expo configuration, configure that correctly.
+
+If a config plugin is required, identify and configure it correctly.
+
+If the project needs `expo prebuild`, determine whether that is actually required and explain before making destructive changes.
+
+### BUILD ATTEMPT
+
+After diagnosing the configuration, make only the minimum required changes and attempt:
+
+EAS Android internal/preview build → APK
+
+Use the existing Expo credentials/project.
+
+### IF IT FAILS
+
+Do NOT respond with a generic statement such as:
+
+"Repository must be linked."
+
+Instead give me the EXACT underlying error from the EAS/Expo build process.
+
+Tell me:
+
+* what command was executed
+* the exact failure
+* which configuration caused it
+* whether it is related to Firebase
+* whether it is related to native Android configuration
+* whether it is actually related to Expo project association
+* whether GitHub is genuinely required or merely one possible workflow
+
+Then fix the underlying problem and retry the build.
+
+The objective is to restore the workflow that worked before Firebase was added:
+
+**Replit → Expo/EAS → Android APK**
+
+while keeping the new Firebase VoIP functionality intact.
