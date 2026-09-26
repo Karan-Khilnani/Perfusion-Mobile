@@ -1,0 +1,647 @@
+We need to implement a new PATIENT COMORBIDITIES / PAST ILLNESS feature across BOTH the Perfusion WEB APP and MOBILE APP.
+
+IMPORTANT:
+This feature must work end-to-end across:
+
+SEEKER BOOKING FORM
+        ↓
+SHARED BACKEND / DATABASE
+        ↓
+PROVIDER CASE FILE
+        ↓
+WEB + MOBILE
+
+The Seeker Hospital should enter the patient's relevant comorbidities/past illnesses during the Patient Booking process.
+
+The Provider should then automatically see the same information in the Patient Case File.
+
+The Provider must NOT need to manually re-enter the information.
+
+==================================================
+1. CORE REQUIREMENT
+==================================================
+
+Add a field to the Patient Booking Form:
+
+"Comorbidities / Past Illness"
+
+The Seeker Hospital enters the patient's relevant comorbidities/past illnesses while creating the consultation/booking.
+
+After the booking is submitted:
+
+The information must be saved to the shared backend/database and associated with that specific patient/consultation.
+
+When the Provider opens the Case File:
+
+The same information must automatically appear under:
+
+"Comorbidities / Past Illness"
+
+The Provider should only be viewing the information provided by the Seeker.
+
+Do NOT create a second Provider-specific comorbidities field that requires re-entry.
+
+==================================================
+2. BOTH WEB AND MOBILE
+==================================================
+
+This feature must be implemented for:
+
+1. Web Seeker Booking Form
+2. Mobile Seeker Booking Form
+3. Web Provider Case File
+4. Mobile Provider Case File
+
+All four must use the SAME backend/data source.
+
+Architecture should be:
+
+WEB BOOKING
+      ↓
+      ├───────────────┐
+      ↓               ↓
+SHARED BACKEND / DATABASE
+      ↑               ↑
+      │
+MOBILE BOOKING
+
+Then:
+
+SHARED PATIENT/CONSULTATION DATA
+      ↓
+WEB PROVIDER CASE FILE
+      +
+MOBILE PROVIDER CASE FILE
+
+Do NOT create separate Web and Mobile comorbidity data.
+
+==================================================
+3. FIRST INSPECT EXISTING ARCHITECTURE
+==================================================
+
+Before writing code, inspect the existing implementation in BOTH Web and Mobile.
+
+Find:
+
+- Patient Booking Form
+- Booking creation API
+- Patient model/data structure
+- Consultation/booking model
+- Case File data structure
+- Existing clinical information fields
+- Existing patient medical-history fields
+- Existing allergies fields
+- Existing API endpoints
+- Existing serializers/types/interfaces
+- Existing Case File UI
+- Existing Web → backend data flow
+- Existing Mobile → backend data flow
+
+IMPORTANT:
+
+Do NOT create a duplicate field if an appropriate existing medical-history/comorbidity field already exists.
+
+If the backend already contains a suitable field that is currently unused or not exposed in the booking form, reuse it.
+
+If no suitable field exists, add the smallest appropriate shared backend field.
+
+Do not create separate mobile and web database fields.
+
+==================================================
+4. SEEKER BOOKING FORM
+==================================================
+
+Add a field to the Patient Booking Form:
+
+COMORBIDITIES / PAST ILLNESS
+
+The Seeker Hospital should be able to enter relevant patient conditions/history during booking.
+
+This information may contain multiple conditions.
+
+The implementation should support multiple comorbidities rather than restricting the patient to only one condition.
+
+IMPORTANT:
+
+Inspect the existing booking form's UI patterns and input components first.
+
+Follow the existing design system.
+
+Do not redesign the entire booking form.
+
+Do not modify unrelated booking fields.
+
+==================================================
+5. DATA TO BE STORED
+==================================================
+
+The submitted comorbidities must be stored as structured patient/consultation data rather than only being rendered temporarily on the screen.
+
+The data must remain associated with the correct:
+
+- Patient
+- Booking/consultation
+
+Use the existing application data relationships.
+
+Do not store the information only in frontend state.
+
+Do not hardcode example values.
+
+The examples in the reference UI:
+
+- Penicillin allergy
+- Type 2 Diabetes
+- Hypertension
+
+are ONLY examples of how the information should appear.
+
+Do not automatically add these conditions to every patient.
+
+==================================================
+6. MULTIPLE COMORBIDITIES
+==================================================
+
+The system must support multiple entries.
+
+For example, a Seeker could enter:
+
+- Type 2 Diabetes
+- Hypertension
+- Asthma
+
+The Provider Case File should then display all three.
+
+The order should remain predictable/consistent with the submitted data.
+
+Do not merge multiple conditions into an unreadable single paragraph if the existing UI supports individual tags/chips.
+
+==================================================
+7. CASE FILE — MOBILE
+==================================================
+
+In the MOBILE Provider Case File, display the patient's comorbidities/past illnesses near the top of the Case File.
+
+Use the provided reference image as the visual target.
+
+The intended structure is approximately:
+
+Patient Header
+        ↓
+Comorbidities / Past Illness
+        ↓
+Presenting Complaint
+        ↓
+Latest Vitals
+        ↓
+Other Case File information
+
+The comorbidities should appear as individual visual tags/chips where appropriate.
+
+Example:
+
+[ Penicillin allergy ] [ Type 2 Diabetes ] [ Hypertension ]
+
+The screenshot provided for this task shows the intended concept: the comorbidity tags are displayed directly below the patient/header area and above Presenting Complaint.
+
+Do not copy the example medical conditions as static text.
+
+Render the actual data submitted by the Seeker.
+
+==================================================
+8. CASE FILE — WEB
+==================================================
+
+Implement the same functionality in the WEB Provider Case File.
+
+The Web Case File should show the same comorbidities/past illnesses associated with the consultation.
+
+The Web and Mobile Case File should retrieve the same underlying data.
+
+Do not create separate values for Web and Mobile.
+
+The visual implementation may follow each platform's existing design system, but the information and behavior must be consistent.
+
+==================================================
+9. PROVIDER MUST NOT RE-ENTER
+==================================================
+
+This is a critical requirement.
+
+The Provider should NOT be asked to manually enter the patient's comorbidities again.
+
+Flow:
+
+Seeker enters:
+"Type 2 Diabetes"
+
+during booking.
+
+↓
+
+Booking is submitted.
+
+↓
+
+Backend stores:
+Type 2 Diabetes
+
+↓
+
+Provider opens Case File.
+
+↓
+
+Case File automatically displays:
+Type 2 Diabetes
+
+The Provider should not need to type it again.
+
+==================================================
+10. EDITING / READ-ONLY BEHAVIOR
+==================================================
+
+Inspect the existing Case File architecture and determine whether Seeker-provided clinical information is currently treated as read-only for Providers.
+
+The intended behavior is:
+
+The Provider receives the information provided by the Seeker.
+
+Do NOT introduce an editable Provider input unless the existing product specification explicitly supports it.
+
+The Provider should primarily be able to VIEW the Seeker-provided comorbidities/past illnesses.
+
+Do not allow accidental modification of the original Seeker-provided booking data from the Provider Case File.
+
+==================================================
+11. EMPTY STATE
+==================================================
+
+If the Seeker did not provide any comorbidities/past illnesses:
+
+Do NOT display fake/example conditions.
+
+Do NOT show:
+
+- Type 2 Diabetes
+- Hypertension
+- Penicillin allergy
+
+unless they were actually entered.
+
+Use an appropriate empty state consistent with the existing Case File design.
+
+For example, the section could show an appropriate "Not provided" / empty state if that is consistent with the existing application terminology.
+
+Inspect the existing UI conventions before choosing the exact empty-state wording.
+
+==================================================
+12. DATA FLOW / API
+==================================================
+
+Trace the complete data flow:
+
+Seeker Booking Form
+        ↓
+Booking submission
+        ↓
+API request
+        ↓
+Backend validation
+        ↓
+Database
+        ↓
+Provider Case File API
+        ↓
+Web Case File
++
+Mobile Case File
+
+Make sure the comorbidities field is included wherever necessary in this flow.
+
+If the existing booking API already accepts a medical-history/comorbidities field, reuse it.
+
+If it does not, add the smallest necessary backend/API change.
+
+Do NOT create separate endpoints for Web and Mobile unless the existing architecture already requires platform-specific endpoints.
+
+==================================================
+13. VALIDATION
+==================================================
+
+Handle:
+
+- Empty comorbidities
+- One comorbidity
+- Multiple comorbidities
+- Long condition names
+- Duplicate entries if the UI allows multiple entries
+- Leading/trailing spaces
+- Invalid/empty individual entries
+
+Do not invent complicated medical validation.
+
+The purpose is to capture the information entered by the Seeker accurately.
+
+Do not modify or reinterpret the medical information using AI or automatic classification.
+
+Store/display what the Seeker entered, subject only to normal input cleaning/validation.
+
+==================================================
+14. PATIENT VS CONSULTATION DATA
+==================================================
+
+Before implementation, determine whether the existing architecture stores clinical information against:
+
+- Patient
+- Booking
+- Consultation
+- Case File
+
+Use the existing architecture correctly.
+
+IMPORTANT:
+
+Comorbidities entered during a specific booking must appear for the correct consultation/case.
+
+Do not accidentally display one patient's comorbidities in another patient's Case File.
+
+Do not globally assign a condition to every consultation for that patient unless the existing data model explicitly treats it as persistent patient medical history.
+
+The implementation must respect the existing data model.
+
+==================================================
+15. WEB ↔ MOBILE CONSISTENCY
+==================================================
+
+Test cross-platform behavior.
+
+Example:
+
+Seeker enters on Web:
+
+Comorbidities:
+- Type 2 Diabetes
+- Hypertension
+
+Submits booking.
+
+Then Provider opens Mobile Case File.
+
+Expected:
+- Type 2 Diabetes
+- Hypertension
+
+are displayed.
+
+Then test the reverse:
+
+If the booking is created through Mobile:
+
+Seeker enters:
+- Asthma
+- Hypertension
+
+Provider opens Web Case File.
+
+Expected:
+- Asthma
+- Hypertension
+
+are displayed.
+
+The data must be identical regardless of which platform created the booking.
+
+==================================================
+16. DO NOT DUPLICATE CLINICAL SUMMARY
+==================================================
+
+There is an existing Case File distinction between:
+
+- Presenting Complaints
+- Clinical Summary
+
+Do NOT put comorbidities into Presenting Complaints or Clinical Summary as a workaround.
+
+Comorbidities/Past Illness must remain a separate piece of clinical information.
+
+The Case File should conceptually contain:
+
+COMORBIDITIES / PAST ILLNESS
+        ↓
+PRESENTING COMPLAINT
+        ↓
+CLINICAL SUMMARY / OTHER INFORMATION
+
+Do not duplicate the same data across multiple sections.
+
+==================================================
+17. DO NOT CHANGE UNRELATED FEATURES
+==================================================
+
+This task must NOT modify:
+
+- Consultation status
+- Scheduled/Ongoing/Paused/Completed lifecycle
+- Calling
+- Video calling
+- Chat functionality
+- Clinical Advisory
+- PDF generation
+- Provider Availability
+- Authentication
+- Forgot Password
+- Billing
+- Patient Profile
+- Report tagging
+- Uploaded file handling
+- Existing Presenting Complaint logic
+
+Only modify the components/data flow necessary for Comorbidities/Past Illness.
+
+==================================================
+18. IMPLEMENTATION PROCESS
+==================================================
+
+Before making changes:
+
+1. Inspect Web Patient Booking Form.
+2. Inspect Mobile Patient Booking Form.
+3. Inspect existing booking API.
+4. Inspect backend patient/consultation schema.
+5. Inspect Web Provider Case File.
+6. Inspect Mobile Provider Case File.
+7. Inspect existing clinical-information data structures.
+8. Determine the correct shared field/data model.
+9. Trace the data from booking submission to Case File.
+10. Implement the feature using the existing architecture.
+
+Do not immediately start coding before understanding the existing data flow.
+
+==================================================
+19. REQUIRED TESTING
+==================================================
+
+TEST 1 — Web Booking → Web Case File
+
+Seeker creates booking on Web.
+
+Enter:
+
+- Type 2 Diabetes
+- Hypertension
+
+Expected:
+
+Provider Web Case File displays both conditions.
+
+==================================================
+
+TEST 2 — Web Booking → Mobile Case File
+
+Create booking through Web.
+
+Enter:
+
+- Type 2 Diabetes
+- Hypertension
+
+Open the same consultation from Provider Mobile.
+
+Expected:
+
+Both conditions appear in Mobile Case File.
+
+==================================================
+
+TEST 3 — Mobile Booking → Web Case File
+
+Create booking through Mobile.
+
+Enter:
+
+- Asthma
+- Hypertension
+
+Open the same consultation from Provider Web.
+
+Expected:
+
+Both conditions appear.
+
+==================================================
+
+TEST 4 — Mobile Booking → Mobile Case File
+
+Create booking through Mobile.
+
+Enter:
+
+- Diabetes
+- Hypertension
+- Asthma
+
+Open the Provider Mobile Case File.
+
+Expected:
+
+All three appear as separate entries/tags/chips.
+
+==================================================
+
+TEST 5 — No comorbidities
+
+Create a booking without entering any comorbidities.
+
+Expected:
+
+- No fake conditions.
+- No stale conditions from another patient.
+- Appropriate empty state.
+
+==================================================
+
+TEST 6 — Patient isolation
+
+Create two different patient bookings.
+
+Patient A:
+- Diabetes
+
+Patient B:
+- Asthma
+
+Open Patient A Case File.
+
+Expected:
+Only Diabetes.
+
+Open Patient B Case File.
+
+Expected:
+Only Asthma.
+
+No cross-patient data leakage.
+
+==================================================
+20. REFERENCE UI
+==================================================
+
+Use the provided reference screenshot as the visual reference for the MOBILE Case File.
+
+The screenshot demonstrates:
+
+Patient header
+↓
+Comorbidity/past illness tags
+↓
+Presenting Complaint
+
+The comorbidity entries appear as compact rounded tags/chips.
+
+Do not hardcode the screenshot's example values.
+
+The actual values must come from the backend data submitted by the Seeker.
+
+Follow the existing Perfusion typography, spacing, and color system.
+
+==================================================
+21. FINAL REPORT
+==================================================
+
+After implementation, report:
+
+1. Existing Web/Mobile booking architecture discovered.
+2. Existing backend data model used.
+3. Whether an existing medical-history/comorbidity field was reused.
+4. If a new backend field was required, explain why.
+5. API changes made.
+6. Web Booking changes.
+7. Mobile Booking changes.
+8. Web Case File changes.
+9. Mobile Case File changes.
+10. How the data flows from Seeker → Backend → Provider Case File.
+11. How Web and Mobile stay synchronized.
+12. How empty states are handled.
+13. Tests performed and results.
+14. Any limitation or backend configuration still required.
+
+IMPORTANT FINAL RULE:
+
+Do not create separate Web and Mobile comorbidity systems.
+
+There must be ONE shared source of truth:
+
+Seeker Web ──────┐
+                 │
+Seeker Mobile ───┤
+                 ↓
+          SHARED BACKEND
+                 ↓
+          SHARED DATA
+                 ↓
+Provider Web ────┐
+                 │
+Provider Mobile ─┘
+
+The Provider must automatically receive the comorbidities/past illnesses entered by the Seeker during booking, without manually re-entering them.
