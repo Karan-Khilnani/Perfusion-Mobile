@@ -103,3 +103,17 @@ mtime_ms = 1789977926003
 storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:034c0c6d-c25b-491b-98e9-0bb19624165f/e925826b-3861-4998-af35-86daf0265c7e/67c1b787-9b73-400a-a558-a14dd8d3339f"
 storage_version_token = "1789977989624138"
 content_type = "text/markdown"
+
+[[outputs]]
+id = "cZhpZdJmrfKcOE4Rxcj6C"
+uri = "file://attached_assets/perfusion-mobile-expo-go-qr.png"
+type = "image"
+title = "Perfusion Mobile — Expo Go QR"
+description = "Scan this QR code with the iPhone Camera app to open the current running Perfusion Mobile preview in Expo Go."
+logical_id = "ae23df39-77ce-477e-9a87-303e696c6221"
+content_hash = "sha256:eeb7c11f2911e85b17f52618d4259617d1c10a574f25dfc95f257b025f7d905a"
+size = 5584
+mtime_ms = 1790399973750
+storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:034c0c6d-c25b-491b-98e9-0bb19624165f/ae23df39-77ce-477e-9a87-303e696c6221/932b086c-e174-42b2-a5a8-bc614ead7e57"
+storage_version_token = "1790399980721229"
+content_type = "image/png"
