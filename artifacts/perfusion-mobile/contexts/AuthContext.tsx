@@ -4,6 +4,10 @@ import * as Linking from "expo-linking";
 import * as WebBrowser from "expo-web-browser";
 import { Platform } from "react-native";
 import React, { createContext, useContext, useEffect, useState } from "react";
+import type {
+  PasswordResetPassword,
+  PasswordResetVerification,
+} from "@workspace/api-client-react";
 
 import {
   apiFetch,
@@ -177,6 +181,9 @@ interface AuthContextType {
   completeProfile: (input: ProfileCompletionInput) => Promise<User>;
   verifyEmail: (code: string) => Promise<void>;
   resendVerification: () => Promise<void>;
+  verifyPasswordReset: (email: string, code: string) => Promise<User>;
+  changePasswordAfterRecovery: (password: string) => Promise<void>;
+  finishPasswordReset: () => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
 }
@@ -426,6 +433,74 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const verifyPasswordReset = async (
+    email: string,
+    code: string,
+  ): Promise<User> => {
+    const payload: PasswordResetVerification = { email, code };
+    const response = await fetch(
+      `${getBaseUrl()}/api/auth/password-reset/verify`,
+      {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Mobile-Client": "1",
+        },
+        body: JSON.stringify(payload),
+      },
+    );
+    const data = (await response.json().catch(() => ({}))) as Record<
+      string,
+      unknown
+    >;
+    if (!response.ok) {
+      throw new Error(
+        typeof data.message === "string"
+          ? data.message
+          : "Could not verify the recovery code.",
+      );
+    }
+    await storeSessionFromResponse(response);
+    return applyAuthenticatedUser(data);
+  };
+
+  const changePasswordAfterRecovery = async (password: string) => {
+    const payload: PasswordResetPassword = { password };
+    const response = await apiFetch("/api/auth/password-reset/change", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+    const data = (await response.json().catch(() => ({}))) as Record<
+      string,
+      unknown
+    >;
+    if (!response.ok) {
+      throw new Error(
+        typeof data.message === "string"
+          ? data.message
+          : "Could not update the password.",
+      );
+    }
+  };
+
+  const finishPasswordReset = async () => {
+    const response = await apiFetch("/api/auth/password-reset/continue", {
+      method: "POST",
+    });
+    const data = (await response.json().catch(() => ({}))) as Record<
+      string,
+      unknown
+    >;
+    if (!response.ok) {
+      throw new Error(
+        typeof data.message === "string"
+          ? data.message
+          : "Could not finish account recovery.",
+      );
+    }
+  };
+
   const completeProfile = async (
     input: ProfileCompletionInput,
   ): Promise<User> => {
@@ -463,7 +538,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   return (
     <AuthContext.Provider value={{
       user, loading, login, loginWithGoogle, register, completeProfile,
-      verifyEmail, resendVerification, logout, refreshUser,
+      verifyEmail, resendVerification, verifyPasswordReset,
+      changePasswordAfterRecovery, finishPasswordReset, logout, refreshUser,
       callbackDevice, callbackDeviceLoading, callbackDeviceError,
       refreshCallbackDevice, saveCallbackDevice,
     }}>

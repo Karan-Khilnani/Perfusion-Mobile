@@ -264,6 +264,17 @@ export default function LoginScreen() {
           </View>
 
           <Pressable
+            onPress={() => router.push("/forgot-password")}
+            accessibilityRole="link"
+            testID="forgot-password-link"
+            style={styles.forgotLinkButton}
+          >
+            <Text style={[styles.forgotLink, { color: colors.primary }]}>
+              Forgot password?
+            </Text>
+          </Pressable>
+
+          <Pressable
             onPress={handleLogin}
             disabled={loading || googleLoading}
             style={({ pressed }) => [
@@ -439,6 +450,15 @@ const styles = StyleSheet.create({
   secondaryLink: {
     textAlign: "center",
     fontSize: 14,
+    fontFamily: "Inter_500Medium",
+  },
+  forgotLinkButton: {
+    alignSelf: "flex-end",
+    marginTop: -10,
+    paddingVertical: 4,
+  },
+  forgotLink: {
+    fontSize: 13,
     fontFamily: "Inter_500Medium",
   },
   footer: {

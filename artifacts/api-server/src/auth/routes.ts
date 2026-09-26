@@ -15,13 +15,19 @@ import {
   setVerificationCode,
   setGooglePasswordSetupCode,
   setGoogleAccountPassword,
+  consumePasswordResetCode,
+  setPasswordAfterRecovery,
   verifyEmailCode,
   getRawUserById,
   completeUserProfile,
 } from "./index";
 import { loginSchema, registerSchema, type UserRole } from "@workspace/db";
 import { z } from "zod/v4";
-import { generateVerificationCode, sendVerificationEmail } from "../email";
+import {
+  generateVerificationCode,
+  sendPasswordResetEmail,
+  sendVerificationEmail,
+} from "../email";
 import { storage } from "../storage";
 import { getPool } from "../db";
 import { AGREEMENT_VERSION } from "../services/agreement-text";
@@ -64,6 +70,40 @@ function getCallbackURL(req: any): string {
 }
 
 const MOBILE_GOOGLE_REDIRECT_URI = "perfusion-mobile://auth/callback";
+const PASSWORD_RECOVERY_WINDOW_MS = 15 * 60 * 1000;
+
+const recoveryRateLimits = new Map<string, { count: number; expiresAt: number }>();
+
+function allowRecoveryAttempt(key: string, limit: number): boolean {
+  const now = Date.now();
+  const existing = recoveryRateLimits.get(key);
+  if (!existing || existing.expiresAt <= now) {
+    recoveryRateLimits.set(key, {
+      count: 1,
+      expiresAt: now + PASSWORD_RECOVERY_WINDOW_MS,
+    });
+  } else if (existing.count >= limit) {
+    return false;
+  } else {
+    existing.count += 1;
+  }
+
+  if (recoveryRateLimits.size > 2_000) {
+    for (const [entryKey, entry] of recoveryRateLimits) {
+      if (entry.expiresAt <= now) recoveryRateLimits.delete(entryKey);
+    }
+  }
+  return true;
+}
+
+function saveSession(session: any): Promise<void> {
+  return new Promise((resolve, reject) => {
+    session.save((error: Error | null) => {
+      if (error) reject(error);
+      else resolve();
+    });
+  });
+}
 
 function getMobileGoogleErrorUrl(error: string): string {
   return `${MOBILE_GOOGLE_REDIRECT_URI}?error=${encodeURIComponent(error)}`;
@@ -568,6 +608,167 @@ export function registerAuthRoutes(app: Express): void {
       }
       console.error("Login error:", error);
       res.status(500).json({ message: "Login failed" });
+    }
+  });
+
+  app.post("/api/auth/password-reset/request", async (req: any, res) => {
+    try {
+      const { email } = z.object({
+        email: z.string().trim().email().max(320).transform((value) => value.toLowerCase()),
+      }).parse(req.body);
+      const ip = req.ip || req.socket?.remoteAddress || "unknown";
+      if (
+        !allowRecoveryAttempt(`reset-request-ip:${ip}`, 10) ||
+        !allowRecoveryAttempt(`reset-request-email:${email}`, 3)
+      ) {
+        return res.status(429).json({ message: "Too many requests. Please try again later." });
+      }
+
+      const user = await getUserByEmail(email);
+      if (!user) {
+        return res.status(404).json({
+          message: "This email is not registered. Create an account to continue.",
+        });
+      }
+      if (!user.isActive) {
+        return res.status(401).json({ message: "Account is deactivated." });
+      }
+
+      const code = generateVerificationCode();
+      await setVerificationCode(user.id, code);
+      const sent = await sendPasswordResetEmail(
+        user.email,
+        code,
+        user.firstName || undefined,
+      );
+      if (!sent) {
+        req.log?.error("Password recovery email delivery failed");
+        return res.status(500).json({
+          message: "Could not send the recovery code. Please try again.",
+        });
+      }
+      return res.json({ message: "Recovery code sent to your email." });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Enter a valid email address." });
+      }
+      req.log?.error("Password recovery request failed");
+      return res.status(500).json({ message: "Could not request account recovery." });
+    }
+  });
+
+  app.post("/api/auth/password-reset/verify", async (req: any, res) => {
+    try {
+      const { email, code } = z.object({
+        email: z.string().trim().email().max(320).transform((value) => value.toLowerCase()),
+        code: z.string().regex(/^\d{6}$/),
+      }).parse(req.body);
+      const ip = req.ip || req.socket?.remoteAddress || "unknown";
+      if (
+        !allowRecoveryAttempt(`reset-verify-ip:${ip}`, 20) ||
+        !allowRecoveryAttempt(`reset-verify-email:${email}`, 8)
+      ) {
+        return res.status(429).json({ message: "Too many attempts. Request a new code later." });
+      }
+
+      const user = await getUserByEmail(email);
+      if (!user) {
+        return res.status(400).json({ message: "The code is invalid or expired. Request a new code." });
+      }
+      if (!user.isActive) {
+        return res.status(401).json({ message: "Account is deactivated." });
+      }
+
+      const recoveredUser = await consumePasswordResetCode(user.id, code);
+      if (!recoveredUser) {
+        return res.status(400).json({ message: "The code is invalid or expired. Request a new code." });
+      }
+
+      await new Promise<void>((resolve, reject) => {
+        req.session.regenerate((error: Error | null) => {
+          if (error) reject(error);
+          else resolve();
+        });
+      });
+      req.session.userId = recoveredUser.id;
+      req.session.passwordRecoveryVerifiedAt = Date.now();
+
+      let requiresAgreement = false;
+      try {
+        requiresAgreement = await userRequiresAgreement(recoveredUser as any);
+      } catch {
+        requiresAgreement =
+          recoveredUser.role !== "admin" && recoveredUser.approvalStatus === "approved";
+      }
+      const mobileUser = await getMobileAuthUser(req, recoveredUser);
+      await saveSession(req.session);
+
+      return res.json({
+        ...mobileUser,
+        needsProfile:
+          recoveredUser.role !== "admin" && !recoveredUser.hospitalName,
+        requiresAgreement,
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({
+          message: "Enter a valid email address and 6-digit code.",
+        });
+      }
+      req.log?.error("Password recovery verification failed");
+      return res.status(500).json({ message: "Could not verify the recovery code." });
+    }
+  });
+
+  app.post("/api/auth/password-reset/change", async (req: any, res) => {
+    try {
+      const { password } = z.object({
+        password: z.string().min(6).max(128),
+      }).parse(req.body);
+      const verifiedAt = req.session.passwordRecoveryVerifiedAt;
+      if (
+        !req.session.userId ||
+        typeof verifiedAt !== "number" ||
+        Date.now() - verifiedAt > PASSWORD_RECOVERY_WINDOW_MS
+      ) {
+        return res.status(401).json({ message: "Your recovery session has expired. Please start again." });
+      }
+
+      const user = await getRawUserById(req.session.userId);
+      if (!user || !user.isActive) {
+        return res.status(401).json({ message: "Your recovery session is no longer valid." });
+      }
+      const changed = await setPasswordAfterRecovery(user.id, password);
+      if (!changed) {
+        return res.status(401).json({ message: "Your recovery session is no longer valid." });
+      }
+
+      delete req.session.passwordRecoveryVerifiedAt;
+      await saveSession(req.session);
+      return res.json({ message: "Password updated successfully." });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Password must be at least 6 characters." });
+      }
+      req.log?.error("Password recovery password update failed");
+      return res.status(500).json({ message: "Could not update the password." });
+    }
+  });
+
+  app.post("/api/auth/password-reset/continue", async (req: any, res) => {
+    try {
+      if (
+        !req.session.userId ||
+        typeof req.session.passwordRecoveryVerifiedAt !== "number"
+      ) {
+        return res.status(401).json({ message: "Your recovery session is no longer valid." });
+      }
+      delete req.session.passwordRecoveryVerifiedAt;
+      await saveSession(req.session);
+      return res.json({ message: "Account recovery complete." });
+    } catch {
+      req.log?.error("Password recovery session finalization failed");
+      return res.status(500).json({ message: "Could not finish account recovery." });
     }
   });
 

@@ -11,6 +11,7 @@ import {
   Sora_700Bold,
 } from "@expo-google-fonts/sora";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { setBaseUrl } from "@workspace/api-client-react";
 import { Redirect, Stack, usePathname, type Href } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect } from "react";
@@ -26,7 +27,9 @@ import { IncomingCallOverlay } from "@/components/IncomingCallOverlay";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { CallProvider } from "@/contexts/CallContext";
 import { useColors } from "@/hooks/useColors";
+import { getBaseUrl } from "@/hooks/useApi";
 
+setBaseUrl(getBaseUrl());
 SplashScreen.preventAutoHideAsync();
 
 const queryClient = new QueryClient({
@@ -58,7 +61,14 @@ function RootLayoutNav() {
     );
   }
 
-  const publicPaths = ["/login", "/register", "/set-password", "/verify-email"];
+  const publicPaths = [
+    "/login",
+    "/register",
+    "/set-password",
+    "/verify-email",
+    "/forgot-password",
+  ];
+  const isRecoveryFlow = pathname === "/forgot-password";
   const onboardingPaths = [
     ...publicPaths,
     "/complete-profile",
@@ -67,9 +77,14 @@ function RootLayoutNav() {
   let redirectHref: Href | null = null;
   if (!user && !publicPaths.includes(pathname)) {
     redirectHref = "/login";
-  } else if (user?.needsProfile && pathname !== "/complete-profile") {
+  } else if (
+    !isRecoveryFlow &&
+    user?.needsProfile &&
+    pathname !== "/complete-profile"
+  ) {
     redirectHref = "/complete-profile";
   } else if (
+    !isRecoveryFlow &&
     user &&
     !user.needsProfile &&
     (user.approvalStatus === "pending" ||
@@ -78,6 +93,7 @@ function RootLayoutNav() {
   ) {
     redirectHref = "/account-status";
   } else if (
+    !isRecoveryFlow &&
     user &&
     user.role !== "admin" &&
     user.approvalStatus === "approved" &&
@@ -86,6 +102,7 @@ function RootLayoutNav() {
   ) {
     redirectHref = "/callback-device";
   } else if (
+    !isRecoveryFlow &&
     user &&
     (user.role === "admin" || user.approvalStatus === "approved") &&
     onboardingPaths.includes(pathname)
@@ -108,6 +125,10 @@ function RootLayoutNav() {
         <Stack.Screen
           name="set-password"
           options={{ headerShown: false, gestureEnabled: false }}
+        />
+        <Stack.Screen
+          name="forgot-password"
+          options={{ headerShown: false }}
         />
         <Stack.Screen
           name="verify-email"

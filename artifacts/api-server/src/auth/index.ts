@@ -4,13 +4,14 @@ import connectPg from "connect-pg-simple";
 import bcrypt from "bcryptjs";
 import { db } from "../db";
 import { users, type User, type SafeUser, type UserRole } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { and, eq, gt } from "drizzle-orm";
 
 declare module "express-session" {
   interface SessionData {
     userId?: string;
     mobileGoogleOAuthState?: string;
     mobileGoogleCodeChallenge?: string;
+    passwordRecoveryVerifiedAt?: number;
   }
 }
 
@@ -118,6 +119,45 @@ export async function setVerificationCode(userId: string, code: string): Promise
     .update(users)
     .set({ verificationCode: code, verificationCodeExpiresAt: expiresAt, updatedAt: new Date() })
     .where(eq(users.id, userId));
+}
+
+export async function consumePasswordResetCode(
+  userId: string,
+  code: string,
+): Promise<SafeUser | null> {
+  const now = new Date();
+  const [user] = await db
+    .update(users)
+    .set({
+      emailVerified: true,
+      verificationCode: null,
+      verificationCodeExpiresAt: null,
+      updatedAt: now,
+    })
+    .where(
+      and(
+        eq(users.id, userId),
+        eq(users.verificationCode, code),
+        gt(users.verificationCodeExpiresAt, now),
+      ),
+    )
+    .returning();
+
+  return user ? excludePassword(user) : null;
+}
+
+export async function setPasswordAfterRecovery(
+  userId: string,
+  password: string,
+): Promise<boolean> {
+  const passwordHash = await bcrypt.hash(password, 10);
+  const [updatedUser] = await db
+    .update(users)
+    .set({ password: passwordHash, updatedAt: new Date() })
+    .where(eq(users.id, userId))
+    .returning({ id: users.id });
+
+  return Boolean(updatedUser);
 }
 
 export async function setGooglePasswordSetupCode(userId: string, code: string): Promise<void> {

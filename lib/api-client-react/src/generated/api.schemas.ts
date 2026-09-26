@@ -28,6 +28,48 @@ export interface HealthStatus {
   status: string;
 }
 
+export interface PasswordResetRequest {
+  /** @maxLength 320 */
+  email: string;
+}
+
+export interface PasswordResetVerification {
+  /** @maxLength 320 */
+  email: string;
+  /** @pattern ^[0-9]{6}$ */
+  code: string;
+}
+
+export interface PasswordResetPassword {
+  /**
+     * @minLength 6
+     * @maxLength 128
+     */
+  password: string;
+}
+
+export interface MessageResponse {
+  message: string;
+}
+
+/**
+ * Authenticated user returned after recovery-code verification. Additional safe account fields are included for compatibility with existing mobile sign-in.
+ */
+export interface PasswordResetSessionUser {
+  id: string;
+  email: string;
+  /** @nullable */
+  firstName?: string | null;
+  /** @nullable */
+  lastName?: string | null;
+  role: string;
+  /** @nullable */
+  approvalStatus?: string | null;
+  requiresAgreement?: boolean;
+  needsProfile?: boolean;
+  [key: string]: unknown;
+ }
+
 export interface BookingCallInfo {
   id: string;
   /** @nullable */

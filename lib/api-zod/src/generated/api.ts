@@ -50,6 +50,76 @@ export const HealthCheckResponse = zod.object({
 
 
 /**
+ * Sends a short-lived six-digit code to the registered account email. This endpoint intentionally distinguishes an unregistered email so the mobile app can offer signup.
+ * @summary Send an account-recovery code
+ */
+export const requestPasswordResetBodyEmailMax = 320;
+
+
+
+export const RequestPasswordResetBody = zod.object({
+  "email": zod.string().email().max(requestPasswordResetBodyEmailMax)
+})
+
+export const RequestPasswordResetResponse = zod.object({
+  "message": zod.string()
+})
+
+
+/**
+ * Consumes the short-lived code and creates the normal persistent session only after successful verification.
+ * @summary Verify an account-recovery code and establish a session
+ */
+export const verifyPasswordResetCodeBodyEmailMax = 320;
+
+export const verifyPasswordResetCodeBodyCodeRegExp = new RegExp('^[0-9]{6}$');
+
+
+export const VerifyPasswordResetCodeBody = zod.object({
+  "email": zod.string().email().max(verifyPasswordResetCodeBodyEmailMax),
+  "code": zod.string().regex(verifyPasswordResetCodeBodyCodeRegExp)
+})
+
+export const VerifyPasswordResetCodeResponse = zod.object({
+  "id": zod.string(),
+  "email": zod.string().email(),
+  "firstName": zod.string().nullish(),
+  "lastName": zod.string().nullish(),
+  "role": zod.string(),
+  "approvalStatus": zod.string().nullish(),
+  "requiresAgreement": zod.boolean().optional(),
+  "needsProfile": zod.boolean().optional()
+}).describe('Authenticated user returned after recovery-code verification. Additional safe account fields are included for compatibility with existing mobile sign-in.')
+
+
+/**
+ * Available only during the short-lived session established by successful recovery-code verification.
+ * @summary Set a password in a verified recovery session
+ */
+export const changePasswordAfterRecoveryBodyPasswordMin = 6;
+export const changePasswordAfterRecoveryBodyPasswordMax = 128;
+
+
+
+export const ChangePasswordAfterRecoveryBody = zod.object({
+  "password": zod.string().min(changePasswordAfterRecoveryBodyPasswordMin).max(changePasswordAfterRecoveryBodyPasswordMax)
+})
+
+export const ChangePasswordAfterRecoveryResponse = zod.object({
+  "message": zod.string()
+})
+
+
+/**
+ * Clears the temporary password-change permission while keeping the authenticated session.
+ * @summary Finish recovery without changing the password
+ */
+export const FinishPasswordResetResponse = zod.object({
+  "message": zod.string()
+})
+
+
+/**
  * @summary Get an authorized booking
  */
 export const GetBookingByIdParams = zod.object({

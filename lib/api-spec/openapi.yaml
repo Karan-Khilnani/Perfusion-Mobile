@@ -58,6 +58,86 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /auth/password-reset/request:
+    post:
+      operationId: requestPasswordReset
+      tags: [auth]
+      summary: Send an account-recovery code
+      description: Sends a short-lived six-digit code to the registered account email. This endpoint intentionally distinguishes an unregistered email so the mobile app can offer signup.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PasswordResetRequest"
+      responses:
+        "200":
+          description: Recovery code sent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+        "400": { description: Invalid email address }
+        "404": { description: This email is not registered }
+        "429": { description: Too many recovery requests }
+        "500": { description: Could not send the recovery code }
+  /auth/password-reset/verify:
+    post:
+      operationId: verifyPasswordResetCode
+      tags: [auth]
+      summary: Verify an account-recovery code and establish a session
+      description: Consumes the short-lived code and creates the normal persistent session only after successful verification.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PasswordResetVerification"
+      responses:
+        "200":
+          description: Verified account and authenticated session user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PasswordResetSessionUser"
+        "400": { description: Invalid or expired recovery code }
+        "401": { description: Account is deactivated }
+        "429": { description: Too many code attempts }
+  /auth/password-reset/change:
+    post:
+      operationId: changePasswordAfterRecovery
+      tags: [auth]
+      summary: Set a password in a verified recovery session
+      description: Available only during the short-lived session established by successful recovery-code verification.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PasswordResetPassword"
+      responses:
+        "200":
+          description: Password updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+        "400": { description: Invalid password }
+        "401": { description: Recovery session is not valid }
+  /auth/password-reset/continue:
+    post:
+      operationId: finishPasswordReset
+      tags: [auth]
+      summary: Finish recovery without changing the password
+      description: Clears the temporary password-change permission while keeping the authenticated session.
+      responses:
+        "200":
+          description: Recovery flow finished
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+        "401": { description: Recovery session is not valid }
   /bookings/{id}:
     get:
       operationId: getBookingById
@@ -399,6 +479,41 @@ components:
           type: string
       required:
         - status
+    PasswordResetRequest:
+      type: object
+      required: [email]
+      properties:
+        email: { type: string, format: email, maxLength: 320 }
+    PasswordResetVerification:
+      type: object
+      required: [email, code]
+      properties:
+        email: { type: string, format: email, maxLength: 320 }
+        code: { type: string, pattern: "^[0-9]{6}$" }
+    PasswordResetPassword:
+      type: object
+      required: [password]
+      properties:
+        password: { type: string, minLength: 6, maxLength: 128 }
+    MessageResponse:
+      type: object
+      required: [message]
+      properties:
+        message: { type: string }
+    PasswordResetSessionUser:
+      type: object
+      description: Authenticated user returned after recovery-code verification. Additional safe account fields are included for compatibility with existing mobile sign-in.
+      required: [id, email, role]
+      properties:
+        id: { type: string }
+        email: { type: string, format: email }
+        firstName: { type: ["string", "null"] }
+        lastName: { type: ["string", "null"] }
+        role: { type: string }
+        approvalStatus: { type: ["string", "null"] }
+        requiresAgreement: { type: boolean }
+        needsProfile: { type: boolean }
+      additionalProperties: true
     BookingCallInfo:
       type: object
       properties:
