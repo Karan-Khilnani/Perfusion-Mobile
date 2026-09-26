@@ -1,0 +1,687 @@
+We need to make a VERY SPECIFIC change to the Perfusion Mobile App — Provider/Seeker consultation status and consultation availability flow.
+
+IMPORTANT:
+This task is ONLY about the consultation lifecycle/status, its placement, permissions, calling availability, and chat availability described below.
+
+DO NOT change any other feature.
+DO NOT modify unrelated UI, backend logic, database structures, authentication, Clinical Advisory, PDF generation, booking flow, patient data, billing, or other functionality unless it is strictly required to implement this exact consultation lifecycle correctly.
+
+Before making changes, inspect the existing implementation and trace how consultation status, scheduled date/time, provider/seeker roles, calling, and chat currently work.
+
+Do not create a second or parallel status system if an existing consultation status field/state already exists. Reuse the existing architecture where possible.
+
+==================================================
+1. THE CORE CONSULTATION LIFECYCLE
+==================================================
+
+There must be ONE single consultation status lifecycle:
+
+SCHEDULED
+    ↓
+ONGOING / PAUSED
+    ↓
+COMPLETED
+
+These are NOT three independent buttons.
+
+The consultation must progress based on the scheduled consultation start time and the 24-hour active window.
+
+The lifecycle must work as follows:
+
+A. BEFORE THE SCHEDULED TIME
+Status = SCHEDULED
+
+B. WHEN THE SCHEDULED TIME IS REACHED
+Status changes from SCHEDULED to ONGOING.
+
+At this point:
+- Provider can control the consultation between ONGOING and PAUSED.
+- Calling becomes available.
+- Seeker can contact/call the Provider.
+- Seeker can use the case-file messaging/chat service.
+
+C. DURING THE 24-HOUR WINDOW
+The consultation remains active for 24 hours from the scheduled consultation start time.
+
+During this period:
+
+ONGOING:
+- Provider can pause the consultation.
+- Calling is enabled.
+- Chat/messaging is enabled for the Seeker and Provider.
+
+PAUSED:
+- Provider can resume the consultation.
+- Calling is disabled for the Seeker.
+- Chat/messaging remains enabled.
+- The consultation itself must NOT become completed just because it is paused.
+
+D. AFTER 24 HOURS
+Status becomes COMPLETED.
+
+At this point:
+- Calling must be disabled.
+- Chat/messaging service must be disabled.
+- The Provider must no longer be able to toggle Ongoing/Paused.
+- The Seeker must not be able to initiate calling or messaging.
+- The consultation should be treated as completed/read-only according to the existing application architecture.
+- Do not delete any consultation data or historical messages.
+
+IMPORTANT:
+The 24-hour period is based on the consultation's actual scheduled start date/time, NOT 24 hours from when the Provider happens to open the screen.
+
+==================================================
+2. STATUS DISPLAY — ONE LOCATION ONLY
+==================================================
+
+Currently the mobile app shows:
+
+- "Scheduled" in the consultation card/status area.
+- "Ongoing" as a separate control below the Call / Video / Case File / Advise buttons.
+- "Ongoing" again inside the Case File near the top.
+
+This is incorrect.
+
+The consultation status must exist/display as ONE status control in the SAME LOCATION where "Scheduled" is currently displayed.
+
+For example:
+
+BEFORE START:
+[ ● Scheduled ]
+
+AFTER SCHEDULED TIME:
+[ ● Ongoing ]
+
+WHEN PROVIDER PAUSES:
+[ ● Paused ]
+
+AFTER 24 HOURS:
+[ ● Completed ]
+
+The exact existing Perfusion visual styling should be preserved unless a small adjustment is required to support this behavior.
+
+==================================================
+3. REMOVE THE OLD "ONGOING" CONTROL
+==================================================
+
+Remove the separate "Ongoing" button/control currently displayed below:
+
+Call | Video | Case File | Advise
+
+That lower Ongoing/Pause control is no longer required.
+
+Do NOT leave two status controls on the screen.
+
+There must be only ONE consultation status control, located where "Scheduled" is currently displayed.
+
+Also remove the duplicate Ongoing status from the Case File top section if it is currently a separate/duplicate control.
+
+The Case File should use the SAME consultation status/state rather than maintaining another independent status.
+
+IMPORTANT:
+Do not simply hide the lower button while leaving duplicate logic behind.
+
+Trace and remove the redundant status-control implementation so there is one source of truth.
+
+==================================================
+4. PROVIDER PERMISSION
+==================================================
+
+Only the PROVIDER can change:
+
+ONGOING ↔ PAUSED
+
+The Provider is allowed to interact with the status control only during the active 24-hour consultation window.
+
+Example:
+
+Scheduled:
+- Provider cannot manually change it to Ongoing before the scheduled start time.
+
+At scheduled time:
+- Status automatically becomes Ongoing.
+- Provider can tap the status.
+- Provider can change Ongoing → Paused.
+- Provider can tap again to change Paused → Ongoing.
+
+After 24 hours:
+- Status automatically becomes Completed.
+- Provider can no longer change the status.
+
+==================================================
+5. SEEKER PERMISSION
+==================================================
+
+The SEEKER can SEE the consultation status.
+
+The Seeker must NOT be able to change it.
+
+If the Seeker taps the status area:
+
+- Nothing should happen.
+- It must not pause the consultation.
+- It must not resume the consultation.
+- It must not change the consultation status.
+- It must not trigger an API mutation.
+
+Ideally the status should behave as a non-interactive display for the Seeker.
+
+Do not create a fake clickable control for the Seeker.
+
+Role/permission must be determined from the actual authenticated user role already used by the application.
+
+Do NOT rely only on hiding the button visually for security.
+
+The backend/API mutation, if applicable, must also reject unauthorized status changes by the Seeker.
+
+==================================================
+6. SCHEDULED STATE
+==================================================
+
+When the Seeker schedules a consultation:
+
+Status = SCHEDULED
+
+Until the scheduled consultation date/time is reached:
+
+- Show "Scheduled".
+- Provider cannot manually change it to Ongoing.
+- Seeker cannot change it.
+- Calling must remain unavailable.
+- The consultation should not be treated as an active consultation.
+- Existing Case File functionality should remain available according to the current application behavior, but do not enable calling before the scheduled time.
+
+IMPORTANT:
+Do not change the scheduled date/time itself.
+
+Use the existing consultation scheduled date/time already stored in the system.
+
+==================================================
+7. AUTOMATIC TRANSITION TO ONGOING
+==================================================
+
+When the scheduled consultation start time is reached:
+
+SCHEDULED → ONGOING
+
+This should happen automatically.
+
+Do not require the Provider to press a separate "Start Consultation" button.
+
+The status should correctly update when:
+- Provider opens the consultation after the scheduled time.
+- Seeker opens the consultation after the scheduled time.
+- The app is refreshed/reloaded.
+- The app was closed during the transition.
+- The user navigates away and comes back.
+
+Do not rely only on a local React/Expo timer that stops when the app is backgrounded.
+
+Use the actual stored scheduled timestamp and current time to determine the lifecycle state.
+
+If the backend already calculates or stores consultation status, inspect and reuse that source of truth instead of creating a conflicting client-side status.
+
+==================================================
+8. ONGOING STATE
+==================================================
+
+Once the consultation reaches its scheduled start time:
+
+Status = ONGOING
+
+Provider:
+- Can tap status.
+- Can change Ongoing → Paused.
+
+Seeker:
+- Can see Ongoing.
+- Cannot change it.
+
+Calling:
+- ENABLED.
+
+Chat/messaging:
+- ENABLED.
+
+The existing Call / Video functionality should become available according to the existing calling architecture.
+
+Do not redesign or rewrite the calling system in this task.
+
+Only connect its availability to the consultation lifecycle described here.
+
+==================================================
+9. PAUSED STATE
+==================================================
+
+When the Provider taps the Ongoing status:
+
+ONGOING → PAUSED
+
+The status shown in the SAME status location must become:
+
+[ ● Paused ]
+
+Provider can tap again:
+
+PAUSED → ONGOING
+
+The pause state must NOT reset the consultation's 24-hour expiry timer.
+
+IMPORTANT:
+
+The 24-hour window is based on:
+
+scheduled consultation start time + 24 hours
+
+NOT:
+
+pause time + 24 hours
+
+Example:
+
+Scheduled start = 2:00 PM
+
+Provider pauses at 4:00 PM.
+
+The consultation still completes at 2:00 PM the next day.
+
+Pausing does NOT extend the consultation.
+
+==================================================
+10. CALLING BEHAVIOR
+==================================================
+
+Calling availability must follow the consultation status.
+
+BEFORE SCHEDULED TIME:
+- Calling disabled/unavailable.
+
+SCHEDULED:
+- Calling disabled.
+
+ONGOING:
+- Calling enabled.
+
+PAUSED:
+- Calling disabled.
+
+COMPLETED:
+- Calling disabled.
+
+IMPORTANT:
+Both voice/video calling availability should follow this lifecycle.
+
+Do not change how the actual voice/video calling mechanism works in this task.
+
+Only make its availability dependent on the consultation status.
+
+If the existing UI has Call and Video buttons:
+- They may remain visually present according to the existing design.
+- Their enabled/disabled behavior must follow the lifecycle.
+- Do not allow the Seeker to initiate a call while the consultation is Paused.
+- Do not allow calls after the 24-hour window.
+
+If the existing implementation already has appropriate disabled-state UI, reuse it.
+
+==================================================
+11. CHAT / CASE FILE MESSAGING BEHAVIOR
+==================================================
+
+The 24-hour consultation window must allow communication even if the consultation is Paused.
+
+Therefore:
+
+SCHEDULED / BEFORE START:
+- Do not enable active calling.
+- Follow existing chat behavior unless the existing architecture requires chat to remain unavailable before consultation start.
+
+ONGOING:
+- Calling enabled.
+- Chat/messaging enabled.
+
+PAUSED:
+- Calling disabled.
+- Chat/messaging STILL enabled.
+
+This distinction is important.
+
+Do NOT disable the entire Case File communication system when the Provider pauses the consultation.
+
+The Provider and Seeker must still be able to use the case-file messaging/chat service during the active 24-hour window.
+
+COMPLETED:
+- Calling disabled.
+- Chat/messaging disabled.
+- Existing messages/data must remain available as historical/read-only data if that is how the application currently handles completed consultations.
+- Do not delete messages.
+
+==================================================
+12. 24-HOUR EXPIRY
+==================================================
+
+The consultation's active communication window is:
+
+scheduled start time → scheduled start time + 24 hours
+
+At the exact expiry point:
+
+ONGOING → COMPLETED
+
+OR
+
+PAUSED → COMPLETED
+
+The Provider can no longer toggle the status after this point.
+
+The Seeker cannot call or message after this point.
+
+The status must display:
+
+[ ● Completed ]
+
+There must be no Ongoing/Paused interaction after completion.
+
+IMPORTANT:
+Do not extend the 24-hour period because the Provider paused the consultation.
+
+Do not calculate the 24-hour period from:
+- first login
+- first call
+- first message
+- first time Provider opens Case File
+- first time status is clicked
+
+It must be based on the consultation's scheduled start timestamp.
+
+==================================================
+13. TIME / DATE HANDLING
+==================================================
+
+Inspect the existing application's timezone handling before implementation.
+
+Do not introduce a second timezone system.
+
+Use the same timezone/date-time interpretation already used by the consultation scheduling system.
+
+The transition must be based on an actual timestamp, not only a displayed string such as "2:27 PM".
+
+Handle:
+- scheduled date
+- scheduled time
+- day changes
+- midnight
+- app reload
+- app background/foreground
+- reopening the consultation
+
+Do not rely solely on a countdown timer running in the mobile UI.
+
+==================================================
+14. SINGLE SOURCE OF TRUTH
+==================================================
+
+This is extremely important.
+
+There must be ONE authoritative consultation lifecycle.
+
+Do NOT create separate states such as:
+
+dashboardStatus
+caseFileStatus
+chatStatus
+callStatus
+
+that can become inconsistent.
+
+Instead, derive the UI permissions/availability from the actual consultation lifecycle.
+
+Conceptually:
+
+SCHEDULED
+ONGOING
+PAUSED
+COMPLETED
+
+Then derive:
+
+CanProviderToggle?
+CanSeekerToggle?
+CanCall?
+CanChat?
+
+from that state.
+
+Use the existing backend/database/API structure where possible.
+
+Before modifying anything, inspect whether the project already has:
+- consultation status fields
+- scheduledAt / scheduledDate / scheduledTime
+- consultation start/end timestamps
+- role information
+- API endpoints for status updates
+- calling availability logic
+- chat availability logic
+
+Reuse them instead of introducing duplicate fields unnecessarily.
+
+==================================================
+15. IMPORTANT BACKEND / SECURITY REQUIREMENT
+==================================================
+
+Because this application handles medical consultations:
+
+Do not implement Provider-only control only through the UI.
+
+If the mobile app sends an API request to pause/resume the consultation:
+
+- Provider should be authorized.
+- Seeker should not be able to mutate consultation status.
+- Completed consultations should not be mutable.
+- Scheduled consultations should not be manually changed to Ongoing by the Provider.
+
+If backend authorization already exists, use it.
+
+If the current API does not enforce these rules, make the smallest necessary backend/API change to enforce them.
+
+Do NOT redesign the backend.
+
+==================================================
+16. DO NOT CHANGE OTHER FEATURES
+==================================================
+
+Do NOT modify:
+- Google authentication
+- Forgot password
+- Clinical Advisory structure
+- Provisional Diagnosis
+- Clinical Details
+- PDF generation
+- Patient Profile
+- Comorbidities
+- Presenting Complaints
+- Doctor availability
+- Booking logic
+- Billing
+- Logo
+- Global colors
+- Typography
+- Calling implementation itself
+- File upload implementation
+- Report tagging
+- Other unrelated screens
+
+Only change functionality that is directly required by this consultation lifecycle.
+
+==================================================
+17. IMPLEMENTATION PROCESS
+==================================================
+
+Before editing:
+
+1. Inspect the current mobile consultation card.
+2. Inspect the current "Scheduled" status implementation.
+3. Find the current lower "Ongoing" button/control.
+4. Find the duplicate Ongoing status inside Case File.
+5. Trace the consultation status state from API/backend → mobile state → UI.
+6. Identify how Provider vs Seeker roles are currently determined.
+7. Identify how scheduled date/time is stored.
+8. Identify how Call/Video availability is currently determined.
+9. Identify how Chat/messaging availability is currently determined.
+
+Then implement the smallest possible architectural change that gives us the lifecycle described above.
+
+Do NOT simply rename buttons.
+
+The actual state transitions and permissions must work.
+
+==================================================
+18. REQUIRED TESTING
+==================================================
+
+After implementation, test these scenarios.
+
+TEST 1 — Scheduled consultation
+
+Create/use a consultation scheduled for a future time.
+
+Expected:
+- Status = Scheduled.
+- Provider cannot manually change it.
+- Seeker cannot change it.
+- Calling is unavailable.
+
+TEST 2 — Scheduled time reached
+
+At/after the scheduled time:
+
+Expected:
+- Status = Ongoing.
+- Provider can interact with status.
+- Seeker can see status but cannot change it.
+- Calling becomes available.
+- Chat becomes available.
+
+TEST 3 — Provider pauses
+
+Provider taps Ongoing.
+
+Expected:
+- Status = Paused.
+- Calling becomes unavailable.
+- Chat remains available.
+- Seeker cannot change the status.
+
+TEST 4 — Provider resumes
+
+Provider taps Paused.
+
+Expected:
+- Status = Ongoing.
+- Calling becomes available again.
+- Chat remains available.
+
+TEST 5 — Seeker tries to change status
+
+Log in as Seeker and tap the status.
+
+Expected:
+- Nothing happens.
+- No pause/resume occurs.
+- No status mutation API request is allowed.
+
+TEST 6 — App reload
+
+Pause the consultation.
+Close/reload the mobile app.
+Open the consultation again.
+
+Expected:
+- Status remains Paused.
+
+Resume it.
+Reload again.
+
+Expected:
+- Status remains Ongoing.
+
+TEST 7 — 24-hour expiry while Ongoing
+
+At scheduled start + 24 hours:
+
+Expected:
+- Status automatically becomes Completed.
+- Calling disabled.
+- Chat/messaging disabled.
+- Provider cannot toggle status.
+
+TEST 8 — 24-hour expiry while Paused
+
+Pause the consultation before expiry.
+
+At scheduled start + 24 hours:
+
+Expected:
+- Status becomes Completed.
+- It must NOT remain Paused.
+- It must NOT become Ongoing again.
+- Calling disabled.
+- Chat/messaging disabled.
+- Provider cannot resume it.
+
+TEST 9 — No duplicate status controls
+
+Check the Provider Dashboard and Case File.
+
+Expected:
+- The primary consultation status is shown in the SAME LOCATION where Scheduled currently appears.
+- The old Ongoing/Pause control below Call / Video / Case File / Advise is removed.
+- The duplicate Case File status control is removed or converted to a non-independent representation of the same status.
+- There must not be two independent status controls.
+
+TEST 10 — Different roles
+
+Provider:
+- Can change Ongoing ↔ Paused only during active 24-hour window.
+
+Seeker:
+- Can see status.
+- Cannot change status.
+
+==================================================
+19. FINAL REPORT
+==================================================
+
+After implementation, do NOT just say "done".
+
+Report:
+
+1. The existing consultation status architecture you found.
+2. The root cause of the current duplicate Ongoing controls/status.
+3. Files/components changed.
+4. How the new lifecycle is implemented.
+5. How the 24-hour calculation works.
+6. How Provider-only permissions are enforced.
+7. How Seeker behavior is enforced.
+8. How Call/Video availability is connected to the lifecycle.
+9. How Chat availability is connected to the lifecycle.
+10. How you verified Scheduled → Ongoing → Paused → Ongoing → Completed.
+11. Any backend/API dependency that could not be verified.
+12. Any remaining limitation.
+
+IMPORTANT FINAL RULE:
+
+Do not make any unrelated feature changes while implementing this task.
+
+The ONLY intended behavior change is:
+
+SCHEDULED
+→ at scheduled start time
+ONGOING
+→ Provider can pause
+PAUSED
+→ Provider can resume
+ONGOING
+→ at scheduled start + 24 hours
+COMPLETED
+
+And the status must be displayed in the existing Scheduled-status location, with the old lower Ongoing control removed.

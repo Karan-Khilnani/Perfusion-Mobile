@@ -1,0 +1,233 @@
+We are fixing the **Perfusion Mobile App — Provider Journey**.
+
+IMPORTANT SCOPE:
+
+* This task is for the **MOBILE APP ONLY**.
+* Do NOT modify the web app.
+* Do NOT change unrelated functionality.
+* Do NOT redesign the UI unless a small UI change is required to correctly support the functionality.
+* Preserve all currently working functionality.
+* Before making changes, inspect the existing implementation, state management, API/data flow, and backend integration used by the mobile app.
+* Do not create duplicate state or parallel implementations.
+* Do not hardcode consultation status.
+
+## TASK: Fix Consultation Status / Pause / Resume Functionality
+
+The current consultation status functionality has the following problems:
+
+### 1. Default Consultation Status
+
+Current problem:
+
+* A consultation is currently appearing as "Paused" by default.
+
+Required behavior:
+
+* A newly active consultation must be **Open/Active by default**.
+* It should NOT automatically start in Paused state.
+* The consultation should become Paused only when the Provider explicitly pauses it.
+* The Provider must be able to resume the consultation through the same status control.
+
+### 2. Provider Status Control
+
+Required behavior:
+
+* The Provider should be able to interact with the consultation status control.
+* The status should support at least:
+
+  * Open/Ongoing
+  * Paused
+* When the Provider pauses the consultation, its state must change to Paused.
+* When the Provider resumes it, its state must change back to Open/Ongoing.
+
+### 3. Status and Pause/Resume Must Be One Integrated Flow
+
+Do not implement separate unrelated controls for:
+
+* consultation status
+* pause
+* resume
+
+The status control should represent the actual consultation state.
+
+Expected behavior:
+
+OPEN/ONGOING
+→ Provider taps status
+→ PAUSED
+
+PAUSED
+→ Provider taps status
+→ OPEN/ONGOING
+
+The UI must always reflect the actual underlying state.
+
+### 4. Persistence / Data Consistency
+
+Before implementing anything, inspect how consultation status is currently stored.
+
+Determine:
+
+* Where the consultation status originates.
+* Whether it is stored locally, remotely, or both.
+* Which API/database field represents the status.
+* How the status is retrieved when opening/reloading a Case File.
+* How the Provider Dashboard gets the status.
+
+Then implement the fix using the existing architecture.
+
+IMPORTANT:
+
+* Do not create a new status field if an existing field already represents this state.
+* Do not maintain two competing sources of truth.
+* If the status is persisted remotely, make sure the mobile UI updates the actual persisted state.
+* If the app currently uses optimistic UI, handle API failure so the UI does not falsely show a state that was not successfully saved.
+* Handle loading and error states appropriately.
+
+### 5. Case File / Consultation Consistency
+
+The status shown in the relevant Provider screens must represent the same consultation state.
+
+Verify that:
+
+* Opening a consultation shows the correct state.
+* Pausing updates the state.
+* Resuming updates the state.
+* Leaving and reopening the consultation does not incorrectly reset it.
+* Refreshing/reloading does not incorrectly turn a paused consultation into Open or an Open consultation into Paused.
+* Dashboard and Case File do not show conflicting states.
+
+### 6. Chat Window
+
+The same consultation-status principle should apply to the Chat window.
+
+Inspect the existing Chat implementation and determine how it currently relates to the consultation state.
+
+The goal is:
+
+* Chat should reflect the actual consultation state.
+* Pause/resume should not create a separate contradictory state.
+* Do not create a second independent consultation-status system for Chat.
+
+Only make changes necessary to correctly synchronize the existing consultation state.
+
+## IMPORTANT SAFETY / DATA REQUIREMENTS
+
+This is a medical-sector application.
+
+Therefore:
+
+* Do not silently fall back to a fake/default status when the real status cannot be retrieved.
+* Do not hardcode "Open" merely to make the UI appear correct.
+* "Open by default" applies to a newly active consultation according to the application's actual consultation lifecycle.
+* Do not overwrite an already-persisted Paused consultation with Open just because the Provider reopened the app.
+* Do not modify historical consultation records unnecessarily.
+* Do not alter unrelated patient, booking, clinical, or provider data.
+
+## IMPLEMENTATION PROCESS
+
+Before modifying code:
+
+1. Inspect the existing mobile consultation status implementation.
+2. Trace the status from:
+   Backend/API/database
+   → mobile data fetching
+   → state management
+   → Case File/Consultation screen
+   → Dashboard/Chat where applicable.
+3. Identify the exact root cause of the default Paused behavior.
+4. Identify all components currently responsible for displaying/changing consultation status.
+5. Then implement the smallest appropriate fix.
+
+Do NOT simply change a UI label from "Paused" to "Open".
+
+The underlying state and persistence must be correct.
+
+## VERIFICATION
+
+After implementation, test these scenarios:
+
+### Test 1 — New active consultation
+
+Expected:
+
+* Consultation starts as Open/Active.
+
+### Test 2 — Pause
+
+Provider pauses the consultation.
+
+Expected:
+
+* Status becomes Paused.
+* The underlying consultation state is updated correctly.
+
+### Test 3 — Resume
+
+Provider resumes the consultation.
+
+Expected:
+
+* Status becomes Open/Ongoing.
+* The underlying state is updated correctly.
+
+### Test 4 — Reload
+
+Pause a consultation → close/reload the mobile app → reopen it.
+
+Expected:
+
+* It remains Paused.
+
+Then resume it → reload.
+
+Expected:
+
+* It remains Open/Ongoing.
+
+### Test 5 — Dashboard / Case File consistency
+
+Verify that the same consultation does not show different statuses in different Provider screens.
+
+### Test 6 — API failure
+
+If the status update fails:
+
+Expected:
+
+* Do not permanently display the new status as if the update succeeded.
+* Show an appropriate error state/message.
+* Keep the actual persisted state consistent.
+
+### Test 7 — Chat
+
+Verify that Chat reflects the same consultation state and does not create an independent conflicting status.
+
+## FINAL REPORT
+
+After implementation, report:
+
+1. Root cause of the bug.
+2. Files/components changed.
+3. Existing status/data flow discovered.
+4. Exact changes made.
+5. How each verification scenario was tested.
+6. Any API/backend dependency that prevents complete verification.
+7. Any remaining limitation.
+
+Do not claim the bug is fixed merely because the code compiles.
+
+Actually inspect the implementation and verify the state transitions and persistence.
+
+DO NOT work on:
+
+* Google authentication
+* Calling/video/voice functionality
+* Clinical Advisory
+* Forgot Password
+* Doctor Availability
+* Booking/Comorbidities
+* Chat file opening
+* PDF generation
+
+Those will be handled separately after this functionality batch is verified.
