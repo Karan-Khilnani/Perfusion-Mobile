@@ -6,7 +6,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import logoImage from "@assets/Perfusion_website_logo_1769522658153.png";
 import indiaMapImage from "@assets/ChatGPT_Image_Dec_18__2025__08_43_37_PM-removebg-preview_1769521462134.png";
 import bedsideImage from "@assets/ChatGPT_Image_Jan_29,_2026,_01_37_39_PM_1769674310991.png";
-import labVideo from "@assets/perfusion_video_h264.mp4";
+import labVideo from "@assets/perfusion_video_h264_silent.mp4";
 import { useAuth } from "@/hooks/use-auth";
 
 export default function LandingPage() {
