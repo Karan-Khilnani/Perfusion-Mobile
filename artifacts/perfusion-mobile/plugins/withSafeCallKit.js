@@ -60,6 +60,22 @@ module.exports = (config, options) =>
 
             VoIPPushManager.register()`,
       );
+
+      // CallStyle notifications normally play their channel sound only once.
+      // Keep ringing while the incoming notification is active, including when JS is closed.
+      replaceExactlyOnce(
+        path.join(javaDir, "managers/CallNotificationManager.kt"),
+        `                .setPriority(NotificationCompat.PRIORITY_MAX)
+                .build()
+
+        postNotification(ctx, callId, displayName, "incoming call")`,
+        `                .setPriority(NotificationCompat.PRIORITY_MAX)
+                .build()
+
+        notification.flags = notification.flags or Notification.FLAG_INSISTENT
+
+        postNotification(ctx, callId, displayName, "incoming call")`,
+      );
       return config;
     },
   ]);

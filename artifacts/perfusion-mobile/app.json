@@ -60,8 +60,9 @@
           "incomingCallTimeout": 45,
           "fulfillAnswerCallTimeout": 30,
           "includesCallsInRecents": false,
+          "sounds": ["./assets/audio/perfusion_ring.wav"],
           "defaultRingtoneIos": "default",
-          "defaultRingtoneAndroid": "default",
+          "defaultRingtoneAndroid": "perfusion_ring.wav",
           "microphonePermission": "Perfusion uses the microphone for secure voice and video consultations.",
           "cameraPermission": "Perfusion uses the camera for secure video consultations."
         }

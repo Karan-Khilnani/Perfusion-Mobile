@@ -1,4 +1,5 @@
-import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
+import { useAudioPlayer } from "expo-audio";
 import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
@@ -18,6 +19,7 @@ import { useColors } from "@/hooks/useColors";
 
 export function IncomingCallOverlay() {
   const { incomingCall, acceptCall, declineCall } = useCall();
+  const ringtone = useAudioPlayer(require("../assets/audio/perfusion_ring.wav"));
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -43,14 +45,23 @@ export function IncomingCallOverlay() {
     if (Platform.OS !== "web") {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
     }
-    return () => pulse.stop();
-  }, [incomingCall, pulseAnim]);
+    // This overlay is only shown when the native call UI cannot be reported.
+    // Native calls play through the Android incoming-call notification channel.
+    ringtone.loop = true;
+    ringtone.play();
+    return () => {
+      pulse.stop();
+      ringtone.pause();
+      ringtone.seekTo(0).catch(() => {});
+    };
+  }, [incomingCall?.bookingId, incomingCall?.sessionGeneration, pulseAnim, ringtone]);
 
   if (!incomingCall) return null;
 
   const handleAccept = async () => {
     if (responding) return;
     setResponding(true);
+    ringtone.pause();
     if (Platform.OS !== "web") {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
@@ -58,6 +69,7 @@ export function IncomingCallOverlay() {
       await acceptCall(incomingCall.bookingId);
       router.push(`/call/${incomingCall.bookingId}?mode=${incomingCall.callType === "voice" ? "voice" : "video"}&generation=${incomingCall.sessionGeneration || ""}`);
     } catch (error) {
+      ringtone.play();
       Alert.alert(
         "Could not accept call",
         error instanceof Error ? error.message : "Please check your connection and try again.",
@@ -70,12 +82,14 @@ export function IncomingCallOverlay() {
   const handleDecline = async () => {
     if (responding) return;
     setResponding(true);
+    ringtone.pause();
     if (Platform.OS !== "web") {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     }
     try {
       await declineCall(incomingCall.bookingId);
     } catch (error) {
+      ringtone.play();
       Alert.alert(
         "Could not decline call",
         error instanceof Error ? error.message : "Please check your connection and try again.",
