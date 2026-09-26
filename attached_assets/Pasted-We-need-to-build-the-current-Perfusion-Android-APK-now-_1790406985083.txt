@@ -1,0 +1,170 @@
+We need to build the current Perfusion Android APK now.
+
+I found the complete history of the successful EAS build from September 23, 2026. Use that successful build as the reference workflow.
+
+IMPORTANT: Do NOT switch to a GitHub/repository-based workflow.
+
+The successful build was submitted directly from the Replit project to EAS and did NOT require GitHub.
+
+### SUCCESSFUL BUILD REFERENCE
+
+Previous successful EAS build:
+
+Build ID:
+f1909ff5-a566-4349-9132-022c8cdc63a9
+
+Platform:
+ANDROID
+
+Profile:
+preview
+
+The successful workflow was:
+
+Replit project
+→ Expo config
+→ EAS preview/internal build
+→ project archive uploaded directly to EAS
+→ remote Android credentials
+→ Android compilation
+→ APK
+
+The previous Gradle failure was resolved by enabling Expo/React Native New Architecture.
+
+The successful build explicitly reported:
+
+"Enabling New Architecture cleared the Gradle failure from the previous attempt."
+
+Therefore:
+
+### 1. DO NOT CHANGE THE BUILD ARCHITECTURE
+
+Verify that the current project still has New Architecture enabled.
+
+If it is already enabled, leave it unchanged.
+
+Do NOT disable New Architecture just because expo-doctor reports that `expo-callkit-telecom` is untested on New Architecture.
+
+The Sept 23 successful build proves that the current Perfusion project can compile with New Architecture enabled.
+
+### 2. CHECK THE CURRENT DEPENDENCY WARNING
+
+Current Expo doctor reports:
+
+Duplicate React versions:
+
+react@19.1.0
+react@18.3.1
+
+First determine WHY the second React 18.3.1 exists and whether it is actually included in the EAS build dependency tree.
+
+Do NOT randomly downgrade React.
+
+Do NOT change React versions unless required by the actual dependency graph.
+
+Do NOT modify application functionality.
+
+If this duplicate is only coming from a parent/workspace node_modules installation and is not part of the actual project dependency tree used for EAS, do not make unnecessary changes.
+
+### 3. expo-callkit-telecom WARNING
+
+Expo doctor reports:
+
+expo-callkit-telecom
+"Untested on New Architecture"
+
+This is a warning from React Native Directory metadata, NOT a confirmed compilation error.
+
+Do NOT replace or remove `expo-callkit-telecom`.
+
+Do NOT disable New Architecture merely because of this warning.
+
+If appropriate, this warning may be excluded from the React Native Directory validation because the package is deliberately being used for our VoIP implementation.
+
+### 4. VERIFY THE EXISTING CONFIGURATION
+
+Before building, verify:
+
+* Expo project ID
+* package name = `com.perfusion.mobile`
+* preview profile
+* internal distribution
+* Android APK output
+* New Architecture enabled
+* Firebase Google Services configuration
+* VoIP plugin
+* notification plugin
+* existing remote Android credentials
+
+Do not change working configuration unnecessarily.
+
+### 5. BUILD USING THE SAME WORKFLOW THAT WORKED ON SEPTEMBER 23
+
+Use EAS CLI directly from the current Replit project source.
+
+Do NOT use the repository-based build-start action that previously returned:
+
+`GraphQL error: No repository found for appId 152f3e2b-ef3c-485d-b808-6d017eb2f925`
+
+That error came from the separate Replit repository-based build action.
+
+The Sept 23 successful build proves that direct project upload to EAS works.
+
+Use:
+
+`eas build --platform android --profile preview`
+
+or the equivalent EAS CLI invocation available in this environment.
+
+### 6. DO NOT MAKE UNRELATED CHANGES
+
+Do not modify:
+
+* UI
+* Provider journey
+* Seeker journey
+* Firebase
+* VoIP
+* authentication
+* Supabase
+* backend
+* calling
+* chat
+* file upload
+* clinical advisory
+* notifications
+
+unless an actual build error specifically requires it.
+
+### 7. IF BUILD FAILS
+
+Do NOT guess.
+
+Show me the exact EAS/Gradle error and compare it with the Sept 23 successful build.
+
+In particular, determine whether the failure is:
+
+* dependency resolution
+* React version duplication
+* New Architecture
+* expo-callkit-telecom
+* Firebase
+* Android Gradle
+* credentials
+* environment variables
+* EAS configuration
+
+Only change the configuration that is actually responsible.
+
+### FINAL OBJECTIVE
+
+Produce a fresh:
+
+**Android APK → preview/internal distribution → direct installation on Android**
+
+No Play Store.
+No App Store.
+No GitHub.
+No repository migration.
+
+Start the build now using the successful September 23 workflow as the reference.
