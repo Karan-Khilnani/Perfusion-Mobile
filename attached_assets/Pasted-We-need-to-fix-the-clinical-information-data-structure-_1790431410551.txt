@@ -1,0 +1,732 @@
+We need to fix the clinical information/data structure in BOTH the Perfusion WEB APP and MOBILE APP.
+
+This is a clinical data-flow correction.
+
+IMPORTANT:
+Do NOT treat this as only a UI rename/reordering task.
+
+The current implementation is incorrectly duplicating clinical information between:
+- Presenting Complaint
+- Clinical Summary
+
+We need to separate these concepts properly and make sure the data entered during Patient Booking flows into the correct sections of the Provider Case File.
+
+==================================================
+1. CURRENT PROBLEM
+==================================================
+
+Currently, in the Provider Case File:
+
+PRESENTING COMPLAINT
+
+and
+
+CLINICAL SUMMARY
+
+are appearing with the same information.
+
+Example currently:
+
+Presenting Complaint:
+"Known case DM presented with chest pain"
+
+Clinical Summary:
+"Known case DM presented with chest pain"
+
+This is incorrect because these are different clinical concepts.
+
+They must NOT be automatically populated with the same value.
+
+==================================================
+2. DEFINITIONS / REQUIRED MEANING
+==================================================
+
+Use these meanings consistently across Web, Mobile, backend, booking, and Case File.
+
+PRESENTING COMPLAINT:
+The patient's main complaint/reason for seeking medical attention.
+
+Example:
+"Acute chest pain and breathlessness for 2 days"
+
+PRESENT ILLNESS:
+The history/details of the patient's current illness or current episode.
+
+Example:
+"Patient developed central chest pain 2 days ago, associated with breathlessness. Pain increased since morning."
+
+COMORBIDITIES / PAST ILLNESS:
+Relevant existing diseases, past illnesses, chronic conditions, or other important medical conditions.
+
+Example:
+- Type 2 Diabetes
+- Hypertension
+- Asthma
+
+CLINICAL DETAILS:
+Relevant examination and investigation information.
+
+This should contain the clinical examination findings and investigation information provided during booking.
+
+Example:
+Examination:
+"BP 128/82, HR 96, RR 18"
+
+Investigations:
+"ECG shows..."
+
+PROVISIONAL DIAGNOSIS:
+The referring/seeking hospital's provisional/working diagnosis.
+
+Example:
+"? ACS"
+
+CLINICAL SUMMARY:
+A relevant overall clinical summary/history that gives the Provider a concise understanding of the case.
+
+It must NOT simply duplicate Presenting Complaint.
+
+==================================================
+3. CHANGE THE PATIENT BOOKING FORM
+==================================================
+
+Currently the Patient Booking Form contains approximately:
+
+1. Patient Name
+2. Age
+3. Gender
+4. Contact Number
+5. Weight
+6. UHID / IP Number
+7. Clinical Summary
+8. Provisional Diagnosis
+9. Requiring Physician Examination
+10. Investigation
+11. Upload Reports
+12. Upload Treatment Charts
+
+Change the clinical section so that AFTER:
+
+UHID / IP Number
+
+the fields appear in this order:
+
+1. COMORBIDITIES / PAST ILLNESS
+2. PRESENT ILLNESS
+3. CLINICAL DETAILS
+   - Examination
+   - Investigations
+4. PROVISIONAL DIAGNOSIS
+
+Then retain the existing remaining booking fields such as:
+
+5. Requiring Physician Examination
+6. Upload Reports
+7. Upload Treatment Charts
+
+Do not remove existing upload functionality.
+
+Do not remove the physician examination requirement functionality.
+
+==================================================
+4. REMOVE THE OLD DUPLICATED CLINICAL SUMMARY INPUT
+==================================================
+
+The current Patient Booking Form has a "Clinical Summary" field.
+
+Do NOT keep this old field alongside the new structured clinical fields if doing so would cause duplicate clinical information.
+
+The new booking structure should collect:
+
+Comorbidities / Past Illness
+Present Illness
+Clinical Details
+Provisional Diagnosis
+
+instead of asking the Seeker to enter the same general information into a generic Clinical Summary field.
+
+IMPORTANT:
+
+Before deleting/replacing the field, inspect the existing backend and determine exactly where the current Clinical Summary value is stored and consumed.
+
+Do not break existing Case File functionality.
+
+If the backend currently depends on the Clinical Summary field, migrate/update the data flow carefully so existing records remain readable.
+
+==================================================
+5. COMORBIDITIES / PAST ILLNESS
+==================================================
+
+Add:
+
+COMORBIDITIES / PAST ILLNESS
+
+This should accept multiple relevant conditions.
+
+Example:
+
+Type 2 Diabetes
+Hypertension
+Asthma
+
+The actual values must come from the Seeker's input.
+
+Do not hardcode example conditions.
+
+The data must be saved to the shared backend and associated with the correct patient/booking/consultation according to the existing architecture.
+
+==================================================
+6. PRESENT ILLNESS
+==================================================
+
+Add:
+
+PRESENT ILLNESS
+
+This is specifically for the history/details of the current illness or current episode.
+
+It must be a separate field from:
+
+Presenting Complaint
+Comorbidities
+Clinical Details
+Provisional Diagnosis
+
+Do NOT copy the same text automatically into all these fields.
+
+Example:
+
+Presenting Complaint:
+"Acute chest pain and breathlessness — 2 days"
+
+Present Illness:
+"Patient developed central chest pain 2 days ago with increasing breathlessness. Symptoms worsened today."
+
+These are separate data points.
+
+==================================================
+7. CLINICAL DETAILS
+==================================================
+
+Add:
+
+CLINICAL DETAILS
+
+This section should support:
+
+A. Examination
+
+B. Investigations
+
+These should remain distinguishable inside Clinical Details.
+
+For example:
+
+EXAMINATION
+BP 128/82
+HR 96
+RR 18
+
+INVESTIGATIONS
+ECG...
+ABG...
+Troponin...
+
+Use the existing application's input components and data structures where possible.
+
+IMPORTANT:
+
+Do not duplicate uploaded reports here.
+
+Uploaded reports should continue using the existing Upload Reports functionality.
+
+Clinical Details should contain the examination/investigation information entered as clinical details.
+
+==================================================
+8. PROVISIONAL DIAGNOSIS
+==================================================
+
+Move/retain:
+
+PROVISIONAL DIAGNOSIS
+
+after:
+
+Comorbidities / Past Illness
+Present Illness
+Clinical Details
+
+The existing provisional diagnosis functionality must continue to work.
+
+Example:
+
+"? ACS"
+
+Do not rename it to Final Diagnosis.
+
+Do not automatically convert it into a confirmed diagnosis.
+
+==================================================
+9. PRESENTING COMPLAINT — IMPORTANT
+==================================================
+
+The current Case File has:
+
+PRESENTING COMPLAINT
+
+This must represent the patient's main complaint/reason for seeking medical attention.
+
+It must NOT simply display the Clinical Summary field.
+
+It must NOT automatically display the Present Illness field unless the existing product specification explicitly defines it that way.
+
+Trace where Presenting Complaint currently comes from.
+
+If there is already a dedicated presenting complaint field in the existing backend/booking flow, use that field.
+
+If there is NOT a dedicated field and the current implementation is incorrectly deriving Presenting Complaint from Clinical Summary, identify this as the root cause and implement the smallest appropriate data-model/API change to separate it.
+
+Do NOT silently map multiple fields to the same value just to make the UI look different.
+
+==================================================
+10. CLINICAL SUMMARY — IMPORTANT
+==================================================
+
+The Case File also contains:
+
+CLINICAL SUMMARY
+
+This should provide relevant overall clinical information/history.
+
+It must NOT simply equal:
+
+Presenting Complaint
+
+It must NOT simply equal:
+
+Present Illness
+
+It must NOT simply equal:
+
+Clinical Details
+
+It must not be a duplicate copy of one of these fields.
+
+Inspect the existing architecture to determine whether Clinical Summary is:
+
+- Stored directly
+- Generated/aggregated from several clinical fields
+- Returned by an existing backend endpoint
+- Derived from existing Case File data
+
+Then preserve the existing intended architecture while ensuring it does not duplicate Presenting Complaint.
+
+If the existing product specification does not define an automatic Clinical Summary generation rule, DO NOT invent an AI-generated summary.
+
+Instead, maintain the existing supported Clinical Summary behavior while separating the underlying clinical fields.
+
+==================================================
+11. REQUIRED DATA MODEL
+==================================================
+
+The final clinical data structure should conceptually support:
+
+Patient Information
+├── Patient Name
+├── Age
+├── Gender
+├── Contact Number
+├── Weight
+└── UHID / IP Number
+
+Clinical Information
+├── Comorbidities / Past Illness
+├── Presenting Complaint
+├── Present Illness
+├── Clinical Details
+│   ├── Examination
+│   └── Investigations
+├── Provisional Diagnosis
+└── Clinical Summary
+
+Additional Booking Information
+├── Requiring Physician Examination
+├── Uploaded Reports
+└── Uploaded Treatment Charts
+
+IMPORTANT:
+
+These must be separate logical fields.
+
+Do NOT use one generic "clinicalSummary" value for all of them.
+
+==================================================
+12. DATA FLOW
+==================================================
+
+The required data flow is:
+
+SEEKER BOOKING FORM
+        ↓
+Shared Backend/API
+        ↓
+Database
+        ↓
+Provider Case File
+        ↓
+Web + Mobile
+
+The data must be shared between Web and Mobile.
+
+If a Seeker creates a booking on Web:
+
+Provider Mobile Case File must show the correct information.
+
+If a Seeker creates a booking on Mobile:
+
+Provider Web Case File must show the correct information.
+
+There must be ONE shared source of truth.
+
+==================================================
+13. EXAMPLE OF CORRECT DATA FLOW
+==================================================
+
+Suppose the Seeker enters:
+
+COMORBIDITIES:
+Type 2 Diabetes, Hypertension
+
+PRESENT ILLNESS:
+"Chest pain started 2 days ago and is associated with breathlessness."
+
+CLINICAL DETAILS:
+
+Examination:
+BP 128/82
+HR 96
+RR 18
+
+Investigations:
+Troponin pending
+
+PROVISIONAL DIAGNOSIS:
+? ACS
+
+Then the Provider Case File should NOT show:
+
+Presenting Complaint:
+"Chest pain started 2 days ago and is associated with breathlessness."
+
+unless that was actually entered as the Presenting Complaint.
+
+Instead, Presenting Complaint must come from its own correct data source.
+
+The Provider should be able to distinguish:
+
+COMORBIDITIES
+Type 2 Diabetes
+Hypertension
+
+PRESENT ILLNESS
+Chest pain started 2 days ago...
+
+CLINICAL DETAILS
+Examination...
+Investigations...
+
+PROVISIONAL DIAGNOSIS
+? ACS
+
+==================================================
+14. CASE FILE UI
+==================================================
+
+The Case File should preserve the existing design language.
+
+The clinical information should be clearly separated.
+
+The existing Clinical Summary bottom sheet/modal should also use the correct separate data.
+
+For example, the Clinical Summary view currently displays:
+
+ALLERGIES
+Not recorded
+
+COMORBIDITIES
+Not recorded
+
+PRESENTING COMPLAINT
+Known case DM presented with chest pain
+
+WORKING DIAGNOSIS AT REFERRAL
+? ACS
+
+CLINICAL HISTORY
+Known case DM presented with chest pain
+
+This must be corrected so that the fields do not simply repeat the same text.
+
+Use the correct backend field for each section.
+
+Do not hardcode or fabricate values.
+
+==================================================
+15. IMPORTANT: ALLERGIES
+==================================================
+
+Do not accidentally merge:
+
+Allergies
+
+with:
+
+Comorbidities / Past Illness.
+
+They are separate clinical concepts.
+
+If the existing system already has an Allergies field, preserve it.
+
+Do not remove or overwrite existing allergy functionality.
+
+==================================================
+16. EXISTING PATIENT RECORDS
+==================================================
+
+There may already be existing patients/consultations using the old Clinical Summary structure.
+
+Do not break existing records.
+
+Before modifying the schema/API:
+
+- Inspect existing stored records.
+- Determine how old Clinical Summary data is represented.
+- Ensure old Case Files continue to load.
+- New bookings should use the new structured fields.
+
+Do not perform destructive migration unless absolutely necessary.
+
+==================================================
+17. WEB + MOBILE
+==================================================
+
+Implement this feature in BOTH:
+
+WEB
+- Seeker Patient Booking Form
+- Provider Case File
+- Clinical Summary view if applicable
+
+MOBILE
+- Seeker Patient Booking Form
+- Provider Case File
+- Clinical Summary view if applicable
+
+The UI can follow platform-specific design conventions, but the underlying data must be shared.
+
+==================================================
+18. DO NOT CHANGE UNRELATED FEATURES
+==================================================
+
+Do NOT modify:
+
+- Consultation Scheduled/Ongoing/Paused/Completed logic
+- Calling
+- Video calling
+- Chat
+- Provider Availability
+- Forgot Password
+- Authentication
+- Billing
+- PDF generation
+- Upload Reports functionality except where required to preserve the new Clinical Details structure
+- Upload Treatment Charts
+- Patient Profile
+- Other unrelated Case File functionality
+
+Only modify the clinical data structure and the necessary UI/API/database flow.
+
+==================================================
+19. IMPLEMENTATION PROCESS
+==================================================
+
+Before coding:
+
+1. Find the Web Patient Booking Form.
+2. Find the Mobile Patient Booking Form.
+3. Find the existing Clinical Summary field.
+4. Find the existing Presenting Complaint field.
+5. Find where Presenting Complaint is populated.
+6. Find where Clinical Summary is populated.
+7. Find the Case File API.
+8. Find the Clinical Summary API/data structure.
+9. Find the Patient/Booking/Consultation database model.
+10. Determine whether these fields already exist under different names.
+11. Identify why Presenting Complaint and Clinical Summary currently contain the same value.
+12. Then implement the smallest correct data-model and UI changes.
+
+Do NOT immediately create new database fields if equivalent fields already exist.
+
+==================================================
+20. TESTING
+==================================================
+
+TEST 1 — Separate values
+
+Create a new booking with:
+
+Comorbidities:
+Diabetes
+
+Present Illness:
+"Chest pain began 2 days ago."
+
+Clinical Details:
+Examination: BP 128/82
+Investigations: Troponin pending
+
+Provisional Diagnosis:
+? ACS
+
+Expected:
+Each value appears in its correct section.
+
+==================================================
+
+TEST 2 — Presenting Complaint does not duplicate Clinical Summary
+
+Create a booking where Presenting Complaint and Present Illness are different.
+
+Expected:
+
+Presenting Complaint:
+shows the actual presenting complaint.
+
+Present Illness:
+shows the illness history.
+
+They must not automatically become identical.
+
+==================================================
+
+TEST 3 — Clinical Summary
+
+Open Clinical Summary.
+
+Expected:
+- It must not simply duplicate Presenting Complaint.
+- It must not simply duplicate Present Illness.
+- Relevant clinical information should be displayed according to the existing application's Clinical Summary architecture.
+
+==================================================
+
+TEST 4 — Comorbidities
+
+Enter:
+
+Diabetes
+Hypertension
+
+Expected:
+Both appear under Comorbidities / Past Illness.
+
+==================================================
+
+TEST 5 — Clinical Details
+
+Enter different Examination and Investigation values.
+
+Expected:
+They remain distinguishable under Clinical Details.
+
+==================================================
+
+TEST 6 — Web → Mobile
+
+Create booking on Web.
+
+Open Provider Case File on Mobile.
+
+Expected:
+All structured clinical information is correct.
+
+==================================================
+
+TEST 7 — Mobile → Web
+
+Create booking on Mobile.
+
+Open Provider Case File on Web.
+
+Expected:
+All structured clinical information is correct.
+
+==================================================
+
+TEST 8 — Empty values
+
+Leave Comorbidities empty.
+
+Expected:
+No fake conditions appear.
+
+Leave Present Illness empty.
+
+Expected:
+No fake history appears.
+
+Leave Clinical Details empty.
+
+Expected:
+Appropriate empty state.
+
+==================================================
+
+TEST 9 — Existing records
+
+Open an older consultation created using the previous data structure.
+
+Expected:
+The Case File still loads without crashing and existing information remains accessible.
+
+==================================================
+21. FINAL REPORT
+==================================================
+
+After implementation, report:
+
+1. Root cause of Presenting Complaint and Clinical Summary duplication.
+2. Existing fields discovered in the backend.
+3. Which existing fields were reused.
+4. Which new fields were required, if any.
+5. Database/model changes.
+6. API changes.
+7. Web Booking changes.
+8. Mobile Booking changes.
+9. Web Case File changes.
+10. Mobile Case File changes.
+11. How Presenting Complaint is now separated from Present Illness.
+12. How Clinical Summary is now prevented from duplicating Presenting Complaint.
+13. How Comorbidities/Past Illness flows through the system.
+14. How Clinical Details stores Examination + Investigations.
+15. How existing records are handled.
+16. Tests performed and results.
+
+FINAL REQUIREMENT:
+
+The goal is NOT merely to make the Case File visually show different labels.
+
+The underlying DATA must be separated.
+
+The final architecture must have distinct clinical data fields for:
+
+COMORBIDITIES / PAST ILLNESS
+PRESENTING COMPLAINT
+PRESENT ILLNESS
+CLINICAL DETAILS
+PROVISIONAL DIAGNOSIS
+CLINICAL SUMMARY
+
+The Provider must receive the correct information entered by the Seeker without the same text being automatically duplicated across multiple sections.
+
+Do not make unrelated feature changes.
