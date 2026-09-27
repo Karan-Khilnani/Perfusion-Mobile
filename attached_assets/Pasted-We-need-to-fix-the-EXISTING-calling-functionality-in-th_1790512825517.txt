@@ -1,0 +1,681 @@
+We need to fix the EXISTING calling functionality in the Perfusion mobile app.
+
+IMPORTANT:
+
+* DO NOT redesign the app.
+* DO NOT rewrite the calling system from scratch.
+* DO NOT change unrelated screens, navigation, authentication, dashboard, UI, backend APIs, or existing functionality.
+* DO NOT introduce a new calling architecture unless absolutely required to fix the existing implementation.
+* Preserve the current codebase and existing working functionality.
+* First inspect the CURRENT calling implementation and identify the root cause of these issues.
+* Make the SMALLEST possible targeted changes.
+* Do not spend time refactoring unrelated code.
+* Do not change the existing visual design except where required for the calling experience.
+* After fixing, test the complete caller → receiver → answer → active call → minimize → return → end-call lifecycle.
+
+## REQUIRED CALLING EXPERIENCE
+
+The intended calling flow is:
+
+CALL BUTTON
+→ IN-APP / SYSTEM-STYLE RINGING
+→ RECEIVER ANSWERS
+→ ACTIVE CALL
+
+It should feel similar to WhatsApp calling.
+
+There must NOT be:
+
+CALL
+→ VIDEO ROOM
+→ JOIN CALL
+→ EXTERNAL LINK
+→ JOIN CALL AGAIN
+
+There must be NO external link and NO second "Join Call" step.
+
+The user should not feel that they are entering a video meeting room.
+
+---
+
+# CURRENT TESTED PROBLEMS
+
+## 1. Incoming call works outside the app, but not when the phone screen is locked
+
+Current behavior:
+
+* Incoming call notification/ringing appears when the receiving app is closed.
+* But when the phone screen is locked, the expected incoming-call experience does not work correctly.
+
+Required:
+
+* Incoming calls must be reliably delivered when:
+
+  * App is open
+  * App is in background
+  * App is closed
+  * Phone screen is locked
+* Use the appropriate Android/native mechanism already available in the project for incoming call handling.
+* Do not create a custom fake notification if the native/system mechanism is required.
+
+IMPORTANT:
+Do not break the currently working background/closed-app behavior while fixing locked-screen behavior.
+
+---
+
+# 2. NO RINGING SOUND FOR INCOMING CALL
+
+Current behavior:
+
+* Incoming call may appear, but there is no audible ringtone in many situations.
+* Ringing sound is only heard when the call UI is already open inside the app.
+
+Required:
+
+* Incoming call must produce an audible ringtone while ringing.
+* Ringtone should continue until:
+
+  * receiver answers
+  * caller cancels
+  * receiver rejects
+  * call times out
+* Ringtone must work when app is:
+
+  * foreground
+  * background
+  * closed
+  * screen locked, where Android permissions/system behavior allows it.
+
+Do not rely only on an in-app audio component for incoming calls.
+
+---
+
+# 3. RINGING ONLY WORKS INSIDE THE APP
+
+Current behavior:
+The ringtone behaves correctly only when the calling screen is already open inside the app.
+
+Required:
+The call lifecycle must be independent of whether the call screen is currently visible.
+
+The incoming-call state must exist independently from the UI screen.
+
+Think of:
+
+CALL STATE
+↓
+RINGING
+↓
+ANSWERED
+↓
+ACTIVE
+↓
+ENDED
+
+The UI should simply reflect that state.
+
+Do NOT make the ringing state dependent on whether a particular React/native screen is mounted.
+
+---
+
+# 4. GHOST NEW INCOMING CALL WHILE ALREADY IN AN ACTIVE CALL
+
+Current behavior:
+Two users are already connected in a call.
+
+After the receiver has answered:
+
+* The app continues showing a new incoming/ringing call from the SAME person.
+
+This is incorrect.
+
+Required:
+Once CALL A is answered:
+
+CALL A = ACTIVE
+
+There must NOT be another incoming-call event/UI/ringtone generated for the same active call.
+
+Investigate whether:
+
+* duplicate push notifications are being generated
+* call listeners are being registered multiple times
+* socket/WebSocket listeners are duplicated
+* Firebase notification handlers are firing more than once
+* the call state is not being updated correctly
+* an old "ringing" state remains active after answer
+* the call screen is creating duplicate subscriptions on mount
+
+Fix the ROOT CAUSE.
+
+Do not simply hide the second ringing UI.
+
+The underlying call state/event duplication must be fixed.
+
+---
+
+# 5. CALL ENDED BUT SYSTEM/OUTSIDE-APP BAR STILL SHOWS ACTIVE CALL
+
+Current behavior:
+After ending the call:
+
+* outside-app call notification/status still says the call is ongoing
+* duration continues increasing
+* system appears to believe the call is still active
+
+Required:
+When either party ends the call:
+
+CALL STATE = ENDED
+
+Then ALL associated call resources/states must be cleaned up:
+
+* active call state
+* ringing state
+* notification
+* foreground service if used
+* ongoing call indicator
+* timer
+* audio
+* microphone
+* camera
+* WebRTC connection
+* socket listeners
+* push/call listeners
+* call UI
+* PiP state if applicable
+
+The call duration MUST stop immediately.
+
+The external/system call indicator MUST disappear after the call is ended.
+
+There must be no stale "ongoing call" state.
+
+---
+
+# 6. BACK BUTTON / MINIMIZE CALL IS BROKEN
+
+Current behavior:
+When the user presses the Android back button during an active call:
+
+* call screen disappears completely instead of going to PiP/minimized call UI
+* the call itself may remain active
+* user cannot correctly return to the call
+* attempting to call again says "call already active"
+* the other participant may continue receiving ghost ringing
+* even closing the app can leave the other participant with ghost ringing
+
+Required behavior:
+
+During an ACTIVE CALL:
+
+Android Back
+→ minimize call / PiP
+→ CALL REMAINS ACTIVE
+
+The user must NOT leave the call session.
+
+The minimized/PiP state must allow the user to return to the active call.
+
+If Android/native PiP is supported by the existing app architecture, use it correctly.
+
+If the project already has a call-minimize mechanism, fix that mechanism instead of replacing it.
+
+IMPORTANT:
+
+Back button during ACTIVE CALL must NOT mean:
+
+* end call
+* destroy call screen
+* reset call state
+* leave WebRTC session
+* create a new call session
+
+The active call must remain active.
+
+When user returns to the app:
+→ restore active call UI.
+
+When user explicitly presses END CALL:
+→ completely terminate the call and clean everything.
+
+---
+
+# 7. TOO MUCH LOADING / VIDEO ROOM FEEL
+
+Current behavior:
+
+User presses CALL.
+
+There is significant loading before the actual call starts.
+
+The user sees:
+
+* loading
+* video-room type transition
+* "allow audio/video" style screens
+* join-room behavior
+* additional waiting
+
+This makes the experience feel like joining a video meeting rather than receiving/making a phone call.
+
+Required:
+
+CALLER:
+
+Tap Call
+→ call starts immediately
+→ receiver gets incoming call/ringing UI
+
+RECEIVER:
+
+Incoming call
+→ Answer
+→ active audio/video call
+
+There should NOT be:
+
+* external browser
+* external URL
+* separate video-room page
+* separate "Join Call" screen
+* second Join Call button
+* unnecessary intermediate loading screen.
+
+IMPORTANT ABOUT PERMISSIONS:
+
+If Android's native microphone/camera permission prompt is required and has never been granted, the OS may legitimately show the native permission prompt.
+
+Do NOT create our own fake permission/notification screen.
+
+Where possible:
+
+* request permissions at the correct point
+* remember granted permissions
+* do not repeatedly ask for already-granted permissions
+* do not make the user feel that they are joining a meeting.
+
+If permissions are already granted:
+CALL → RINGING should happen without unnecessary loading.
+
+---
+
+# 8. CALLER DOES NOT HEAR OUTGOING RINGBACK TONE
+
+Current behavior:
+
+The caller presses Call but does not hear the normal ringing/ringback sound while waiting for the receiver to answer.
+
+In a conventional phone call:
+
+CALLER:
+Calling...
+♪ ringback tone ♪
+♪ ringback tone ♪
+Receiver answers
+→ ringback stops
+→ active call
+
+Required:
+
+While the outgoing call is in RINGING state:
+
+* caller should hear a ringback tone
+* tone should continue while waiting
+* tone must stop immediately when:
+
+  * receiver answers
+  * receiver rejects
+  * caller cancels
+  * call times out
+
+This is separate from the receiver's incoming ringtone.
+
+We need BOTH:
+
+RECEIVER:
+Incoming ringtone
+
+CALLER:
+Outgoing ringback tone
+
+---
+
+# IMPORTANT CALL STATE MODEL
+
+Please inspect the current implementation and make sure there is a single authoritative call state.
+
+Conceptually it should behave like:
+
+IDLE
+↓
+OUTGOING_RINGING
+↓
+CONNECTED
+↓
+MINIMIZED/PIP
+↓
+CONNECTED
+↓
+ENDED
+
+For receiver:
+
+IDLE
+↓
+INCOMING_RINGING
+↓
+CONNECTED
+↓
+MINIMIZED/PIP
+↓
+CONNECTED
+↓
+ENDED
+
+Possible terminal states:
+
+REJECTED
+CANCELLED
+MISSED
+FAILED
+ENDED
+
+Once the call reaches a terminal state, it must not remain active anywhere.
+
+There must be ONE unique call/session ID.
+
+Do not allow an old call session to generate events after it has ended.
+
+---
+
+# VERY IMPORTANT: DUPLICATE LISTENER CHECK
+
+Because several of the reported bugs strongly suggest duplicate event/listener registration, inspect the current code for:
+
+* duplicate WebSocket listeners
+* duplicate socket listeners
+* duplicate Firebase messaging listeners
+* duplicate push notification handlers
+* duplicate call event listeners
+* React useEffect listeners without proper cleanup
+* listeners being registered every time the call screen mounts
+* listeners remaining active after unmount
+* duplicate foreground/background notification handlers
+* duplicate WebRTC event handlers
+* timers continuing after call termination
+
+Every listener created for a call must have a corresponding cleanup.
+
+For example conceptually:
+
+SUBSCRIBE
+→ CALL EVENTS
+
+END CALL / UNMOUNT
+→ UNSUBSCRIBE
+
+Do not solve duplicate events by merely hiding the UI.
+
+---
+
+# CALL CLEANUP REQUIREMENT
+
+Create/verify ONE reliable call cleanup path.
+
+When a call ends for ANY reason:
+
+1. Mark call as ended on the backend/state layer.
+2. Stop ringing.
+3. Stop ringback.
+4. Stop call timer.
+5. Stop audio/video tracks if appropriate.
+6. Close WebRTC peer connection if the architecture requires it.
+7. Remove call notification.
+8. Stop foreground call service if being used.
+9. Remove PiP/minimized state.
+10. Remove call listeners.
+11. Clear active-call state.
+12. Prevent stale events from recreating the call.
+13. Return user to the normal app screen.
+
+This cleanup must work for:
+
+* caller ends
+* receiver ends
+* receiver rejects
+* caller cancels while ringing
+* call timeout
+* network failure
+* app backgrounding
+* app reopening
+* PiP/minimize
+* app process termination where applicable
+
+---
+
+# DO NOT BREAK EXISTING FUNCTIONALITY
+
+Before modifying anything:
+
+1. Inspect the current call implementation.
+2. Identify which files/components/services are responsible for:
+
+   * outgoing call
+   * incoming call
+   * push notification
+   * ringing
+   * call state
+   * WebRTC/video room
+   * call timer
+   * PiP/minimize
+   * notification/foreground service
+3. Make only targeted changes.
+
+DO NOT:
+
+* rewrite the entire app
+* migrate frameworks
+* change authentication
+* change navigation architecture
+* change dashboard
+* change provider/seeker journeys
+* change backend architecture unnecessarily
+* change unrelated UI
+* remove existing functionality.
+
+---
+
+# TESTING REQUIRED AFTER FIX
+
+Do not just verify that the call screen opens.
+
+Test these exact scenarios:
+
+### TEST 1 — APP OPEN
+
+Caller A → Receiver B
+
+A calls B.
+B receives ringtone.
+B answers.
+Both enter active call.
+
+Expected:
+No Join Call screen.
+No external link.
+No duplicate ringing.
+
+### TEST 2 — RECEIVER APP IN BACKGROUND
+
+A calls B while B app is backgrounded.
+
+Expected:
+B receives incoming call/ringtone.
+
+### TEST 3 — RECEIVER APP CLOSED
+
+A calls B while B app is closed.
+
+Expected:
+B receives incoming call/ringtone.
+
+### TEST 4 — PHONE SCREEN LOCKED
+
+A calls B while B phone screen is locked.
+
+Expected:
+Incoming call experience/ringtone works according to Android system capabilities and permissions.
+
+### TEST 5 — CALLER RINGBACK
+
+A calls B.
+
+Before B answers:
+
+A must hear outgoing ringback tone.
+
+B must hear incoming ringtone.
+
+B answers.
+
+Both tones stop immediately.
+
+### TEST 6 — ANSWER DUPLICATION
+
+B answers.
+
+Wait at least 20–30 seconds.
+
+Expected:
+No second incoming call from A.
+No ghost ringing.
+
+### TEST 7 — END CALL
+
+A and B are connected.
+
+A ends call.
+
+Expected:
+
+* call ends for both
+* timer stops
+* notification disappears
+* ongoing-call indicator disappears
+* no ringing
+* no ghost call
+* no active call state remains.
+
+### TEST 8 — BACK / MINIMIZE
+
+A and B are connected.
+
+B presses Android Back.
+
+Expected:
+
+* call remains active
+* call minimizes/PiP if supported
+* B can return to active call
+* A continues seeing an active call
+* no new ringing
+* no "call already active" error.
+
+### TEST 9 — RECALL AFTER END
+
+End the call completely.
+
+Then A calls B again.
+
+Expected:
+New call works normally.
+
+There must NOT be:
+"Call already active."
+
+### TEST 10 — CLOSE AFTER MINIMIZE
+
+Active call → minimize/PiP → reopen app.
+
+Expected:
+Active call can be restored correctly.
+
+### TEST 11 — REPEATED CALLS
+
+Make several calls sequentially:
+
+Call → Answer → End
+Call → Reject
+Call → Cancel
+Call → Answer → End
+Call again
+
+Expected:
+No accumulated listeners.
+No duplicate ringtone.
+No ghost notifications.
+No stale active-call state.
+
+---
+
+# SUCCESS CRITERIA
+
+The final experience should feel like:
+
+CALLER:
+
+Tap Call
+↓
+Calling / ringback tone
+↓
+Receiver answers
+↓
+Active call
+
+RECEIVER:
+
+Incoming call
+↓
+Ringtone
+↓
+Answer
+↓
+Active call
+
+During active call:
+
+Back
+↓
+Minimized/PiP
+↓
+Return to call
+
+End Call
+↓
+Everything terminates cleanly.
+
+There should be NO:
+
+❌ External link
+❌ Video-room join screen
+❌ Second Join Call
+❌ Ghost ringing
+❌ Ghost active-call notification
+❌ Call duration continuing after end
+❌ "Call already active" after a properly ended call
+❌ Duplicate incoming call
+❌ Unnecessary loading
+❌ Caller waiting silently without ringback
+
+Before making changes, inspect the existing implementation and fix the root causes with the smallest possible code changes.
+After implementation, report:
+
+1. Root causes identified
+2. Files changed
+3. What was changed in each file
+4. How each of the 8 reported issues was addressed
+5. What was tested
+6. Any Android/native limitation that genuinely cannot be solved from the current architecture
+
+Do NOT make unrelated improvements.
