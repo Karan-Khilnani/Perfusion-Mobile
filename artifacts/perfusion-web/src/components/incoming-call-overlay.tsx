@@ -20,11 +20,13 @@ export function IncomingCallOverlay({ callEvent, onDismiss }: Props) {
   if (!callEvent) return null;
 
   // Close the OS push notification for this call (if still showing)
-  const dismissNotification = (bookingId: string) => {
+  const dismissNotification = (bookingId: string, sessionGeneration: string) => {
     if (!("serviceWorker" in navigator)) return;
     navigator.serviceWorker.ready.then((reg) => {
       reg.getNotifications({ tag: `call-${bookingId}` }).then((notifs) => {
-        notifs.forEach((n) => n.close());
+        notifs.forEach((n) => {
+          if (n.data?.sessionGeneration === sessionGeneration) n.close();
+        });
       });
     }).catch(() => {});
   };
@@ -32,9 +34,11 @@ export function IncomingCallOverlay({ callEvent, onDismiss }: Props) {
   const handleAccept = async () => {
     setAccepting(true);
     try {
-      const result = await apiRequest("POST", `/api/call/accept/${callEvent.bookingId}`, {});
+      const sessionGeneration = callEvent.sessionGeneration;
+      if (!sessionGeneration) throw new Error("The call session has changed. Please wait for the latest call alert.");
+      const result = await apiRequest("POST", `/api/call/accept/${callEvent.bookingId}`, { sessionGeneration });
       const data = await result.json().catch(() => ({}));
-      dismissNotification(callEvent.bookingId);
+      dismissNotification(callEvent.bookingId, sessionGeneration);
       onDismiss();
       // callerRole tells us who called; recipient is the opposite role
       const returnTo = callEvent.callerRole === "provider" ? "/user/orders" : "/provider/bookings";
@@ -42,7 +46,8 @@ export function IncomingCallOverlay({ callEvent, onDismiss }: Props) {
       const roomUrl = data?.videoRoomUrl || callEvent.videoRoomUrl || "";
       // accepted=true tells video-room to skip precall and go straight to connected
       const voiceParam = callEvent.callType === "voice" ? "&voice=true" : "";
-      navigate(`/video/${encodeURIComponent(roomUrl)}?returnTo=${returnTo}&accepted=true${voiceParam}`);
+      const acceptedGeneration = data?.sessionGeneration || sessionGeneration;
+      navigate(`/video/${encodeURIComponent(roomUrl)}?returnTo=${returnTo}&accepted=true${voiceParam}&sessionGeneration=${encodeURIComponent(acceptedGeneration)}`);
     } catch (err: any) {
       setAccepting(false);
       const msg = err?.message || "";
@@ -65,9 +70,12 @@ export function IncomingCallOverlay({ callEvent, onDismiss }: Props) {
 
   const handleDecline = async () => {
     try {
-      await apiRequest("POST", `/api/call/decline/${callEvent.bookingId}`, {});
+      if (!callEvent.sessionGeneration) throw new Error("The call session has changed");
+      await apiRequest("POST", `/api/call/decline/${callEvent.bookingId}`, {
+        sessionGeneration: callEvent.sessionGeneration,
+      });
     } catch {}
-    dismissNotification(callEvent.bookingId);
+    if (callEvent.sessionGeneration) dismissNotification(callEvent.bookingId, callEvent.sessionGeneration);
     onDismiss();
   };
 

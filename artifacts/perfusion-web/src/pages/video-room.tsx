@@ -51,6 +51,9 @@ export default function VideoRoomPage() {
   const [panelOpen, setPanelOpen] = useState(true);
   const [inCallDocs, setInCallDocs] = useState<{ url: string; name: string }[]>([]);
   const [phase, setPhase] = useState<CallPhase>("precall");
+  const [sessionGeneration, setSessionGeneration] = useState<string | null>(
+    () => new URLSearchParams(window.location.search).get("sessionGeneration"),
+  );
   const [showSummaryDialog, setShowSummaryDialog] = useState(false);
   const [mobilePanel, setMobilePanel] = useState<MobilePanel>("video");
   const mobilePanelRef = useRef<MobilePanel>("video");
@@ -208,7 +211,15 @@ export default function VideoRoomPage() {
     if (!booking || joinedAsCallee || ringAlreadyStartedRef.current || ringStartedRef.current) return;
     ringStartedRef.current = true;
     try {
-      await apiRequest("POST", `/api/call/ring/${booking.id}`, { callType: isVoiceCall ? "voice" : "video" });
+      const response = await apiRequest("POST", `/api/call/ring/${booking.id}`, {
+        callType: isVoiceCall ? "voice" : "video",
+      });
+      const result = await response.json().catch(() => ({}));
+      const generation = result?.session?.sessionGeneration;
+      if (typeof generation !== "string" || !generation) {
+        throw new Error("The call server did not return a session generation.");
+      }
+      setSessionGeneration(generation);
     } catch (error) {
       ringStartedRef.current = false;
       toast({
@@ -310,7 +321,11 @@ export default function VideoRoomPage() {
         if (statusData.sessionGeneration === undefined || statusData.sessionGeneration === null) {
           throw new Error("The call server did not provide a session generation.");
         }
+        if (sessionGeneration && String(statusData.sessionGeneration) !== sessionGeneration) {
+          throw new Error("This call link belongs to an older call session.");
+        }
         if (stopped) return;
+        setSessionGeneration(String(statusData.sessionGeneration));
         setCallMediaProvider(statusData.mediaProvider);
 
         if (statusData.mediaProvider === "stream") {
@@ -359,7 +374,7 @@ export default function VideoRoomPage() {
     };
     void prepareMedia();
     return () => { stopped = true; };
-  }, [phase, booking?.id]);
+  }, [phase, booking?.id, sessionGeneration]);
 
   useEffect(() => {
     if (phase !== "connected") return;
@@ -411,7 +426,8 @@ export default function VideoRoomPage() {
       return;
     }
     try {
-      await apiRequest("POST", `/api/call/cancel/${booking.id}`, {});
+      if (!sessionGeneration) throw new Error("The current call session is unavailable.");
+      await apiRequest("POST", `/api/call/cancel/${booking.id}`, { sessionGeneration });
     } catch {
       toast({
         title: "Could not cancel the call",
@@ -432,7 +448,8 @@ export default function VideoRoomPage() {
   const hangUp = async () => {
     try {
       if (!booking) throw new Error("Booking details are not available");
-      await apiRequest("POST", `/api/call/end/${booking.id}`, {});
+      if (!sessionGeneration) throw new Error("The current call session is unavailable.");
+      await apiRequest("POST", `/api/call/end/${booking.id}`, { sessionGeneration });
     } catch {
       toast({
         title: "Could not end the call",

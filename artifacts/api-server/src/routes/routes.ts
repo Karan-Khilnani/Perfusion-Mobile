@@ -5971,15 +5971,36 @@ export async function registerRoutes(
         bookingId: session.bookingId,
         sessionGeneration: session.sessionGeneration,
       };
-      void notifyMobileCallEnded(userId, session)
-        .catch(error => log.warn(
-          { err: error, bookingId: session.bookingId, sessionGeneration: session.sessionGeneration, userId },
-          "Could not deliver native call cleanup push",
-        ));
+      // Acceptance promotes Telecom's incoming call into an ongoing call; only
+      // send this control push for a call that has actually ended.
+      if (pushType !== "call_accepted") {
+        void notifyMobileCallEnded(userId, session)
+          .catch(error => log.warn(
+            { err: error, bookingId: session.bookingId, sessionGeneration: session.sessionGeneration, userId },
+            "Could not deliver native call cleanup push",
+          ));
+      }
       void storage.getPushSubscriptionsByUserId(userId)
         .then(subscriptions => Promise.all(subscriptions.map(subscription => sendPushNotification(subscription, payload))))
         .catch(error => log.warn({ err: error, bookingId: session.bookingId, sessionGeneration: session.sessionGeneration, userId }, "Could not deliver terminal call push"));
     }
+  }
+
+  function requireCallSessionGeneration(
+    req: any,
+    res: any,
+    session: { sessionGeneration: string },
+  ): boolean {
+    const requestedGeneration = req.body?.sessionGeneration;
+    if (typeof requestedGeneration !== "string" || !requestedGeneration.trim()) {
+      res.status(400).json({ error: "Missing or invalid sessionGeneration" });
+      return false;
+    }
+    if (requestedGeneration !== session.sessionGeneration) {
+      res.status(409).json({ error: "Call session has changed" });
+      return false;
+    }
+    return true;
   }
 
   function broadcastCaseFileUpdate(booking: any, event: object) {
@@ -6267,12 +6288,7 @@ export async function registerRoutes(
       const { bookingId } = req.params;
       const session = await storage.getCallSession(bookingId);
       if (!session) return res.status(404).json({ error: "No active call session" });
-      if (req.body?.sessionGeneration !== undefined && (typeof req.body.sessionGeneration !== "string" || !req.body.sessionGeneration.trim())) {
-        return res.status(400).json({ error: "Missing or invalid sessionGeneration" });
-      }
-      if (req.body?.sessionGeneration && req.body.sessionGeneration !== session.sessionGeneration) {
-        return res.status(409).json({ error: "Call session has changed" });
-      }
+      if (!requireCallSessionGeneration(req, res, session)) return;
 
       // Verify the acceptor is NOT the caller and IS a participant in the booking
       const booking = await storage.getBookingById(bookingId);
@@ -6373,12 +6389,7 @@ export async function registerRoutes(
       const { bookingId } = req.params;
       const session = await storage.getCallSession(bookingId);
       if (!session) return res.status(404).json({ error: "No active call session" });
-      if (req.body?.sessionGeneration !== undefined && (typeof req.body.sessionGeneration !== "string" || !req.body.sessionGeneration.trim())) {
-        return res.status(400).json({ error: "Missing or invalid sessionGeneration" });
-      }
-      if (req.body?.sessionGeneration && req.body.sessionGeneration !== session.sessionGeneration) {
-        return res.status(409).json({ error: "Call session has changed" });
-      }
+      if (!requireCallSessionGeneration(req, res, session)) return;
 
       // Verify the decliner is NOT the caller and IS a participant in the booking
       const booking = await storage.getBookingById(bookingId);
@@ -6422,12 +6433,7 @@ export async function registerRoutes(
       const { bookingId } = req.params;
       const session = await storage.getCallSession(bookingId);
       if (!session) return res.status(404).json({ error: "No active call session" });
-      if (req.body?.sessionGeneration !== undefined && (typeof req.body.sessionGeneration !== "string" || !req.body.sessionGeneration.trim())) {
-        return res.status(400).json({ error: "Missing or invalid sessionGeneration" });
-      }
-      if (req.body?.sessionGeneration && req.body.sessionGeneration !== session.sessionGeneration) {
-        return res.status(409).json({ error: "Call session has changed" });
-      }
+      if (!requireCallSessionGeneration(req, res, session)) return;
       if (session.callerId !== userId) return res.status(403).json({ error: "Only the caller can cancel" });
       {
         const cancelledSession = await storage.transitionCallSession(bookingId, session.sessionGeneration, ["ringing"], { status: "declined" });
@@ -6459,12 +6465,7 @@ export async function registerRoutes(
       const { bookingId } = req.params;
       const session = await storage.getCallSession(bookingId);
       if (!session) return res.status(404).json({ error: "No active call session" });
-      if (req.body?.sessionGeneration !== undefined && (typeof req.body.sessionGeneration !== "string" || !req.body.sessionGeneration.trim())) {
-        return res.status(400).json({ error: "Missing or invalid sessionGeneration" });
-      }
-      if (req.body?.sessionGeneration && req.body.sessionGeneration !== session.sessionGeneration) {
-        return res.status(409).json({ error: "Call session has changed" });
-      }
+      if (!requireCallSessionGeneration(req, res, session)) return;
 
       const booking = await storage.getBookingById(bookingId);
       if (!booking) return res.status(404).json({ error: "Booking not found" });
