@@ -113,13 +113,13 @@ export default function VideoRoomPage() {
     return null;
   };
 
-  const dailyUrl = getDailyUrl();
-
   // Daily.co meeting token — generated server-side with the user's real name baked in.
   // This is the only reliable way: URL params are ignored when prejoinUI=false and
   // Daily caches the last-entered name in browser localStorage across sessions.
   const [dailyToken, setDailyToken] = useState<string | null>(null);
   const [dailyTokenError, setDailyTokenError] = useState<string | null>(null);
+  const [activeDailyUrl, setActiveDailyUrl] = useState<string | null>(null);
+  const dailyUrl = activeDailyUrl || getDailyUrl();
   const [callMediaProvider, setCallMediaProvider] = useState<"daily" | "stream" | null>(null);
   const [streamCredentials, setStreamCredentials] = useState<StreamCallCredentials | null>(null);
   const [mediaSetupError, setMediaSetupError] = useState<string | null>(null);
@@ -296,6 +296,7 @@ export default function VideoRoomPage() {
     setMediaSetupError(null);
     setDailyToken(null);
     setDailyTokenError(null);
+    setActiveDailyUrl(null);
     const prepareMedia = async () => {
       try {
         const statusResponse = await fetch(`/api/call/status/${booking.id}`, { credentials: "include" });
@@ -335,8 +336,12 @@ export default function VideoRoomPage() {
         }
 
         // Legacy Daily calls retain the existing secure token and iframe flow.
-        if (!dailyUrl) throw new Error("The Daily room URL is unavailable.");
-        const tokenResponse = await fetch(`/api/bookings/room/${encodeURIComponent(dailyUrl)}/daily-token`, { credentials: "include" });
+        const sessionDailyUrl = statusData.videoRoomUrl;
+        if (typeof sessionDailyUrl !== "string" || !sessionDailyUrl.startsWith("https://")) {
+          throw new Error("The Daily room URL is unavailable.");
+        }
+        setActiveDailyUrl(sessionDailyUrl);
+        const tokenResponse = await fetch(`/api/bookings/room/${encodeURIComponent(sessionDailyUrl)}/daily-token`, { credentials: "include" });
         const tokenData = await tokenResponse.json().catch(() => ({}));
         if (!tokenResponse.ok || !tokenData?.token) {
           throw new Error(tokenData?.message || "Could not prepare the secure video room.");
@@ -354,7 +359,7 @@ export default function VideoRoomPage() {
     };
     void prepareMedia();
     return () => { stopped = true; };
-  }, [phase, booking?.id, dailyUrl]);
+  }, [phase, booking?.id]);
 
   useEffect(() => {
     if (phase !== "connected") return;

@@ -33,6 +33,11 @@ function callMediaProvider(videoRoomUrl?: string | null): "daily" | "stream" {
   return videoRoomUrl?.startsWith("stream://default/") ? "stream" : "daily";
 }
 
+function bookingIdFromStreamLink(roomUrl: string): string | null {
+  const match = /^stream:\/\/booking\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i.exec(roomUrl);
+  return match?.[1] ?? null;
+}
+
 async function endStreamMediaSession(session: { videoRoomUrl: string; sessionGeneration: string }): Promise<void> {
   if (callMediaProvider(session.videoRoomUrl) !== "stream") return;
   const apiKey = process.env.STREAM_VIDEO_API_KEY;
@@ -1130,7 +1135,10 @@ export async function registerRoutes(
       const userId = req.user?.id;
       if (!userId) return res.status(401).json({ message: "Unauthorized" });
       const roomUrl = decodeURIComponent(req.params.roomUrl);
-      const booking = await storage.getBookingByVideoRoomUrl(roomUrl);
+      const streamBookingId = bookingIdFromStreamLink(roomUrl);
+      const booking = streamBookingId
+        ? await storage.getBookingById(streamBookingId)
+        : await storage.getBookingByVideoRoomUrl(roomUrl);
       if (!booking) return res.status(404).json({ message: "Booking not found" });
       // Only allow the seeker or the provider assigned to this booking
       const provider = booking.providerId ? await storage.getProviderById(booking.providerId) : null;
@@ -1852,10 +1860,15 @@ export async function registerRoutes(
           bookingData.providerId = consultant.providerId;
         }
         
-        // Generate Daily.co room for video calls
-        const roomName = `perfusion-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-        const dailyRoom = await createDailyRoom(roomName);
-        bookingData.videoRoomId = dailyRoom ? dailyRoom.url : null;
+        if (process.env.CALL_MEDIA_PROVIDER === "daily") {
+          const roomName = `perfusion-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+          const dailyRoom = await createDailyRoom(roomName);
+          bookingData.videoRoomId = dailyRoom ? dailyRoom.url : null;
+        } else {
+          // Keep existing booking call links without provisioning a Daily room.
+          bookingData.id = randomUUID();
+          bookingData.videoRoomId = `stream://booking/${bookingData.id}`;
+        }
       }
       
       // For lab bookings, auto-assign to enabled provider for that test
@@ -4650,13 +4663,17 @@ export async function registerRoutes(
           if (provider) bookingData.providerName = provider.name;
         }
 
-        // ── Daily.co video room ───────────────────────────────────────────────
-        try {
-          const roomName = `perfusion-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-          const dailyRoom = await createDailyRoom(roomName);
-          bookingData.videoRoomId = dailyRoom ? dailyRoom.url : null;
-        } catch {
-          bookingData.videoRoomId = null;
+        if (process.env.CALL_MEDIA_PROVIDER === "daily") {
+          try {
+            const roomName = `perfusion-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+            const dailyRoom = await createDailyRoom(roomName);
+            bookingData.videoRoomId = dailyRoom ? dailyRoom.url : null;
+          } catch {
+            bookingData.videoRoomId = null;
+          }
+        } else {
+          bookingData.id = randomUUID();
+          bookingData.videoRoomId = `stream://booking/${bookingData.id}`;
         }
 
         // ── Pricing ───────────────────────────────────────────────────────────
@@ -6077,10 +6094,9 @@ export async function registerRoutes(
           return res.status(502).json({ error: "Could not create Stream Video call" });
         }
       } else {
-        if (!videoRoomUrl) return res.status(400).json({ error: "No video room for this booking" });
-
-        // Validate the room still exists (Daily.co rooms expire). Recreate if needed.
-        const roomValid = await isDailyRoomValid(videoRoomUrl);
+        // Stream booking links are not media rooms. Only the explicit rollback
+        // provisions a Daily room for a booking originally created on Stream.
+        const roomValid = videoRoomUrl.startsWith("https://") && await isDailyRoomValid(videoRoomUrl);
         if (!roomValid) {
           req.log.info({ bookingId }, "Daily room expired or missing; recreating");
           const roomName = `perfusion-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
