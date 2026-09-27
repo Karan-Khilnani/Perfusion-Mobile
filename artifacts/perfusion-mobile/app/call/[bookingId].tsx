@@ -15,6 +15,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { CallMedia } from "@/components/CallMedia";
+import { StreamCallMedia } from "@/components/StreamCallMedia";
 import { apiFetch } from "@/hooks/useApi";
 import { useColors } from "@/hooks/useColors";
 
@@ -29,8 +30,19 @@ interface CallStatus {
   status: "none" | "ringing" | "accepted" | "declined" | "timeout" | "ended";
   isCaller?: boolean;
   callType?: "voice" | "video";
+  mediaProvider?: "daily" | "stream";
   videoRoomUrl?: string;
   sessionGeneration?: string;
+}
+
+interface StreamCredentials {
+  apiKey: string;
+  token: string;
+  callId: string;
+  callType: string;
+  userId: string;
+  userName: string;
+  sessionGeneration: string;
 }
 
 export default function CallScreen() {
@@ -45,6 +57,7 @@ export default function CallScreen() {
   const [permissionsReady, setPermissionsReady] = useState(Platform.OS !== "android");
   const [permissionDenied, setPermissionDenied] = useState(false);
   const [roomError, setRoomError] = useState(false);
+  const [streamError, setStreamError] = useState<string | null>(null);
   const [endPending, setEndPending] = useState(false);
   const [endError, setEndError] = useState<string | null>(null);
 
@@ -74,6 +87,7 @@ export default function CallScreen() {
   // The session is authoritative; the route mode is only used while it loads.
   const callMode = callStatus?.callType || (mode === "voice" ? "voice" : "video");
 
+  const isStreamCall = callStatus?.mediaProvider === "stream";
   const { data: tokenData, isError: tokenError } = useQuery<{ token: string; userName: string }>({
     queryKey: ["daily-token", bookingId, callStatus?.videoRoomUrl],
     queryFn: async () => {
@@ -84,7 +98,33 @@ export default function CallScreen() {
       if (!res.ok) throw new Error("Token error");
       return res.json();
     },
-    enabled: !!callStatus?.videoRoomUrl && currentStatus === "accepted",
+    enabled: !isStreamCall && !!callStatus?.videoRoomUrl && currentStatus === "accepted",
+  });
+  const {
+    data: streamCredentials,
+    isLoading: streamCredentialsLoading,
+    isError: streamCredentialsError,
+    refetch: refetchStreamCredentials,
+  } = useQuery<StreamCredentials>({
+    queryKey: ["stream-call-credentials", bookingId, callStatus?.sessionGeneration],
+    queryFn: async () => {
+      const res = await apiFetch(`/api/call/stream-credentials/${bookingId}`);
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body?.error || "Could not load secure call credentials.");
+      }
+      const data = (await res.json()) as StreamCredentials;
+      if (
+        !data.apiKey || !data.token || !data.callId || !data.callType ||
+        !data.userId || !data.userName ||
+        (callStatus?.sessionGeneration && data.sessionGeneration !== callStatus.sessionGeneration)
+      ) {
+        throw new Error("The secure call credentials are incomplete or belong to another call.");
+      }
+      return data;
+    },
+    enabled: isStreamCall && currentStatus === "accepted",
+    retry: 1,
   });
 
   useEffect(() => {
@@ -146,7 +186,9 @@ export default function CallScreen() {
     }
   };
 
-  if (isLoading || statusLoading || (currentStatus === "accepted" && !!callStatus?.videoRoomUrl && !roomUrl && !tokenError && !statusError) ||
+  if (isLoading || statusLoading ||
+      (currentStatus === "accepted" && isStreamCall && streamCredentialsLoading) ||
+      (currentStatus === "accepted" && !isStreamCall && !!callStatus?.videoRoomUrl && !roomUrl && !tokenError && !statusError) ||
       (currentStatus === "accepted" && Platform.OS === "android" && !permissionsReady && !permissionDenied)) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -183,7 +225,58 @@ export default function CallScreen() {
     );
   }
 
-  if (currentStatus === "accepted" && roomUrl) {
+  if (currentStatus === "accepted" && isStreamCall && streamCredentials && Platform.OS !== "web") {
+    return (
+      <View style={styles.roomContainer}>
+        <StreamCallMedia
+          key={`${streamCredentials.callId}:${streamCredentials.sessionGeneration}`}
+          credentials={streamCredentials}
+          voiceCall={callMode === "voice"}
+          onError={setStreamError}
+        />
+        <View style={[styles.roomHeader, { top: insets.top + 8 }]}>
+          <Pressable
+            onPress={handleEndCall}
+            disabled={endPending}
+            style={[styles.leaveRoomButton, { backgroundColor: colors.destructive }]}
+            accessibilityLabel="End call"
+            testID="leave-in-app-call"
+          >
+            <Ionicons name="call" size={22} color={colors.callForeground} style={{ transform: [{ rotate: "135deg" }] }} />
+          </Pressable>
+          {endError && <Text style={[styles.roomErrorText, { color: colors.callForeground }]} accessibilityRole="alert">{endError}</Text>}
+        </View>
+        {(streamError || streamCredentialsError) && (
+          <View style={styles.roomError}>
+            <Text style={styles.roomErrorText} accessibilityRole="alert">
+              {streamError || "Could not load secure call credentials."}
+            </Text>
+            {streamCredentialsError && (
+              <Pressable onPress={() => { setStreamError(null); void refetchStreamCredentials(); }}>
+                <Text style={[styles.retryText, { color: colors.primary }]}>Try again</Text>
+              </Pressable>
+            )}
+          </View>
+        )}
+      </View>
+    );
+  }
+
+  if (currentStatus === "accepted" && isStreamCall && Platform.OS === "web") {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.callBackground }]}>
+        <Text style={[styles.hint, { color: colors.callForeground }]}>
+          Native Stream calls are available in the installed iOS or Android app.
+        </Text>
+        <Pressable onPress={handleEndCall} disabled={endPending} style={styles.endBtn}>
+          <Text style={[styles.endBtnText, { color: colors.callForeground }]}>End call</Text>
+        </Pressable>
+        {endError && <Text style={[styles.roomErrorText, { color: colors.callForeground }]} accessibilityRole="alert">{endError}</Text>}
+      </View>
+    );
+  }
+
+  if (currentStatus === "accepted" && !isStreamCall && roomUrl) {
     return (
       <View style={styles.roomContainer}>
         <CallMedia key={roomAttempt} url={roomUrl} onError={() => setRoomError(true)} />

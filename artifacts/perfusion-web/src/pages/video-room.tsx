@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useCallEvents, type CallEvent } from "@/hooks/use-call-events";
 import { ClinicalPanel } from "@/components/clinical-panel";
 import { InCallSummaryForm } from "@/components/in-call-summary-form";
+import { StreamCallMedia, type StreamCallCredentials } from "@/components/stream-call-media";
 import type { Booking } from "@shared/schema";
 
 import { getCallWindow, toISTTimeString, getPostRxStatus } from "@/lib/call-window";
@@ -119,6 +120,9 @@ export default function VideoRoomPage() {
   // Daily caches the last-entered name in browser localStorage across sessions.
   const [dailyToken, setDailyToken] = useState<string | null>(null);
   const [dailyTokenError, setDailyTokenError] = useState<string | null>(null);
+  const [callMediaProvider, setCallMediaProvider] = useState<"daily" | "stream" | null>(null);
+  const [streamCredentials, setStreamCredentials] = useState<StreamCallCredentials | null>(null);
+  const [mediaSetupError, setMediaSetupError] = useState<string | null>(null);
 
   const buildDailyUrl = (url: string) => {
     try {
@@ -256,28 +260,68 @@ export default function VideoRoomPage() {
     };
   }, [phase, booking?.id]);
 
-  // Fetch a server-side Daily token when entering the call — this locks in the user's
-  // real name and cannot be overridden by browser cache.
+  // Resolve the authoritative provider before preparing either media session.
+  // Credentials are only requested once the accepted call's status says Stream.
   useEffect(() => {
-    if (phase === "connected" && dailyUrl) {
-      setDailyToken(null);
-      setDailyTokenError(null);
-      fetch(`/api/bookings/room/${encodeURIComponent(dailyUrl)}/daily-token`, { credentials: "include" })
-        .then(async (response) => {
-          const data = await response.json().catch(() => ({}));
-          if (!response.ok || !data?.token) {
-            throw new Error(data?.message || "Could not prepare the secure video room");
+    if (phase !== "connected" || !booking?.id) return;
+    let stopped = false;
+    setCallMediaProvider(null);
+    setStreamCredentials(null);
+    setMediaSetupError(null);
+    setDailyToken(null);
+    setDailyTokenError(null);
+    const prepareMedia = async () => {
+      try {
+        const statusResponse = await fetch(`/api/call/status/${booking.id}`, { credentials: "include" });
+        const statusData = await statusResponse.json().catch(() => ({}));
+        if (!statusResponse.ok) {
+          throw new Error(statusData?.message || "Could not check the call media provider.");
+        }
+        if (statusData.mediaProvider !== "daily" && statusData.mediaProvider !== "stream") {
+          throw new Error("The call server returned an unsupported media provider.");
+        }
+        if (stopped) return;
+        setCallMediaProvider(statusData.mediaProvider);
+
+        if (statusData.mediaProvider === "stream") {
+          const credentialsResponse = await fetch(`/api/call/stream-credentials/${booking.id}`, { credentials: "include" });
+          const credentialsData = await credentialsResponse.json().catch(() => ({}));
+          if (!credentialsResponse.ok) {
+            throw new Error(credentialsData?.message || "Could not prepare Stream call credentials.");
           }
-          setDailyToken(data.token);
-        })
-        .catch((error) => {
-          setDailyTokenError(
-            error instanceof Error ? error.message : "Could not prepare the secure video room",
-          );
+          if (
+            !credentialsData.apiKey || !credentialsData.token || !credentialsData.callId ||
+            !credentialsData.callType || !credentialsData.userId || !credentialsData.userName
+          ) {
+            throw new Error("The Stream credentials response is incomplete.");
+          }
+          if (stopped) return;
+          setStreamCredentials(credentialsData as StreamCallCredentials);
           setIsLoading(false);
-        });
-    }
-  }, [phase, dailyUrl]);
+          return;
+        }
+
+        // Legacy Daily calls retain the existing secure token and iframe flow.
+        if (!dailyUrl) throw new Error("The Daily room URL is unavailable.");
+        const tokenResponse = await fetch(`/api/bookings/room/${encodeURIComponent(dailyUrl)}/daily-token`, { credentials: "include" });
+        const tokenData = await tokenResponse.json().catch(() => ({}));
+        if (!tokenResponse.ok || !tokenData?.token) {
+          throw new Error(tokenData?.message || "Could not prepare the secure video room.");
+        }
+        if (!stopped) {
+          setDailyToken(tokenData.token);
+          setIsLoading(false);
+        }
+      } catch (error) {
+        if (stopped) return;
+        const message = error instanceof Error ? error.message : "Could not prepare the secure video room.";
+        setMediaSetupError(message);
+        setIsLoading(false);
+      }
+    };
+    void prepareMedia();
+    return () => { stopped = true; };
+  }, [phase, booking?.id, dailyUrl]);
 
   useEffect(() => {
     if (phase !== "connected") return;
@@ -474,7 +518,7 @@ export default function VideoRoomPage() {
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [phase]);
 
-  if (!roomId || !dailyUrl) {
+  if (!roomId) {
     return (
       <div className="flex h-screen items-center justify-center">
         <Card className="max-w-md">
@@ -484,7 +528,7 @@ export default function VideoRoomPage() {
             <p className="mb-4 text-muted-foreground">
               {!roomId
                 ? "No video room ID was provided."
-                : "This booking was created before video calls were set up. Please book a new consultation to get a working video room."}
+              : "This booking does not have a video room. Please contact support for help."}
             </p>
             <Link href={returnTo}>
               <Button data-testid="button-back-orders">Back to Orders</Button>
@@ -749,7 +793,10 @@ export default function VideoRoomPage() {
                 </div>
               </div>
             )}
-            {dailyUrl && dailyToken && (
+            {callMediaProvider === "stream" && streamCredentials && (
+              <StreamCallMedia credentials={streamCredentials} voiceCall={isVoiceCall} />
+            )}
+            {callMediaProvider === "daily" && dailyUrl && dailyToken && (
               <iframe
                 ref={iframeRef}
                 src={buildDailyUrl(dailyUrl)}
@@ -776,12 +823,12 @@ export default function VideoRoomPage() {
                 data-testid="video-container"
               />
             )}
-            {dailyTokenError && (
+            {(dailyTokenError || mediaSetupError) && (
               <div className="absolute inset-0 z-20 flex items-center justify-center bg-background px-6">
                 <div className="max-w-sm text-center space-y-3">
                   <VideoOff className="mx-auto h-10 w-10 text-destructive" />
                   <p className="font-medium">Unable to open the secure video room</p>
-                  <p className="text-sm text-muted-foreground">{dailyTokenError}</p>
+                  <p className="text-sm text-muted-foreground">{mediaSetupError || dailyTokenError}</p>
                   <Button onClick={() => setPhase("precall")} variant="outline">
                     Try Again
                   </Button>
@@ -1080,7 +1127,10 @@ export default function VideoRoomPage() {
             </div>
           )}
 
-          {dailyUrl && dailyToken && (
+          {callMediaProvider === "stream" && streamCredentials && (
+            <StreamCallMedia credentials={streamCredentials} voiceCall={isVoiceCall} />
+          )}
+          {callMediaProvider === "daily" && dailyUrl && dailyToken && (
             <iframe
               ref={iframeRef}
               src={buildDailyUrl(dailyUrl)}
@@ -1096,12 +1146,12 @@ export default function VideoRoomPage() {
               data-testid="video-container"
             />
           )}
-          {dailyTokenError && (
+          {(dailyTokenError || mediaSetupError) && (
             <div className="absolute inset-0 z-30 flex items-center justify-center bg-background px-6">
               <div className="max-w-sm text-center space-y-3">
                 <VideoOff className="mx-auto h-10 w-10 text-destructive" />
                 <p className="font-medium">Unable to open the secure video room</p>
-                <p className="text-sm text-muted-foreground">{dailyTokenError}</p>
+                <p className="text-sm text-muted-foreground">{mediaSetupError || dailyTokenError}</p>
                 <Button onClick={() => setPhase("precall")} variant="outline">
                   Try Again
                 </Button>

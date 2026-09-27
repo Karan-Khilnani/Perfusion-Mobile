@@ -27,6 +27,15 @@ import { notifyMobileIncomingCall } from "../services/mobile-call-push";
 import { getConsultantAvailabilityPreview } from "../services/consultant-availability";
 import { normalizeComorbidities } from "../services/patient-comorbidities";
 import { randomUUID } from "crypto";
+import { StreamClient } from "@stream-io/node-sdk";
+
+function callMediaProvider(videoRoomUrl?: string | null): "daily" | "stream" {
+  return videoRoomUrl?.startsWith("stream://default/") ? "stream" : "daily";
+}
+
+function streamPilotBookingIds(): Set<string> {
+  return new Set((process.env.STREAM_PILOT_BOOKING_IDS || "").split(",").map(id => id.trim()).filter(Boolean));
+}
 
 function sanitizeUserForClient<T extends Record<string, any> | undefined>(user: T) {
   if (!user) return user;
@@ -1173,6 +1182,9 @@ export async function registerRoutes(
       const session = await storage.getCallSession(booking.id);
       if (!session || session.status !== "accepted") {
         return res.status(409).json({ message: "The call must be accepted before joining the video room" });
+      }
+      if (callMediaProvider(session.videoRoomUrl) === "stream" || session.videoRoomUrl !== roomUrl) {
+        return res.status(409).json({ message: "The requested Daily room does not match the active call session" });
       }
 
       const apiKey = process.env.DAILY_API_KEY;
