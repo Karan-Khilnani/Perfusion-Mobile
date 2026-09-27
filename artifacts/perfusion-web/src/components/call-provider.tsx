@@ -32,6 +32,9 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioUnlocked = useRef(false);
   const callAutoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const incomingCallRef = useRef<CallEvent | null>(null);
+  const pendingIncomingCallRef = useRef<CallEvent | null>(null);
+  const incomingValidationRef = useRef(0);
 
   // Create the audio element once and unlock it on first user interaction.
   useEffect(() => {
@@ -92,11 +95,15 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
 
   const pendingSwCall = useRef<CallEvent | null>(null);
 
-  const dismissNotification = useCallback((bookingId: string) => {
+  const dismissNotification = useCallback((bookingId: string, sessionGeneration?: string) => {
     if (!("serviceWorker" in navigator)) return;
     navigator.serviceWorker.ready.then((reg) => {
       reg.getNotifications({ tag: `call-${bookingId}` }).then((notifs) => {
-        notifs.forEach((n) => n.close());
+        notifs.forEach((notification) => {
+          if (!sessionGeneration || notification.data?.sessionGeneration === sessionGeneration) {
+            notification.close();
+          }
+        });
       });
     }).catch(() => {});
   }, []);
@@ -110,17 +117,86 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
 
   const handleCallEvent = useCallback((event: CallEvent) => {
     if (event.type === "incoming_call") {
-      setIncomingCall(event);
-      // Auto-dismiss after 70 seconds in case the server's timeout/cancel event
-      // is missed (e.g. tab was backgrounded or SSE reconnected after the event).
-      clearCallAutoTimer();
-      callAutoTimerRef.current = setTimeout(() => {
+      if (!event.bookingId || !event.sessionGeneration) return;
+      const validationId = ++incomingValidationRef.current;
+      pendingIncomingCallRef.current = event;
+      fetch(`/api/call/status/${encodeURIComponent(event.bookingId)}`, {
+        credentials: "include",
+        cache: "no-store",
+      }).then(async (response) => {
+        if (!response.ok) return;
+        const currentSession = await response.json();
+        if (
+          validationId !== incomingValidationRef.current ||
+          currentSession?.status !== "ringing" ||
+          currentSession.sessionGeneration !== event.sessionGeneration
+        ) {
+          if (
+            pendingIncomingCallRef.current?.bookingId === event.bookingId &&
+            pendingIncomingCallRef.current.sessionGeneration === event.sessionGeneration
+          ) {
+            pendingIncomingCallRef.current = null;
+          }
+          return;
+        }
+
+        const currentCall = incomingCallRef.current;
+        if (currentCall?.bookingId === event.bookingId && currentCall.sessionGeneration === event.sessionGeneration) {
+          pendingIncomingCallRef.current = null;
+          return;
+        }
+        incomingCallRef.current = event;
+        pendingIncomingCallRef.current = null;
+        setIncomingCall(event);
+        // Auto-dismiss if the server's terminal SSE event is missed.
+        clearCallAutoTimer();
+        callAutoTimerRef.current = setTimeout(() => {
+          if (
+            incomingCallRef.current?.bookingId === event.bookingId &&
+            incomingCallRef.current.sessionGeneration === event.sessionGeneration
+          ) {
+            incomingCallRef.current = null;
+            setIncomingCall(null);
+          }
+          if (
+            pendingIncomingCallRef.current?.bookingId === event.bookingId &&
+            pendingIncomingCallRef.current.sessionGeneration === event.sessionGeneration
+          ) {
+            pendingIncomingCallRef.current = null;
+          }
+        }, 70000);
+      }).catch(() => {
+        if (
+          pendingIncomingCallRef.current?.bookingId === event.bookingId &&
+          pendingIncomingCallRef.current.sessionGeneration === event.sessionGeneration
+        ) {
+          pendingIncomingCallRef.current = null;
+        }
+      });
+      return;
+    }
+
+    const isTerminalCallEvent =
+      event.type === "call_accepted" ||
+      event.type === "call_declined" ||
+      event.type === "call_timeout" ||
+      event.type === "call_cancelled" ||
+      event.type === "call_ended";
+    if (isTerminalCallEvent && event.bookingId && event.sessionGeneration) {
+      dismissNotification(event.bookingId, event.sessionGeneration);
+      if (
+        pendingIncomingCallRef.current?.bookingId === event.bookingId &&
+        pendingIncomingCallRef.current.sessionGeneration === event.sessionGeneration
+      ) {
+        pendingIncomingCallRef.current = null;
+        incomingValidationRef.current++;
+      }
+      const currentCall = incomingCallRef.current;
+      if (currentCall?.bookingId === event.bookingId && currentCall.sessionGeneration === event.sessionGeneration) {
+        incomingCallRef.current = null;
+        clearCallAutoTimer();
         setIncomingCall(null);
-      }, 70000);
-    } else if (event.type === "call_timeout" || event.type === "call_cancelled") {
-      if (event.bookingId) dismissNotification(event.bookingId);
-      clearCallAutoTimer();
-      setIncomingCall(null);
+      }
     }
   }, [dismissNotification, clearCallAutoTimer]);
 
@@ -131,14 +207,37 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
     if (!("serviceWorker" in navigator)) return;
 
     function onSwMessage(event: MessageEvent) {
+      if (event.data?.type === "CALL_ACTION_REJECTED") {
+        const current = incomingCallRef.current;
+        if (
+          current &&
+          current?.bookingId === event.data.bookingId &&
+          current.sessionGeneration === event.data.sessionGeneration
+        ) {
+          incomingCallRef.current = null;
+          pendingIncomingCallRef.current = null;
+          incomingValidationRef.current++;
+          clearCallAutoTimer();
+          setIncomingCall(null);
+          toast({
+            title: "Call already ended",
+            description: "This call has already been answered or ended.",
+            variant: "destructive",
+          });
+        }
+        return;
+      }
       if (!event.data || event.data.type !== "INCOMING_CALL") return;
+      if (!event.data.sessionGeneration) return;
 
       const callEvent: CallEvent = {
         type: "incoming_call",
         bookingId: event.data.bookingId,
+        sessionGeneration: event.data.sessionGeneration,
         callerName: event.data.callerName,
         callerRole: event.data.callerRole,
         videoRoomUrl: event.data.videoRoomUrl,
+        mediaProvider: event.data.mediaProvider,
         serviceName: event.data.serviceName,
         subtitle: event.data.subtitle,
         callType: event.data.callType,
@@ -165,7 +264,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
       navigator.serviceWorker.removeEventListener("message", onSwMessage);
       document.removeEventListener("visibilitychange", onVisibilityChange);
     };
-  }, [handleCallEvent]);
+  }, [handleCallEvent, clearCallAutoTimer, toast]);
 
   // Check push subscription status and prompt when needed
   useEffect(() => {
@@ -241,7 +340,13 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
       {incomingCall && (
         <IncomingCallOverlay
           callEvent={incomingCall}
-          onDismiss={() => { clearCallAutoTimer(); setIncomingCall(null); }}
+          onDismiss={() => {
+            incomingCallRef.current = null;
+            pendingIncomingCallRef.current = null;
+            incomingValidationRef.current++;
+            clearCallAutoTimer();
+            setIncomingCall(null);
+          }}
         />
       )}
 

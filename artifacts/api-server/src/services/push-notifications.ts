@@ -15,18 +15,25 @@ if (VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
   );
 }
 
-export interface PushPayload {
-  type: "incoming_call" | "call_accepted" | "call_declined" | "call_timeout";
-  bookingId: string;
-  callerName: string;
-  callerRole: "seeker" | "provider";
-  recipientRole: "seeker" | "provider";
-  videoRoomUrl: string;
-  mediaProvider: "daily" | "stream";
-  title: string;
-  body: string;
-  subtitle?: string;
-}
+export type PushPayload =
+  | {
+      type: "incoming_call";
+      bookingId: string;
+      sessionGeneration: string;
+      callerName: string;
+      callerRole: "seeker" | "provider";
+      recipientRole: "seeker" | "provider";
+      videoRoomUrl: string;
+      mediaProvider: "daily" | "stream";
+      title: string;
+      body: string;
+      subtitle?: string;
+    }
+  | {
+      type: "call_accepted" | "call_declined" | "call_timeout" | "call_cancelled" | "call_ended";
+      bookingId: string;
+      sessionGeneration: string;
+    };
 
 export interface PushSubscriptionData {
   endpoint: string;

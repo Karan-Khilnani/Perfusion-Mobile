@@ -21,7 +21,10 @@ export interface NativeIncomingCall {
 
 interface NativeCallHandlers {
   onAnswered: (bookingId: string, sessionGeneration?: string) => Promise<void>;
-  onDeclined: (bookingId: string, sessionGeneration?: string) => Promise<void>;
+  onEnded: (
+    bookingId: string,
+    sessionGeneration: string,
+  ) => Promise<void>;
   onToken: (token: string, type: PushTokenType) => Promise<void>;
 }
 
@@ -45,6 +48,55 @@ function bookingIdFromSession(session: CallSession | null): string | null {
 function generationFromSession(session: CallSession | null): string | undefined {
   const value = session?.incomingCallEvent?.metadata?.sessionGeneration;
   return typeof value === "string" ? value : undefined;
+}
+
+function isSameCallSession(
+  session: CallSession | null,
+  bookingId: string,
+  sessionGeneration: string,
+): boolean {
+  return (
+    bookingIdFromSession(session) === bookingId &&
+    generationFromSession(session) === sessionGeneration
+  );
+}
+
+export async function getNativeActiveCallSession(): Promise<CallSession | null> {
+  const calls = await getCallsModule();
+  if (!calls) return null;
+
+  try {
+    return await calls.getActiveCallSession();
+  } catch (error) {
+    console.warn("[native-calls] Could not read the active system call", error);
+    return null;
+  }
+}
+
+/**
+ * Clears a native call only when it is the exact session we are reconciling.
+ * The generation check prevents a delayed end event from clearing a newer call.
+ */
+export async function endNativeCallForSession(
+  bookingId: string,
+  sessionGeneration: string,
+  reason: "remoteEnded" | "failed" = "remoteEnded",
+): Promise<boolean> {
+  if (!sessionGeneration) return false;
+  const calls = await getCallsModule();
+  if (!calls) return false;
+
+  try {
+    const session = await calls.getActiveCallSession();
+    if (!session || !isSameCallSession(session, bookingId, sessionGeneration)) {
+      return false;
+    }
+    await calls.reportCallEnded(session.id, reason);
+    return true;
+  } catch (error) {
+    console.warn("[native-calls] Could not clear the ended system call", error);
+    return false;
+  }
 }
 
 export async function initializeNativeCalls(
@@ -76,8 +128,11 @@ export async function initializeNativeCalls(
     }),
     calls.addCallEndedListener(({ session }) => {
       const bookingId = bookingIdFromSession(session);
-      if (bookingId && session.status !== "connected") {
-        handlers.onDeclined(bookingId, generationFromSession(session)).catch(() => {});
+      const sessionGeneration = generationFromSession(session);
+      if (bookingId && sessionGeneration) {
+        handlers.onEnded(bookingId, sessionGeneration).catch((error) => {
+          console.warn("[native-calls] Could not sync a system call end", error);
+        });
       }
     }),
   ];
@@ -108,6 +163,20 @@ export async function reportNativeIncomingCall(
   const calls = await getCallsModule();
   if (!calls) return false;
 
+  if (incomingCall.sessionGeneration) {
+    const activeSession = await getNativeActiveCallSession();
+    if (
+      activeSession &&
+      isSameCallSession(
+        activeSession,
+        incomingCall.bookingId,
+        incomingCall.sessionGeneration,
+      )
+    ) {
+      return true;
+    }
+  }
+
   const event: IncomingCallEvent = {
     eventId: incomingCall.sessionGeneration || incomingCall.bookingId,
     serverCallId: incomingCall.sessionGeneration || incomingCall.bookingId,
@@ -131,7 +200,8 @@ export async function reportNativeIncomingCall(
   try {
     await calls.reportIncomingCall(event);
     return true;
-  } catch {
+  } catch (error) {
+    console.warn("[native-calls] Could not report an incoming system call", error);
     return false;
   }
 }

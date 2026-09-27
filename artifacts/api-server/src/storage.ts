@@ -249,6 +249,7 @@ export interface IStorage {
     data: Partial<InsertDbCallSession>,
   ): Promise<DbCallSession | undefined>;
   expireRingingCallSession(bookingId: string, generation: string): Promise<DbCallSession | undefined>;
+  endExpiredAcceptedCallSession(bookingId: string, generation: string): Promise<DbCallSession | undefined>;
   deleteCallSession(bookingId: string, generation: string, statuses: string[], onlyIfExpired?: boolean): Promise<void>;
   getActiveCallSessionsForRecipient(recipientUserId: string): Promise<DbCallSession[]>;
 }
@@ -1013,6 +1014,16 @@ export class DatabaseStorage implements IStorage {
       eq(callSessionsTable.bookingId, bookingId),
       eq(callSessionsTable.sessionGeneration, generation),
       eq(callSessionsTable.status, "ringing"),
+      lte(callSessionsTable.expiresAt, new Date()),
+    )).returning();
+    return row;
+  }
+
+  async endExpiredAcceptedCallSession(bookingId: string, generation: string): Promise<DbCallSession | undefined> {
+    const [row] = await db.update(callSessionsTable).set({ status: "ended" }).where(and(
+      eq(callSessionsTable.bookingId, bookingId),
+      eq(callSessionsTable.sessionGeneration, generation),
+      eq(callSessionsTable.status, "accepted"),
       lte(callSessionsTable.expiresAt, new Date()),
     )).returning();
     return row;

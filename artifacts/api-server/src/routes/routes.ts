@@ -23,7 +23,7 @@ import { AGREEMENT_VERSION, AGREEMENT_FULL_TEXT, partnerTypeLabel } from "../ser
 import { sendPushNotification, getVapidPublicKey, type PushPayload } from "../services/push-notifications";
 import { getCallWindow } from "../services/call-window";
 import { resolveConsultationLifecycle } from "../services/consultation-lifecycle";
-import { notifyMobileIncomingCall } from "../services/mobile-call-push";
+import { notifyMobileCallEnded, notifyMobileIncomingCall } from "../services/mobile-call-push";
 import { getConsultantAvailabilityPreview } from "../services/consultant-availability";
 import { normalizeComorbidities } from "../services/patient-comorbidities";
 import { randomUUID } from "crypto";
@@ -44,6 +44,31 @@ async function endStreamMediaSession(session: { videoRoomUrl: string; sessionGen
   const apiSecret = process.env.STREAM_VIDEO_API_SECRET;
   if (!apiKey || !apiSecret) throw new Error("Stream Video is not configured");
   await new StreamClient(apiKey, apiSecret).video.call("default", session.sessionGeneration).end();
+}
+
+async function endStreamMediaSessionWithRetries(
+  session: { videoRoomUrl: string; sessionGeneration: string },
+  log: any,
+  context: Record<string, unknown>,
+): Promise<boolean> {
+  const retryDelays = [0, 300, 900];
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt < retryDelays.length; attempt++) {
+    if (retryDelays[attempt] > 0) {
+      await new Promise(resolve => setTimeout(resolve, retryDelays[attempt]));
+    }
+    try {
+      await endStreamMediaSession(session);
+      return true;
+    } catch (error) {
+      lastError = error;
+      log.warn({ ...context, err: error, attempt: attempt + 1 }, "Stream call cleanup attempt failed");
+    }
+  }
+
+  log.error({ ...context, err: lastError }, "Stream call cleanup remains pending after retries");
+  return false;
 }
 
 function sanitizeUserForClient<T extends Record<string, any> | undefined>(user: T) {
@@ -5932,6 +5957,31 @@ export async function registerRoutes(
     });
   }
 
+  function broadcastTerminalCallEvent(
+    session: { bookingId: string; sessionGeneration: string; callerId: string; recipientUserId: string },
+    event: object,
+    pushType: Exclude<PushPayload["type"], "incoming_call">,
+    log: any,
+  ) {
+    const userIds = new Set([session.callerId, session.recipientUserId]);
+    for (const userId of userIds) {
+      broadcastCallEvent(userId, event);
+      const payload: PushPayload = {
+        type: pushType,
+        bookingId: session.bookingId,
+        sessionGeneration: session.sessionGeneration,
+      };
+      void notifyMobileCallEnded(userId, session)
+        .catch(error => log.warn(
+          { err: error, bookingId: session.bookingId, sessionGeneration: session.sessionGeneration, userId },
+          "Could not deliver native call cleanup push",
+        ));
+      void storage.getPushSubscriptionsByUserId(userId)
+        .then(subscriptions => Promise.all(subscriptions.map(subscription => sendPushNotification(subscription, payload))))
+        .catch(error => log.warn({ err: error, bookingId: session.bookingId, sessionGeneration: session.sessionGeneration, userId }, "Could not deliver terminal call push"));
+    }
+  }
+
   function broadcastCaseFileUpdate(booking: any, event: object) {
     broadcastCallEvent(booking.userId, event);
     if (booking.providerId) {
@@ -5964,7 +6014,7 @@ export async function registerRoutes(
     // incoming call overlay when opening the app directly (e.g. after
     // hearing a Twilio voice alert) rather than via push notification.
     storage.getActiveCallSessionsForRecipient(userId).then(activeSessions => {
-      const s = activeSessions[0];
+      const s = activeSessions.find(session => session.status === "ringing");
       if (s) {
         try {
           res.write(`data: ${JSON.stringify({
@@ -6134,8 +6184,12 @@ export async function registerRoutes(
             endStreamMediaSession(expired).catch((error) =>
               req.log.warn({ err: error, bookingId }, "Could not close timed-out Stream call"));
             if (expired.twilioCallSid) cancelVoiceCall(expired.twilioCallSid).catch(() => {});
-            broadcastCallEvent(callerId, { type: "call_timeout", bookingId, sessionGeneration, mediaProvider: callMediaProvider(expired.videoRoomUrl) });
-            broadcastCallEvent(recipientUserId, { type: "call_timeout", bookingId, sessionGeneration, mediaProvider: callMediaProvider(expired.videoRoomUrl) });
+            broadcastTerminalCallEvent(
+              expired,
+              { type: "call_timeout", bookingId, sessionGeneration, mediaProvider: callMediaProvider(expired.videoRoomUrl) },
+              "call_timeout",
+              req.log,
+            );
             setTimeout(() => storage.deleteCallSession(bookingId, sessionGeneration, ["timeout"]), 5000);
           }
         } catch {}
@@ -6165,6 +6219,7 @@ export async function registerRoutes(
       const payload: PushPayload = {
         type: "incoming_call",
         bookingId,
+        sessionGeneration,
         callerName: displayCallerName,
         callerRole,
         recipientRole,
@@ -6212,6 +6267,9 @@ export async function registerRoutes(
       const { bookingId } = req.params;
       const session = await storage.getCallSession(bookingId);
       if (!session) return res.status(404).json({ error: "No active call session" });
+      if (req.body?.sessionGeneration !== undefined && (typeof req.body.sessionGeneration !== "string" || !req.body.sessionGeneration.trim())) {
+        return res.status(400).json({ error: "Missing or invalid sessionGeneration" });
+      }
       if (req.body?.sessionGeneration && req.body.sessionGeneration !== session.sessionGeneration) {
         return res.status(409).json({ error: "Call session has changed" });
       }
@@ -6256,25 +6314,42 @@ export async function registerRoutes(
         cancelVoiceCall(session.twilioCallSid).catch(() => {});
       }
 
-      // Notify caller that call was accepted
-      broadcastCallEvent(session.callerId, {
+      // Notify both participants so any duplicate browser notification closes.
+      broadcastTerminalCallEvent(session, {
         type: "call_accepted",
         bookingId,
         sessionGeneration: acceptedSession.sessionGeneration,
         callType: session.callType,
         videoRoomUrl: session.videoRoomUrl,
         mediaProvider: callMediaProvider(session.videoRoomUrl),
-      });
+      }, "call_accepted", req.log);
 
       // Keep the accepted session alive for 2 hours so the ring-guard can detect
       // it on page refresh — the 10 s window was too short and caused ghost re-rings.
       setTimeout(async () => {
         try {
-          await endStreamMediaSession(acceptedSession);
+          const mediaCleanupCompleted = await endStreamMediaSessionWithRetries(
+            acceptedSession,
+            req.log,
+            { bookingId, sessionGeneration: acceptedSession.sessionGeneration, reason: "accepted_call_expired" },
+          );
+          const endedSession = await storage.endExpiredAcceptedCallSession(bookingId, acceptedSession.sessionGeneration);
+          if (!endedSession) return;
+          const endedEvent = {
+            type: "call_ended",
+            bookingId,
+            sessionGeneration: acceptedSession.sessionGeneration,
+            mediaProvider: callMediaProvider(acceptedSession.videoRoomUrl),
+            mediaCleanupCompleted,
+          };
+          broadcastTerminalCallEvent(acceptedSession, endedEvent, "call_ended", req.log);
+          setTimeout(
+            () => storage.deleteCallSession(bookingId, acceptedSession.sessionGeneration, ["ended"], true).catch(() => {}),
+            5000,
+          );
         } catch (error) {
-          req.log.warn({ err: error, bookingId }, "Could not close expired Stream call");
+          req.log.error({ err: error, bookingId, sessionGeneration: acceptedSession.sessionGeneration }, "Expired accepted call cleanup failed");
         }
-        await storage.deleteCallSession(bookingId, session.sessionGeneration, ["accepted"], true).catch(() => {});
       }, 2 * 60 * 60 * 1000 + 1000);
 
       res.json({
@@ -6298,6 +6373,9 @@ export async function registerRoutes(
       const { bookingId } = req.params;
       const session = await storage.getCallSession(bookingId);
       if (!session) return res.status(404).json({ error: "No active call session" });
+      if (req.body?.sessionGeneration !== undefined && (typeof req.body.sessionGeneration !== "string" || !req.body.sessionGeneration.trim())) {
+        return res.status(400).json({ error: "Missing or invalid sessionGeneration" });
+      }
       if (req.body?.sessionGeneration && req.body.sessionGeneration !== session.sessionGeneration) {
         return res.status(409).json({ error: "Call session has changed" });
       }
@@ -6321,12 +6399,12 @@ export async function registerRoutes(
         cancelVoiceCall(session.twilioCallSid).catch(() => {});
       }
 
-      broadcastCallEvent(session.callerId, {
+      broadcastTerminalCallEvent(session, {
         type: "call_declined",
         bookingId,
         sessionGeneration: session.sessionGeneration,
         mediaProvider: callMediaProvider(session.videoRoomUrl),
-      });
+      }, "call_declined", req.log);
 
       setTimeout(() => storage.deleteCallSession(bookingId, session.sessionGeneration, ["declined"]), 5000);
 
@@ -6344,6 +6422,9 @@ export async function registerRoutes(
       const { bookingId } = req.params;
       const session = await storage.getCallSession(bookingId);
       if (!session) return res.status(404).json({ error: "No active call session" });
+      if (req.body?.sessionGeneration !== undefined && (typeof req.body.sessionGeneration !== "string" || !req.body.sessionGeneration.trim())) {
+        return res.status(400).json({ error: "Missing or invalid sessionGeneration" });
+      }
       if (req.body?.sessionGeneration && req.body.sessionGeneration !== session.sessionGeneration) {
         return res.status(409).json({ error: "Call session has changed" });
       }
@@ -6355,15 +6436,12 @@ export async function registerRoutes(
           req.log.warn({ err: error, bookingId }, "Could not close cancelled Stream call"));
         // Cancel the Twilio voice call if it's still ringing
         if (session.twilioCallSid) cancelVoiceCall(session.twilioCallSid).catch(() => {});
-        // Find recipient to notify
-        const booking = await storage.getBookingById(bookingId);
-        if (booking) {
-          const provider = await storage.getProviderById(booking.providerId!);
-          const recipientUserId = session.callerRole === "seeker" ? provider?.userId : booking.userId;
-          if (recipientUserId) {
-            broadcastCallEvent(recipientUserId, { type: "call_cancelled", bookingId, sessionGeneration: session.sessionGeneration, mediaProvider: callMediaProvider(session.videoRoomUrl) });
-          }
-        }
+        broadcastTerminalCallEvent(session, {
+          type: "call_cancelled",
+          bookingId,
+          sessionGeneration: session.sessionGeneration,
+          mediaProvider: callMediaProvider(session.videoRoomUrl),
+        }, "call_cancelled", req.log);
         setTimeout(() => storage.deleteCallSession(bookingId, session.sessionGeneration, ["declined"]), 5000);
       }
       res.json({ success: true, mediaProvider: callMediaProvider(session.videoRoomUrl) });
@@ -6381,6 +6459,9 @@ export async function registerRoutes(
       const { bookingId } = req.params;
       const session = await storage.getCallSession(bookingId);
       if (!session) return res.status(404).json({ error: "No active call session" });
+      if (req.body?.sessionGeneration !== undefined && (typeof req.body.sessionGeneration !== "string" || !req.body.sessionGeneration.trim())) {
+        return res.status(400).json({ error: "Missing or invalid sessionGeneration" });
+      }
       if (req.body?.sessionGeneration && req.body.sessionGeneration !== session.sessionGeneration) {
         return res.status(409).json({ error: "Call session has changed" });
       }
@@ -6396,37 +6477,57 @@ export async function registerRoutes(
       }
 
       if (session.status === "ended") {
-        return res.json({ success: true, status: "ended", mediaProvider: callMediaProvider(session.videoRoomUrl) });
+        const mediaCleanupCompleted = await endStreamMediaSessionWithRetries(
+          session,
+          req.log,
+          { bookingId, sessionGeneration: session.sessionGeneration, reason: "repeated_hangup" },
+        );
+        return res.json({
+          success: true,
+          status: "ended",
+          mediaProvider: callMediaProvider(session.videoRoomUrl),
+          mediaCleanupCompleted,
+        });
       }
       if (session.status !== "accepted" && session.status !== "ringing") {
         return res.status(409).json({ error: "Call is no longer active", status: session.status });
       }
 
-      // Closing the application session alone does not revoke an already issued
-      // Stream token. End the media call before reporting a successful hangup.
-      try {
-        await endStreamMediaSession(session);
-      } catch (error) {
-        req.log.error({ err: error, bookingId }, "Failed to end Stream media call");
-        return res.status(502).json({ error: "Could not end the Stream call. Please retry." });
-      }
+      // Try provider teardown with a bounded retry policy. Even when the
+      // provider is unavailable, the server lifecycle and both clients must
+      // transition out of the active call state.
+      const mediaCleanupCompleted = await endStreamMediaSessionWithRetries(
+        session,
+        req.log,
+        { bookingId, sessionGeneration: session.sessionGeneration, reason: "participant_hangup" },
+      );
       const endedSession = await storage.transitionCallSession(bookingId, session.sessionGeneration, ["accepted", "ringing"], { status: "ended" });
       if (!endedSession) return res.status(409).json({ error: "Call is no longer active or has changed" });
       if (session.status === "ringing" && session.twilioCallSid) {
         cancelVoiceCall(session.twilioCallSid).catch(() => {});
       }
 
-      const otherParticipantId = session.callerId === userId
-        ? session.recipientUserId
-        : session.callerId;
-      broadcastCallEvent(otherParticipantId, { type: "call_ended", bookingId, sessionGeneration: session.sessionGeneration, mediaProvider: callMediaProvider(session.videoRoomUrl) });
+      const endedEvent = {
+        type: "call_ended",
+        bookingId,
+        sessionGeneration: session.sessionGeneration,
+        mediaProvider: callMediaProvider(session.videoRoomUrl),
+        mediaCleanupCompleted,
+      };
+      broadcastTerminalCallEvent(session, endedEvent, "call_ended", req.log);
 
       // Keep the ended status queryable briefly so both clients can observe it.
       setTimeout(() => {
         storage.deleteCallSession(bookingId, session.sessionGeneration, ["ended"]).catch(() => {});
       }, 5000);
 
-      res.json({ success: true, status: "ended", mediaProvider: callMediaProvider(session.videoRoomUrl) });
+      res.json({
+        success: true,
+        status: "ended",
+        mediaProvider: callMediaProvider(session.videoRoomUrl),
+        mediaCleanupCompleted,
+        ...(mediaCleanupCompleted ? {} : { warning: "Call ended, but Stream media cleanup is still pending." }),
+      });
     } catch (error) {
       res.status(500).json({ error: "Failed to end call" });
     }

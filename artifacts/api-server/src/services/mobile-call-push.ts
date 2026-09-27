@@ -167,3 +167,50 @@ export async function notifyMobileIncomingCall(userId: string, call: IncomingCal
     }
   }
 }
+
+export async function notifyMobileCallEnded(
+  userId: string,
+  call: { bookingId: string; sessionGeneration: string },
+): Promise<void> {
+  const pool = getPool();
+  const { rows } = await pool.query<TokenRow>(
+    "SELECT token FROM mobile_push_tokens WHERE user_id = $1 AND platform = 'android' AND token_type = 'FCM'",
+    [userId],
+  );
+  if (!rows.length) return;
+
+  const firebase = getFirebaseMessaging();
+  if (!firebase) return;
+
+  const callEnded = JSON.stringify({
+    bookingId: call.bookingId,
+    sessionGeneration: call.sessionGeneration,
+  });
+
+  for (let offset = 0; offset < rows.length; offset += 500) {
+    const batch = rows.slice(offset, offset + 500);
+    try {
+      const result = await firebase.sendEachForMulticast({
+        tokens: batch.map((row) => row.token),
+        data: { messageType: "callEnded", callEnded },
+        android: { priority: "high", ttl: 60_000 },
+      });
+
+      for (let i = 0; i < result.responses.length; i++) {
+        const response = result.responses[i];
+        if (response.success) continue;
+
+        const code = response.error?.code;
+        logger.warn({ code }, "[MobilePush] Native call cleanup delivery failed");
+        if (
+          code === "messaging/registration-token-not-registered" ||
+          code === "messaging/invalid-registration-token"
+        ) {
+          await pool.query("DELETE FROM mobile_push_tokens WHERE token = $1", [batch[i].token]);
+        }
+      }
+    } catch (error) {
+      logger.error({ err: error }, "[MobilePush] Native call cleanup delivery failed");
+    }
+  }
+}

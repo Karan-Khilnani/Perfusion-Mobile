@@ -7,15 +7,18 @@ export type CallEventType =
   | "call_declined"
   | "call_timeout"
   | "call_cancelled"
+  | "call_ended"
   | "document_uploaded"
   | "case_file_updated";
 
 export interface CallEvent {
   type: CallEventType;
   bookingId: string;
+  sessionGeneration?: string;
   callerName?: string;
   callerRole?: "seeker" | "provider";
   videoRoomUrl?: string;
+  mediaProvider?: "daily" | "stream";
   serviceName?: string;
   subtitle?: string;
   callType?: "voice" | "video";

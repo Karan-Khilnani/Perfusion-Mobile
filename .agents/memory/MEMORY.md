@@ -21,3 +21,4 @@
 - [Bundled API imports](bundled-api-imports.md) — avoid runtime-relative imports for internal modules in the single-file API bundle; a dev-only success can hide production failures.
 - [Android call ringtone channels](android-call-ringtone-channels.md) — ringtone changes need a new channel identity and native build; JS audio cannot ring when the app is closed.
 - [Workspace package installation](workspace-package-installation.md) — generic package-install callback may target the pnpm workspace root; filtered installs belong in the artifact.
+- [Stream Android PiP bridge](stream-android-pip.md) — installed JS PiP helper references a native enter method absent from the SDK; verify the native bridge during prebuild.

@@ -1,9 +1,13 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
+import { useAudioPlayer } from "expo-audio";
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useEffect, useMemo, useState } from "react";
+import { enterPiPAndroid, useIsInPiPMode } from "@stream-io/video-react-native-sdk";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
+  BackHandler,
   Linking,
   PermissionsAndroid,
   Platform,
@@ -18,6 +22,7 @@ import { CallMedia } from "@/components/CallMedia";
 import { StreamCallMedia } from "@/components/StreamCallMedia";
 import { apiFetch } from "@/hooks/useApi";
 import { useColors } from "@/hooks/useColors";
+import { endNativeCallForSession } from "@/lib/native-calls";
 
 interface CallInfo {
   videoRoomId?: string;
@@ -57,11 +62,23 @@ export default function CallScreen() {
   const [permissionsReady, setPermissionsReady] = useState(Platform.OS !== "android");
   const [permissionDenied, setPermissionDenied] = useState(false);
   const [roomError, setRoomError] = useState(false);
-  const [streamError, setStreamError] = useState<string | null>(null);
+  const [streamAttempt, setStreamAttempt] = useState(0);
   const [endPending, setEndPending] = useState(false);
   const [endError, setEndError] = useState<string | null>(null);
+  const [permissionNeedsSettings, setPermissionNeedsSettings] = useState(false);
+  const [permissionRequesting, setPermissionRequesting] = useState(false);
+  const [streamCredentialsTimedOut, setStreamCredentialsTimedOut] = useState(false);
+  const [streamCredentialRetry, setStreamCredentialRetry] = useState(0);
+  const [mediaJoined, setMediaJoined] = useState(false);
+  const isInPiPMode = useIsInPiPMode();
+  const pipEnteringRef = useRef(false);
+  const acceptedGenerationRef = useRef<string | null>(null);
+  const onMediaJoined = useCallback(() => setMediaJoined(true), []);
+  const onMediaDisconnected = useCallback(() => setMediaJoined(false), []);
+  const ringback = useAudioPlayer(require("../../assets/audio/perfusion_ring.wav"));
+  const permissionRequestRef = useRef<Promise<boolean> | null>(null);
 
-  const { data: booking, isLoading } = useQuery<CallInfo>({
+  const { data: booking } = useQuery<CallInfo>({
     queryKey: ["booking", bookingId],
     queryFn: async () => {
       const res = await apiFetch(`/api/bookings/${bookingId}`);
@@ -80,7 +97,7 @@ export default function CallScreen() {
       return res.json();
     },
     enabled: !!bookingId,
-    refetchInterval: 2000,
+    refetchInterval: (query) => query.state.data?.status === "ringing" ? 1000 : 2000,
   });
   const currentSession = !generation || callStatus?.sessionGeneration === generation;
   const currentStatus = currentSession ? callStatus?.status : "ended";
@@ -88,6 +105,93 @@ export default function CallScreen() {
   const callMode = callStatus?.callType || (mode === "voice" ? "voice" : "video");
 
   const isStreamCall = callStatus?.mediaProvider === "stream";
+  const requestMediaPermissions = useCallback(async () => {
+    if (Platform.OS !== "android") return true;
+    if (permissionRequestRef.current) return permissionRequestRef.current;
+
+    const request = (async () => {
+      setPermissionRequesting(true);
+      const requiredPermissions = callMode === "video"
+        ? [PermissionsAndroid.PERMISSIONS.RECORD_AUDIO, PermissionsAndroid.PERMISSIONS.CAMERA]
+        : [PermissionsAndroid.PERMISSIONS.RECORD_AUDIO];
+
+      try {
+        const alreadyGranted = await Promise.all(
+          requiredPermissions.map((permission) => PermissionsAndroid.check(permission)),
+        );
+        const missingPermissions = requiredPermissions.filter(
+          (_permission, index) => !alreadyGranted[index],
+        );
+        const results: Record<string, string> = missingPermissions.length
+          ? await PermissionsAndroid.requestMultiple(missingPermissions) as Record<string, string>
+          : {};
+        const deniedPermissions = requiredPermissions.filter((permission, index) => {
+          return !alreadyGranted[index] &&
+            results[permission] !== PermissionsAndroid.RESULTS.GRANTED;
+        });
+        setPermissionsReady(deniedPermissions.length === 0);
+        setPermissionDenied(deniedPermissions.length > 0);
+        setPermissionNeedsSettings(deniedPermissions.some(
+          (permission) => results[permission] === PermissionsAndroid.RESULTS.NEVER_ASK_AGAIN,
+        ));
+        return deniedPermissions.length === 0;
+      } catch {
+        setPermissionsReady(false);
+        setPermissionDenied(true);
+        return false;
+      } finally {
+        setPermissionRequesting(false);
+      }
+    })();
+
+    permissionRequestRef.current = request;
+    try {
+      return await request;
+    } finally {
+      if (permissionRequestRef.current === request) permissionRequestRef.current = null;
+    }
+  }, [callMode]);
+
+  useEffect(() => {
+    const shouldPreflightPermissions =
+      currentStatus === "accepted" ||
+      (currentStatus === "ringing" && callStatus?.isCaller === true);
+    if (Platform.OS !== "android" || !shouldPreflightPermissions) return;
+    void requestMediaPermissions();
+  }, [callMode, callStatus?.isCaller, currentStatus, requestMediaPermissions]);
+
+  useEffect(() => {
+    if (Platform.OS === "web" || currentStatus !== "ringing" || !callStatus?.isCaller) {
+      ringback.pause();
+      return;
+    }
+
+    let active = true;
+    let stopTimeout: ReturnType<typeof setTimeout> | undefined;
+    let nextBurstTimeout: ReturnType<typeof setTimeout> | undefined;
+    ringback.loop = true;
+
+    const playRingbackBurst = async () => {
+      if (!active) return;
+      await ringback.seekTo(0).catch(() => {});
+      if (!active) return;
+      ringback.play();
+      stopTimeout = setTimeout(() => {
+        ringback.pause();
+        nextBurstTimeout = setTimeout(() => void playRingbackBurst(), 4000);
+      }, 2000);
+    };
+
+    void playRingbackBurst();
+    return () => {
+      active = false;
+      if (stopTimeout) clearTimeout(stopTimeout);
+      if (nextBurstTimeout) clearTimeout(nextBurstTimeout);
+      ringback.pause();
+      void ringback.seekTo(0).catch(() => {});
+    };
+  }, [callStatus?.isCaller, callStatus?.sessionGeneration, currentStatus, ringback]);
+
   const { data: tokenData, isError: tokenError } = useQuery<{ token: string; userName: string }>({
     queryKey: ["daily-token", bookingId, callStatus?.videoRoomUrl],
     queryFn: async () => {
@@ -128,26 +232,13 @@ export default function CallScreen() {
   });
 
   useEffect(() => {
-    if (Platform.OS !== "android" || currentStatus !== "accepted") return;
-
-    const requestMediaPermissions = async () => {
-      const permissions = [PermissionsAndroid.PERMISSIONS.RECORD_AUDIO];
-      if (callMode === "video" || isStreamCall) {
-        permissions.push(PermissionsAndroid.PERMISSIONS.CAMERA);
-      }
-      const results = await PermissionsAndroid.requestMultiple(permissions);
-      const microphoneGranted =
-        results[PermissionsAndroid.PERMISSIONS.RECORD_AUDIO] === PermissionsAndroid.RESULTS.GRANTED;
-      const cameraRequired = callMode === "video";
-      const cameraGranted =
-        results[PermissionsAndroid.PERMISSIONS.CAMERA] === PermissionsAndroid.RESULTS.GRANTED;
-      const requiredPermissionsGranted = microphoneGranted && (!cameraRequired || cameraGranted);
-      setPermissionsReady(requiredPermissionsGranted);
-      setPermissionDenied(!requiredPermissionsGranted);
-    };
-
-    requestMediaPermissions().catch(() => setPermissionDenied(true));
-  }, [callMode, currentStatus, isStreamCall]);
+    if (!isStreamCall || currentStatus !== "accepted" || !streamCredentialsLoading) {
+      setStreamCredentialsTimedOut(false);
+      return;
+    }
+    const timeout = setTimeout(() => setStreamCredentialsTimedOut(true), 20000);
+    return () => clearTimeout(timeout);
+  }, [currentStatus, isStreamCall, streamCredentialRetry, streamCredentialsLoading]);
 
   const roomUrl = useMemo(() => {
     if (!callStatus?.videoRoomUrl || !tokenData?.token || currentStatus !== "accepted") return null;
@@ -166,20 +257,24 @@ export default function CallScreen() {
     if (endPending) return;
     setEndPending(true);
     setEndError(null);
+    const sessionGeneration = generation || callStatus?.sessionGeneration;
     try {
       if (currentStatus === "ringing") {
         const action = callStatus?.isCaller ? "cancel" : "decline";
         const response = await apiFetch(`/api/call/${action}/${bookingId}`, {
           method: "POST",
-          body: JSON.stringify({ sessionGeneration: generation || callStatus?.sessionGeneration }),
+          body: JSON.stringify({ sessionGeneration }),
         });
         if (!response.ok) throw new Error("Could not cancel the call. Please try again.");
       } else if (currentStatus === "accepted") {
         const response = await apiFetch(`/api/call/end/${bookingId}`, {
           method: "POST",
-          body: JSON.stringify({ sessionGeneration: generation || callStatus?.sessionGeneration }),
+          body: JSON.stringify({ sessionGeneration }),
         });
         if (!response.ok) throw new Error("Could not end the call. Please try again.");
+      }
+      if (sessionGeneration) {
+        await endNativeCallForSession(bookingId, sessionGeneration);
       }
       router.back();
     } catch (error) {
@@ -189,8 +284,55 @@ export default function CallScreen() {
     }
   };
 
-  if (isLoading || statusLoading ||
-      (currentStatus === "accepted" && isStreamCall && streamCredentialsLoading) ||
+  // The system may end a call from the other device, or the accepted session
+  // may expire while this screen is open. Never clear another generation's call.
+  useEffect(() => {
+    if (currentStatus === "accepted" && currentSession && callStatus?.sessionGeneration) {
+      acceptedGenerationRef.current = callStatus.sessionGeneration;
+      return;
+    }
+    if (currentStatus && currentStatus !== "ringing" && acceptedGenerationRef.current) {
+      const acceptedGeneration = acceptedGenerationRef.current;
+      acceptedGenerationRef.current = null;
+      void endNativeCallForSession(bookingId, acceptedGeneration);
+    }
+  }, [bookingId, callStatus?.sessionGeneration, currentSession, currentStatus]);
+
+  // A normal Back would unmount the Stream media while leaving the server call
+  // accepted. Keep the Activity and media mounted in Android picture-in-picture.
+  useEffect(() => {
+    if (Platform.OS !== "android") return;
+    const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
+      if (isInPiPMode) return true;
+      if (currentStatus !== "accepted" && currentStatus !== "ringing") return false;
+      if (currentStatus === "accepted" && isStreamCall && mediaJoined) {
+        if (pipEnteringRef.current) return true;
+        pipEnteringRef.current = true;
+        void Promise.resolve(enterPiPAndroid(9, 16))
+          .then((entered) => {
+            if (entered === false) {
+              Alert.alert("Picture-in-picture unavailable", "Stay on this screen or end the call using the red button.");
+            }
+          })
+          .catch(() => Alert.alert("Picture-in-picture unavailable", "Stay on this screen or end the call using the red button."))
+          .finally(() => { pipEnteringRef.current = false; });
+      } else {
+        Alert.alert(
+          currentStatus === "ringing" ? "Cancel this call?" : "Call still connecting",
+          "Leaving this screen would disconnect the call without ending it.",
+          [
+            { text: "Stay", style: "cancel" },
+            { text: "End call", style: "destructive", onPress: () => { void handleEndCall(); } },
+          ],
+        );
+      }
+      return true;
+    });
+    return () => subscription.remove();
+  }, [currentStatus, isInPiPMode, isStreamCall, mediaJoined, handleEndCall]);
+
+  if (statusLoading ||
+      (currentStatus === "accepted" && isStreamCall && streamCredentialsLoading && !streamCredentialsTimedOut) ||
       (currentStatus === "accepted" && !isStreamCall && !!callStatus?.videoRoomUrl && !roomUrl && !tokenError && !statusError) ||
       (currentStatus === "accepted" && Platform.OS === "android" && !permissionsReady && !permissionDenied)) {
     return (
@@ -212,14 +354,39 @@ export default function CallScreen() {
           {callMode === "voice" ? "Microphone access is required" : "Camera and microphone access are required"}
         </Text>
         <Text style={[styles.permissionText, { color: colors.mutedForeground }]}>
-          Allow access in device settings to continue this consultation in the app.
+          {callMode === "voice"
+            ? "Allow microphone access in Android to continue this call."
+            : "Allow camera and microphone access in Android to continue this call."}
         </Text>
-        <Pressable
-          onPress={() => Linking.openSettings()}
-          style={[styles.settingsButton, { backgroundColor: colors.primary }]}
-        >
-          <Text style={styles.settingsButtonText}>Open Settings</Text>
-        </Pressable>
+        {permissionNeedsSettings ? (
+          <>
+            <Pressable
+              onPress={() => Linking.openSettings()}
+              style={[styles.settingsButton, { backgroundColor: colors.primary }]}
+            >
+              <Text style={styles.settingsButtonText}>Open Settings</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => void requestMediaPermissions()}
+              disabled={permissionRequesting}
+              style={styles.permissionRetry}
+            >
+              <Text style={[styles.retryText, { color: colors.primary }]}>
+                I enabled access — check again
+              </Text>
+            </Pressable>
+          </>
+        ) : (
+          <Pressable
+            onPress={() => void requestMediaPermissions()}
+            disabled={permissionRequesting}
+            style={[styles.settingsButton, { backgroundColor: colors.primary }]}
+          >
+            <Text style={styles.settingsButtonText}>
+              {permissionRequesting ? "Requesting access…" : "Allow access"}
+            </Text>
+          </Pressable>
+        )}
         <Pressable onPress={handleEndCall} disabled={endPending} style={styles.endBtn}>
           <Text style={[styles.endBtnText, { color: colors.destructive }]}>Leave</Text>
         </Pressable>
@@ -233,11 +400,29 @@ export default function CallScreen() {
       <View style={styles.roomContainer}>
         {streamCredentials ? (
           <StreamCallMedia
-            key={`${streamCredentials.callId}:${streamCredentials.sessionGeneration}`}
+            key={`${streamCredentials.callId}:${streamCredentials.sessionGeneration}:${streamAttempt}`}
             credentials={streamCredentials}
             voiceCall={callMode === "voice"}
-            onError={setStreamError}
+            compact={isInPiPMode}
+            onJoined={onMediaJoined}
+            onDisconnected={onMediaDisconnected}
           />
+        ) : streamCredentialsTimedOut ? (
+          <View style={styles.roomError}>
+            <Text style={styles.roomErrorText} accessibilityRole="alert">
+              Secure call setup is taking too long. Check your connection and try again.
+            </Text>
+            <Pressable
+              onPress={() => {
+                setStreamCredentialsTimedOut(false);
+                setStreamCredentialRetry((attempt) => attempt + 1);
+                void refetchStreamCredentials();
+              }}
+              testID="retry-stream-credentials"
+            >
+              <Text style={[styles.retryText, { color: colors.primary }]}>Try again</Text>
+            </Pressable>
+          </View>
         ) : (
           <View style={styles.roomError}>
             <Text style={styles.roomErrorText} accessibilityRole="alert">
@@ -250,7 +435,7 @@ export default function CallScreen() {
             )}
           </View>
         )}
-        <View style={[styles.roomHeader, { top: insets.top + 8 }]}>
+        {!isInPiPMode && <View style={[styles.roomHeader, { top: insets.top + 8 }]}>
           <Pressable
             onPress={handleEndCall}
             disabled={endPending}
@@ -261,12 +446,7 @@ export default function CallScreen() {
             <Ionicons name="call" size={22} color={colors.callForeground} style={{ transform: [{ rotate: "135deg" }] }} />
           </Pressable>
           {endError && <Text style={[styles.roomErrorText, { color: colors.callForeground }]} accessibilityRole="alert">{endError}</Text>}
-        </View>
-        {streamError && (
-          <View style={styles.roomError}>
-            <Text style={styles.roomErrorText} accessibilityRole="alert">{streamError}</Text>
-          </View>
-        )}
+        </View>}
       </View>
     );
   }
@@ -351,7 +531,9 @@ export default function CallScreen() {
           <Text style={styles.patientName}>{booking.patientName}</Text>
         )}
         <Text style={[styles.hint, { color: colors.callForeground }]}>
-          {currentStatus === "ringing"
+          {currentStatus === "ringing" && callStatus?.isCaller && permissionDenied
+            ? "Allow microphone access before the other participant answers so you can join quickly."
+            : currentStatus === "ringing"
             ? callStatus?.isCaller ? `Calling… Waiting for the other participant to answer` : "Incoming call…"
             : statusError || tokenError ? "Unable to connect to the secure call. Please try again."
             : currentStatus === "declined" ? "The call was declined."
@@ -435,6 +617,12 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     fontFamily: "Inter_400Regular",
     textAlign: "center",
+  },
+  permissionRetry: {
+    minHeight: 44,
+    paddingHorizontal: 12,
+    alignItems: "center",
+    justifyContent: "center",
   },
   settingsButton: {
     minHeight: 50,

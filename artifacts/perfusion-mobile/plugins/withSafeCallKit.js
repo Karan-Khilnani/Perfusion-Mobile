@@ -26,6 +26,112 @@ module.exports = (config, options) =>
         "android/src/main/java/expo/modules/callkittelecom",
       );
 
+      const callManagerFile = path.join(javaDir, "managers/CallManager.kt");
+      replaceExactlyOnce(
+        callManagerFile,
+        `    /** Reports externally-ended call with explicit reason (\`onCallReportedEnded\` path). */`,
+        `    /**
+     * Ends only the native call matching the server-owned booking and generation.
+     *
+     * The generated Telecom UUID is deliberately resolved from the stored call session; a delayed
+     * terminal push can never end a newer call for the same booking.
+     */
+    fun reportCallEndedIfMatches(bookingId: String, sessionGeneration: String): Boolean {
+        if (bookingId.isBlank() || sessionGeneration.isBlank()) return false
+
+        val matchingSession = CallStore.allSessions().firstOrNull { session ->
+            val metadata = session.incomingCallEvent?.metadata ?: return@firstOrNull false
+            metadata["bookingId"] == bookingId &&
+                metadata["sessionGeneration"] == sessionGeneration
+        } ?: return false
+
+        reportCallEnded(matchingSession.id, CallEndedReason.REMOTE_ENDED)
+        return true
+    }
+
+    /** Reports externally-ended call with explicit reason (\`onCallReportedEnded\` path). */`,
+      );
+
+      const messagingServiceFile = path.join(
+        javaDir,
+        "services/ExpoCallKitTelecomMessagingService.kt",
+      );
+      replaceExactlyOnce(
+        messagingServiceFile,
+        `        private val MESSAGE_TYPE_INCOMING_CALL = setOf("incomingCall", "incoming_call")
+        private val KEYS_INCOMING_CALL = listOf("incomingCall", "incoming_call")
+        private const val DEDUP_WINDOW_MS = 120_000L`,
+        `        private val MESSAGE_TYPE_INCOMING_CALL = setOf("incomingCall", "incoming_call")
+        private val KEYS_INCOMING_CALL = listOf("incomingCall", "incoming_call")
+        private val MESSAGE_TYPE_CALL_ENDED = setOf("callEnded", "call_ended")
+        private val KEYS_CALL_ENDED = listOf("callEnded", "call_ended")
+        private const val DEDUP_WINDOW_MS = 120_000L`,
+      );
+      replaceExactlyOnce(
+        messagingServiceFile,
+        `        val data = message.data
+
+        // Try to parse as an incoming call payload.`,
+        `        val data = message.data
+
+        // Terminal call-control messages are consumed here rather than delegated to Expo
+        // Notifications, so they can clear Telecom even while the React Native process is stopped.
+        if (data[KEY_MESSAGE_TYPE] in MESSAGE_TYPE_CALL_ENDED) {
+            val terminalCall = parseCallEndedEvent(data)
+            if (terminalCall == null) {
+                Log.w(TAG, "Dropping malformed native call-ended push")
+                return
+            }
+            Handler(Looper.getMainLooper()).post {
+                processCallEnded(terminalCall.first, terminalCall.second)
+            }
+            return
+        }
+
+        // Try to parse as an incoming call payload.`,
+      );
+      replaceExactlyOnce(
+        messagingServiceFile,
+        `    private fun parseIncomingCallEvent(data: Map<String, String>): Map<String, Any?>? {`,
+        `    private fun processCallEnded(bookingId: String, sessionGeneration: String) {
+        try {
+            CallManager.shared.initialize(applicationContext)
+            if (CallManager.shared.reportCallEndedIfMatches(bookingId, sessionGeneration)) {
+                Log.i(TAG, "Ended the matching native call session")
+            } else {
+                Log.d(TAG, "Ignoring stale or unmatched native call-ended push")
+            }
+        } catch (error: Throwable) {
+            Log.e(TAG, "Failed to process native call-ended push", error)
+        }
+    }
+
+    private fun parseCallEndedEvent(data: Map<String, String>): Pair<String, String>? {
+        if (data[KEY_MESSAGE_TYPE] !in MESSAGE_TYPE_CALL_ENDED) return null
+        val nestedPayload = KEYS_CALL_ENDED.firstNotNullOfOrNull { data[it] } ?: return null
+
+        return try {
+            val payload = JSONObject(nestedPayload)
+            val bookingId = payload.opt("bookingId") as? String ?: return null
+            val sessionGeneration = payload.opt("sessionGeneration") as? String ?: return null
+            if (
+                bookingId.isBlank() ||
+                sessionGeneration.isBlank() ||
+                bookingId.length > 128 ||
+                sessionGeneration.length > 128
+            ) {
+                return null
+            }
+            bookingId to sessionGeneration
+        } catch (error: Throwable) {
+            Log.w(TAG, "Failed to parse native call-ended JSON payload", error)
+            null
+        }
+    }
+
+    private fun parseIncomingCallEvent(data: Map<String, String>): Map<String, Any?>? {`,
+      );
+
       replaceExactlyOnce(
         path.join(javaDir, "managers/VoIPPushManager.kt"),
         `        FirebaseMessaging.getInstance()

@@ -55,6 +55,7 @@
         }
       ],
       "@stream-io/video-react-native-sdk",
+      "./plugins/withCallPiP",
       [
         "@config-plugins/react-native-webrtc",
         {
@@ -72,7 +73,7 @@
             "./assets/audio/perfusion_ring.wav"
           ],
           "defaultRingtoneIos": "default",
-          "defaultRingtoneAndroid": "perfusion_ring.wav",
+          "defaultRingtoneAndroid": "default",
           "microphonePermission": "Perfusion uses the microphone for secure voice and video consultations.",
           "cameraPermission": "Perfusion uses the camera for secure video consultations."
         }

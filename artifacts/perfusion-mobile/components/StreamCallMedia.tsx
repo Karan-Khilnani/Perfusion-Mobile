@@ -7,6 +7,7 @@ import {
   StreamVideo,
   StreamVideoClient,
   useCall,
+  useAutoEnterPiPEffect,
   useCallStateHooks,
 } from "@stream-io/video-react-native-sdk";
 
@@ -23,54 +24,107 @@ interface StreamCredentials {
 interface StreamCallMediaProps {
   credentials: StreamCredentials;
   voiceCall: boolean;
-  onError: (message: string) => void;
+  compact?: boolean;
+  onJoined?: () => void;
+  onDisconnected?: () => void;
 }
 
-export function StreamCallMedia({ credentials, voiceCall, onError }: StreamCallMediaProps) {
+const STREAM_CONNECT_TIMEOUT_MS = 25000;
+
+export function StreamCallMedia({ credentials, voiceCall, compact = false, onJoined, onDisconnected }: StreamCallMediaProps) {
   const [client, setClient] = useState<StreamVideoClient | null>(null);
   const [call, setCall] = useState<ReturnType<StreamVideoClient["call"]> | null>(null);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
+  const [retryAttempt, setRetryAttempt] = useState(0);
 
   useEffect(() => {
     let disposed = false;
+    let timedOut = false;
+    let timeout: ReturnType<typeof setTimeout> | undefined;
     let activeClient: StreamVideoClient | null = null;
     let activeCall: ReturnType<StreamVideoClient["call"]> | null = null;
 
     const connect = async () => {
-      try {
-        activeClient = new StreamVideoClient({
-          apiKey: credentials.apiKey,
-          user: { id: credentials.userId, name: credentials.userName },
-          token: credentials.token,
-        });
-        activeCall = activeClient.call(credentials.callType, credentials.callId);
-        if (voiceCall) await activeCall.camera.disable();
-        await activeCall.join({ create: false });
-        if (voiceCall) await activeCall.camera.disable();
-        else await activeCall.camera.enable();
-        await activeCall.microphone.enable();
-        if (disposed) {
-          await activeCall.leave();
-          await activeClient.disconnectUser();
-          return;
-        }
-        setClient(activeClient);
-        setCall(activeCall);
-      } catch (error) {
-        if (!disposed) {
-          onError(error instanceof Error ? error.message : "Could not join the secure Stream call.");
-        }
-        if (activeCall) await activeCall.leave().catch(() => undefined);
-        if (activeClient) await activeClient.disconnectUser().catch(() => undefined);
+      activeClient = new StreamVideoClient({
+        apiKey: credentials.apiKey,
+        user: { id: credentials.userId, name: credentials.userName },
+        token: credentials.token,
+      });
+      activeCall = activeClient.call(credentials.callType, credentials.callId);
+      await activeCall.join({ create: false });
+      if (disposed || timedOut) return;
+      if (voiceCall) {
+        await activeCall.camera.disable();
+      }
+      await activeCall.microphone.enable();
+      if (disposed || timedOut) return;
+      if (!voiceCall) {
+        await activeCall.camera.enable();
       }
     };
 
-    void connect();
+    setClient(null);
+    setCall(null);
+    setConnectionError(null);
+
+    const timeoutPromise = new Promise<never>((_resolve, reject) => {
+      timeout = setTimeout(() => {
+        timedOut = true;
+        reject(new Error("The call is taking too long to connect. Check your connection and try again."));
+      }, STREAM_CONNECT_TIMEOUT_MS);
+    });
+
+    void Promise.race([connect(), timeoutPromise])
+      .then(() => {
+        if (disposed || timedOut || !activeClient || !activeCall) return;
+        setClient(activeClient);
+        setCall(activeCall);
+        onJoined?.();
+      })
+      .catch(async (error: unknown) => {
+        if (!disposed) {
+          onDisconnected?.();
+          setConnectionError(
+            error instanceof Error
+              ? error.message
+              : "Could not join the secure Stream call. Check your connection and try again.",
+          );
+        }
+        if (activeCall) await activeCall.leave().catch(() => undefined);
+        if (activeClient) await activeClient.disconnectUser().catch(() => undefined);
+      })
+      .finally(() => {
+        if (timeout) clearTimeout(timeout);
+      });
+
     return () => {
       disposed = true;
+      onDisconnected?.();
+      if (timeout) clearTimeout(timeout);
       if (activeCall) void activeCall.leave().catch(() => undefined);
       if (activeClient) void activeClient.disconnectUser().catch(() => undefined);
     };
-  }, [credentials.apiKey, credentials.callId, credentials.callType, credentials.sessionGeneration, credentials.token, credentials.userId, credentials.userName, onError, voiceCall]);
+  }, [credentials.apiKey, credentials.callId, credentials.callType, credentials.sessionGeneration, credentials.token, credentials.userId, credentials.userName, retryAttempt, voiceCall, onJoined, onDisconnected]);
+
+  if (connectionError) {
+    return (
+      <View style={styles.connecting}>
+        <Text style={styles.connectionError} accessibilityRole="alert">
+          {connectionError}
+        </Text>
+        <Pressable
+          style={styles.retryButton}
+          onPress={() => {
+            setConnectionError(null);
+            setRetryAttempt((attempt) => attempt + 1);
+          }}
+          testID="retry-stream-connection"
+        >
+          <Text style={styles.retryButtonText}>Try again</Text>
+        </Pressable>
+      </View>
+    );
+  }
 
   if (!client || !call) {
     return (
@@ -84,13 +138,14 @@ export function StreamCallMedia({ credentials, voiceCall, onError }: StreamCallM
   return (
     <StreamVideo client={client}>
       <StreamCall call={call}>
-        <ActiveStreamCall voiceCall={voiceCall} />
+        <ActiveStreamCall voiceCall={voiceCall} compact={compact} />
       </StreamCall>
     </StreamVideo>
   );
 }
 
-function ActiveStreamCall({ voiceCall }: { voiceCall: boolean }) {
+function ActiveStreamCall({ voiceCall, compact }: { voiceCall: boolean; compact: boolean }) {
+  useAutoEnterPiPEffect(false);
   const call = useCall();
   const { useParticipants } = useCallStateHooks();
   const participants = useParticipants();
@@ -119,32 +174,32 @@ function ActiveStreamCall({ voiceCall }: { voiceCall: boolean }) {
   };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.providerLabel}>
+    <View style={[styles.container, compact && { padding: 0 }]}>
+      {!compact && <View style={styles.providerLabel}>
         <View style={styles.liveDot} />
         <Text style={styles.providerText}>STREAM · SECURE CALL</Text>
-      </View>
+      </View>}
       <View style={styles.participants}>
         {participants.length === 0 ? (
           <View style={styles.waiting}>
             <Ionicons name="person-circle-outline" size={76} color="#FFFFFF" />
-            <Text style={styles.waitingText}>Waiting for the other participant…</Text>
+            {!compact && <Text style={styles.waitingText}>Waiting for the other participant…</Text>}
           </View>
         ) : (
-          participants.map((participant) => (
+          (compact ? participants.slice(-1) : participants).map((participant) => (
             <View key={participant.sessionId} style={styles.participantTile}>
               <ParticipantView participant={participant} />
-              <Text style={styles.participantName}>
+              {!compact && <Text style={styles.participantName}>
                 {participant.name || "Participant"}
-              </Text>
+              </Text>}
             </View>
           ))
         )}
       </View>
-      {!!controlError && (
+      {!compact && !!controlError && (
         <Text style={styles.controlError} accessibilityRole="alert">{controlError}</Text>
       )}
-      <View style={styles.controls}>
+      {!compact && <View style={styles.controls}>
         <Pressable
           style={[styles.control, muted && styles.controlActive]}
           onPress={() => void toggleMicrophone()}
@@ -163,7 +218,7 @@ function ActiveStreamCall({ voiceCall }: { voiceCall: boolean }) {
           <Ionicons name={cameraOn ? "videocam" : "videocam-off"} size={23} color="#FFFFFF" />
           <Text style={styles.controlLabel}>{cameraOn ? "Video on" : "Video off"}</Text>
         </Pressable>
-      </View>
+      </View>}
     </View>
   );
 }
@@ -188,6 +243,27 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 16,
     fontFamily: "Inter_500Medium",
+  },
+  connectionError: {
+    color: "#FFFFFF",
+    fontSize: 15,
+    lineHeight: 22,
+    fontFamily: "Inter_400Regular",
+    textAlign: "center",
+    paddingHorizontal: 28,
+  },
+  retryButton: {
+    minHeight: 48,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#3157C8",
+  },
+  retryButtonText: {
+    color: "#FFFFFF",
+    fontSize: 15,
+    fontFamily: "Inter_600SemiBold",
   },
   providerLabel: {
     position: "absolute",
