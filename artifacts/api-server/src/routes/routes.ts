@@ -33,8 +33,12 @@ function callMediaProvider(videoRoomUrl?: string | null): "daily" | "stream" {
   return videoRoomUrl?.startsWith("stream://default/") ? "stream" : "daily";
 }
 
-function streamPilotBookingIds(): Set<string> {
-  return new Set((process.env.STREAM_PILOT_BOOKING_IDS || "").split(",").map(id => id.trim()).filter(Boolean));
+async function endStreamMediaSession(session: { videoRoomUrl: string; sessionGeneration: string }): Promise<void> {
+  if (callMediaProvider(session.videoRoomUrl) !== "stream") return;
+  const apiKey = process.env.STREAM_VIDEO_API_KEY;
+  const apiSecret = process.env.STREAM_VIDEO_API_SECRET;
+  if (!apiKey || !apiSecret) throw new Error("Stream Video is not configured");
+  await new StreamClient(apiKey, apiSecret).video.call("default", session.sessionGeneration).end();
 }
 
 function sanitizeUserForClient<T extends Record<string, any> | undefined>(user: T) {
@@ -5890,6 +5894,7 @@ export async function registerRoutes(
         callerRole: session.callerRole,
         callType: session.callType,
         videoRoomUrl: session.videoRoomUrl,
+        mediaProvider: callMediaProvider(session.videoRoomUrl),
         serviceName: session.serviceName,
         subtitle: session.subtitle,
       });
@@ -5953,6 +5958,7 @@ export async function registerRoutes(
             callerRole: s.callerRole,
             callType: s.callType,
             videoRoomUrl: s.videoRoomUrl,
+            mediaProvider: callMediaProvider(s.videoRoomUrl),
             serviceName: s.serviceName,
             subtitle: s.subtitle,
           })}\n\n`);
@@ -6008,7 +6014,11 @@ export async function registerRoutes(
       // authoritative cross-instance check for concurrent ring requests.
       const existingSession = await storage.getCallSession(bookingId);
       if (existingSession && (existingSession.status === "ringing" || existingSession.status === "accepted")) {
-        return res.status(409).json({ error: "A call session is already active", status: existingSession.status });
+        return res.status(409).json({
+          error: "A call session is already active",
+          status: existingSession.status,
+          mediaProvider: callMediaProvider(existingSession.videoRoomUrl),
+        });
       }
 
       // Get caller display name
@@ -6037,21 +6047,6 @@ export async function registerRoutes(
         ? callerUser?.hospitalName?.trim() || callerName
         : callerName;
 
-      let videoRoomUrl = booking.videoRoomId || "";
-      if (!videoRoomUrl) return res.status(400).json({ error: "No video room for this booking" });
-
-      // Validate the room still exists (Daily.co rooms expire). Recreate if needed.
-      const roomValid = await isDailyRoomValid(videoRoomUrl);
-      if (!roomValid) {
-        console.log(`[Ring] Daily room expired or missing for booking ${bookingId} — recreating`);
-        const roomName = `perfusion-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-        const newRoom = await createDailyRoom(roomName);
-        if (!newRoom) return res.status(500).json({ error: "Could not create video room" });
-        videoRoomUrl = newRoom.url;
-        await storage.updateBooking(bookingId, { videoRoomId: videoRoomUrl });
-        console.log(`[Ring] New room created: ${videoRoomUrl}`);
-      }
-
       // Find recipient userId
       const recipientUserId = isSeeker ? provider?.userId : booking.userId;
       if (!recipientUserId) return res.status(400).json({ error: "Cannot find recipient" });
@@ -6059,6 +6054,43 @@ export async function registerRoutes(
       // Persist call session to DB — shared across all autoscale instances
       const SESSION_TTL_MS = 300_000; // 5 minutes
       const sessionGeneration = randomUUID();
+      const mediaProvider: "daily" | "stream" = process.env.CALL_MEDIA_PROVIDER === "daily" ? "daily" : "stream";
+      let videoRoomUrl = booking.videoRoomId || "";
+      if (mediaProvider === "stream") {
+        const streamApiKey = process.env.STREAM_VIDEO_API_KEY;
+        const streamApiSecret = process.env.STREAM_VIDEO_API_SECRET;
+        if (!streamApiKey || !streamApiSecret) {
+          req.log.error("Stream Video credentials are not configured");
+          return res.status(503).json({ error: "Stream Video is not configured" });
+        }
+        try {
+          const streamClient = new StreamClient(streamApiKey, streamApiSecret);
+          await streamClient.video.call("default", sessionGeneration).getOrCreate({
+            data: {
+              created_by_id: callerId,
+              members: [{ user_id: callerId }, { user_id: recipientUserId }],
+            },
+          });
+          videoRoomUrl = `stream://default/${sessionGeneration}`;
+        } catch (error) {
+          req.log.error({ err: error, bookingId, sessionGeneration }, "Failed to create Stream Video call");
+          return res.status(502).json({ error: "Could not create Stream Video call" });
+        }
+      } else {
+        if (!videoRoomUrl) return res.status(400).json({ error: "No video room for this booking" });
+
+        // Validate the room still exists (Daily.co rooms expire). Recreate if needed.
+        const roomValid = await isDailyRoomValid(videoRoomUrl);
+        if (!roomValid) {
+          req.log.info({ bookingId }, "Daily room expired or missing; recreating");
+          const roomName = `perfusion-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+          const newRoom = await createDailyRoom(roomName);
+          if (!newRoom) return res.status(500).json({ error: "Could not create video room" });
+          videoRoomUrl = newRoom.url;
+          await storage.updateBooking(bookingId, { videoRoomId: videoRoomUrl });
+          req.log.info({ bookingId, videoRoomUrl }, "Created replacement Daily room");
+        }
+      }
       const createdSession = await storage.createCallSession({
         bookingId,
         sessionGeneration,
@@ -6083,9 +6115,11 @@ export async function registerRoutes(
         try {
           const expired = await storage.expireRingingCallSession(bookingId, sessionGeneration);
           if (expired) {
+            endStreamMediaSession(expired).catch((error) =>
+              req.log.warn({ err: error, bookingId }, "Could not close timed-out Stream call"));
             if (expired.twilioCallSid) cancelVoiceCall(expired.twilioCallSid).catch(() => {});
-            broadcastCallEvent(callerId, { type: "call_timeout", bookingId, sessionGeneration });
-            broadcastCallEvent(recipientUserId, { type: "call_timeout", bookingId, sessionGeneration });
+            broadcastCallEvent(callerId, { type: "call_timeout", bookingId, sessionGeneration, mediaProvider: callMediaProvider(expired.videoRoomUrl) });
+            broadcastCallEvent(recipientUserId, { type: "call_timeout", bookingId, sessionGeneration, mediaProvider: callMediaProvider(expired.videoRoomUrl) });
             setTimeout(() => storage.deleteCallSession(bookingId, sessionGeneration, ["timeout"]), 5000);
           }
         } catch {}
@@ -6099,6 +6133,7 @@ export async function registerRoutes(
         callerName: displayCallerName,
         callerRole,
         videoRoomUrl,
+        mediaProvider,
         serviceName: booking.serviceName,
         subtitle,
         callType,
@@ -6106,9 +6141,9 @@ export async function registerRoutes(
 
       // Send push notification to recipient (even if browser closed)
       const subscriptions = await storage.getPushSubscriptionsByUserId(recipientUserId);
-      console.log(`[Ring] Recipient ${recipientUserId} has ${subscriptions.length} push subscription(s)`);
+      req.log.info({ recipientUserId, subscriptions: subscriptions.length }, "Loaded recipient push subscriptions");
       if (subscriptions.length === 0) {
-        console.log(`[Ring] No push subscriptions — recipient will only be alerted via SSE + Twilio voice`);
+        req.log.info({ recipientUserId }, "Recipient has no push subscriptions");
       }
       const recipientRole: "seeker" | "provider" = callerRole === "seeker" ? "provider" : "seeker";
       const payload: PushPayload = {
@@ -6118,6 +6153,7 @@ export async function registerRoutes(
         callerRole,
         recipientRole,
         videoRoomUrl,
+        mediaProvider,
         subtitle,
         title: callerRole === "seeker" ? displayCallerName : "Perfusion",
         body: subtitle,
@@ -6139,13 +6175,14 @@ export async function registerRoutes(
         callerRole,
         callType,
         videoRoomUrl,
+        mediaProvider,
         serviceName: booking.serviceName || "",
         subtitle,
       }).catch((error) => req.log.error({ err: error }, "Mobile incoming-call push failed"));
 
-      res.json({ success: true, session: { bookingId, sessionGeneration, status: "ringing", callType } });
+      res.json({ success: true, session: { bookingId, sessionGeneration, status: "ringing", callType, videoRoomUrl, mediaProvider } });
     } catch (error) {
-      console.error("[Call] Ring error:", error);
+      req.log.error({ err: error }, "Call ring error");
       res.status(500).json({ error: "Failed to initiate ring" });
     }
   });
@@ -6210,15 +6247,24 @@ export async function registerRoutes(
         sessionGeneration: acceptedSession.sessionGeneration,
         callType: session.callType,
         videoRoomUrl: session.videoRoomUrl,
+        mediaProvider: callMediaProvider(session.videoRoomUrl),
       });
 
       // Keep the accepted session alive for 2 hours so the ring-guard can detect
       // it on page refresh — the 10 s window was too short and caused ghost re-rings.
-      setTimeout(() => storage.deleteCallSession(bookingId, session.sessionGeneration, ["accepted"], true), 2 * 60 * 60 * 1000 + 1000);
+      setTimeout(async () => {
+        try {
+          await endStreamMediaSession(acceptedSession);
+        } catch (error) {
+          req.log.warn({ err: error, bookingId }, "Could not close expired Stream call");
+        }
+        await storage.deleteCallSession(bookingId, session.sessionGeneration, ["accepted"], true).catch(() => {});
+      }, 2 * 60 * 60 * 1000 + 1000);
 
       res.json({
         success: true,
         videoRoomUrl: acceptedSession.videoRoomUrl,
+        mediaProvider: callMediaProvider(acceptedSession.videoRoomUrl),
         callType: acceptedSession.callType,
         sessionGeneration: acceptedSession.sessionGeneration,
       });
@@ -6251,6 +6297,8 @@ export async function registerRoutes(
 
       const declinedSession = await storage.transitionCallSession(bookingId, session.sessionGeneration, ["ringing"], { status: "declined" });
       if (!declinedSession) return res.status(409).json({ error: "Call is no longer ringing or has changed" });
+      endStreamMediaSession(declinedSession).catch((error) =>
+        req.log.warn({ err: error, bookingId }, "Could not close declined Stream call"));
 
       // Cancel the Twilio voice call if it's still ringing
       if (session.twilioCallSid) {
@@ -6261,11 +6309,12 @@ export async function registerRoutes(
         type: "call_declined",
         bookingId,
         sessionGeneration: session.sessionGeneration,
+        mediaProvider: callMediaProvider(session.videoRoomUrl),
       });
 
       setTimeout(() => storage.deleteCallSession(bookingId, session.sessionGeneration, ["declined"]), 5000);
 
-      res.json({ success: true });
+      res.json({ success: true, mediaProvider: callMediaProvider(session.videoRoomUrl) });
     } catch (error) {
       res.status(500).json({ error: "Failed to decline call" });
     }
@@ -6286,6 +6335,8 @@ export async function registerRoutes(
       {
         const cancelledSession = await storage.transitionCallSession(bookingId, session.sessionGeneration, ["ringing"], { status: "declined" });
         if (!cancelledSession) return res.status(409).json({ error: "Call is no longer ringing or has changed" });
+        endStreamMediaSession(cancelledSession).catch((error) =>
+          req.log.warn({ err: error, bookingId }, "Could not close cancelled Stream call"));
         // Cancel the Twilio voice call if it's still ringing
         if (session.twilioCallSid) cancelVoiceCall(session.twilioCallSid).catch(() => {});
         // Find recipient to notify
@@ -6294,12 +6345,12 @@ export async function registerRoutes(
           const provider = await storage.getProviderById(booking.providerId!);
           const recipientUserId = session.callerRole === "seeker" ? provider?.userId : booking.userId;
           if (recipientUserId) {
-            broadcastCallEvent(recipientUserId, { type: "call_cancelled", bookingId, sessionGeneration: session.sessionGeneration });
+            broadcastCallEvent(recipientUserId, { type: "call_cancelled", bookingId, sessionGeneration: session.sessionGeneration, mediaProvider: callMediaProvider(session.videoRoomUrl) });
           }
         }
         setTimeout(() => storage.deleteCallSession(bookingId, session.sessionGeneration, ["declined"]), 5000);
       }
-      res.json({ success: true });
+      res.json({ success: true, mediaProvider: callMediaProvider(session.videoRoomUrl) });
     } catch (error) {
       res.status(500).json({ error: "Failed to cancel call" });
     }
@@ -6329,12 +6380,20 @@ export async function registerRoutes(
       }
 
       if (session.status === "ended") {
-        return res.json({ success: true, status: "ended" });
+        return res.json({ success: true, status: "ended", mediaProvider: callMediaProvider(session.videoRoomUrl) });
       }
       if (session.status !== "accepted" && session.status !== "ringing") {
         return res.status(409).json({ error: "Call is no longer active", status: session.status });
       }
 
+      // Closing the application session alone does not revoke an already issued
+      // Stream token. End the media call before reporting a successful hangup.
+      try {
+        await endStreamMediaSession(session);
+      } catch (error) {
+        req.log.error({ err: error, bookingId }, "Failed to end Stream media call");
+        return res.status(502).json({ error: "Could not end the Stream call. Please retry." });
+      }
       const endedSession = await storage.transitionCallSession(bookingId, session.sessionGeneration, ["accepted", "ringing"], { status: "ended" });
       if (!endedSession) return res.status(409).json({ error: "Call is no longer active or has changed" });
       if (session.status === "ringing" && session.twilioCallSid) {
@@ -6344,16 +6403,96 @@ export async function registerRoutes(
       const otherParticipantId = session.callerId === userId
         ? session.recipientUserId
         : session.callerId;
-      broadcastCallEvent(otherParticipantId, { type: "call_ended", bookingId, sessionGeneration: session.sessionGeneration });
+      broadcastCallEvent(otherParticipantId, { type: "call_ended", bookingId, sessionGeneration: session.sessionGeneration, mediaProvider: callMediaProvider(session.videoRoomUrl) });
 
       // Keep the ended status queryable briefly so both clients can observe it.
       setTimeout(() => {
         storage.deleteCallSession(bookingId, session.sessionGeneration, ["ended"]).catch(() => {});
       }, 5000);
 
-      res.json({ success: true, status: "ended" });
+      res.json({ success: true, status: "ended", mediaProvider: callMediaProvider(session.videoRoomUrl) });
     } catch (error) {
       res.status(500).json({ error: "Failed to end call" });
+    }
+  });
+
+  // Mint short-lived Stream credentials only for a caller/recipient on an accepted Stream session.
+  app.get("/api/call/stream-credentials/:bookingId", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) return res.status(401).json({ error: "Not authenticated" });
+      const { bookingId } = req.params;
+      const booking = await storage.getBookingById(bookingId);
+      if (!booking) return res.status(404).json({ error: "Booking not found" });
+
+      const provider = booking.providerId ? await storage.getProviderById(booking.providerId) : null;
+      const isSeeker = booking.userId === userId;
+      const isProviderUser = provider?.userId === userId;
+      if (!isSeeker && !isProviderUser) return res.status(403).json({ error: "Not part of this booking" });
+
+      const session = await storage.getCallSession(bookingId);
+      if (!session || session.status !== "accepted") {
+        return res.status(409).json({ error: "The call must be accepted before joining Stream Video" });
+      }
+      if (callMediaProvider(session.videoRoomUrl) !== "stream") {
+        return res.status(409).json({ error: "The active call is not using Stream Video" });
+      }
+      if (session.callerId !== userId && session.recipientUserId !== userId) {
+        return res.status(403).json({ error: "Not a participant in this call" });
+      }
+      const bookingParticipantIds = [booking.userId, provider?.userId].filter((id): id is string => Boolean(id));
+      if (
+        !provider?.userId ||
+        session.videoRoomUrl !== `stream://default/${session.sessionGeneration}` ||
+        session.callerId === session.recipientUserId ||
+        !bookingParticipantIds.includes(session.callerId) ||
+        !bookingParticipantIds.includes(session.recipientUserId)
+      ) {
+        return res.status(403).json({ error: "Call participants do not match this booking" });
+      }
+
+      const apiKey = process.env.STREAM_VIDEO_API_KEY;
+      const apiSecret = process.env.STREAM_VIDEO_API_SECRET;
+      if (!apiKey || !apiSecret) {
+        req.log.error({ bookingId }, "Stream Video credentials are not configured");
+        return res.status(503).json({ error: "Stream Video is not configured" });
+      }
+
+      const callId = session.sessionGeneration;
+      const user = req.user as any;
+      const userName = `${user.firstName || ""} ${user.lastName || ""}`.trim() || user.email || "Participant";
+      try {
+        const streamClient = new StreamClient(apiKey, apiSecret);
+        await streamClient.video.call("default", callId).getOrCreate({
+          data: {
+            created_by_id: session.callerId,
+            members: [{ user_id: session.callerId }, { user_id: session.recipientUserId }],
+          },
+        });
+        // A call-scoped token cannot join another booking's room even if its ID is learned.
+        // Cover the two-hour accepted-session lifetime plus a small reconnect margin.
+        const token = streamClient.generateCallToken({
+          user_id: userId,
+          call_cids: [`default:${callId}`],
+          validity_in_seconds: 2 * 60 * 60 + 5 * 60,
+        });
+        return res.json({
+          apiKey,
+          token,
+          callId,
+          callType: "default",
+          userId,
+          userName,
+          sessionGeneration: session.sessionGeneration,
+          mediaProvider: "stream",
+        });
+      } catch (error) {
+        req.log.error({ err: error, bookingId, sessionGeneration: session.sessionGeneration }, "Failed to generate Stream Video credentials");
+        return res.status(502).json({ error: "Failed to generate Stream Video credentials" });
+      }
+    } catch (error) {
+      req.log.error({ err: error }, "Stream Video credentials request failed");
+      return res.status(500).json({ error: "Failed to fetch Stream Video credentials" });
     }
   });
 
@@ -6374,11 +6513,12 @@ export async function registerRoutes(
       if (!isSeeker && !isProviderUser) return res.status(403).json({ error: "Not part of this booking" });
 
       const session = await storage.getCallSession(bookingId);
-      if (!session) return res.json({ status: "none" });
+      if (!session) return res.json({ status: "none", mediaProvider: "daily" });
       res.json({
         status: session.status,
         sessionGeneration: session.sessionGeneration,
         videoRoomUrl: session.videoRoomUrl,
+        mediaProvider: callMediaProvider(session.videoRoomUrl),
         callType: session.callType,
         isCaller: session.callerId === userId,
       });

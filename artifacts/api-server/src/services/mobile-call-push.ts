@@ -13,6 +13,7 @@ interface IncomingCallPush {
   callerRole: "seeker" | "provider";
   callType: string;
   videoRoomUrl: string;
+  mediaProvider: "daily" | "stream";
   serviceName: string;
   subtitle: string;
 }
@@ -89,6 +90,7 @@ export async function notifyMobileIncomingCall(userId: string, call: IncomingCal
         callType: call.callType,
         sessionGeneration: call.sessionGeneration,
         videoRoomUrl: call.videoRoomUrl,
+        mediaProvider: call.mediaProvider,
         serviceName: call.serviceName,
         subtitle: call.subtitle,
         patientName: call.callerRole === "seeker" ? call.subtitle : undefined,

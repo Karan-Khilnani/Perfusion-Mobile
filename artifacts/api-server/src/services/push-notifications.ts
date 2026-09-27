@@ -22,6 +22,7 @@ export interface PushPayload {
   callerRole: "seeker" | "provider";
   recipientRole: "seeker" | "provider";
   videoRoomUrl: string;
+  mediaProvider: "daily" | "stream";
   title: string;
   body: string;
   subtitle?: string;

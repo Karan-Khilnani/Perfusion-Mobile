@@ -291,7 +291,27 @@ export const GetCallStatusParams = zod.object({
 export const GetCallStatusResponse = zod.object({
   "status": zod.string(),
   "videoRoomUrl": zod.string().nullish(),
+  "mediaProvider": zod.enum(['daily', 'stream']),
   "isCaller": zod.boolean().optional()
+})
+
+
+/**
+ * @summary Get short-lived Stream Video credentials for an accepted call
+ */
+export const GetStreamCallCredentialsParams = zod.object({
+  "bookingId": zod.coerce.string()
+})
+
+export const GetStreamCallCredentialsResponse = zod.object({
+  "apiKey": zod.string(),
+  "token": zod.string(),
+  "callId": zod.string(),
+  "callType": zod.enum(['default']),
+  "userId": zod.string(),
+  "userName": zod.string(),
+  "sessionGeneration": zod.string(),
+  "mediaProvider": zod.enum(['stream'])
 })
 
 

@@ -260,6 +260,32 @@ export default function VideoRoomPage() {
     };
   }, [phase, booking?.id]);
 
+  // Keep the connected call tied to the persisted server lifecycle. The ringing
+  // poll intentionally stops after acceptance, so continue checking for a remote
+  // hangup (or a call that was removed) while either provider is connected.
+  useEffect(() => {
+    if (phase !== "connected" || !booking?.id) return;
+    let stopped = false;
+    const checkConnectedStatus = async () => {
+      try {
+        const response = await fetch(`/api/call/status/${booking.id}`, { credentials: "include" });
+        if (!response.ok) return;
+        const data = await response.json();
+        if (stopped) return;
+        if (data.status === "ended") setPhase("ended");
+        else if (data.status === "none") setPhase("ended");
+      } catch {
+        // A temporary status endpoint failure must not tear down a live media call.
+      }
+    };
+    void checkConnectedStatus();
+    const interval = window.setInterval(() => void checkConnectedStatus(), 3000);
+    return () => {
+      stopped = true;
+      window.clearInterval(interval);
+    };
+  }, [phase, booking?.id]);
+
   // Resolve the authoritative provider before preparing either media session.
   // Credentials are only requested once the accepted call's status says Stream.
   useEffect(() => {
@@ -280,6 +306,9 @@ export default function VideoRoomPage() {
         if (statusData.mediaProvider !== "daily" && statusData.mediaProvider !== "stream") {
           throw new Error("The call server returned an unsupported media provider.");
         }
+        if (statusData.sessionGeneration === undefined || statusData.sessionGeneration === null) {
+          throw new Error("The call server did not provide a session generation.");
+        }
         if (stopped) return;
         setCallMediaProvider(statusData.mediaProvider);
 
@@ -291,9 +320,13 @@ export default function VideoRoomPage() {
           }
           if (
             !credentialsData.apiKey || !credentialsData.token || !credentialsData.callId ||
-            !credentialsData.callType || !credentialsData.userId || !credentialsData.userName
+            !credentialsData.callType || !credentialsData.userId || !credentialsData.userName ||
+            credentialsData.sessionGeneration === undefined || credentialsData.sessionGeneration === null
           ) {
             throw new Error("The Stream credentials response is incomplete.");
+          }
+          if (String(credentialsData.sessionGeneration) !== String(statusData.sessionGeneration)) {
+            throw new Error("Stream credentials belong to a different call session. Please retry.");
           }
           if (stopped) return;
           setStreamCredentials(credentialsData as StreamCallCredentials);
@@ -735,6 +768,9 @@ export default function VideoRoomPage() {
             <Video className="h-3 w-3" />
             Live
           </Badge>
+          {callMediaProvider === "stream" && (
+            <Badge variant="secondary" className="text-xs" data-testid="media-provider-label">Stream</Badge>
+          )}
         </header>
 
         {/* Swipe area — NO touch handlers here; iframe swallows them. Edge strips handle it. */}
@@ -1079,6 +1115,9 @@ export default function VideoRoomPage() {
             <Video className="h-3.5 w-3.5" />
             Live
           </Badge>
+          {callMediaProvider === "stream" && (
+            <Badge variant="secondary" data-testid="media-provider-label">Stream</Badge>
+          )}
 
           {/* Write Summary button — provider only */}
           {isProvider && (

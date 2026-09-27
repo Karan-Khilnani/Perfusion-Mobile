@@ -5,10 +5,12 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { CallStatusMediaProvider } from './callStatusMediaProvider';
 
 export interface CallStatus {
   status: string;
   /** @nullable */
   videoRoomUrl?: string | null;
+  mediaProvider: CallStatusMediaProvider;
   isCaller?: boolean;
 }

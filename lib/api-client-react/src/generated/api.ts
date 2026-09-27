@@ -45,6 +45,7 @@ import type {
   PasswordResetRequest,
   PasswordResetSessionUser,
   PasswordResetVerification,
+  StreamCallCredentials,
   UpdateBookingStatusBody,
   VerifyCaseFileAdvisory200
 } from './api.schemas';
@@ -1091,6 +1092,83 @@ export function useGetCallStatus<TData = Awaited<ReturnType<typeof getCallStatus
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetCallStatusQueryOptions(bookingId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetStreamCallCredentialsUrl = (bookingId: string,) => {
+
+
+
+
+  return `/api/call/stream-credentials/${bookingId}`
+}
+
+/**
+ * @summary Get short-lived Stream Video credentials for an accepted call
+ */
+export const getStreamCallCredentials = async (bookingId: string, options?: RequestInit): Promise<StreamCallCredentials> => {
+
+  return customFetch<StreamCallCredentials>(getGetStreamCallCredentialsUrl(bookingId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetStreamCallCredentialsQueryKey = (bookingId: string,) => {
+    return [
+    `/api/call/stream-credentials/${bookingId}`
+    ] as const;
+    }
+
+
+export const getGetStreamCallCredentialsQueryOptions = <TData = Awaited<ReturnType<typeof getStreamCallCredentials>>, TError = ErrorType<void>>(bookingId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getStreamCallCredentials>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetStreamCallCredentialsQueryKey(bookingId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getStreamCallCredentials>>> = ({ signal }) => getStreamCallCredentials(bookingId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(bookingId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getStreamCallCredentials>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetStreamCallCredentialsQueryResult = NonNullable<Awaited<ReturnType<typeof getStreamCallCredentials>>>
+export type GetStreamCallCredentialsQueryError = ErrorType<void>
+
+
+/**
+ * @summary Get short-lived Stream Video credentials for an accepted call
+ */
+
+export function useGetStreamCallCredentials<TData = Awaited<ReturnType<typeof getStreamCallCredentials>>, TError = ErrorType<void>>(
+ bookingId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getStreamCallCredentials>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetStreamCallCredentialsQueryOptions(bookingId,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

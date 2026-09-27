@@ -284,6 +284,29 @@ paths:
           description: Access denied
         "404":
           description: Booking not found
+  /call/stream-credentials/{bookingId}:
+    get:
+      operationId: getStreamCallCredentials
+      tags: [calls]
+      summary: Get short-lived Stream Video credentials for an accepted call
+      parameters:
+        - name: bookingId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Stream Video call credentials for the authenticated call participant
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StreamCallCredentials"
+        "401": { description: Not authenticated }
+        "403": { description: Access denied }
+        "404": { description: Booking not found }
+        "409": { description: No accepted Stream call session }
+        "503": { description: Stream Video is not configured }
   /bookings/{bookingId}/case-file:
     get:
       operationId: getCaseFile
@@ -607,10 +630,26 @@ components:
           type: string
         videoRoomUrl:
           type: ["string", "null"]
+        mediaProvider:
+          type: string
+          enum: [daily, stream]
         isCaller:
           type: boolean
       required:
         - status
+        - mediaProvider
+    StreamCallCredentials:
+      type: object
+      required: [apiKey, token, callId, callType, userId, userName, sessionGeneration, mediaProvider]
+      properties:
+        apiKey: { type: string }
+        token: { type: string }
+        callId: { type: string }
+        callType: { type: string, enum: [default] }
+        userId: { type: string }
+        userName: { type: string }
+        sessionGeneration: { type: string }
+        mediaProvider: { type: string, enum: [stream] }
     CaseFileCapabilities:
       type: object
       required: [canMessage, canAttach, canAddVitals, canComposeAdvisory, canToggleFollowUp, readOnly, callsEnabled, videoEnabled]

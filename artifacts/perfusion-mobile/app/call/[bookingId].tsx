@@ -132,19 +132,22 @@ export default function CallScreen() {
 
     const requestMediaPermissions = async () => {
       const permissions = [PermissionsAndroid.PERMISSIONS.RECORD_AUDIO];
-      if (callMode === "video") {
+      if (callMode === "video" || isStreamCall) {
         permissions.push(PermissionsAndroid.PERMISSIONS.CAMERA);
       }
       const results = await PermissionsAndroid.requestMultiple(permissions);
-      const granted = permissions.every(
-        (permission) => results[permission] === PermissionsAndroid.RESULTS.GRANTED
-      );
-      setPermissionsReady(granted);
-      setPermissionDenied(!granted);
+      const microphoneGranted =
+        results[PermissionsAndroid.PERMISSIONS.RECORD_AUDIO] === PermissionsAndroid.RESULTS.GRANTED;
+      const cameraRequired = callMode === "video";
+      const cameraGranted =
+        results[PermissionsAndroid.PERMISSIONS.CAMERA] === PermissionsAndroid.RESULTS.GRANTED;
+      const requiredPermissionsGranted = microphoneGranted && (!cameraRequired || cameraGranted);
+      setPermissionsReady(requiredPermissionsGranted);
+      setPermissionDenied(!requiredPermissionsGranted);
     };
 
     requestMediaPermissions().catch(() => setPermissionDenied(true));
-  }, [callMode, currentStatus]);
+  }, [callMode, currentStatus, isStreamCall]);
 
   const roomUrl = useMemo(() => {
     if (!callStatus?.videoRoomUrl || !tokenData?.token || currentStatus !== "accepted") return null;
@@ -225,15 +228,28 @@ export default function CallScreen() {
     );
   }
 
-  if (currentStatus === "accepted" && isStreamCall && streamCredentials && Platform.OS !== "web") {
+  if (currentStatus === "accepted" && isStreamCall && Platform.OS !== "web") {
     return (
       <View style={styles.roomContainer}>
-        <StreamCallMedia
-          key={`${streamCredentials.callId}:${streamCredentials.sessionGeneration}`}
-          credentials={streamCredentials}
-          voiceCall={callMode === "voice"}
-          onError={setStreamError}
-        />
+        {streamCredentials ? (
+          <StreamCallMedia
+            key={`${streamCredentials.callId}:${streamCredentials.sessionGeneration}`}
+            credentials={streamCredentials}
+            voiceCall={callMode === "voice"}
+            onError={setStreamError}
+          />
+        ) : (
+          <View style={styles.roomError}>
+            <Text style={styles.roomErrorText} accessibilityRole="alert">
+              {streamCredentialsError ? "Could not load secure Stream call credentials." : "Preparing secure Stream call…"}
+            </Text>
+            {streamCredentialsError && (
+              <Pressable onPress={() => void refetchStreamCredentials()}>
+                <Text style={[styles.retryText, { color: colors.primary }]}>Try again</Text>
+              </Pressable>
+            )}
+          </View>
+        )}
         <View style={[styles.roomHeader, { top: insets.top + 8 }]}>
           <Pressable
             onPress={handleEndCall}
@@ -246,16 +262,9 @@ export default function CallScreen() {
           </Pressable>
           {endError && <Text style={[styles.roomErrorText, { color: colors.callForeground }]} accessibilityRole="alert">{endError}</Text>}
         </View>
-        {(streamError || streamCredentialsError) && (
+        {streamError && (
           <View style={styles.roomError}>
-            <Text style={styles.roomErrorText} accessibilityRole="alert">
-              {streamError || "Could not load secure call credentials."}
-            </Text>
-            {streamCredentialsError && (
-              <Pressable onPress={() => { setStreamError(null); void refetchStreamCredentials(); }}>
-                <Text style={[styles.retryText, { color: colors.primary }]}>Try again</Text>
-              </Pressable>
-            )}
+            <Text style={styles.roomErrorText} accessibilityRole="alert">{streamError}</Text>
           </View>
         )}
       </View>

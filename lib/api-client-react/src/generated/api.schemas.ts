@@ -81,11 +81,45 @@ export interface BookingCallInfo {
   status: string;
 }
 
+export type CallStatusMediaProvider = typeof CallStatusMediaProvider[keyof typeof CallStatusMediaProvider];
+
+
+export const CallStatusMediaProvider = {
+  daily: 'daily',
+  stream: 'stream',
+} as const;
+
 export interface CallStatus {
   status: string;
   /** @nullable */
   videoRoomUrl?: string | null;
+  mediaProvider: CallStatusMediaProvider;
   isCaller?: boolean;
+}
+
+export type StreamCallCredentialsCallType = typeof StreamCallCredentialsCallType[keyof typeof StreamCallCredentialsCallType];
+
+
+export const StreamCallCredentialsCallType = {
+  default: 'default',
+} as const;
+
+export type StreamCallCredentialsMediaProvider = typeof StreamCallCredentialsMediaProvider[keyof typeof StreamCallCredentialsMediaProvider];
+
+
+export const StreamCallCredentialsMediaProvider = {
+  stream: 'stream',
+} as const;
+
+export interface StreamCallCredentials {
+  apiKey: string;
+  token: string;
+  callId: string;
+  callType: StreamCallCredentialsCallType;
+  userId: string;
+  userName: string;
+  sessionGeneration: string;
+  mediaProvider: StreamCallCredentialsMediaProvider;
 }
 
 export interface CaseFileCapabilities {

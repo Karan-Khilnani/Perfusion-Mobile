@@ -54,17 +54,35 @@
           "color": "#DB2841"
         }
       ],
+      "@stream-io/video-react-native-sdk",
+      [
+        "@config-plugins/react-native-webrtc",
+        {
+          "cameraPermission": "Perfusion uses the camera for secure video consultations.",
+          "microphonePermission": "Perfusion uses the microphone for secure voice and video consultations."
+        }
+      ],
       [
         "./plugins/withSafeCallKit",
         {
           "incomingCallTimeout": 45,
           "fulfillAnswerCallTimeout": 30,
           "includesCallsInRecents": false,
-          "sounds": ["./assets/audio/perfusion_ring.wav"],
+          "sounds": [
+            "./assets/audio/perfusion_ring.wav"
+          ],
           "defaultRingtoneIos": "default",
           "defaultRingtoneAndroid": "perfusion_ring.wav",
           "microphonePermission": "Perfusion uses the microphone for secure voice and video consultations.",
           "cameraPermission": "Perfusion uses the camera for secure video consultations."
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "minSdkVersion": 24
+          }
         }
       ]
     ],

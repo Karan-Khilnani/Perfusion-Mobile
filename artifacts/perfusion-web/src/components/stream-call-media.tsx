@@ -46,6 +46,9 @@ export function StreamCallMedia({ credentials, voiceCall }: Props) {
           token: credentials.token,
         });
         streamCall = videoClient.call(credentials.callType, credentials.callId);
+        // Keep voice sessions audio-only from the start. In particular, disable
+        // camera before joining so there is never a transient video publication.
+        if (voiceCall) await streamCall.camera.disable();
         await streamCall.join({ create: false });
         if (!voiceCall) await streamCall.camera.enable();
         await streamCall.microphone.enable();
