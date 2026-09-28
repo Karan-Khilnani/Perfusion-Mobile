@@ -75,7 +75,7 @@ export default function CallScreen() {
   const pipEnteringRef = useRef(false);
   const returningFromCallRef = useRef(false);
   const acceptedGenerationRef = useRef<string | null>(null);
-  const ringback = useAudioPlayer(require("../../assets/audio/perfusion_ring.wav"));
+  const ringback = useAudioPlayer(require("../../assets/audio/perfusion_ringback.mp3"));
   const permissionRequestRef = useRef<Promise<boolean> | null>(null);
 
   const { data: booking } = useQuery<CallInfo>({
@@ -287,22 +287,40 @@ export default function CallScreen() {
     setEndError(null);
     const sessionGeneration = generation || callStatus?.sessionGeneration;
     try {
-      if (currentStatus === "ringing") {
-        const action = callStatus?.isCaller ? "cancel" : "decline";
-        const response = await apiFetch(`/api/call/${action}/${bookingId}`, {
-          method: "POST",
-          body: JSON.stringify({ sessionGeneration }),
-        });
-        if (!response.ok && response.status !== 404 && response.status !== 409) {
-          throw new Error("Could not cancel the call. Please try again.");
-        }
-      } else if (currentStatus === "accepted") {
-        const response = await apiFetch(`/api/call/end/${bookingId}`, {
-          method: "POST",
-          body: JSON.stringify({ sessionGeneration }),
-        });
-        if (!response.ok && response.status !== 404 && response.status !== 409) {
-          throw new Error("Could not end the call. Please try again.");
+      let action: "cancel" | "decline" | "end" | null =
+        currentStatus === "ringing"
+          ? callStatus?.isCaller ? "cancel" : "decline"
+          : currentStatus === "accepted" ? "end" : null;
+      if (action) {
+        if (!sessionGeneration) throw new Error("Call identity is missing. Please try again.");
+        const failureMessage = "Could not end the call. Please try again.";
+        for (let attempt = 0; attempt < 2; attempt++) {
+          const response = await apiFetch(`/api/call/${action}/${bookingId}`, {
+            method: "POST",
+            body: JSON.stringify({ sessionGeneration }),
+          });
+          if (response.ok || response.status === 404) break;
+          if (response.status !== 409) throw new Error(failureMessage);
+
+          // The recipient may have answered just as the caller cancelled.
+          // Reconcile the same generation before leaving, so an accepted call
+          // is never abandoned while the other participant remains connected.
+          const latestResponse = await apiFetch(`/api/call/status/${bookingId}`);
+          if (!latestResponse.ok) throw new Error(failureMessage);
+          const latest: CallStatus = await latestResponse.json();
+          if (
+            latest.sessionGeneration !== sessionGeneration ||
+            latest.status === "none" ||
+            latest.status === "declined" ||
+            latest.status === "timeout" ||
+            latest.status === "ended"
+          ) {
+            break;
+          }
+          if (attempt === 1) throw new Error(failureMessage);
+          if (latest.status === "accepted") action = "end";
+          else if (latest.status === "ringing") action = latest.isCaller ? "cancel" : "decline";
+          else throw new Error(failureMessage);
         }
       }
       if (sessionGeneration) {
@@ -321,14 +339,8 @@ export default function CallScreen() {
   useEffect(() => {
     if (currentStatus === "accepted" && currentSession && callStatus?.sessionGeneration) {
       acceptedGenerationRef.current = callStatus.sessionGeneration;
-      return;
     }
-    if (currentStatus && currentStatus !== "ringing" && acceptedGenerationRef.current) {
-      const acceptedGeneration = acceptedGenerationRef.current;
-      acceptedGenerationRef.current = null;
-      void endNativeCallForSession(bookingId, acceptedGeneration);
-    }
-  }, [bookingId, callStatus?.sessionGeneration, currentSession, currentStatus]);
+  }, [callStatus?.sessionGeneration, currentSession, currentStatus]);
 
   useEffect(() => {
     if (!callStatus || statusLoading || (!generation && !statusFetchedAfterMount)) return;
@@ -416,22 +428,26 @@ export default function CallScreen() {
   if (showConnectingCallUi) {
     return (
       <View style={[styles.roomContainer, { backgroundColor: colors.callBackground }]}>
-        <View style={styles.callConnectingCenter}>
-          <View style={[styles.avatarArea, { backgroundColor: `${colors.conversationPrimary}18` }]}>
-            <Ionicons
-              name={callMode === "voice" ? "call-outline" : "videocam-outline"}
-              size={52}
-              color={colors.conversationPrimary}
-            />
-          </View>
-          <Text style={[styles.connectingTitle, { color: colors.callForeground }]}>
-            {callTitle}
-          </Text>
-          {booking?.patientName && (
-            <Text style={styles.patientName}>{booking.patientName}</Text>
-          )}
-          {booking?.seekerCity && (
-            <Text style={styles.patientCity}>City: {booking.seekerCity}</Text>
+        <View style={[styles.callConnectingCenter, isInPiPMode && styles.callConnectingCompact]}>
+          {!isInPiPMode && (
+            <>
+              <View style={[styles.avatarArea, { backgroundColor: `${colors.conversationPrimary}18` }]}>
+                <Ionicons
+                  name={callMode === "voice" ? "call-outline" : "videocam-outline"}
+                  size={52}
+                  color={colors.conversationPrimary}
+                />
+              </View>
+              <Text style={[styles.connectingTitle, { color: colors.callForeground }]}>
+                {callTitle}
+              </Text>
+              {booking?.patientName && (
+                <Text style={styles.patientName}>{booking.patientName}</Text>
+              )}
+              {booking?.seekerCity && (
+                <Text style={styles.patientCity}>City: {booking.seekerCity}</Text>
+              )}
+            </>
           )}
           {statusError && !callStatus ? (
             <>
@@ -444,9 +460,9 @@ export default function CallScreen() {
             </>
           ) : (
             <>
-              <ActivityIndicator color={colors.callForeground} size="large" />
+              <ActivityIndicator color={colors.callForeground} size={isInPiPMode ? "small" : "large"} />
               <Text style={[styles.hint, { color: colors.callForeground }]}>
-                Connecting securely to your call…
+                {isInPiPMode ? "Connecting…" : "Connecting securely to your call…"}
               </Text>
             </>
           )}
@@ -694,6 +710,22 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#0A0A0A",
   },
+  callConnectingCenter: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 12,
+    paddingHorizontal: 28,
+  },
+  callConnectingCompact: {
+    gap: 4,
+    paddingHorizontal: 8,
+  },
+  connectingTitle: {
+    fontSize: 24,
+    fontFamily: "Inter_700Bold",
+    textAlign: "center",
+  },
   webView: {
     flex: 1,
     backgroundColor: "#0A0A0A",
@@ -808,6 +840,12 @@ const styles = StyleSheet.create({
   },
   patientName: {
     fontSize: 16,
+    fontFamily: "Inter_400Regular",
+    color: "rgba(255,255,255,0.6)",
+    textAlign: "center",
+  },
+  patientCity: {
+    fontSize: 14,
     fontFamily: "Inter_400Regular",
     color: "rgba(255,255,255,0.6)",
     textAlign: "center",

@@ -28,10 +28,7 @@ interface NativeCallHandlers {
   onToken: (token: string, type: PushTokenType) => Promise<void>;
 }
 
-type CallsModule = typeof import("expo-callkit-telecom") & {
-  canUseFullScreenIntent?: () => boolean;
-  openFullScreenIntentSettings?: () => boolean;
-};
+type CallsModule = typeof import("expo-callkit-telecom");
 
 let callsModulePromise: Promise<CallsModule | null> | null = null;
 
@@ -41,32 +38,6 @@ async function getCallsModule(): Promise<CallsModule | null> {
     callsModulePromise = import("expo-callkit-telecom").catch(() => null);
   }
   return callsModulePromise;
-}
-
-export async function getFullScreenCallAccess(): Promise<boolean | null> {
-  if (Platform.OS !== "android") return true;
-  const calls = await getCallsModule();
-  if (!calls?.canUseFullScreenIntent) return null;
-
-  try {
-    return await calls.canUseFullScreenIntent();
-  } catch (error) {
-    console.warn("[native-calls] Could not check full-screen call access", error);
-    return null;
-  }
-}
-
-export async function openFullScreenCallSettings(): Promise<boolean> {
-  if (Platform.OS !== "android") return false;
-  const calls = await getCallsModule();
-  if (!calls?.openFullScreenIntentSettings) return false;
-
-  try {
-    return await calls.openFullScreenIntentSettings();
-  } catch (error) {
-    console.warn("[native-calls] Could not open full-screen call settings", error);
-    return false;
-  }
 }
 
 function bookingIdFromSession(session: CallSession | null): string | null {

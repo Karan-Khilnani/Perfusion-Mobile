@@ -117,3 +117,10 @@ mtime_ms = 1790399973750
 storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:034c0c6d-c25b-491b-98e9-0bb19624165f/ae23df39-77ce-477e-9a87-303e696c6221/932b086c-e174-42b2-a5a8-bc614ead7e57"
 storage_version_token = "1790399980721229"
 content_type = "image/png"
+
+[[outputs]]
+id = "IdyIBHoomKD-7TuZI4PCS"
+uri = "file://artifacts/perfusion-mobile/assets/audio/perfusion_ringback.mp3"
+type = "audio"
+title = "Classic double telephone ringback for the caller"
+description = "Generated sound effect: Caller-side classic landline ringback: two distinct mechanical metallic bell trills, trrring ... trrring, with warm narrowband telephone resonance and a natural decay. Recogni…"
