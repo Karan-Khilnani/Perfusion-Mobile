@@ -88,6 +88,7 @@ export type CaseFileMessage = {
     id: string;
     originalFilename?: string | null;
     byteSize?: number | null;
+    durationSeconds?: number | null;
     category?: string | null;
     mimeType?: string | null;
   } | null;

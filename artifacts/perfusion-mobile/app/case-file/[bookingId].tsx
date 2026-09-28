@@ -1,10 +1,14 @@
 import { Feather } from "@expo/vector-icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import { VideoView, useVideoPlayer } from "expo-video";
+import { File as ExpoFile, Paths } from "expo-file-system";
+import * as Sharing from "expo-sharing";
 import {
   ActivityIndicator,
   Alert,
+  Image,
   FlatList,
   Linking,
   Modal,
@@ -29,6 +33,7 @@ import {
   type AttachmentSource,
   pickCaseFileAttachment,
   uploadCaseFileAttachment,
+  isVideoDraft,
 } from "@/lib/case-file-attachments";
 import {
   Advisory,
@@ -125,14 +130,20 @@ export default function CaseFileScreen() {
     }
   };
 
-  const openCaseFileAttachment = async (attachmentId: string, disposition: "inline" | "attachment") => {
+  const openCaseFileAttachment = async (attachmentId: string, disposition: "inline" | "attachment", filename?: string | null) => {
     if (openingAttachmentId) return;
     setOpeningAttachmentId(attachmentId);
     try {
       const { url } = await requestJson<{ url: string }>(
         `/api/bookings/${encodeURIComponent(bookingId)}/case-file/attachments/${encodeURIComponent(attachmentId)}/signed-url?disposition=${disposition}`,
       );
-      await Linking.openURL(url);
+      if (disposition === "attachment" && Platform.OS !== "web" && await Sharing.isAvailableAsync()) {
+        const safeName = (filename || `case-file-${attachmentId}`).replace(/[^a-zA-Z0-9._-]/g, "_");
+        const local = await ExpoFile.downloadFileAsync(url, new ExpoFile(Paths.cache, `${Date.now()}-${safeName}`));
+        await Sharing.shareAsync(local.uri, { dialogTitle: "Save or share original attachment" });
+      } else {
+        await Linking.openURL(url);
+      }
     } catch (error) {
       const reason = error instanceof Error ? error.message : "The file could not be opened.";
       Alert.alert(disposition === "inline" ? "Could not open file" : "Could not download file", reason);
@@ -348,9 +359,10 @@ export default function CaseFileScreen() {
         renderItem={({ item }) => (
           <MessageBubble
             message={item}
+            bookingId={bookingId}
             own={item.senderUserId === user?.id}
             onAdvisory={() => setSheet("trail")}
-            onAttachmentAction={(attachmentId, disposition) => void openCaseFileAttachment(attachmentId, disposition)}
+            onAttachmentAction={(attachmentId, disposition, filename) => void openCaseFileAttachment(attachmentId, disposition, filename)}
             openingAttachmentId={openingAttachmentId}
           />
         )}
@@ -397,7 +409,15 @@ export default function CaseFileScreen() {
 
       <CaseFileSheet
         type={sheet}
-        onClose={() => { if (!uploading) setSheet(null); }}
+        onClose={() => {
+          if (uploading) return;
+          if (sheet === "attach") {
+            setAttachment(null);
+            setAttachmentCategory(null);
+            setAttachmentError(null);
+          }
+          setSheet(null);
+        }}
         onChooseAttachment={chooseAttachment}
         attachment={attachment}
         attachmentCategory={attachmentCategory}
@@ -435,15 +455,17 @@ function VitalCell({ label, value, detail }: { label: string; value: string; det
 
 function MessageBubble({
   message,
+  bookingId,
   own,
   onAdvisory,
   onAttachmentAction,
   openingAttachmentId,
 }: {
   message: CaseFileMessage;
+  bookingId: string;
   own: boolean;
   onAdvisory: () => void;
-  onAttachmentAction: (attachmentId: string, disposition: "inline" | "attachment") => void;
+  onAttachmentAction: (attachmentId: string, disposition: "inline" | "attachment", filename?: string | null) => void;
   openingAttachmentId: string | null;
 }) {
   const palette = useColors();
@@ -472,15 +494,19 @@ function MessageBubble({
         </View>
       )}
       {message.attachment && (
+        <AttachmentPreview attachment={message.attachment} bookingId={bookingId} onOpen={() => onAttachmentAction(message.attachment!.id, "inline")} />
+      )}
+      {message.attachment && (
         <View style={styles.attachmentHeading}>
           <View style={[styles.attachmentIcon, { backgroundColor: own ? "rgba(255,255,255,.14)" : palette.conversationSoft }]}>
-            <Feather name="file-text" size={16} color={own ? palette.conversationPrimaryForeground : palette.conversationPrimary} />
+             <Feather name={message.attachment.mimeType?.startsWith("video/") ? "video" : message.attachment.mimeType?.startsWith("image/") ? "image" : "file-text"} size={16} color={own ? palette.conversationPrimaryForeground : palette.conversationPrimary} />
           </View>
           <View style={{ flex: 1 }}>
             <Text style={[styles.attachmentName, { color: own ? palette.conversationPrimaryForeground : palette.foreground }]}>{message.attachment.originalFilename || "Clinical file"}</Text>
             <Text style={[styles.attachmentMeta, { color: own ? "rgba(255,255,255,.68)" : palette.conversationMuted }]}>
-              {message.attachment.category?.replace("_", " ") || "Clinical attachment"}
+               {message.attachment.mimeType?.split("/").pop()?.toUpperCase() || "File"}
               {message.attachment.byteSize ? ` · ${Math.max(1, Math.round(message.attachment.byteSize / 1024))} KB` : ""}
+               {message.attachment.durationSeconds ? ` · ${Math.floor(message.attachment.durationSeconds / 60)}:${String(Math.floor(message.attachment.durationSeconds % 60)).padStart(2, "0")}` : ""}
             </Text>
           </View>
         </View>
@@ -532,7 +558,7 @@ function MessageBubble({
             </Pressable>
             <Pressable
               disabled={openingAttachmentId === message.attachment.id}
-              onPress={() => onAttachmentAction(message.attachment!.id, "attachment")}
+               onPress={() => onAttachmentAction(message.attachment!.id, "attachment", message.attachment!.originalFilename)}
               style={[styles.attachmentActionButton, { backgroundColor: palette.conversationSoft }]}
               accessibilityRole="button"
               accessibilityLabel={`Download original ${message.attachment.originalFilename || "clinical file"}`}
@@ -543,6 +569,76 @@ function MessageBubble({
         )}
       </View>
     </View>
+  );
+}
+
+function CaseFileVideo({ uri, height = 220 }: { uri: string; height?: number }) {
+  const player = useVideoPlayer({ uri });
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    const subscription = player.addListener("statusChange", ({ status }) => {
+      setFailed(status === "error");
+    });
+    return () => subscription.remove();
+  }, [player]);
+  return <View>
+    <VideoView player={player} nativeControls allowsFullscreen style={{ width: "100%", height, backgroundColor: "#111" }} />
+    {failed && <Text style={{ color: "#DB2841", fontSize: 12, padding: 8 }} accessibilityRole="alert">Playback unavailable. Download the original video to view it.</Text>}
+  </View>;
+}
+
+function AttachmentPreview({ attachment, bookingId, onOpen }: {
+  attachment: NonNullable<CaseFileMessage["attachment"]>;
+  bookingId: string;
+  onOpen: () => void;
+}) {
+  const palette = useColors();
+  const [url, setUrl] = useState<string | null>(null);
+  const [full, setFull] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const isImage = attachment.mimeType?.startsWith("image/");
+  const isVideo = attachment.mimeType?.startsWith("video/") || /\.(mp4|mov|webm)$/i.test(attachment.originalFilename || "");
+  const refresh = async () => {
+    try {
+      const result = await requestJson<{ url: string }>(`/api/bookings/${encodeURIComponent(bookingId)}/case-file/attachments/${encodeURIComponent(attachment.id)}/signed-url?disposition=inline`);
+      setUrl(result.url);
+      setError(null);
+      return result.url;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Preview unavailable.");
+      return null;
+    }
+  };
+  useEffect(() => {
+    if (isImage || isVideo) void refresh();
+  }, [bookingId, attachment.id]);
+  const open = async () => {
+    if (!isImage && !isVideo) { onOpen(); return; }
+    if (await refresh()) setFull(true);
+  };
+  return (
+    <>
+      <Pressable onPress={() => void open()} accessibilityRole="button" accessibilityLabel={`Open ${attachment.originalFilename || "attachment"}`} style={{ marginBottom: 8, borderRadius: 9, overflow: "hidden", backgroundColor: palette.conversationSoft }}>
+        {isImage && url ? <Image source={{ uri: url }} style={{ width: 220, height: 155 }} resizeMode="cover" onError={() => setError("Preview expired. Tap to retry.")} /> :
+          isVideo ? <View style={{ width: 220, height: 135, alignItems: "center", justifyContent: "center", backgroundColor: "#17212f" }}>
+            <Feather name="play-circle" size={42} color="#FFFFFF" />
+            <Text style={{ color: "#FFFFFF", fontSize: 11 }}>Play video</Text>
+          </View> :
+          <View style={{ width: 220, padding: 18, flexDirection: "row", alignItems: "center", gap: 9 }}>
+            <Feather name="file-text" size={25} color={palette.conversationPrimary} />
+            <Text style={{ color: palette.foreground, fontSize: 12 }}>{attachment.mimeType === "application/pdf" ? "Open complete PDF" : "Open complete file"}</Text>
+          </View>}
+      </Pressable>
+      {error && <Text style={{ color: palette.primary, fontSize: 11 }} accessibilityRole="alert">{error}</Text>}
+      <Modal visible={full} animationType="fade" onRequestClose={() => setFull(false)}>
+        <View style={{ flex: 1, backgroundColor: "#101820", justifyContent: "center", padding: 12 }}>
+          <Pressable onPress={() => setFull(false)} accessibilityLabel="Close preview" style={{ position: "absolute", top: 45, right: 20, zIndex: 2, padding: 12 }}><Feather name="x" size={25} color="#FFFFFF" /></Pressable>
+          {full && url && (isImage ? <Image source={{ uri: url }} style={{ width: "100%", height: "80%" }} resizeMode="contain" onError={() => setError("Image could not be loaded. Close and retry.")} /> :
+            isVideo ? <CaseFileVideo uri={url} height={300} /> : null)}
+          {error && <Text style={{ color: "#FFFFFF", textAlign: "center" }}>{error}</Text>}
+        </View>
+      </Modal>
+    </>
   );
 }
 
@@ -794,6 +890,8 @@ function CaseFileSheet({
                   ["camera", "Camera", "camera"],
                   ["image", "Photo Gallery", "photo_gallery"],
                   ["file-text", "Document", "document"],
+                  ["film", "Choose video", "video_gallery"],
+                  ["video", "Record video", "video_camera"],
                 ] as const).map(([icon, label, source]) => (
                   <Pressable key={label} style={[styles.sourceRow, { borderColor: palette.border }]} onPress={() => onChooseAttachment(source)}>
                     <Feather name={icon as keyof typeof Feather.glyphMap} size={20} color={palette.foreground} />
@@ -801,7 +899,7 @@ function CaseFileSheet({
                     <Feather name="chevron-right" size={18} color={palette.mutedForeground} />
                   </Pressable>
                 ))}
-                <Text style={[styles.sheetHint, { color: palette.mutedForeground }]}>PDF, JPEG, PNG, GIF or DICOM · up to 25 MB</Text>
+                <Text style={[styles.sheetHint, { color: palette.mutedForeground }]}>Files up to 25 MB · videos up to 75 MB and 2 minutes</Text>
               </>
             )}
             {type === "attach" && attachment && (
@@ -815,6 +913,12 @@ function CaseFileSheet({
                     </Text>
                   </View>
                 </View>
+                {isVideoDraft(attachment) && (
+                  <View style={{ gap: 8 }}>
+                    <CaseFileVideo uri={attachment.uri} />
+                    <Text style={[styles.sheetHint, { color: palette.mutedForeground }]}>Review video · {Math.floor((attachment.durationSeconds || 0) / 60)}:{String(Math.floor((attachment.durationSeconds || 0) % 60)).padStart(2, "0")} · Tap play before sending</Text>
+                  </View>
+                )}
                 {seeker && (
                   <>
                     <Text style={[styles.fieldLabel, { color: palette.mutedForeground }]}>FILE CATEGORY</Text>
@@ -834,7 +938,7 @@ function CaseFileSheet({
                   </>
                 )}
                 {attachmentError && <Text style={[styles.uploadError, { color: palette.primary }]} accessibilityRole="alert">{attachmentError}</Text>}
-                <SubmitButton label="Send to Case File" disabled={seeker && !attachmentCategory} pending={uploading} onPress={onSendAttachment} />
+                <SubmitButton label={uploading ? "Uploading…" : "Send to Case File"} disabled={seeker && !attachmentCategory} pending={uploading} onPress={onSendAttachment} />
                 <Pressable onPress={onClose} disabled={uploading} style={styles.cancelAttachment}>
                   <Text style={[styles.sheetHint, { color: palette.mutedForeground }]}>Cancel</Text>
                 </Pressable>

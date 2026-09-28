@@ -27,6 +27,7 @@ import { notifyMobileCallEnded, notifyMobileIncomingCall } from "../services/mob
 import { getConsultantAvailabilityPreview } from "../services/consultant-availability";
 import { normalizeComorbidities } from "../services/patient-comorbidities";
 import { createHash, randomUUID } from "crypto";
+import { inspectCaseFileVideo, isCaseFileVideo } from "../services/case-file-video";
 import { StreamClient } from "@stream-io/node-sdk";
 
 function callMediaProvider(videoRoomUrl?: string | null): "daily" | "stream" {
@@ -293,7 +294,7 @@ const uploadReport = multer({
 
 const caseFileUpload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 25 * 1024 * 1024 },
+  limits: { fileSize: 75 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     const allowedTypes = [
       "application/pdf",
@@ -305,7 +306,7 @@ const caseFileUpload = multer({
       "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     ];
     const allowedExtensions = /\.(pdf|jpe?g|png|gif|dcm|docx?)$/i;
-    if (allowedTypes.includes(file.mimetype) || allowedExtensions.test(file.originalname)) cb(null, true);
+    if (allowedTypes.includes(file.mimetype) || allowedExtensions.test(file.originalname) || isCaseFileVideo(file.originalname, file.mimetype)) cb(null, true);
     else cb(new Error("Invalid file type. Allowed: PDF, images, DICOM, DOC, or DOCX"));
   },
 });
@@ -1422,10 +1423,10 @@ export async function registerRoutes(
       const cursor = req.query.cursor ? new Date(String(req.query.cursor)) : null;
       const pool = getPool();
       const result = cursor
-        ? await pool.query(`SELECT m.*, a.id AS attachment_id, a.original_filename, a.mime_type, a.byte_size, a.object_path, a.legacy_url, a.source, a.category, a.created_at AS attachment_created_at
+        ? await pool.query(`SELECT m.*, a.id AS attachment_id, a.original_filename, a.mime_type, a.byte_size, a.duration_seconds, a.object_path, a.legacy_url, a.source, a.category, a.created_at AS attachment_created_at
           FROM case_file_messages m LEFT JOIN case_file_attachments a ON a.message_id = m.id
           WHERE m.booking_id = $1 AND m.created_at < $2 ORDER BY m.created_at DESC, m.id DESC LIMIT $3`, [access.booking.id, cursor, limit + 1])
-        : await pool.query(`SELECT m.*, a.id AS attachment_id, a.original_filename, a.mime_type, a.byte_size, a.object_path, a.legacy_url, a.source, a.category, a.created_at AS attachment_created_at
+        : await pool.query(`SELECT m.*, a.id AS attachment_id, a.original_filename, a.mime_type, a.byte_size, a.duration_seconds, a.object_path, a.legacy_url, a.source, a.category, a.created_at AS attachment_created_at
           FROM case_file_messages m LEFT JOIN case_file_attachments a ON a.message_id = m.id
           WHERE m.booking_id = $1 ORDER BY m.created_at DESC, m.id DESC LIMIT $2`, [access.booking.id, limit + 1]);
       const hasMore = result.rows.length > limit;
@@ -1435,7 +1436,7 @@ export async function registerRoutes(
         kind: row.kind, body: row.body, createdAt: row.created_at,
         attachment: row.attachment_id ? {
           id: row.attachment_id, bookingId: row.booking_id, messageId: row.id, uploaderUserId: row.sender_user_id,
-          uploaderRole: row.sender_role, originalFilename: row.original_filename, mimeType: row.mime_type, byteSize: row.byte_size,
+          uploaderRole: row.sender_role, originalFilename: row.original_filename, mimeType: row.mime_type, byteSize: row.byte_size, durationSeconds: row.duration_seconds,
           objectPath: null, legacyUrl: null, source: row.source, category: row.category, createdAt: row.attachment_created_at,
         } : null,
       }));
@@ -1583,14 +1584,14 @@ export async function registerRoutes(
         return res.status(400).json({ message: "disposition must be inline or attachment" });
       }
       const row = (await getPool().query(
-        "SELECT object_path, original_filename FROM case_file_attachments WHERE id = $1 AND booking_id = $2",
+        "SELECT object_path, playback_path, original_filename FROM case_file_attachments WHERE id = $1 AND booking_id = $2",
         [req.params.attachmentId, access.booking.id],
       )).rows[0];
       if (!row?.object_path) return res.status(404).json({ message: "Private attachment not found" });
       const expiresIn = 300;
       const downloadName = String(row.original_filename || "clinical-advisory.pdf").replace(/["\r\n\\/]/g, "_");
       const url = await createPrivateCaseFileSignedUrl(
-        String(row.object_path),
+        String(disposition === "inline" ? row.playback_path || row.object_path : row.object_path),
         expiresIn,
         disposition === "attachment" ? downloadName : undefined,
       );
@@ -1744,6 +1745,32 @@ export async function registerRoutes(
       const category = access.isProvider ? "uncategorized" : String(req.body?.category || "uncategorized").toLowerCase();
       if (access.isSeeker && !CASE_FILE_SEEKER_CATEGORIES.has(category)) return res.status(400).json({ message: "Seeker attachments require Lab, Radiology, Treatment Chart, or General category" });
       if (!req.file) return res.status(400).json({ message: "No file uploaded" });
+      const video = isCaseFileVideo(req.file.originalname, req.file.mimetype);
+      if (video && req.file.size > 75 * 1024 * 1024) return res.status(413).json({ message: "Choose a video smaller than 75 MB." });
+      if (!video && req.file.size > 25 * 1024 * 1024) return res.status(413).json({ message: "Choose a file smaller than 25 MB." });
+      let durationSeconds: number | null = null;
+      let playback: Buffer | undefined;
+      if (video) {
+        try {
+          const inspected = await inspectCaseFileVideo(req.file.buffer);
+          if (inspected.durationSeconds > 120.05) return res.status(400).json({ message: "Video must be 2 minutes or less." });
+          durationSeconds = inspected.durationSeconds;
+          playback = inspected.playback;
+          req.file.mimetype = inspected.mimeType;
+        } catch (error) {
+          req.log?.warn({ err: error }, "Invalid Case File video");
+          return res.status(400).json({ message: "Could not verify this video's duration or format." });
+        }
+      } else if (!req.file.mimetype || req.file.mimetype === "application/octet-stream") {
+        const extension = path.extname(req.file.originalname).toLowerCase();
+        const types: Record<string, string> = {
+          ".pdf": "application/pdf", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
+          ".png": "image/png", ".gif": "image/gif", ".dcm": "application/dicom",
+          ".doc": "application/msword",
+          ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        };
+        if (types[extension]) req.file.mimetype = types[extension];
+      }
       const source = ["camera", "photo_gallery", "document"].includes(String(req.body?.source || "document"))
         ? String(req.body?.source || "document")
         : "document";
@@ -1760,7 +1787,7 @@ export async function registerRoutes(
       const findExisting = async () => (await pool.query(
         `SELECT m.id AS message_id, m.booking_id, m.sender_user_id, m.sender_role, m.kind, m.body,
                 m.created_at AS message_created_at, a.id AS attachment_id, a.original_filename,
-                a.mime_type, a.byte_size, a.source, a.category, a.uploader_user_id, a.uploader_role,
+                a.mime_type, a.byte_size, a.duration_seconds, a.source, a.category, a.uploader_user_id, a.uploader_role,
                 a.created_at AS attachment_created_at
          FROM case_file_attachments a
          JOIN case_file_messages m ON m.id = a.message_id
@@ -1784,6 +1811,7 @@ export async function registerRoutes(
           originalFilename: row.original_filename,
           mimeType: row.mime_type,
           byteSize: row.byte_size,
+          durationSeconds: row.duration_seconds,
           objectPath: null,
           legacyUrl: null,
           source: row.source,
@@ -1802,10 +1830,13 @@ export async function registerRoutes(
       if (caseFileReadOnly(access.booking)) return res.status(403).json({ message: "This Case File is read-only" });
 
       let fileUrl: string | null = null;
+      let playbackPath: string | null = null;
       try {
         if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) throw new Error("Supabase storage is not configured");
         fileUrl = await uploadPrivateCaseFile(req.file.buffer, req.file.originalname, req.file.mimetype, attachmentId);
+        if (playback) playbackPath = await uploadPrivateCaseFile(playback, "playback.mp4", "video/mp4", `${attachmentId}-playback`);
       } catch (error) {
+        if (fileUrl) await deletePrivateCaseFile(fileUrl).catch(() => {});
         if (process.env.NODE_ENV === "production") return res.status(503).json({ message: "File storage is temporarily unavailable. Please try again later." });
         throw error;
       }
@@ -1814,7 +1845,7 @@ export async function registerRoutes(
       try {
         await client.query("BEGIN");
         await client.query("INSERT INTO case_file_messages (id, booking_id, sender_user_id, sender_role, kind, created_at) VALUES ($1,$2,$3,$4,'attachment',$5)", [messageId, access.booking.id, req.user.id, req.user.role, now]);
-        await client.query("INSERT INTO case_file_attachments (id, booking_id, message_id, uploader_user_id, uploader_role, original_filename, mime_type, byte_size, object_path, source, category, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)", [attachmentId, access.booking.id, messageId, req.user.id, req.user.role, req.file.originalname, req.file.mimetype, req.file.size, fileUrl, source, category, now]);
+        await client.query("INSERT INTO case_file_attachments (id, booking_id, message_id, uploader_user_id, uploader_role, original_filename, mime_type, byte_size, duration_seconds, object_path, playback_path, source, category, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)", [attachmentId, access.booking.id, messageId, req.user.id, req.user.role, req.file.originalname, req.file.mimetype, req.file.size, durationSeconds, fileUrl, playbackPath, source, category, now]);
         const bookingDocumentUrl = `/api/bookings/${encodeURIComponent(access.booking.id)}/case-file/attachments/${encodeURIComponent(attachmentId)}/download`;
         if (category === "general") {
           await client.query(
@@ -1847,6 +1878,7 @@ export async function registerRoutes(
         if (fileUrl) {
           try {
             await deletePrivateCaseFile(fileUrl);
+            if (playbackPath) await deletePrivateCaseFile(playbackPath);
           } catch (cleanupError) {
             req.log?.warn({ err: cleanupError }, "Case File attachment cleanup failed");
           }
@@ -1873,6 +1905,7 @@ export async function registerRoutes(
           originalFilename: req.file.originalname,
           mimeType: req.file.mimetype,
           byteSize: req.file.size,
+          durationSeconds,
           objectPath: null,
           legacyUrl: null,
           source,

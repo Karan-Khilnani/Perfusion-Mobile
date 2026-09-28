@@ -10,7 +10,6 @@ import {
   useGetCaseFileAdvisories, getGetCaseFileAdvisoriesQueryKey,
   useCreateCaseFileAdvisory,
   useCreateCaseFileAttachment,
-  getDownloadCaseFileAttachmentUrl,
   useUpdateCaseFileFollowUpAccess
 } from "@workspace/api-client-react";
 import { useCallEvents, CallEvent } from "@/hooks/use-call-events";
@@ -39,6 +38,17 @@ function getComorbidityEntries(value: string | null | undefined): string[] {
     .split(/\r\n|\n|\r/)
     .map((entry) => entry.trim())
     .filter(Boolean);
+}
+
+function videoDuration(file: File): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const video = document.createElement("video");
+    video.preload = "metadata";
+    video.onloadedmetadata = () => { resolve(video.duration); video.src = ""; URL.revokeObjectURL(url); };
+    video.onerror = () => { reject(new Error("Could not read video duration.")); video.src = ""; URL.revokeObjectURL(url); };
+    video.src = url;
+  });
 }
 
 export default function CaseFilePage() {
@@ -170,6 +180,9 @@ export default function CaseFilePage() {
   // Dialog States
   const [showAttachDialog, setShowAttachDialog] = useState(false);
   const [attachFile, setAttachFile] = useState<File | null>(null);
+  const [attachDuration, setAttachDuration] = useState<number | null>(null);
+  const [attachPreview, setAttachPreview] = useState<string | null>(null);
+  const [checkingVideo, setCheckingVideo] = useState(false);
   const [attachCategory, setAttachCategory] = useState<string>("");
   const [attachSource, setAttachSource] = useState<"camera" | "photo_gallery" | "document">("document");
 
@@ -194,8 +207,37 @@ export default function CaseFilePage() {
     });
   };
 
+  const selectAttachment = async (file: File | null) => {
+    setAttachFile(null);
+    setAttachDuration(null);
+    if (attachPreview) URL.revokeObjectURL(attachPreview);
+    setAttachPreview(null);
+    if (!file) return;
+    const video = file.type.startsWith("video/") || /\.(mp4|mov|webm)$/i.test(file.name);
+    if (file.size > (video ? 75 : 25) * 1024 * 1024) {
+      toast({ title: "File too large", description: video ? "Choose a video smaller than 75 MB." : "Choose a file smaller than 25 MB.", variant: "destructive" });
+      return;
+    }
+    if (video) {
+      setCheckingVideo(true);
+      try {
+        const seconds = await videoDuration(file);
+        if (!Number.isFinite(seconds) || seconds <= 0) throw new Error("Could not read video duration.");
+        if (seconds > 120.05) throw new Error("Video must be 2 minutes or less.");
+        setAttachDuration(seconds);
+      } catch (error: any) {
+        toast({ title: "Video not selected", description: error.message, variant: "destructive" });
+        setCheckingVideo(false);
+        return;
+      }
+      setCheckingVideo(false);
+    }
+    setAttachPreview(URL.createObjectURL(file));
+    setAttachFile(file);
+  };
+
   const handleAttachFile = () => {
-    if (!attachFile) return;
+    if (!attachFile || checkingVideo || attachMutation.isPending) return;
     const categoryToUse = caseFile?.capabilities.canAttach && !isProvider ? attachCategory : "uncategorized";
     if (!isProvider && !attachCategory) {
       toast({ title: "Required", description: "Please select a category", variant: "destructive" });
@@ -209,6 +251,9 @@ export default function CaseFilePage() {
       onSuccess: () => {
         setShowAttachDialog(false);
         setAttachFile(null);
+        if (attachPreview) URL.revokeObjectURL(attachPreview);
+        setAttachPreview(null);
+        setAttachDuration(null);
         setAttachCategory("");
         toast({ title: "File attached" });
       },
@@ -773,7 +818,7 @@ export default function CaseFilePage() {
       <Dialog open={showAttachDialog} onOpenChange={setShowAttachDialog}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Attach Document</DialogTitle>
+            <DialogTitle>Attach to Case File</DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="space-y-2">
@@ -811,18 +856,26 @@ export default function CaseFilePage() {
               <Label>File</Label>
               <Input
                 type="file"
-                onChange={(e) => setAttachFile(e.target.files?.[0] || null)}
-                accept={attachSource === "camera" || attachSource === "photo_gallery" ? "image/*" : "image/*,.pdf"}
+                onChange={(e) => void selectAttachment(e.target.files?.[0] || null)}
+                accept={attachSource === "camera" ? "image/*,video/*" : "image/*,video/mp4,video/quicktime,video/webm,.pdf,.doc,.docx,.dcm"}
                 capture={attachSource === "camera" ? "environment" : undefined}
               />
+              {checkingVideo && <p className="text-sm text-muted-foreground">Checking video duration…</p>}
+              {attachFile && attachDuration !== null && attachPreview && (
+                <div className="space-y-2">
+                  <video src={attachPreview} controls preload="metadata" className="w-full max-h-52 rounded-lg bg-black" />
+                  <p className="text-sm">Review video · {Math.floor(attachDuration / 60)}:{String(Math.floor(attachDuration % 60)).padStart(2, "0")} · {attachFile.name}</p>
+                  <Button variant="outline" onClick={() => void selectAttachment(null)}>Remove video</Button>
+                </div>
+              )}
             </div>
 
             <Button
               className="w-full mt-2"
-              disabled={!attachFile || (!isProvider && !attachCategory) || attachMutation.isPending}
+              disabled={!attachFile || checkingVideo || (!isProvider && !attachCategory) || attachMutation.isPending}
               onClick={handleAttachFile}
             >
-              Upload Attachment
+              {attachMutation.isPending ? "Uploading…" : "Send attachment"}
             </Button>
           </div>
         </DialogContent>
@@ -903,34 +956,74 @@ export default function CaseFilePage() {
 }
 
 function AttachmentViewer({ attachment, bookingId }: { attachment: any; bookingId: string }) {
-  const url = getDownloadCaseFileAttachmentUrl(bookingId, attachment.id);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [openUrl, setOpenUrl] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const endpoint = `/api/bookings/${encodeURIComponent(bookingId)}/case-file/attachments/${encodeURIComponent(attachment.id)}/signed-url`;
+  const getUrl = async (disposition: "inline" | "attachment") => {
+    const response = await fetch(`${endpoint}?disposition=${disposition}`, { credentials: "include" });
+    if (!response.ok) throw new Error("Could not retrieve this attachment.");
+    return (await response.json()).url as string;
+  };
   const isImg = attachment.originalFilename?.match(/\.(jpeg|jpg|gif|png|webp)($|\?)/i) || attachment.mimeType?.startsWith('image/');
+  const isVideo = attachment.mimeType?.startsWith("video/") || /\.(mp4|mov|webm)$/i.test(attachment.originalFilename || "");
+  useEffect(() => {
+    if (!isImg && !isVideo) return;
+    let active = true;
+    getUrl("inline").then((url) => { if (active) setPreviewUrl(url); }).catch(() => { if (active) setError("Preview unavailable. Try opening the file."); });
+    return () => { active = false; };
+  }, [bookingId, attachment.id]);
+  const open = async (disposition: "inline" | "attachment") => {
+    if (busy) return;
+    const newTab = (disposition === "attachment" || (!isImg && !isVideo))
+      ? window.open("", "_blank") : null;
+    setBusy(true);
+    setError(null);
+    try {
+      const url = await getUrl(disposition);
+      if (newTab) newTab.location.replace(url);
+      else if (disposition === "attachment") throw new Error("Your browser blocked the download window. Allow pop-ups and try again.");
+      else if (isImg || isVideo) setOpenUrl(url);
+      else throw new Error("Your browser blocked the file window. Allow pop-ups and try again.");
+    } catch (err: any) {
+      newTab?.close();
+      setError(err.message || "Could not open file.");
+    } finally {
+      setBusy(false);
+    }
+  };
   const filename = attachment.originalFilename || `Attachment (${attachment.category})`;
 
-  if (!url) return <span className="text-xs text-muted-foreground">Attachment missing</span>;
-
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-2 min-w-[190px]">
       <div className="flex items-center gap-2">
-        {isImg ? <ImageIcon className="h-4 w-4 text-primary" /> : <FileText className="h-4 w-4 text-primary" />}
+        {isImg ? <ImageIcon className="h-4 w-4 text-primary" /> : isVideo ? <Video className="h-4 w-4 text-primary" /> : <FileText className="h-4 w-4 text-primary" />}
         <span className="text-sm font-medium truncate max-w-[200px]">{filename}</span>
         {attachment.category && attachment.category !== 'uncategorized' && (
           <Badge variant="outline" className="text-[9px] uppercase ml-1 px-1 py-0 h-4">{attachment.category.replace('_', ' ')}</Badge>
         )}
       </div>
 
-      {isImg ? (
-        <a href={url} target="_blank" rel="noreferrer" className="block mt-1 relative group overflow-hidden rounded border border-border/50">
-          <img src={url} alt={filename} className="max-w-[240px] max-h-[160px] object-cover rounded bg-muted/30" loading="lazy" />
-          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-            <ExternalLink className="text-white h-6 w-6" />
-          </div>
-        </a>
-      ) : (
-        <a href={url} target="_blank" rel="noreferrer" className="mt-1 flex items-center justify-center gap-2 px-4 py-2 bg-background border rounded hover:bg-muted/50 transition-colors text-sm text-primary">
-          <ExternalLink className="h-4 w-4" /> Open Document
-        </a>
-      )}
+      <button type="button" onClick={() => void open("inline")} disabled={busy} className="text-left mt-1 rounded border border-border/50 overflow-hidden hover:bg-muted/50">
+        {isImg && previewUrl ? <img src={previewUrl} alt={filename} className="max-w-[240px] max-h-[160px] object-cover" loading="lazy" /> :
+          isVideo ? <div className="relative w-[240px] h-[145px] bg-slate-900 flex items-center justify-center text-white">
+            {previewUrl && <video src={previewUrl} preload="metadata" muted playsInline className="absolute inset-0 w-full h-full object-cover" />}
+            <span className="relative z-10 bg-black/60 rounded-full p-3"><Video className="h-6 w-6" /></span>
+          </div> :
+          <div className="flex items-center gap-2 px-4 py-3 text-sm text-primary"><FileText className="h-5 w-5" /> {attachment.mimeType === "application/pdf" ? "Open PDF" : "Open file"}</div>}
+      </button>
+      <p className="text-xs text-muted-foreground">{isVideo && attachment.durationSeconds ? `${Math.floor(attachment.durationSeconds / 60)}:${String(Math.floor(attachment.durationSeconds % 60)).padStart(2, "0")} · ` : ""}{attachment.mimeType?.split("/").pop()?.toUpperCase() || "File"}{attachment.byteSize ? ` · ${(attachment.byteSize / 1024 / 1024).toFixed(1)} MB` : ""}</p>
+      <button type="button" onClick={() => void open("attachment")} disabled={busy} className="text-xs text-primary underline text-left">Download original</button>
+      {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
+      <Dialog open={!!openUrl} onOpenChange={(open) => { if (!open) setOpenUrl(null); }}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader><DialogTitle>{filename}</DialogTitle></DialogHeader>
+          {openUrl && (isImg ? <img src={openUrl} alt={filename} className="max-h-[75vh] max-w-full object-contain mx-auto" /> :
+            <video key={openUrl} src={openUrl} controls autoPlay playsInline className="w-full max-h-[75vh] bg-black" onError={() => setError("Playback unavailable on this browser. Download the original video to view it.")} />)}
+          <button type="button" onClick={() => void open("attachment")} className="text-sm text-primary underline">Download original</button>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -194,6 +194,8 @@ async function startServer() {
       original_filename varchar(255),
       mime_type varchar(150),
       byte_size integer,
+      duration_seconds double precision,
+      playback_path text,
       object_path text,
       legacy_url text,
       source varchar(40) NOT NULL DEFAULT 'document',
@@ -201,6 +203,8 @@ async function startServer() {
       created_at timestamptz DEFAULT now()
     )`);
     await pool.query(`CREATE INDEX IF NOT EXISTS case_file_attachments_booking_created_idx ON case_file_attachments(booking_id, created_at)`);
+    await pool.query(`ALTER TABLE case_file_attachments ADD COLUMN IF NOT EXISTS duration_seconds double precision`);
+    await pool.query(`ALTER TABLE case_file_attachments ADD COLUMN IF NOT EXISTS playback_path text`);
     await pool.query(`CREATE TABLE IF NOT EXISTS case_file_vitals (
       id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
       booking_id varchar NOT NULL,

@@ -684,6 +684,7 @@ components:
         originalFilename: { type: ["string", "null"] }
         mimeType: { type: ["string", "null"] }
         byteSize: { type: ["integer", "null"] }
+        durationSeconds: { type: ["number", "null"] }
         objectPath: { type: ["string", "null"] }
         legacyUrl: { type: ["string", "null"] }
         source: { type: string }

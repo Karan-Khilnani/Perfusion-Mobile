@@ -50,6 +50,8 @@ export const caseFileAttachments = pgTable("case_file_attachments", {
   originalFilename: varchar("original_filename", { length: 255 }),
   mimeType: varchar("mime_type", { length: 150 }),
   byteSize: integer("byte_size"),
+  durationSeconds: doublePrecision("duration_seconds"),
+  playbackPath: text("playback_path"),
   objectPath: text("object_path"),
   legacyUrl: text("legacy_url"),
   source: varchar("source", { length: 40 }).notNull().default("document"),

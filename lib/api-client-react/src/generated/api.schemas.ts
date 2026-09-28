@@ -147,6 +147,8 @@ export interface CaseFileAttachment {
   /** @nullable */
   byteSize?: number | null;
   /** @nullable */
+  durationSeconds?: number | null;
+  /** @nullable */
   objectPath?: string | null;
   /** @nullable */
   legacyUrl?: string | null;
