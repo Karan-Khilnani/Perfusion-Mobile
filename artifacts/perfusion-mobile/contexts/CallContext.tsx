@@ -6,7 +6,7 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { AppState, Platform } from "react-native";
+import { Alert, AppState, Platform } from "react-native";
 import { router } from "expo-router";
 
 import { useAuth } from "@/contexts/AuthContext";
@@ -14,7 +14,9 @@ import { apiFetch } from "@/hooks/useApi";
 import {
   endNativeCallForSession,
   getNativeActiveCallSession,
+  getFullScreenCallAccess,
   initializeNativeCalls,
+  openFullScreenCallSettings,
   reportNativeIncomingCall,
 } from "@/lib/native-calls";
 import { getPushDeviceId } from "@/lib/push-device";
@@ -53,6 +55,34 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const nativeReportedSessionRef = useRef<string | null>(null);
   const incomingCheckInFlightRef = useRef(false);
+  const fullScreenAccessPromptedRef = useRef(false);
+
+  useEffect(() => {
+    if (
+      Platform.OS !== "android" ||
+      !user ||
+      fullScreenAccessPromptedRef.current
+    ) {
+      return;
+    }
+    fullScreenAccessPromptedRef.current = true;
+    void getFullScreenCallAccess().then((allowed) => {
+      if (allowed !== false) return;
+      Alert.alert(
+        "Enable full-screen call alerts",
+        "Android is currently allowing banner alerts only. Enable full-screen call access so incoming calls can show Answer and Decline over the lock screen.",
+        [
+          { text: "Not now", style: "cancel" },
+          {
+            text: "Open Settings",
+            onPress: () => {
+              void openFullScreenCallSettings();
+            },
+          },
+        ],
+      );
+    });
+  }, [user]);
 
   const checkIncomingCall = useCallback(async () => {
     if (!user || incomingCheckInFlightRef.current) return;

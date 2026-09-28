@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAudioPlayer } from "expo-audio";
 import { router, useLocalSearchParams } from "expo-router";
 import { enterPiPAndroid, useIsInPiPMode } from "@stream-io/video-react-native-sdk";
@@ -29,6 +29,7 @@ interface CallInfo {
   serviceName?: string;
   patientName?: string;
   seekerHospitalName?: string;
+  seekerCity?: string | null;
 }
 
 interface CallStatus {
@@ -53,6 +54,7 @@ interface StreamCredentials {
 export default function CallScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const queryClient = useQueryClient();
   const { bookingId, mode, generation } = useLocalSearchParams<{
     bookingId: string;
     mode?: "voice" | "video";
@@ -69,12 +71,10 @@ export default function CallScreen() {
   const [permissionRequesting, setPermissionRequesting] = useState(false);
   const [streamCredentialsTimedOut, setStreamCredentialsTimedOut] = useState(false);
   const [streamCredentialRetry, setStreamCredentialRetry] = useState(0);
-  const [mediaJoined, setMediaJoined] = useState(false);
   const isInPiPMode = useIsInPiPMode();
   const pipEnteringRef = useRef(false);
+  const returningFromCallRef = useRef(false);
   const acceptedGenerationRef = useRef<string | null>(null);
-  const onMediaJoined = useCallback(() => setMediaJoined(true), []);
-  const onMediaDisconnected = useCallback(() => setMediaJoined(false), []);
   const ringback = useAudioPlayer(require("../../assets/audio/perfusion_ring.wav"));
   const permissionRequestRef = useRef<Promise<boolean> | null>(null);
 
@@ -89,22 +89,50 @@ export default function CallScreen() {
   });
   const callTitle = booking?.seekerHospitalName || booking?.serviceName || "Consultation";
 
-  const { data: callStatus, isLoading: statusLoading, isError: statusError } = useQuery<CallStatus>({
-    queryKey: ["call-status", bookingId],
+  const {
+    data: callStatus,
+    isLoading: statusLoading,
+    isError: statusError,
+    isFetchedAfterMount: statusFetchedAfterMount,
+    refetch: refetchCallStatus,
+  } = useQuery<CallStatus>({
+    queryKey: ["call-status", bookingId, generation || "current"],
     queryFn: async () => {
       const res = await apiFetch(`/api/call/status/${bookingId}`);
       if (!res.ok) throw new Error("Call status unavailable");
       return res.json();
     },
     enabled: !!bookingId,
-    refetchInterval: (query) => query.state.data?.status === "ringing" ? 1000 : 2000,
+    staleTime: 0,
+    refetchOnMount: "always",
+    refetchInterval: (query) => {
+      const status = query.state.data?.status;
+      return status === "ringing" ? 1000 : status === "accepted" ? 2000 : false;
+    },
   });
-  const currentSession = !generation || callStatus?.sessionGeneration === generation;
+  const currentSession =
+    !generation ||
+    !callStatus ||
+    !callStatus.sessionGeneration ||
+    callStatus.sessionGeneration === generation;
   const currentStatus = currentSession ? callStatus?.status : "ended";
   // The session is authoritative; the route mode is only used while it loads.
   const callMode = callStatus?.callType || (mode === "voice" ? "voice" : "video");
 
   const isStreamCall = callStatus?.mediaProvider === "stream";
+  const returnFromCall = useCallback(() => {
+    if (returningFromCallRef.current) return;
+    returningFromCallRef.current = true;
+    queryClient.removeQueries({
+      queryKey: ["call-status", bookingId, generation || "current"],
+    });
+    queryClient.removeQueries({
+      queryKey: ["stream-call-credentials", bookingId, callStatus?.sessionGeneration],
+    });
+    if (router.canGoBack()) router.back();
+    else router.replace("/(tabs)");
+  }, [bookingId, callStatus?.sessionGeneration, generation, queryClient]);
+
   const requestMediaPermissions = useCallback(async () => {
     if (Platform.OS !== "android") return true;
     if (permissionRequestRef.current) return permissionRequestRef.current;
@@ -253,7 +281,7 @@ export default function CallScreen() {
     return `${callStatus.videoRoomUrl}${separator}${params}`;
   }, [callStatus?.videoRoomUrl, callMode, currentStatus, tokenData?.token]);
 
-  const handleEndCall = async () => {
+  const handleEndCall = useCallback(async () => {
     if (endPending) return;
     setEndPending(true);
     setEndError(null);
@@ -265,24 +293,28 @@ export default function CallScreen() {
           method: "POST",
           body: JSON.stringify({ sessionGeneration }),
         });
-        if (!response.ok) throw new Error("Could not cancel the call. Please try again.");
+        if (!response.ok && response.status !== 404 && response.status !== 409) {
+          throw new Error("Could not cancel the call. Please try again.");
+        }
       } else if (currentStatus === "accepted") {
         const response = await apiFetch(`/api/call/end/${bookingId}`, {
           method: "POST",
           body: JSON.stringify({ sessionGeneration }),
         });
-        if (!response.ok) throw new Error("Could not end the call. Please try again.");
+        if (!response.ok && response.status !== 404 && response.status !== 409) {
+          throw new Error("Could not end the call. Please try again.");
+        }
       }
       if (sessionGeneration) {
         await endNativeCallForSession(bookingId, sessionGeneration);
       }
-      router.back();
+      returnFromCall();
     } catch (error) {
       setEndError(error instanceof Error ? error.message : "Could not end the call.");
     } finally {
       setEndPending(false);
     }
-  };
+  }, [bookingId, callStatus?.sessionGeneration, callStatus?.isCaller, currentStatus, endPending, generation, returnFromCall]);
 
   // The system may end a call from the other device, or the accepted session
   // may expire while this screen is open. Never clear another generation's call.
@@ -298,23 +330,55 @@ export default function CallScreen() {
     }
   }, [bookingId, callStatus?.sessionGeneration, currentSession, currentStatus]);
 
+  useEffect(() => {
+    if (!callStatus || statusLoading || (!generation && !statusFetchedAfterMount)) return;
+    const terminal =
+      callStatus.status === "none" ||
+      callStatus.status === "declined" ||
+      callStatus.status === "timeout" ||
+      callStatus.status === "ended" ||
+      (!!generation &&
+        !!callStatus.sessionGeneration &&
+        callStatus.sessionGeneration !== generation);
+    if (!terminal) return;
+
+    const endedGeneration =
+      acceptedGenerationRef.current ||
+      (callStatus.sessionGeneration === generation
+        ? callStatus.sessionGeneration
+        : null);
+    acceptedGenerationRef.current = null;
+    if (endedGeneration) {
+      void endNativeCallForSession(bookingId, endedGeneration);
+    }
+    returnFromCall();
+  }, [
+    bookingId,
+    callStatus,
+    generation,
+    returnFromCall,
+    statusFetchedAfterMount,
+    statusLoading,
+  ]);
+
   // A normal Back would unmount the Stream media while leaving the server call
   // accepted. Keep the Activity and media mounted in Android picture-in-picture.
   useEffect(() => {
     if (Platform.OS !== "android") return;
     const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
       if (isInPiPMode) return true;
+      if (statusLoading && generation) return true;
       if (currentStatus !== "accepted" && currentStatus !== "ringing") return false;
-      if (currentStatus === "accepted" && isStreamCall && mediaJoined) {
+      if (currentStatus === "accepted" && isStreamCall) {
         if (pipEnteringRef.current) return true;
         pipEnteringRef.current = true;
         void Promise.resolve(enterPiPAndroid(9, 16))
           .then((entered) => {
             if (entered === false) {
-              Alert.alert("Picture-in-picture unavailable", "Stay on this screen or end the call using the red button.");
+              Alert.alert("Picture-in-picture unavailable", "The call is still active. Stay on this screen and use the red button when you want to end it.");
             }
           })
-          .catch(() => Alert.alert("Picture-in-picture unavailable", "Stay on this screen or end the call using the red button."))
+          .catch(() => Alert.alert("Picture-in-picture unavailable", "The call is still active. Stay on this screen and use the red button when you want to end it."))
           .finally(() => { pipEnteringRef.current = false; });
       } else {
         Alert.alert(
@@ -329,15 +393,78 @@ export default function CallScreen() {
       return true;
     });
     return () => subscription.remove();
-  }, [currentStatus, isInPiPMode, isStreamCall, mediaJoined, handleEndCall]);
+  }, [currentStatus, generation, handleEndCall, isInPiPMode, isStreamCall, statusLoading]);
 
-  if (statusLoading ||
-      (currentStatus === "accepted" && isStreamCall && streamCredentialsLoading && !streamCredentialsTimedOut) ||
-      (currentStatus === "accepted" && !isStreamCall && !!callStatus?.videoRoomUrl && !roomUrl && !tokenError && !statusError) ||
-      (currentStatus === "accepted" && Platform.OS === "android" && !permissionsReady && !permissionDenied)) {
+  const showConnectingCallUi =
+    statusLoading ||
+    (statusError && !callStatus) ||
+    (currentStatus === "accepted" &&
+      isStreamCall &&
+      streamCredentialsLoading &&
+      !streamCredentialsTimedOut) ||
+    (currentStatus === "accepted" &&
+      !isStreamCall &&
+      !!callStatus?.videoRoomUrl &&
+      !roomUrl &&
+      !tokenError &&
+      !statusError) ||
+    (currentStatus === "accepted" &&
+      Platform.OS === "android" &&
+      !permissionsReady &&
+      !permissionDenied);
+
+  if (showConnectingCallUi) {
     return (
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <ActivityIndicator color={colors.primary} size="large" />
+      <View style={[styles.roomContainer, { backgroundColor: colors.callBackground }]}>
+        <View style={styles.callConnectingCenter}>
+          <View style={[styles.avatarArea, { backgroundColor: `${colors.conversationPrimary}18` }]}>
+            <Ionicons
+              name={callMode === "voice" ? "call-outline" : "videocam-outline"}
+              size={52}
+              color={colors.conversationPrimary}
+            />
+          </View>
+          <Text style={[styles.connectingTitle, { color: colors.callForeground }]}>
+            {callTitle}
+          </Text>
+          {booking?.patientName && (
+            <Text style={styles.patientName}>{booking.patientName}</Text>
+          )}
+          {booking?.seekerCity && (
+            <Text style={styles.patientCity}>City: {booking.seekerCity}</Text>
+          )}
+          {statusError && !callStatus ? (
+            <>
+              <Text style={[styles.roomErrorText, { color: colors.callForeground }]}>
+                Call details could not be loaded. Check your connection and try again.
+              </Text>
+              <Pressable onPress={() => void refetchCallStatus()}>
+                <Text style={[styles.retryText, { color: colors.callForeground }]}>Try again</Text>
+              </Pressable>
+            </>
+          ) : (
+            <>
+              <ActivityIndicator color={colors.callForeground} size="large" />
+              <Text style={[styles.hint, { color: colors.callForeground }]}>
+                Connecting securely to your call…
+              </Text>
+            </>
+          )}
+        </View>
+        {!isInPiPMode && callStatus && (
+          <View style={[styles.roomHeader, { top: insets.top + 8 }]}>
+            <Pressable
+              onPress={handleEndCall}
+              disabled={endPending}
+              style={[styles.leaveRoomButton, { backgroundColor: colors.destructive }]}
+              accessibilityLabel="End call"
+              testID="leave-in-app-call"
+            >
+              <Ionicons name="call" size={22} color={colors.callForeground} style={{ transform: [{ rotate: "135deg" }] }} />
+            </Pressable>
+            {endError && <Text style={[styles.roomErrorText, { color: colors.callForeground }]} accessibilityRole="alert">{endError}</Text>}
+          </View>
+        )}
       </View>
     );
   }
@@ -404,8 +531,6 @@ export default function CallScreen() {
             credentials={streamCredentials}
             voiceCall={callMode === "voice"}
             compact={isInPiPMode}
-            onJoined={onMediaJoined}
-            onDisconnected={onMediaDisconnected}
           />
         ) : streamCredentialsTimedOut ? (
           <View style={styles.roomError}>
@@ -529,6 +654,9 @@ export default function CallScreen() {
         </Text>
         {booking?.patientName && (
           <Text style={styles.patientName}>{booking.patientName}</Text>
+        )}
+        {booking?.seekerCity && (
+          <Text style={styles.patientCity}>City: {booking.seekerCity}</Text>
         )}
         <Text style={[styles.hint, { color: colors.callForeground }]}>
           {currentStatus === "ringing" && callStatus?.isCaller && permissionDenied

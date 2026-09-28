@@ -25,13 +25,11 @@ interface StreamCallMediaProps {
   credentials: StreamCredentials;
   voiceCall: boolean;
   compact?: boolean;
-  onJoined?: () => void;
-  onDisconnected?: () => void;
 }
 
 const STREAM_CONNECT_TIMEOUT_MS = 25000;
 
-export function StreamCallMedia({ credentials, voiceCall, compact = false, onJoined, onDisconnected }: StreamCallMediaProps) {
+export function StreamCallMedia({ credentials, voiceCall, compact = false }: StreamCallMediaProps) {
   const [client, setClient] = useState<StreamVideoClient | null>(null);
   const [call, setCall] = useState<ReturnType<StreamVideoClient["call"]> | null>(null);
   const [connectionError, setConnectionError] = useState<string | null>(null);
@@ -79,11 +77,9 @@ export function StreamCallMedia({ credentials, voiceCall, compact = false, onJoi
         if (disposed || timedOut || !activeClient || !activeCall) return;
         setClient(activeClient);
         setCall(activeCall);
-        onJoined?.();
       })
       .catch(async (error: unknown) => {
         if (!disposed) {
-          onDisconnected?.();
           setConnectionError(
             error instanceof Error
               ? error.message
@@ -99,12 +95,11 @@ export function StreamCallMedia({ credentials, voiceCall, compact = false, onJoi
 
     return () => {
       disposed = true;
-      onDisconnected?.();
       if (timeout) clearTimeout(timeout);
       if (activeCall) void activeCall.leave().catch(() => undefined);
       if (activeClient) void activeClient.disconnectUser().catch(() => undefined);
     };
-  }, [credentials.apiKey, credentials.callId, credentials.callType, credentials.sessionGeneration, credentials.token, credentials.userId, credentials.userName, retryAttempt, voiceCall, onJoined, onDisconnected]);
+  }, [credentials.apiKey, credentials.callId, credentials.callType, credentials.sessionGeneration, credentials.token, credentials.userId, credentials.userName, retryAttempt, voiceCall]);
 
   if (connectionError) {
     return (

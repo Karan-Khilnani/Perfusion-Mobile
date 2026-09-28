@@ -26,6 +26,40 @@ module.exports = (config, options) =>
         "android/src/main/java/expo/modules/callkittelecom",
       );
 
+      replaceExactlyOnce(
+        path.join(javaDir, "ExpoCallKitTelecomModule.kt"),
+        `        Name("ExpoCallKitTelecom")
+
+        // region Events`,
+        `        Name("ExpoCallKitTelecom")
+
+        Function("canUseFullScreenIntent") {
+            val context = appContext.reactContext ?: return@Function false
+            if (android.os.Build.VERSION.SDK_INT < 34) return@Function true
+            val manager = context.getSystemService(android.app.NotificationManager::class.java)
+            manager?.canUseFullScreenIntent() ?: false
+        }
+
+        Function("openFullScreenIntentSettings") {
+            val context = appContext.reactContext ?: return@Function false
+            if (android.os.Build.VERSION.SDK_INT < 34) return@Function true
+            val intent = android.content.Intent(
+                "android.settings.MANAGE_APP_USE_FULL_SCREEN_INTENT",
+            ).apply {
+                data = android.net.Uri.parse("package:\${context.packageName}")
+                addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            try {
+                context.startActivity(intent)
+                true
+            } catch (_: Exception) {
+                false
+            }
+        }
+
+        // region Events`,
+      );
+
       const callManagerFile = path.join(javaDir, "managers/CallManager.kt");
       replaceExactlyOnce(
         callManagerFile,

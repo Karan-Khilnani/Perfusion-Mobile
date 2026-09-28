@@ -1292,7 +1292,12 @@ export async function registerRoutes(
         : "";
       return res.json({
         ...withConsultationLifecycle(booking),
-        ...(isProviderUser ? { seekerHospitalName: seekerUser?.hospitalName?.trim() || seekerName || "Care Seeker" } : {}),
+        ...(isProviderUser
+          ? {
+              seekerHospitalName: seekerUser?.hospitalName?.trim() || seekerName || "Care Seeker",
+              seekerCity: seekerUser?.city?.trim() || null,
+            }
+          : {}),
       });
     } catch (error) {
       return res.status(500).json({ message: "Failed to fetch booking" });
