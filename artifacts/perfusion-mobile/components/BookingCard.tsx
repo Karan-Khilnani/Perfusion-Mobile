@@ -30,6 +30,7 @@ export function BookingCard({ booking, onStatusToggle, statusTogglePending = fal
   const [startingCall, setStartingCall] = useState<"voice" | "video" | null>(null);
   const seeker = isSeekerRole(user?.role);
   const provider = user?.role === "provider";
+  const providerConsultation = provider && booking.bookingType === "consultation";
   const status = booking.bookingType === "consultation" && booking.consultationLifecycleAvailable === false
     ? { label: "Schedule unavailable", dot: palette.warning, text: palette.warning }
     : statusPresentation(booking.status, {
@@ -56,7 +57,10 @@ export function BookingCard({ booking, onStatusToggle, statusTogglePending = fal
   const hospital = seeker ? booking.providerHospital : booking.seekerHospitalName || booking.hospitalName;
   const location = seeker
     ? booking.providerCity || booking.city
-    : booking.seekerHospitalLocation || booking.city;
+    : providerConsultation
+      ? booking.seekerCity || booking.city
+      : booking.seekerHospitalLocation || booking.city;
+  const title = providerConsultation ? hospital || "Consultation" : service;
   const patientContext = seeker ? booking.patientName : null;
   const time = formatTime(booking.appointmentSlot || booking.timeSlot || booking.scheduledDate);
   const callsAvailable =
@@ -111,10 +115,14 @@ export function BookingCard({ booking, onStatusToggle, statusTogglePending = fal
             accessibilityState={{ expanded }}
             testID={`consultation-row-${booking.id}`}
           >
-            <Text style={[styles.title, { color: palette.foreground }]}>{service}</Text>
+            <Text style={[styles.title, { color: palette.foreground }]}>{title}</Text>
             <Text style={[styles.person, { color: palette.foreground }]}>{person || (seeker ? "Consultant" : "Patient")}</Text>
             {patientContext ? <Text style={[styles.patientContext, { color: palette.mutedForeground }]}>For patient: {patientContext}</Text> : null}
-            {(hospital || location) ? (
+            {providerConsultation ? (
+              location ? (
+                <Text style={[styles.place, { color: palette.mutedForeground }]}>· {location}</Text>
+              ) : null
+            ) : (hospital || location) ? (
               <View style={styles.placeLine}>
                 {hospital ? <Text style={[styles.placeStrong, { color: palette.foreground }]}>{hospital}</Text> : null}
                 {location ? <Text style={[styles.place, { color: palette.mutedForeground }]}>{hospital ? ` · ${location}` : location}</Text> : null}
