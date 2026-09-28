@@ -46,13 +46,13 @@ Full healthcare platform with:
 - Provider portal: manage bookings, services, billing
 - Admin portal: users, providers, approvals, analytics, diagnostics
 - Google OAuth + email/password registration with admin approval flow
-- Real-time consultation video rooms (Daily.co)
+- Real-time consultation video rooms (Stream Video by default; Daily is an explicit rollback option)
 - Push notifications, SMS/voice via MSG91/Twilio
 - Razorpay payments, PDF reports, prescriptions
 
 ## User preferences
 
-_Populate as you build — explicit user instructions worth remembering across sessions._
+- Keep mobile consultation calls and their picture-in-picture view portrait (9:16). Ask the owner before any critical call-layout or orientation change.
 
 ## Exotel (phone call masking)
 

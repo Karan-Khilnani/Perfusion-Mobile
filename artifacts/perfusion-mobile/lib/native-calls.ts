@@ -1,3 +1,4 @@
+import { requireNativeModule } from "expo";
 import { Platform } from "react-native";
 import { apiFetch } from "@/hooks/useApi";
 
@@ -38,6 +39,47 @@ async function getCallsModule(): Promise<CallsModule | null> {
     callsModulePromise = import("expo-callkit-telecom").catch(() => null);
   }
   return callsModulePromise;
+}
+
+type FullScreenCallModule = {
+  canUseFullScreenIntent: () => boolean;
+  openFullScreenIntentSettings: () => boolean;
+};
+
+function getFullScreenCallModule(): FullScreenCallModule | null {
+  if (Platform.OS !== "android") return null;
+  try {
+    const module = requireNativeModule<FullScreenCallModule>("ExpoCallKitTelecom");
+    return typeof module.canUseFullScreenIntent === "function" &&
+      typeof module.openFullScreenIntentSettings === "function"
+      ? module
+      : null;
+  } catch {
+    // Expo Go and older native builds do not include this Android-only bridge.
+    return null;
+  }
+}
+
+export function getFullScreenCallAccess(): boolean | null {
+  const module = getFullScreenCallModule();
+  if (!module) return null;
+  try {
+    return module.canUseFullScreenIntent();
+  } catch (error) {
+    console.warn("[native-calls] Could not check full-screen call access", error);
+    return null;
+  }
+}
+
+export function openFullScreenCallSettings(): boolean {
+  const module = getFullScreenCallModule();
+  if (!module) return false;
+  try {
+    return module.openFullScreenIntentSettings();
+  } catch (error) {
+    console.warn("[native-calls] Could not open full-screen call settings", error);
+    return false;
+  }
 }
 
 function bookingIdFromSession(session: CallSession | null): string | null {

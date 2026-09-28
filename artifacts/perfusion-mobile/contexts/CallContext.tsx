@@ -6,15 +6,18 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { AppState, Platform } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Alert, AppState, Platform } from "react-native";
 import { router } from "expo-router";
 
 import { useAuth } from "@/contexts/AuthContext";
 import { apiFetch } from "@/hooks/useApi";
 import {
   endNativeCallForSession,
+  getFullScreenCallAccess,
   getNativeActiveCallSession,
   initializeNativeCalls,
+  openFullScreenCallSettings,
   reportNativeIncomingCall,
 } from "@/lib/native-calls";
 import { getPushDeviceId } from "@/lib/push-device";
@@ -38,6 +41,7 @@ interface CallContextType {
 }
 
 const CallContext = createContext<CallContextType | null>(null);
+const FULL_SCREEN_ACCESS_PROMPTED_KEY = "full-screen-call-access-prompted";
 
 function sessionKey(
   call: Pick<IncomingCallData, "bookingId" | "sessionGeneration">,
@@ -53,6 +57,44 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const nativeReportedSessionRef = useRef<string | null>(null);
   const incomingCheckInFlightRef = useRef(false);
+
+  useEffect(() => {
+    if (Platform.OS !== "android" || !user?.id) return;
+    let active = true;
+
+    void (async () => {
+      // Do not show a setup message when Android already permits full-screen
+      // calls, or in Expo Go / older builds without the native bridge.
+      if (getFullScreenCallAccess() !== false) return;
+      const alreadyPrompted = await AsyncStorage.getItem(FULL_SCREEN_ACCESS_PROMPTED_KEY);
+      if (!active || alreadyPrompted === "true") return;
+      await AsyncStorage.setItem(FULL_SCREEN_ACCESS_PROMPTED_KEY, "true");
+      if (!active) return;
+
+      Alert.alert(
+        "Enable full-screen call alerts",
+        "Android has blocked full-screen call alerts, so incoming calls may appear only as banners. Enable access to show Answer and Decline over the lock screen.",
+        [
+          { text: "Not now", style: "cancel" },
+          {
+            text: "Open Settings",
+            onPress: () => {
+              if (!openFullScreenCallSettings()) {
+                Alert.alert(
+                  "Open Android settings",
+                  "Find Perfusion in your phone's app settings and enable full-screen call alerts.",
+                );
+              }
+            },
+          },
+        ],
+      );
+    })().catch((error) => {
+      console.warn("[call-context] Could not check full-screen call access", error);
+    });
+
+    return () => { active = false; };
+  }, [user?.id]);
 
   const checkIncomingCall = useCallback(async () => {
     if (!user || incomingCheckInFlightRef.current) return;
