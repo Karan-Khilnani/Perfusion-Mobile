@@ -2,13 +2,14 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
-  ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet,
+  ActivityIndicator, Platform, Pressable, StyleSheet,
   Text, TextInput, View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useAuth } from "@/contexts/AuthContext";
 import { useColors } from "@/hooks/useColors";
+import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 
 export default function CallbackDeviceScreen() {
   const colors = useColors();
@@ -51,7 +52,7 @@ export default function CallbackDeviceScreen() {
   };
 
   return (
-    <ScrollView
+    <KeyboardAwareScrollViewCompat
       style={{ flex: 1, backgroundColor: colors.background }}
       contentContainerStyle={[styles.container, {
         paddingTop: Platform.OS === "web" ? 67 + insets.top : 24,
@@ -112,7 +113,7 @@ export default function CallbackDeviceScreen() {
           <Text style={{ color: colors.mutedForeground }}>Sign out</Text>
         </Pressable>
       )}
-    </ScrollView>
+    </KeyboardAwareScrollViewCompat>
   );
 }
 

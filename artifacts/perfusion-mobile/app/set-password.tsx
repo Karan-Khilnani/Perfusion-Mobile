@@ -3,10 +3,8 @@ import { router, useLocalSearchParams } from "expo-router";
 import React, { useState } from "react";
 import {
   ActivityIndicator,
-  KeyboardAvoidingView,
   Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -16,6 +14,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { getBaseUrl } from "@/hooks/useApi";
 import { useColors } from "@/hooks/useColors";
+import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 
 export default function SetPasswordScreen() {
   const colors = useColors();
@@ -79,8 +78,11 @@ export default function SetPasswordScreen() {
   };
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-      <ScrollView contentContainerStyle={[styles.container, { paddingTop: Platform.OS === "web" ? 67 + insets.top : insets.top + 32, paddingBottom: insets.bottom + 24 }]} keyboardShouldPersistTaps="handled">
+    <KeyboardAwareScrollViewCompat
+      style={{ flex: 1, backgroundColor: colors.background }}
+      contentContainerStyle={[styles.container, { paddingTop: Platform.OS === "web" ? 67 + insets.top : insets.top + 32, paddingBottom: insets.bottom + 24 }]}
+      keyboardShouldPersistTaps="handled"
+    >
         <Pressable onPress={() => router.back()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={20} color={colors.foreground} />
           <Text style={[styles.backText, { color: colors.foreground }]}>Back to sign in</Text>
@@ -111,8 +113,7 @@ export default function SetPasswordScreen() {
             </Pressable>
           </>
         )}
-      </ScrollView>
-    </KeyboardAvoidingView>
+    </KeyboardAwareScrollViewCompat>
   );
 }
 

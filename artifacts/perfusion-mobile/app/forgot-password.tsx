@@ -201,7 +201,6 @@ export default function ForgotPasswordScreen() {
       style={[styles.screen, { backgroundColor: colors.background }]}
       contentContainerStyle={[styles.content, contentPadding]}
       keyboardShouldPersistTaps="handled"
-      bottomOffset={72}
       showsVerticalScrollIndicator={false}
     >
       <View style={styles.top}>

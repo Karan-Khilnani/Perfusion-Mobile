@@ -21,6 +21,7 @@ import {
 } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { KeyboardProvider } from "react-native-keyboard-controller";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { IncomingCallOverlay } from "@/components/IncomingCallOverlay";
@@ -193,11 +194,13 @@ export default function RootLayout() {
       <ErrorBoundary>
         <QueryClientProvider client={queryClient}>
           <GestureHandlerRootView style={{ flex: 1 }}>
-            <AuthProvider>
-              <CallProvider>
-                <RootLayoutNav />
-              </CallProvider>
-            </AuthProvider>
+            <KeyboardProvider>
+              <AuthProvider>
+                <CallProvider>
+                  <RootLayoutNav />
+                </CallProvider>
+              </AuthProvider>
+            </KeyboardProvider>
           </GestureHandlerRootView>
         </QueryClientProvider>
       </ErrorBoundary>

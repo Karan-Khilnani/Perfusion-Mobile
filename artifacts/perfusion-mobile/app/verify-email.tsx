@@ -1,9 +1,10 @@
 import { router } from "expo-router";
 import React, { useState } from "react";
-import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput } from "react-native";
 
 import { useAuth } from "@/contexts/AuthContext";
 import { useColors } from "@/hooks/useColors";
+import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 
 export default function VerifyEmailScreen() {
   const colors = useColors();
@@ -40,7 +41,11 @@ export default function VerifyEmailScreen() {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <KeyboardAwareScrollViewCompat
+      style={{ flex: 1, backgroundColor: colors.background }}
+      contentContainerStyle={styles.container}
+      keyboardShouldPersistTaps="handled"
+    >
       <Text style={[styles.title, { color: colors.foreground }]}>Verify your email</Text>
       <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>Enter the 6-digit code sent to your email address.</Text>
       {message && <Text style={[styles.message, { color: colors.primary }]}>{message}</Text>}
@@ -55,12 +60,12 @@ export default function VerifyEmailScreen() {
       <Pressable onPress={() => router.replace("/login")}>
         <Text style={[styles.link, { color: colors.mutedForeground }]}>Back to sign in</Text>
       </Pressable>
-    </View>
+    </KeyboardAwareScrollViewCompat>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 24, justifyContent: "center", gap: 16 },
+  container: { flexGrow: 1, padding: 24, justifyContent: "center", gap: 16 },
   title: { fontSize: 26, fontFamily: "Sora_700Bold" },
   subtitle: { fontSize: 15, fontFamily: "Inter_400Regular", lineHeight: 22 },
   input: { height: 50, borderWidth: 1, borderRadius: 10, paddingHorizontal: 14, fontSize: 18, letterSpacing: 4 },

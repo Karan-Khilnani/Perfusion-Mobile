@@ -4,10 +4,8 @@ import { router } from "expo-router";
 import React, { useState } from "react";
 import {
   ActivityIndicator,
-  KeyboardAvoidingView,
   Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -18,6 +16,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "@/contexts/AuthContext";
 import { useColors } from "@/hooks/useColors";
 import { BrandMark } from "@/components/BrandMark";
+import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 
 export default function LoginScreen() {
   const colors = useColors();
@@ -99,23 +98,20 @@ export default function LoginScreen() {
   };
 
   return (
-    <KeyboardAvoidingView
+    <KeyboardAwareScrollViewCompat
       style={{ flex: 1, backgroundColor: colors.background }}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      contentContainerStyle={[
+        styles.container,
+        {
+          paddingTop:
+            Platform.OS === "web" ? 67 + insets.top : insets.top + 40,
+          paddingBottom:
+            Platform.OS === "web" ? 34 + insets.bottom : insets.bottom + 24,
+        },
+      ]}
+      keyboardShouldPersistTaps="handled"
+      showsVerticalScrollIndicator={false}
     >
-      <ScrollView
-        contentContainerStyle={[
-          styles.container,
-          {
-            paddingTop:
-              Platform.OS === "web" ? 67 + insets.top : insets.top + 40,
-            paddingBottom:
-              Platform.OS === "web" ? 34 + insets.bottom : insets.bottom + 24,
-          },
-        ]}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-      >
         <View style={styles.header}>
           <BrandMark large />
           <Text style={[styles.tagline, { color: colors.mutedForeground }]}>
@@ -319,8 +315,7 @@ export default function LoginScreen() {
         <Text style={[styles.footer, { color: colors.mutedForeground }]}>
           Perfusion — Connecting Care
         </Text>
-      </ScrollView>
-    </KeyboardAvoidingView>
+    </KeyboardAwareScrollViewCompat>
   );
 }
 

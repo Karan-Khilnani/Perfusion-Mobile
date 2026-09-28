@@ -3,10 +3,8 @@ import { router } from "expo-router";
 import React, { useState } from "react";
 import {
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
-  ScrollView,
+  Platform,
   StyleSheet,
   Text,
   TextInput,
@@ -16,6 +14,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useAuth } from "@/contexts/AuthContext";
 import { useColors } from "@/hooks/useColors";
+import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 
 export default function RegisterScreen() {
   const colors = useColors();
@@ -60,20 +59,17 @@ export default function RegisterScreen() {
   };
 
   return (
-    <KeyboardAvoidingView
+    <KeyboardAwareScrollViewCompat
       style={{ flex: 1, backgroundColor: colors.background }}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      contentContainerStyle={[
+        styles.container,
+        {
+          paddingTop: Platform.OS === "web" ? 67 + insets.top : insets.top + 32,
+          paddingBottom: Platform.OS === "web" ? 34 + insets.bottom : insets.bottom + 24,
+        },
+      ]}
+      keyboardShouldPersistTaps="handled"
     >
-      <ScrollView
-        contentContainerStyle={[
-          styles.container,
-          {
-            paddingTop: Platform.OS === "web" ? 67 + insets.top : insets.top + 32,
-            paddingBottom: Platform.OS === "web" ? 34 + insets.bottom : insets.bottom + 24,
-          },
-        ]}
-        keyboardShouldPersistTaps="handled"
-      >
         <Pressable onPress={() => router.back()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={20} color={colors.foreground} />
           <Text style={[styles.backText, { color: colors.foreground }]}>Back to sign in</Text>
@@ -101,8 +97,7 @@ export default function RegisterScreen() {
         <Pressable onPress={handleRegister} disabled={loading} style={[styles.primaryButton, { backgroundColor: loading ? `${colors.primary}80` : colors.primary }]}>
           {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryButtonText}>Create account</Text>}
         </Pressable>
-      </ScrollView>
-    </KeyboardAvoidingView>
+    </KeyboardAwareScrollViewCompat>
   );
 }
 

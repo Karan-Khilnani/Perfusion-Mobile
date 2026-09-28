@@ -18,6 +18,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { apiFetch } from "@/hooks/useApi";
 import { useColors } from "@/hooks/useColors";
+import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 
 type Consultant = {
   id: string;
@@ -129,7 +130,12 @@ export default function NewConsultationScreen() {
       </View>
 
       {step === "explore" ? (
-        <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 24 }]} showsVerticalScrollIndicator={false}>
+        <KeyboardAwareScrollViewCompat
+          style={{ flex: 1 }}
+          contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 24 }]}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
           <View style={[styles.search, { backgroundColor: palette.card, borderColor: palette.border }]}>
             <Feather name="search" size={17} color={palette.mutedForeground} />
             <TextInput value={search} onChangeText={setSearch} placeholder="Search consultants" placeholderTextColor={palette.mutedForeground} style={[styles.searchInput, { color: palette.foreground }]} />
@@ -170,9 +176,13 @@ export default function NewConsultationScreen() {
                   : "No consultants have upcoming availability."}
             </Text>
           )}
-        </ScrollView>
+        </KeyboardAwareScrollViewCompat>
       ) : (
-        <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 28 }]} keyboardShouldPersistTaps="handled">
+        <KeyboardAwareScrollViewCompat
+          style={{ flex: 1 }}
+          contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 28 }]}
+          keyboardShouldPersistTaps="handled"
+        >
           <View style={[styles.selectedCard, { backgroundColor: palette.card, borderColor: palette.border }]}>
             <View style={[styles.photo, { backgroundColor: palette.accent }]}><Feather name="user" size={22} color={palette.mutedForeground} /></View>
             <View style={{ flex: 1 }}>
@@ -223,7 +233,7 @@ export default function NewConsultationScreen() {
           <Pressable disabled={!valid} onPress={() => setConfirming(true)} style={[styles.bookButton, { backgroundColor: valid ? palette.primary : palette.muted }]}>
             <Text style={[styles.bookButtonText, { color: valid ? "#FFFFFF" : palette.mutedForeground }]}>Book Consultation</Text>
           </Pressable>
-        </ScrollView>
+        </KeyboardAwareScrollViewCompat>
       )}
 
       <Modal transparent visible={confirming} animationType="slide" onRequestClose={() => setConfirming(false)}>

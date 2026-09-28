@@ -22,6 +22,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiFetch } from "@/hooks/useApi";
 import { useColors } from "@/hooks/useColors";
+import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 import {
   type AttachmentCategory,
   type AttachmentDraft,
@@ -595,7 +596,10 @@ function CaseFileSheet({
             </View>
             <Pressable onPress={onClose} disabled={uploading} style={styles.iconButton}><Feather name="x" size={20} color={palette.foreground} /></Pressable>
           </View>
-          <ScrollView contentContainerStyle={styles.sheetContent} keyboardShouldPersistTaps="handled">
+          <KeyboardAwareScrollViewCompat
+            contentContainerStyle={styles.sheetContent}
+            keyboardShouldPersistTaps="handled"
+          >
             {type === "summary" && (
               <>
                 <InfoSection label="ALLERGIES" value={aggregate.summary.allergies} warning />
@@ -778,7 +782,7 @@ function CaseFileSheet({
                 </Pressable>
               </>
             )}
-          </ScrollView>
+          </KeyboardAwareScrollViewCompat>
         </View>
       </View>
     </Modal>
