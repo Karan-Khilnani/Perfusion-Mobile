@@ -26,7 +26,7 @@ import { resolveConsultationLifecycle } from "../services/consultation-lifecycle
 import { notifyMobileCallEnded, notifyMobileIncomingCall } from "../services/mobile-call-push";
 import { getConsultantAvailabilityPreview } from "../services/consultant-availability";
 import { normalizeComorbidities } from "../services/patient-comorbidities";
-import { randomUUID } from "crypto";
+import { createHash, randomUUID } from "crypto";
 import { StreamClient } from "@stream-io/node-sdk";
 
 function callMediaProvider(videoRoomUrl?: string | null): "daily" | "stream" {
@@ -295,9 +295,18 @@ const caseFileUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 25 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
-    const allowedTypes = ["application/pdf", "image/jpeg", "image/png", "image/gif", "application/dicom"];
-    if (allowedTypes.includes(file.mimetype) || file.originalname.toLowerCase().endsWith(".dcm")) cb(null, true);
-    else cb(new Error("Invalid file type. Allowed: PDF, JPEG, PNG, GIF, or DICOM"));
+    const allowedTypes = [
+      "application/pdf",
+      "image/jpeg",
+      "image/png",
+      "image/gif",
+      "application/dicom",
+      "application/msword",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ];
+    const allowedExtensions = /\.(pdf|jpe?g|png|gif|dcm|docx?)$/i;
+    if (allowedTypes.includes(file.mimetype) || allowedExtensions.test(file.originalname)) cb(null, true);
+    else cb(new Error("Invalid file type. Allowed: PDF, images, DICOM, DOC, or DOCX"));
   },
 });
 
@@ -1569,6 +1578,10 @@ export async function registerRoutes(
       const access = await getCaseFileParticipant(req.params.bookingId, req.user);
       if (!access.booking) return res.status(404).json({ message: "Booking not found" });
       if (!access.allowed) return res.status(403).json({ message: "Access denied" });
+      const disposition = String(req.query.disposition || "attachment").toLowerCase();
+      if (!["inline", "attachment"].includes(disposition)) {
+        return res.status(400).json({ message: "disposition must be inline or attachment" });
+      }
       const row = (await getPool().query(
         "SELECT object_path, original_filename FROM case_file_attachments WHERE id = $1 AND booking_id = $2",
         [req.params.attachmentId, access.booking.id],
@@ -1579,7 +1592,7 @@ export async function registerRoutes(
       const url = await createPrivateCaseFileSignedUrl(
         String(row.object_path),
         expiresIn,
-        downloadName,
+        disposition === "attachment" ? downloadName : undefined,
       );
       res.json({ url, expiresIn });
     } catch (error) {
@@ -1728,39 +1741,145 @@ export async function registerRoutes(
       const access = await getCaseFileParticipant(req.params.bookingId, req.user);
       if (!access.booking) return res.status(404).json({ message: "Booking not found" });
       if (!access.allowed || (!access.isSeeker && !access.isProvider)) return res.status(403).json({ message: "Only Case File participants may attach files" });
-      if (caseFileReadOnly(access.booking)) return res.status(403).json({ message: "This Case File is read-only" });
       const category = access.isProvider ? "uncategorized" : String(req.body?.category || "uncategorized").toLowerCase();
       if (access.isSeeker && !CASE_FILE_SEEKER_CATEGORIES.has(category)) return res.status(400).json({ message: "Seeker attachments require Lab, Radiology, Treatment Chart, or General category" });
       if (!req.file) return res.status(400).json({ message: "No file uploaded" });
       const source = ["camera", "photo_gallery", "document"].includes(String(req.body?.source || "document"))
         ? String(req.body?.source || "document")
         : "document";
-      let fileUrl: string;
+
+      const digest = createHash("sha256");
+      for (const part of [access.booking.id, req.user.id, source, category, req.file.originalname, req.file.mimetype]) {
+        digest.update(String(part)).update("\0");
+      }
+      digest.update(req.file.buffer);
+      const stableId = digest.digest("hex");
+      const messageId = `case-file-message-${stableId}`;
+      const attachmentId = `case-file-attachment-${stableId}`;
+      const pool = getPool();
+      const findExisting = async () => (await pool.query(
+        `SELECT m.id AS message_id, m.booking_id, m.sender_user_id, m.sender_role, m.kind, m.body,
+                m.created_at AS message_created_at, a.id AS attachment_id, a.original_filename,
+                a.mime_type, a.byte_size, a.source, a.category, a.uploader_user_id, a.uploader_role,
+                a.created_at AS attachment_created_at
+         FROM case_file_attachments a
+         JOIN case_file_messages m ON m.id = a.message_id
+         WHERE a.id = $1`,
+        [attachmentId],
+      )).rows[0];
+      const messageResponse = (row: any) => ({
+        id: row.message_id,
+        bookingId: row.booking_id,
+        senderUserId: row.sender_user_id,
+        senderRole: row.sender_role,
+        kind: row.kind,
+        body: row.body,
+        createdAt: row.message_created_at,
+        attachment: {
+          id: row.attachment_id,
+          bookingId: row.booking_id,
+          messageId: row.message_id,
+          uploaderUserId: row.uploader_user_id,
+          uploaderRole: row.uploader_role,
+          originalFilename: row.original_filename,
+          mimeType: row.mime_type,
+          byteSize: row.byte_size,
+          objectPath: null,
+          legacyUrl: null,
+          source: row.source,
+          category: row.category,
+          createdAt: row.attachment_created_at,
+        },
+      });
+
+      const existing = await findExisting();
+      if (existing) {
+        if (existing.booking_id !== access.booking.id || existing.uploader_user_id !== req.user.id) {
+          return res.status(409).json({ message: "This document upload conflicts with an existing attachment." });
+        }
+        return res.status(200).json(messageResponse(existing));
+      }
+      if (caseFileReadOnly(access.booking)) return res.status(403).json({ message: "This Case File is read-only" });
+
+      let fileUrl: string | null = null;
       try {
         if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) throw new Error("Supabase storage is not configured");
-        fileUrl = await uploadPrivateCaseFile(req.file.buffer, req.file.originalname, req.file.mimetype);
+        fileUrl = await uploadPrivateCaseFile(req.file.buffer, req.file.originalname, req.file.mimetype, attachmentId);
       } catch (error) {
         if (process.env.NODE_ENV === "production") return res.status(503).json({ message: "File storage is temporarily unavailable. Please try again later." });
         throw error;
       }
-      const pool = getPool();
       const client = await pool.connect();
-      const messageId = randomUUID();
-      const attachmentId = randomUUID();
       const now = new Date();
       try {
         await client.query("BEGIN");
         await client.query("INSERT INTO case_file_messages (id, booking_id, sender_user_id, sender_role, kind, created_at) VALUES ($1,$2,$3,$4,'attachment',$5)", [messageId, access.booking.id, req.user.id, req.user.role, now]);
         await client.query("INSERT INTO case_file_attachments (id, booking_id, message_id, uploader_user_id, uploader_role, original_filename, mime_type, byte_size, object_path, source, category, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)", [attachmentId, access.booking.id, messageId, req.user.id, req.user.role, req.file.originalname, req.file.mimetype, req.file.size, fileUrl, source, category, now]);
+        const bookingDocumentUrl = `/api/bookings/${encodeURIComponent(access.booking.id)}/case-file/attachments/${encodeURIComponent(attachmentId)}/download`;
+        if (category === "general") {
+          await client.query(
+            `UPDATE bookings
+             SET document_urls = CASE
+               WHEN $2 = ANY(COALESCE(document_urls, ARRAY[]::text[])) THEN COALESCE(document_urls, ARRAY[]::text[])
+               ELSE array_append(COALESCE(document_urls, ARRAY[]::text[]), $2)
+             END
+             WHERE id = $1`,
+            [access.booking.id, bookingDocumentUrl],
+          );
+        } else if (category === "treatment_chart") {
+          await client.query(
+            `UPDATE bookings
+             SET treatment_chart_urls = CASE
+               WHEN $2 = ANY(COALESCE(treatment_chart_urls, ARRAY[]::text[])) THEN COALESCE(treatment_chart_urls, ARRAY[]::text[])
+               ELSE array_append(COALESCE(treatment_chart_urls, ARRAY[]::text[]), $2)
+             END
+             WHERE id = $1`,
+            [access.booking.id, bookingDocumentUrl],
+          );
+        }
         await client.query("COMMIT");
       } catch (error) {
         await client.query("ROLLBACK");
+        const duplicate = await findExisting();
+        if (duplicate && duplicate.booking_id === access.booking.id && duplicate.uploader_user_id === req.user.id) {
+          return res.status(200).json(messageResponse(duplicate));
+        }
+        if (fileUrl) {
+          try {
+            await deletePrivateCaseFile(fileUrl);
+          } catch (cleanupError) {
+            req.log?.warn({ err: cleanupError }, "Case File attachment cleanup failed");
+          }
+        }
         throw error;
       } finally {
         client.release();
       }
       broadcastCaseFileUpdate(access.booking, { type: "case_file_updated", bookingId: access.booking.id, change: "attachment_finalized", messageId });
-      res.status(201).json({ id: messageId, bookingId: access.booking.id, senderUserId: req.user.id, senderRole: req.user.role, kind: "attachment", body: null, createdAt: now, attachment: { id: attachmentId, bookingId: access.booking.id, messageId, uploaderUserId: req.user.id, uploaderRole: req.user.role, originalFilename: req.file.originalname, mimeType: req.file.mimetype, byteSize: req.file.size, objectPath: null, legacyUrl: null, source, category, createdAt: now } });
+      res.status(201).json({
+        id: messageId,
+        bookingId: access.booking.id,
+        senderUserId: req.user.id,
+        senderRole: req.user.role,
+        kind: "attachment",
+        body: null,
+        createdAt: now,
+        attachment: {
+          id: attachmentId,
+          bookingId: access.booking.id,
+          messageId,
+          uploaderUserId: req.user.id,
+          uploaderRole: req.user.role,
+          originalFilename: req.file.originalname,
+          mimeType: req.file.mimetype,
+          byteSize: req.file.size,
+          objectPath: null,
+          legacyUrl: null,
+          source,
+          category,
+          createdAt: now,
+        },
+      });
     } catch (error) {
       req.log?.error({ err: error }, "Case File attachment failed");
       res.status(500).json({ message: "Failed to upload attachment" });

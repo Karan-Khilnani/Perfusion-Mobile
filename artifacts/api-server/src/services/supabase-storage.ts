@@ -64,14 +64,20 @@ export async function uploadPrivateCaseFile(
   buffer: Buffer,
   originalName: string,
   mimeType: string,
+  idempotencyId?: string,
 ): Promise<string> {
   const client = getClient();
   await ensureCaseFileBucket(client);
   const ext = path.extname(originalName);
-  const objectPath = `attachments/${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`;
+  if (idempotencyId && !/^[a-zA-Z0-9_-]{1,128}$/.test(idempotencyId)) {
+    throw new Error("Invalid Case File upload identifier");
+  }
+  const objectPath = idempotencyId
+    ? `attachments/${idempotencyId}${ext}`
+    : `attachments/${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`;
   const { error } = await client.storage.from(CASE_FILE_BUCKET).upload(objectPath, buffer, {
     contentType: mimeType,
-    upsert: false,
+    upsert: Boolean(idempotencyId),
   });
   if (error) throw new Error(`Private Case File upload failed: ${error.message}`);
   return objectPath;

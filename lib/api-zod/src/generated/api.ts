@@ -551,6 +551,31 @@ export const CreateCaseFileAttachmentBody = zod.object({
   "category": zod.enum(['lab', 'radiology', 'treatment_chart', 'general', 'uncategorized']).optional()
 })
 
+export const CreateCaseFileAttachmentResponse = zod.object({
+  "id": zod.string(),
+  "bookingId": zod.string(),
+  "senderUserId": zod.string(),
+  "senderRole": zod.string(),
+  "kind": zod.string(),
+  "body": zod.string().nullish(),
+  "createdAt": zod.coerce.date(),
+  "attachment": zod.union([zod.object({
+  "id": zod.string(),
+  "bookingId": zod.string(),
+  "messageId": zod.string().nullish(),
+  "uploaderUserId": zod.string().optional(),
+  "uploaderRole": zod.string().optional(),
+  "originalFilename": zod.string().nullish(),
+  "mimeType": zod.string().nullish(),
+  "byteSize": zod.number().nullish(),
+  "objectPath": zod.string().nullish(),
+  "legacyUrl": zod.string().nullish(),
+  "source": zod.string(),
+  "category": zod.string(),
+  "createdAt": zod.coerce.date()
+}),zod.null()]).optional()
+})
+
 
 /**
  * @summary Toggle Seeker follow-up call/video access
@@ -591,6 +616,12 @@ export const DownloadCaseFileAttachmentParams = zod.object({
 export const GetCaseFileAttachmentSignedUrlParams = zod.object({
   "bookingId": zod.coerce.string(),
   "attachmentId": zod.coerce.string()
+})
+
+export const getCaseFileAttachmentSignedUrlQueryDispositionDefault = `attachment`;
+
+export const GetCaseFileAttachmentSignedUrlQueryParams = zod.object({
+  "disposition": zod.enum(['inline', 'attachment']).default(getCaseFileAttachmentSignedUrlQueryDispositionDefault).describe('Whether the short-lived link opens inline or downloads as an attachment')
 })
 
 export const GetCaseFileAttachmentSignedUrlResponse = zod.object({

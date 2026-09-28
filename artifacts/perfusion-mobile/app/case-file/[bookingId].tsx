@@ -77,6 +77,7 @@ export default function CaseFileScreen() {
   const [attachmentCategory, setAttachmentCategory] = useState<AttachmentCategory | null>(null);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [openingAttachmentId, setOpeningAttachmentId] = useState<string | null>(null);
   const [startingCall, setStartingCall] = useState<"voice" | "video" | null>(null);
   const [callError, setCallError] = useState<string | null>(null);
 
@@ -121,6 +122,22 @@ export default function CaseFileScreen() {
           { text: "Open Settings", onPress: () => void Linking.openSettings() },
         ]);
       }
+    }
+  };
+
+  const openCaseFileAttachment = async (attachmentId: string, disposition: "inline" | "attachment") => {
+    if (openingAttachmentId) return;
+    setOpeningAttachmentId(attachmentId);
+    try {
+      const { url } = await requestJson<{ url: string }>(
+        `/api/bookings/${encodeURIComponent(bookingId)}/case-file/attachments/${encodeURIComponent(attachmentId)}/signed-url?disposition=${disposition}`,
+      );
+      await Linking.openURL(url);
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : "The file could not be opened.";
+      Alert.alert(disposition === "inline" ? "Could not open file" : "Could not download file", reason);
+    } finally {
+      setOpeningAttachmentId(null);
     }
   };
 
@@ -332,8 +349,9 @@ export default function CaseFileScreen() {
           <MessageBubble
             message={item}
             own={item.senderUserId === user?.id}
-            bookingId={bookingId}
             onAdvisory={() => setSheet("trail")}
+            onAttachmentAction={(attachmentId, disposition) => void openCaseFileAttachment(attachmentId, disposition)}
+            openingAttachmentId={openingAttachmentId}
           />
         )}
         ListHeaderComponent={sortedMessages.length === 0 ? (
@@ -415,7 +433,19 @@ function VitalCell({ label, value, detail }: { label: string; value: string; det
   );
 }
 
-function MessageBubble({ message, own, bookingId, onAdvisory }: { message: CaseFileMessage; own: boolean; bookingId: string; onAdvisory: () => void }) {
+function MessageBubble({
+  message,
+  own,
+  onAdvisory,
+  onAttachmentAction,
+  openingAttachmentId,
+}: {
+  message: CaseFileMessage;
+  own: boolean;
+  onAdvisory: () => void;
+  onAttachmentAction: (attachmentId: string, disposition: "inline" | "attachment") => void;
+  openingAttachmentId: string | null;
+}) {
   const palette = useColors();
   const advisory = message.kind === "advisory";
   const senderLabel = own
@@ -424,6 +454,49 @@ function MessageBubble({ message, own, bookingId, onAdvisory }: { message: CaseF
       ? "Consultant"
       : "Treating team";
   const time = new Date(message.createdAt).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" });
+  const bubbleStyle = [
+    styles.bubble,
+    own && !advisory ? styles.ownBubble : styles.otherBubble,
+    advisory && { backgroundColor: palette.advisoryBackground, borderColor: palette.advisoryBorder },
+    !advisory && { backgroundColor: own ? palette.conversationPrimary : palette.conversationCard, borderColor: own ? palette.conversationPrimary : palette.conversationBorder },
+  ];
+  const bubbleContent = (
+    <>
+      {advisory && (
+        <View style={styles.advisoryHeading}>
+          <Feather name="shield" size={15} color={palette.advisoryForeground} />
+          <Text style={[styles.advisoryTitle, { color: palette.advisoryForeground }]}>Clinical Advisory</Text>
+          <View style={[styles.signedBadge, { backgroundColor: `${palette.advisoryForeground}18` }]}>
+            <Text style={[styles.signedBadgeText, { color: palette.advisoryForeground }]}>SIGNED</Text>
+          </View>
+        </View>
+      )}
+      {message.attachment && (
+        <View style={styles.attachmentHeading}>
+          <View style={[styles.attachmentIcon, { backgroundColor: own ? "rgba(255,255,255,.14)" : palette.conversationSoft }]}>
+            <Feather name="file-text" size={16} color={own ? palette.conversationPrimaryForeground : palette.conversationPrimary} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.attachmentName, { color: own ? palette.conversationPrimaryForeground : palette.foreground }]}>{message.attachment.originalFilename || "Clinical file"}</Text>
+            <Text style={[styles.attachmentMeta, { color: own ? "rgba(255,255,255,.68)" : palette.conversationMuted }]}>
+              {message.attachment.category?.replace("_", " ") || "Clinical attachment"}
+              {message.attachment.byteSize ? ` · ${Math.max(1, Math.round(message.attachment.byteSize / 1024))} KB` : ""}
+            </Text>
+          </View>
+        </View>
+      )}
+      {!!message.body && <Text style={[styles.messageText, { color: own && !advisory ? palette.conversationPrimaryForeground : palette.foreground }]}>{message.body}</Text>}
+      {advisory && (
+        <View style={styles.advisoryFooter}>
+          <Feather name="lock" size={11} color={palette.advisoryForeground} />
+          <Text style={[styles.advisoryMeta, { color: palette.advisoryForeground }]}>Permanent signed record · {time}</Text>
+          <Text style={[styles.fullAdvisory, { color: palette.advisoryForeground }]}>View full</Text>
+        </View>
+      )}
+      {!advisory && <Text style={[styles.messageTime, { color: own ? "rgba(255,255,255,.65)" : palette.conversationMuted }]}>{time}</Text>}
+    </>
+  );
+
   return (
     <View style={[styles.messageRow, { alignItems: own ? "flex-end" : "flex-start" }]}>
       {!advisory && (
@@ -440,50 +513,35 @@ function MessageBubble({ message, own, bookingId, onAdvisory }: { message: CaseF
           </Text>
         </View>
       )}
-      <Pressable
-        disabled={!advisory && !message.attachment}
-        onPress={advisory ? onAdvisory : undefined}
-        style={[
-          styles.bubble,
-          own && !advisory ? styles.ownBubble : styles.otherBubble,
-          advisory && { backgroundColor: palette.advisoryBackground, borderColor: palette.advisoryBorder },
-          !advisory && { backgroundColor: own ? palette.conversationPrimary : palette.conversationCard, borderColor: own ? palette.conversationPrimary : palette.conversationBorder },
-        ]}
-      >
-        {advisory && (
-          <View style={styles.advisoryHeading}>
-            <Feather name="shield" size={15} color={palette.advisoryForeground} />
-            <Text style={[styles.advisoryTitle, { color: palette.advisoryForeground }]}>Clinical Advisory</Text>
-            <View style={[styles.signedBadge, { backgroundColor: `${palette.advisoryForeground}18` }]}>
-              <Text style={[styles.signedBadgeText, { color: palette.advisoryForeground }]}>SIGNED</Text>
-            </View>
-          </View>
-        )}
+      <View style={[styles.messageContent, own && styles.messageContentOwn]}>
+        {advisory
+          ? <Pressable onPress={onAdvisory} style={bubbleStyle} accessibilityRole="button" accessibilityLabel="View Clinical Advisory">{bubbleContent}</Pressable>
+          : <View style={bubbleStyle}>{bubbleContent}</View>}
         {message.attachment && (
-          <View style={styles.attachmentHeading}>
-            <View style={[styles.attachmentIcon, { backgroundColor: own ? "rgba(255,255,255,.14)" : palette.conversationSoft }]}>
-              <Feather name="file-text" size={16} color={own ? palette.conversationPrimaryForeground : palette.conversationPrimary} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.attachmentName, { color: own ? palette.conversationPrimaryForeground : palette.foreground }]}>{message.attachment.originalFilename || "Clinical file"}</Text>
-              <Text style={[styles.attachmentMeta, { color: own ? "rgba(255,255,255,.68)" : palette.conversationMuted }]}>
-                {message.attachment.category?.replace("_", " ") || "Clinical attachment"}
-                {message.attachment.byteSize ? ` · ${Math.max(1, Math.round(message.attachment.byteSize / 1024))} KB` : ""}
+          <View style={[styles.attachmentActions, own && styles.attachmentActionsOwn]}>
+            <Pressable
+              disabled={openingAttachmentId === message.attachment.id}
+              onPress={() => onAttachmentAction(message.attachment!.id, "inline")}
+              style={[styles.attachmentActionButton, { backgroundColor: palette.conversationSoft }]}
+              accessibilityRole="button"
+              accessibilityLabel={`Preview ${message.attachment.originalFilename || "clinical file"}`}
+            >
+              <Text style={[styles.attachmentAction, { color: palette.conversationPrimary }]}>
+                {openingAttachmentId === message.attachment.id ? "Opening…" : "Preview / open"}
               </Text>
-            </View>
+            </Pressable>
+            <Pressable
+              disabled={openingAttachmentId === message.attachment.id}
+              onPress={() => onAttachmentAction(message.attachment!.id, "attachment")}
+              style={[styles.attachmentActionButton, { backgroundColor: palette.conversationSoft }]}
+              accessibilityRole="button"
+              accessibilityLabel={`Download original ${message.attachment.originalFilename || "clinical file"}`}
+            >
+              <Text style={[styles.attachmentAction, { color: palette.conversationPrimary }]}>Download original</Text>
+            </Pressable>
           </View>
         )}
-        {!!message.body && <Text style={[styles.messageText, { color: own && !advisory ? palette.conversationPrimaryForeground : palette.foreground }]}>{message.body}</Text>}
-        {message.attachment && <Text style={[styles.attachmentAction, { color: own ? palette.conversationPrimaryForeground : palette.conversationPrimary }]}>Tap to preview</Text>}
-        {advisory && (
-          <View style={styles.advisoryFooter}>
-            <Feather name="lock" size={11} color={palette.advisoryForeground} />
-            <Text style={[styles.advisoryMeta, { color: palette.advisoryForeground }]}>Permanent signed record · {time}</Text>
-            <Text style={[styles.fullAdvisory, { color: palette.advisoryForeground }]}>View full</Text>
-          </View>
-        )}
-        {!advisory && <Text style={[styles.messageTime, { color: own ? "rgba(255,255,255,.65)" : palette.conversationMuted }]}>{time}</Text>}
-      </Pressable>
+      </View>
     </View>
   );
 }
@@ -538,7 +596,7 @@ function CaseFileSheet({
     setDownloadingAdvisoryId(item.id);
     try {
       const { url } = await requestJson<{ url: string }>(
-        `/api/bookings/${bookingId}/case-file/attachments/${attachmentId}/signed-url`,
+        `/api/bookings/${bookingId}/case-file/attachments/${attachmentId}/signed-url?disposition=inline`,
       );
       await Linking.openURL(url);
     } catch (error) {
@@ -859,12 +917,14 @@ const styles = StyleSheet.create({
   dateLine: { height: StyleSheet.hairlineWidth, width: 42 },
   dateText: { fontSize: 9, letterSpacing: 0.5, fontFamily: "Inter_500Medium" },
   messageRow: { marginVertical: 3 },
+  messageContent: { width: "88%", alignSelf: "flex-start" },
+  messageContentOwn: { alignSelf: "flex-end" },
   senderLine: { flexDirection: "row", alignItems: "center", gap: 5, marginBottom: 4, marginLeft: 4 },
   senderLineOwn: { marginRight: 4, marginLeft: 0 },
   senderAvatar: { width: 17, height: 17, borderRadius: 9, alignItems: "center", justifyContent: "center" },
   senderInitials: { fontSize: 7, fontFamily: "Inter_700Bold" },
   senderLabel: { fontSize: 9, fontFamily: "Inter_600SemiBold" },
-  bubble: { maxWidth: "84%", borderWidth: 1, paddingHorizontal: 12, paddingVertical: 10 },
+  bubble: { maxWidth: "100%", borderWidth: 1, paddingHorizontal: 12, paddingVertical: 10 },
   ownBubble: { borderTopRightRadius: 4, borderTopLeftRadius: 16, borderBottomLeftRadius: 16, borderBottomRightRadius: 16 },
   otherBubble: { borderTopLeftRadius: 4, borderTopRightRadius: 16, borderBottomLeftRadius: 16, borderBottomRightRadius: 16 },
   advisoryHeading: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 7 },
@@ -876,6 +936,9 @@ const styles = StyleSheet.create({
   attachmentName: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
   attachmentMeta: { fontSize: 9, marginTop: 2, fontFamily: "Inter_400Regular", textTransform: "capitalize" },
   attachmentAction: { fontSize: 10, marginTop: 6, fontFamily: "Inter_600SemiBold" },
+  attachmentActions: { flexDirection: "row", flexWrap: "wrap", justifyContent: "flex-start", gap: 6, marginTop: 6 },
+  attachmentActionsOwn: { justifyContent: "flex-end" },
+  attachmentActionButton: { borderRadius: 10, paddingHorizontal: 9, paddingVertical: 6 },
   messageText: { fontSize: 12, lineHeight: 18, fontFamily: "Inter_400Regular" },
   advisoryFooter: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 8 },
   advisoryMeta: { fontSize: 9, fontFamily: "Inter_500Medium" },

@@ -4,6 +4,7 @@ import { router } from "expo-router";
 import React, { useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Modal,
   Platform,
   Pressable,
@@ -19,6 +20,11 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { apiFetch } from "@/hooks/useApi";
 import { useColors } from "@/hooks/useColors";
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
+import {
+  type AttachmentDraft,
+  pickCaseFileAttachment,
+  uploadCaseFileAttachment,
+} from "@/lib/case-file-attachments";
 
 type Consultant = {
   id: string;
@@ -53,6 +59,11 @@ export default function NewConsultationScreen() {
   const [selected, setSelected] = useState<{ consultant: Consultant; slot: string } | null>(null);
   const [confirming, setConfirming] = useState(false);
   const [allergyNotSpecified, setAllergyNotSpecified] = useState(true);
+  const [reportFiles, setReportFiles] = useState<AttachmentDraft[]>([]);
+  const [chartFiles, setChartFiles] = useState<AttachmentDraft[]>([]);
+  const [createdBooking, setCreatedBooking] = useState<{ id?: string } | null>(null);
+  const [attachmentUploadError, setAttachmentUploadError] = useState<string | null>(null);
+  const [uploadingAttachments, setUploadingAttachments] = useState(false);
   const [form, setForm] = useState({
     patientName: "", patientAge: "", patientGender: "", patientPhone: "", patientWeight: "", uhidIpNumber: "",
     allergies: "", comorbidities: "", presentingComplaint: "", presentIllness: "",
@@ -74,6 +85,49 @@ export default function NewConsultationScreen() {
     const availabilityMatch = !todayOnly || item.availabilityPreview?.label === "Available Today";
     return specialtyMatch && text.includes(search.trim().toLowerCase()) && availabilityMatch;
   }), [consultants.data, search, specialty, todayOnly]);
+
+  const finishBooking = (booking: { id?: string }) => {
+    queryClient.invalidateQueries({ queryKey: ["consultations"] });
+    setConfirming(false);
+    router.replace(booking.id ? `/case-file/${booking.id}` : "/(tabs)");
+  };
+
+  const uploadBookingDocuments = async (booking: { id?: string }) => {
+    if (!booking.id) {
+      setAttachmentUploadError("The booking was saved, but its Case File could not be identified.");
+      return;
+    }
+    setUploadingAttachments(true);
+    setAttachmentUploadError(null);
+    try {
+      for (const file of reportFiles) {
+        await uploadCaseFileAttachment(booking.id, file, "general");
+      }
+      for (const file of chartFiles) {
+        await uploadCaseFileAttachment(booking.id, file, "treatment_chart");
+      }
+      setCreatedBooking(null);
+      finishBooking(booking);
+    } catch (error) {
+      setAttachmentUploadError(error instanceof Error ? error.message : "Please retry the document uploads.");
+    } finally {
+      setUploadingAttachments(false);
+    }
+  };
+
+  const chooseBookingDocument = async (kind: "report" | "chart") => {
+    try {
+      const file = await pickCaseFileAttachment("document");
+      if (!file) return;
+      const addFile = (current: AttachmentDraft[]) => current.some((existing) =>
+        existing.uri === file.uri || (existing.name === file.name && existing.size === file.size)
+      ) ? current : [...current, file];
+      if (kind === "report") setReportFiles(addFile);
+      else setChartFiles(addFile);
+    } catch (error) {
+      Alert.alert("Could not add file", error instanceof Error ? error.message : "Choose a supported document and try again.");
+    }
+  };
 
   const book = useMutation({
     mutationFn: async () => {
@@ -110,9 +164,12 @@ export default function NewConsultationScreen() {
       return body;
     },
     onSuccess: (booking: { id?: string }) => {
-      queryClient.invalidateQueries({ queryKey: ["consultations"] });
-      setConfirming(false);
-      router.replace(booking.id ? `/case-file/${booking.id}` : "/(tabs)");
+      if (reportFiles.length || chartFiles.length) {
+        setCreatedBooking(booking);
+        void uploadBookingDocuments(booking);
+      } else {
+        finishBooking(booking);
+      }
     },
   });
 
@@ -226,9 +283,43 @@ export default function NewConsultationScreen() {
           <Input multiline label="Investigations" value={form.investigations} placeholder="Lab results, imaging findings, ECG…" onChangeText={(value) => update("investigations", value)} />
           <Input multiline label="Provisional Diagnosis" value={form.provisionalDiagnosis} onChangeText={(value) => update("provisionalDiagnosis", value)} />
           <View style={styles.uploadRow}>
-            <UploadPrompt label="Upload Reports" icon="file-text" />
-            <UploadPrompt label="Treatment Chart" icon="clipboard" />
+            <UploadPrompt
+              label="Upload Reports"
+              icon="file-text"
+              count={reportFiles.length}
+              onPress={() => void chooseBookingDocument("report")}
+            />
+            <UploadPrompt
+              label="Treatment Chart"
+              icon="clipboard"
+              count={chartFiles.length}
+              onPress={() => void chooseBookingDocument("chart")}
+            />
           </View>
+          {(reportFiles.length > 0 || chartFiles.length > 0) && (
+            <View style={styles.fileList}>
+              {[...reportFiles.map((file, index) => ({ file, kind: "report" as const, index })),
+                ...chartFiles.map((file, index) => ({ file, kind: "chart" as const, index }))].map(({ file, kind, index }) => (
+                <View key={`${kind}-${file.uri}`} style={[styles.selectedFile, { backgroundColor: palette.card, borderColor: palette.border }]}>
+                  <Feather name={kind === "report" ? "file-text" : "clipboard"} size={15} color={palette.primary} />
+                  <View style={{ flex: 1 }}>
+                    <Text numberOfLines={1} style={[styles.selectedFileName, { color: palette.foreground }]}>{file.name}</Text>
+                    <Text style={[styles.selectedFileMeta, { color: palette.mutedForeground }]}>{kind === "report" ? "Report" : "Treatment chart"}</Text>
+                  </View>
+                  <Pressable
+                    onPress={() => kind === "report"
+                      ? setReportFiles((current) => current.filter((_, fileIndex) => fileIndex !== index))
+                      : setChartFiles((current) => current.filter((_, fileIndex) => fileIndex !== index))}
+                    accessibilityLabel={`Remove ${file.name}`}
+                    hitSlop={8}
+                  >
+                    <Feather name="x" size={17} color={palette.mutedForeground} />
+                  </Pressable>
+                </View>
+              ))}
+            </View>
+          )}
+          <Text style={[styles.patientIdNote, { color: palette.mutedForeground }]}>Selected files are added to the private Case File after the booking is created.</Text>
           <Text style={[styles.patientIdNote, { color: palette.mutedForeground }]}>A unique Perfusion Patient ID will be generated for a new patient and saved for future consultations.</Text>
           <Pressable disabled={!valid} onPress={() => setConfirming(true)} style={[styles.bookButton, { backgroundColor: valid ? palette.primary : palette.muted }]}>
             <Text style={[styles.bookButtonText, { color: valid ? "#FFFFFF" : palette.mutedForeground }]}>Book Consultation</Text>
@@ -236,9 +327,20 @@ export default function NewConsultationScreen() {
         </KeyboardAwareScrollViewCompat>
       )}
 
-      <Modal transparent visible={confirming} animationType="slide" onRequestClose={() => setConfirming(false)}>
+      <Modal
+        transparent
+        visible={confirming}
+        animationType="slide"
+        onRequestClose={() => {
+          if (!createdBooking && !uploadingAttachments) setConfirming(false);
+        }}
+      >
         <View style={styles.backdrop}>
-          <Pressable style={StyleSheet.absoluteFill} onPress={() => setConfirming(false)} />
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            disabled={!!createdBooking || uploadingAttachments}
+            onPress={() => setConfirming(false)}
+          />
           <View style={[styles.confirmSheet, { backgroundColor: palette.card, paddingBottom: Math.max(insets.bottom, 18) }]}>
             <Text style={[styles.confirmTitle, { color: palette.foreground }]}>Confirm consultation</Text>
             <Text style={[styles.confirmLine, { color: palette.foreground }]}>{form.patientName}</Text>
@@ -249,8 +351,21 @@ export default function NewConsultationScreen() {
               <Text style={[styles.postpaidText, { color: palette.foreground }]}>Postpaid, billed later. Booking cannot be undone in this app.</Text>
             </View>
             {!!book.error && <Text style={[styles.error, { color: palette.primary }]}>{book.error.message}</Text>}
-            <Pressable onPress={() => book.mutate()} disabled={book.isPending} style={[styles.bookButton, { backgroundColor: palette.primary }]}>
-              {book.isPending ? <ActivityIndicator color="#FFFFFF" /> : <Text style={[styles.bookButtonText, { color: "#FFFFFF" }]}>Confirm Booking</Text>}
+            {!!attachmentUploadError && (
+              <Text accessibilityRole="alert" style={[styles.error, { color: palette.primary }]}>
+                Booking saved, but some files need a retry: {attachmentUploadError}
+              </Text>
+            )}
+            <Pressable
+              onPress={() => createdBooking ? void uploadBookingDocuments(createdBooking) : book.mutate()}
+              disabled={book.isPending || uploadingAttachments}
+              style={[styles.bookButton, { backgroundColor: palette.primary, opacity: book.isPending || uploadingAttachments ? 0.75 : 1 }]}
+            >
+              {book.isPending || uploadingAttachments
+                ? <ActivityIndicator color="#FFFFFF" />
+                : <Text style={[styles.bookButtonText, { color: "#FFFFFF" }]}>
+                    {createdBooking && attachmentUploadError ? "Retry document uploads" : "Confirm Booking"}
+                  </Text>}
             </Pressable>
           </View>
         </View>
@@ -312,12 +427,22 @@ function Input({ label, compact, multiline, ...props }: React.ComponentProps<typ
   );
 }
 
-function UploadPrompt({ label, icon }: { label: string; icon: keyof typeof Feather.glyphMap }) {
+function UploadPrompt({
+  label,
+  icon,
+  count,
+  onPress,
+}: {
+  label: string;
+  icon: keyof typeof Feather.glyphMap;
+  count: number;
+  onPress: () => void;
+}) {
   const palette = useColors();
   return (
-    <Pressable style={[styles.upload, { borderColor: palette.border, backgroundColor: palette.card }]}>
+    <Pressable onPress={onPress} style={[styles.upload, { borderColor: palette.border, backgroundColor: palette.card }]}>
       <Feather name={icon} size={19} color={palette.foreground} />
-      <Text style={[styles.uploadText, { color: palette.foreground }]}>{label}</Text>
+      <Text style={[styles.uploadText, { color: palette.foreground }]}>{label}{count ? ` · ${count}` : ""}</Text>
     </Pressable>
   );
 }
@@ -363,6 +488,10 @@ const styles = StyleSheet.create({
   uploadRow: { flexDirection: "row", gap: 9 },
   upload: { flex: 1, minHeight: 72, borderRadius: 13, borderWidth: 1, alignItems: "center", justifyContent: "center", gap: 7 },
   uploadText: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
+  fileList: { gap: 7 },
+  selectedFile: { borderWidth: 1, borderRadius: 11, padding: 10, flexDirection: "row", alignItems: "center", gap: 9 },
+  selectedFileName: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
+  selectedFileMeta: { fontSize: 9, textTransform: "capitalize", marginTop: 2, fontFamily: "Inter_400Regular" },
   patientIdNote: { fontSize: 10, lineHeight: 15, fontFamily: "Inter_400Regular" },
   bookButton: { height: 50, borderRadius: 14, alignItems: "center", justifyContent: "center", marginTop: 3 },
   bookButtonText: { fontSize: 14, fontFamily: "Sora_600SemiBold" },

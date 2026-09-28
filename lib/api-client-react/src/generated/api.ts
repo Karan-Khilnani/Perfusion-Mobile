@@ -38,6 +38,7 @@ import type {
   ConsultantAvailability,
   ConsultantAvailabilityUpdate,
   GetCaseFileAttachmentSignedUrl200,
+  GetCaseFileAttachmentSignedUrlParams,
   GetCaseFileMessagesParams,
   HealthStatus,
   MessageResponse,
@@ -1952,21 +1953,30 @@ export function useDownloadCaseFileAttachment<TData = Awaited<ReturnType<typeof 
 
 
 export const getGetCaseFileAttachmentSignedUrlUrl = (bookingId: string,
-    attachmentId: string,) => {
+    attachmentId: string,
+    params?: GetCaseFileAttachmentSignedUrlParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
 
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
 
+  const stringifiedParams = normalizedParams.toString();
 
-  return `/api/bookings/${bookingId}/case-file/attachments/${attachmentId}/signed-url`
+  return stringifiedParams.length > 0 ? `/api/bookings/${bookingId}/case-file/attachments/${attachmentId}/signed-url?${stringifiedParams}` : `/api/bookings/${bookingId}/case-file/attachments/${attachmentId}/signed-url`
 }
 
 /**
  * @summary Get a short-lived authorized URL for a private Case File attachment
  */
 export const getCaseFileAttachmentSignedUrl = async (bookingId: string,
-    attachmentId: string, options?: RequestInit): Promise<GetCaseFileAttachmentSignedUrl200> => {
+    attachmentId: string,
+    params?: GetCaseFileAttachmentSignedUrlParams, options?: RequestInit): Promise<GetCaseFileAttachmentSignedUrl200> => {
 
-  return customFetch<GetCaseFileAttachmentSignedUrl200>(getGetCaseFileAttachmentSignedUrlUrl(bookingId,attachmentId),
+  return customFetch<GetCaseFileAttachmentSignedUrl200>(getGetCaseFileAttachmentSignedUrlUrl(bookingId,attachmentId,params),
   {
     ...options,
     method: 'GET'
@@ -1980,24 +1990,26 @@ export const getCaseFileAttachmentSignedUrl = async (bookingId: string,
 
 
 export const getGetCaseFileAttachmentSignedUrlQueryKey = (bookingId: string,
-    attachmentId: string,) => {
+    attachmentId: string,
+    params?: GetCaseFileAttachmentSignedUrlParams,) => {
     return [
-    `/api/bookings/${bookingId}/case-file/attachments/${attachmentId}/signed-url`
+    `/api/bookings/${bookingId}/case-file/attachments/${attachmentId}/signed-url`, ...(params ? [params] : [])
     ] as const;
     }
 
 
 export const getGetCaseFileAttachmentSignedUrlQueryOptions = <TData = Awaited<ReturnType<typeof getCaseFileAttachmentSignedUrl>>, TError = ErrorType<void>>(bookingId: string,
-    attachmentId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCaseFileAttachmentSignedUrl>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+    attachmentId: string,
+    params?: GetCaseFileAttachmentSignedUrlParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCaseFileAttachmentSignedUrl>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetCaseFileAttachmentSignedUrlQueryKey(bookingId,attachmentId);
+  const queryKey =  queryOptions?.queryKey ?? getGetCaseFileAttachmentSignedUrlQueryKey(bookingId,attachmentId,params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCaseFileAttachmentSignedUrl>>> = ({ signal }) => getCaseFileAttachmentSignedUrl(bookingId,attachmentId, { signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCaseFileAttachmentSignedUrl>>> = ({ signal }) => getCaseFileAttachmentSignedUrl(bookingId,attachmentId,params, { signal, ...requestOptions });
 
 
 
@@ -2016,11 +2028,12 @@ export type GetCaseFileAttachmentSignedUrlQueryError = ErrorType<void>
 
 export function useGetCaseFileAttachmentSignedUrl<TData = Awaited<ReturnType<typeof getCaseFileAttachmentSignedUrl>>, TError = ErrorType<void>>(
  bookingId: string,
-    attachmentId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCaseFileAttachmentSignedUrl>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+    attachmentId: string,
+    params?: GetCaseFileAttachmentSignedUrlParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCaseFileAttachmentSignedUrl>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getGetCaseFileAttachmentSignedUrlQueryOptions(bookingId,attachmentId,options)
+  const queryOptions = getGetCaseFileAttachmentSignedUrlQueryOptions(bookingId,attachmentId,params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

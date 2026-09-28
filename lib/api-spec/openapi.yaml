@@ -449,6 +449,11 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/CaseFileMessage" }
+        "200":
+          description: Existing attachment returned for an idempotent retry
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CaseFileMessage" }
         "403": { description: Access denied or closed Case File }
   /bookings/{bookingId}/case-file/follow-up-access:
     patch:
@@ -506,6 +511,11 @@ paths:
           in: path
           required: true
           schema: { type: string }
+        - name: disposition
+          in: query
+          required: false
+          description: Whether the short-lived link opens inline or downloads as an attachment
+          schema: { type: string, enum: [inline, attachment], default: attachment }
       responses:
         "200":
           description: Short-lived download URL

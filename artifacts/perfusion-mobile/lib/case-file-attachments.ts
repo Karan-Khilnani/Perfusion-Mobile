@@ -19,13 +19,22 @@ export type AttachmentDraft = {
 };
 
 const MAX_SIZE = 25 * 1024 * 1024;
-const ALLOWED_MIME = new Set(["application/pdf", "image/jpeg", "image/png", "image/gif", "application/dicom"]);
+const ALLOWED_MIME = new Set([
+  "application/pdf",
+  "image/jpeg",
+  "image/png",
+  "image/gif",
+  "application/dicom",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+]);
+const ALLOWED_EXTENSIONS = new Set(["pdf", "jpg", "jpeg", "png", "gif", "dcm", "doc", "docx"]);
 
 function validateDraft(draft: AttachmentDraft): AttachmentDraft {
   const extension = draft.name.toLowerCase().split(".").pop();
   if (draft.size && draft.size > MAX_SIZE) throw new Error("Choose a file smaller than 25 MB.");
-  if (!ALLOWED_MIME.has(draft.mimeType) && extension !== "dcm") {
-    throw new Error("Choose a PDF, JPEG, PNG, GIF, or DICOM file.");
+  if (!ALLOWED_MIME.has(draft.mimeType) && !ALLOWED_EXTENSIONS.has(extension || "")) {
+    throw new Error("Choose a PDF, image, DICOM, DOC, or DOCX file.");
   }
   return draft;
 }
@@ -33,7 +42,16 @@ function validateDraft(draft: AttachmentDraft): AttachmentDraft {
 export async function pickCaseFileAttachment(source: AttachmentSource): Promise<AttachmentDraft | null> {
   if (source === "document") {
     const result = await DocumentPicker.getDocumentAsync({
-      type: ["application/pdf", "image/jpeg", "image/png", "image/gif", "application/dicom", "application/octet-stream"],
+      type: [
+        "application/pdf",
+        "image/jpeg",
+        "image/png",
+        "image/gif",
+        "application/dicom",
+        "application/msword",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "application/octet-stream",
+      ],
       copyToCacheDirectory: true,
     });
     if (result.canceled) return null;

@@ -38,6 +38,8 @@ export * from './consultantAvailabilityStatus';
 export * from './consultantAvailabilityUpdate';
 export * from './consultantAvailabilityUpdateStatus';
 export * from './getCaseFileAttachmentSignedUrl200';
+export * from './getCaseFileAttachmentSignedUrlDisposition';
+export * from './getCaseFileAttachmentSignedUrlParams';
 export * from './getCaseFileMessagesParams';
 export * from './healthStatus';
 export * from './messageResponse';

@@ -18,6 +18,7 @@ import { useRazorpay } from "@/hooks/use-razorpay";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ArrowLeft, Check, CreditCard, Briefcase, Video, Upload, FileText, X, ChevronLeft, ChevronRight, CalendarDays, Clock, Phone } from "lucide-react";
+import { useCreateCaseFileAttachment } from "@workspace/api-client-react";
 import type { Consultant, ConsultantSlotOverride, SlotSeries } from "@shared/schema";
 
 const bookingSchema = z.object({
@@ -170,10 +171,10 @@ export default function ConsultationBookingPage() {
   const [bookingId, setBookingId] = useState<string | null>(null);
   const [videoRoomId, setVideoRoomId] = useState<string | null>(null);
   const [reportFiles, setReportFiles] = useState<File[]>([]);
-  const [reportUrls, setReportUrls] = useState<string[]>([]);
   const [chartFiles, setChartFiles] = useState<File[]>([]);
-  const [chartUrls, setChartUrls] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [pendingBooking, setPendingBooking] = useState<any | null>(null);
+  const [attachmentUploadError, setAttachmentUploadError] = useState<string | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<"pay_now" | "pay_later">("pay_later");
   const [calendarMonth, setCalendarMonth] = useState(() => {
     const now = getIstClock();
@@ -181,6 +182,7 @@ export default function ConsultationBookingPage() {
   });
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const { openCheckout } = useRazorpay();
+  const caseFileAttachmentMutation = useCreateCaseFileAttachment();
 
   const { data: consultant, isLoading } = useQuery<Consultant>({
     queryKey: ["/api/consultants", id],
@@ -263,42 +265,105 @@ export default function ConsultationBookingPage() {
     },
   });
 
-  const uploadFile = async (file: File): Promise<string> => {
-    const { uploadFileAsBase64 } = await import("@/lib/uploadFile");
-    return uploadFileAsBase64(file);
-  };
-
   const handleReportFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
-    setReportFiles(prev => [...prev, ...files]);
+    setReportFiles(prev => [
+      ...prev,
+      ...files.filter((file) => !prev.some((existing) =>
+        existing.name === file.name && existing.size === file.size && existing.lastModified === file.lastModified
+      )),
+    ]);
+    e.target.value = "";
   };
   const removeReportFile = (index: number) => {
     setReportFiles(prev => prev.filter((_, i) => i !== index));
   };
   const handleChartFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
-    setChartFiles(prev => [...prev, ...files]);
+    setChartFiles(prev => [
+      ...prev,
+      ...files.filter((file) => !prev.some((existing) =>
+        existing.name === file.name && existing.size === file.size && existing.lastModified === file.lastModified
+      )),
+    ]);
+    e.target.value = "";
   };
   const removeChartFile = (index: number) => {
     setChartFiles(prev => prev.filter((_, i) => i !== index));
   };
 
+  const finishBooking = (data: any) => {
+    setBookingId(data.bookingNumber || data.id);
+    if (data.videoRoomId) {
+      setVideoRoomId(data.videoRoomId);
+    }
+
+    if (paymentMethod === "pay_now") {
+      const fee = parseFloat(data.amount || (service as any)?.computedCustomerPrice || service?.consultationFee || "0");
+      openCheckout({
+        amount: fee,
+        bookingId: data.id,
+        description: `Consultation: ${data.serviceName}`,
+        prefill: { name: form.getValues("patientName"), contact: form.getValues("contactNumber") },
+        onSuccess: () => {
+          queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
+          queryClient.invalidateQueries({ queryKey: ["/api/user/dashboard"] });
+          queryClient.invalidateQueries({ queryKey: ["/api/billing/my-invoices"] });
+          setStep("confirmation");
+          toast({ title: "Payment Successful", description: "Your consultation has been booked and paid." });
+        },
+        onError: (msg) => {
+          setStep("confirmation");
+          toast({ title: "Payment Pending", description: msg || "You can pay later from the billing page.", variant: "destructive" });
+        },
+      });
+    } else {
+      setStep("confirmation");
+      queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/user/dashboard"] });
+      toast({ title: "Appointment Confirmed", description: "Your consultation has been booked successfully." });
+    }
+  };
+
+  const attachBookingDocuments = async (booking: any) => {
+    if (!booking?.id) {
+      setAttachmentUploadError("The booking was created, but its Case File could not be identified. Contact support before retrying.");
+      return;
+    }
+    setUploading(true);
+    setAttachmentUploadError(null);
+    try {
+      for (const file of reportFiles) {
+        await caseFileAttachmentMutation.mutateAsync({
+          bookingId: booking.id,
+          data: { file, source: "document", category: "general" },
+        });
+      }
+      for (const file of chartFiles) {
+        await caseFileAttachmentMutation.mutateAsync({
+          bookingId: booking.id,
+          data: { file, source: "document", category: "treatment_chart" },
+        });
+      }
+      setPendingBooking(null);
+      setAttachmentUploadError(null);
+      finishBooking(booking);
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : "Please try uploading the selected files again.";
+      setAttachmentUploadError(reason);
+      toast({
+        title: "Booking created, but document upload needs a retry",
+        description: reason,
+        variant: "destructive",
+      });
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const bookingMutation = useMutation({
     mutationFn: async (data: BookingFormData) => {
       if (!service) throw new Error("Service not found");
-
-      const uploadedReportUrls: string[] = [];
-      const uploadedChartUrls: string[] = [];
-
-      for (const file of reportFiles) {
-        const url = await uploadFile(file);
-        uploadedReportUrls.push(url);
-      }
-      for (const file of chartFiles) {
-        const url = await uploadFile(file);
-        uploadedChartUrls.push(url);
-      }
-
       const response = await apiRequest("POST", "/api/bookings", {
         bookingType: "consultation",
         serviceId: service.id,
@@ -323,8 +388,6 @@ export default function ConsultationBookingPage() {
         referringPhysician: data.orderingPhysician || null,
         examination: data.examination || null,
         investigations: data.investigations || null,
-        documentUrls: uploadedReportUrls.length > 0 ? uploadedReportUrls : null,
-        treatmentChartUrls: uploadedChartUrls.length > 0 ? uploadedChartUrls : null,
         appointmentSlot: isEmergencyTeam ? "Emergency - Immediate" : data.appointmentSlot,
         amount: (service as any).computedCustomerPrice || service.consultationFee,
         urgency: isEmergencyTeam ? "emergency" : "routine",
@@ -335,35 +398,11 @@ export default function ConsultationBookingPage() {
       return response.json();
     },
     onSuccess: (data) => {
-      setBookingId(data.bookingNumber || data.id);
-      if (data.videoRoomId) {
-        setVideoRoomId(data.videoRoomId);
-      }
-
-      if (paymentMethod === "pay_now") {
-        const fee = parseFloat(data.amount || (service as any)?.computedCustomerPrice || service?.consultationFee || "0");
-        openCheckout({
-          amount: fee,
-          bookingId: data.id,
-          description: `Consultation: ${data.serviceName}`,
-          prefill: { name: form.getValues("patientName"), contact: form.getValues("contactNumber") },
-          onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
-            queryClient.invalidateQueries({ queryKey: ["/api/user/dashboard"] });
-            queryClient.invalidateQueries({ queryKey: ["/api/billing/my-invoices"] });
-            setStep("confirmation");
-            toast({ title: "Payment Successful", description: "Your consultation has been booked and paid." });
-          },
-          onError: (msg) => {
-            setStep("confirmation");
-            toast({ title: "Payment Pending", description: msg || "You can pay later from the billing page.", variant: "destructive" });
-          },
-        });
-      } else {
-        setStep("confirmation");
-        queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
-        queryClient.invalidateQueries({ queryKey: ["/api/user/dashboard"] });
-        toast({ title: "Appointment Confirmed", description: "Your consultation has been booked successfully." });
+      setPendingBooking(data);
+      if (reportFiles.length || chartFiles.length) void attachBookingDocuments(data);
+      else {
+        setPendingBooking(null);
+        finishBooking(data);
       }
     },
     onError: (error: any) => {
@@ -382,7 +421,8 @@ export default function ConsultationBookingPage() {
     } else if (step === "clinical") {
       setStep("payment");
     } else if (step === "payment") {
-      bookingMutation.mutate(data);
+      if (pendingBooking) void attachBookingDocuments(pendingBooking);
+      else bookingMutation.mutate(data);
     }
   };
 
@@ -564,7 +604,8 @@ export default function ConsultationBookingPage() {
     const handleFollowUpSubmit = async () => {
       const isValid = await form.trigger(["presentIllness", ...(hasSlots ? ["appointmentSlot" as const] : [])]);
       if (!isValid) return;
-      bookingMutation.mutate(form.getValues());
+      if (pendingBooking) void attachBookingDocuments(pendingBooking);
+      else bookingMutation.mutate(form.getValues());
     };
 
     return (
@@ -992,6 +1033,11 @@ export default function ConsultationBookingPage() {
                     </div>
                   </div>
 
+                  {attachmentUploadError && pendingBooking && (
+                    <p role="alert" className="text-sm text-destructive">
+                      Your booking is saved, but some files did not upload. Retry to add them to this Case File. {attachmentUploadError}
+                    </p>
+                  )}
                   <Button
                     type="button"
                     className="w-full"
@@ -999,7 +1045,7 @@ export default function ConsultationBookingPage() {
                     onClick={handleFollowUpSubmit}
                     data-testid="button-confirm-followup"
                   >
-                    {bookingMutation.isPending || uploading ? "Processing..." : paymentMethod === "pay_now" ? "Confirm & Pay" : "Confirm Follow-Up"}
+                    {uploading ? "Uploading patient documents..." : pendingBooking && attachmentUploadError ? "Retry file uploads" : bookingMutation.isPending ? "Processing..." : paymentMethod === "pay_now" ? "Confirm & Pay" : "Confirm Follow-Up"}
                   </Button>
                 </CardContent>
               </Card>
@@ -1688,6 +1734,11 @@ export default function ConsultationBookingPage() {
                     </div>
                   </div>
 
+                  {attachmentUploadError && pendingBooking && (
+                    <p role="alert" className="text-sm text-destructive">
+                      Your booking is saved, but some files did not upload. Retry to add them to this Case File. {attachmentUploadError}
+                    </p>
+                  )}
                   <div className="flex gap-3">
                     <Button
                       type="button"
@@ -1790,16 +1841,17 @@ export default function ConsultationBookingPage() {
                       variant="outline"
                       onClick={() => setStep("clinical")}
                       className="flex-1"
+                      disabled={bookingMutation.isPending || uploading || !!pendingBooking}
                     >
                       Back
                     </Button>
                     <Button
                       type="submit"
                       className="flex-1"
-                      disabled={bookingMutation.isPending}
+                      disabled={bookingMutation.isPending || uploading}
                       data-testid="button-confirm-booking"
                     >
-                      {bookingMutation.isPending ? "Processing..." : paymentMethod === "pay_now" ? "Confirm & Pay" : "Confirm Booking"}
+                      {uploading ? "Uploading patient documents..." : pendingBooking && attachmentUploadError ? "Retry file uploads" : bookingMutation.isPending ? "Processing..." : paymentMethod === "pay_now" ? "Confirm & Pay" : "Confirm Booking"}
                     </Button>
                   </div>
                 </CardContent>

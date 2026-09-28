@@ -465,6 +465,21 @@ cursor?: string;
 limit?: number;
 };
 
+export type GetCaseFileAttachmentSignedUrlParams = {
+/**
+ * Whether the short-lived link opens inline or downloads as an attachment
+ */
+disposition?: GetCaseFileAttachmentSignedUrlDisposition;
+};
+
+export type GetCaseFileAttachmentSignedUrlDisposition = typeof GetCaseFileAttachmentSignedUrlDisposition[keyof typeof GetCaseFileAttachmentSignedUrlDisposition];
+
+
+export const GetCaseFileAttachmentSignedUrlDisposition = {
+  inline: 'inline',
+  attachment: 'attachment',
+} as const;
+
 export type GetCaseFileAttachmentSignedUrl200 = {
   url: string;
   /** Seconds until the URL expires */
