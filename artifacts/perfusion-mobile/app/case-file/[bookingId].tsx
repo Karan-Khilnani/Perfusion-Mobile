@@ -455,8 +455,11 @@ function VitalCell({ label, value, detail }: { label: string; value: string; det
 
 function getVisibleMessageText(message: CaseFileMessage): string {
   const body: unknown = message.body;
+  if (message.kind === "attachment") return "";
+  const structuredAdvisory =
+    message.kind === "clinical_advisory_reference" || message.kind === "advisory";
 
-  if (message.kind !== "clinical_advisory_reference") {
+  if (!structuredAdvisory) {
     return typeof body === "string" ? body : "";
   }
 
