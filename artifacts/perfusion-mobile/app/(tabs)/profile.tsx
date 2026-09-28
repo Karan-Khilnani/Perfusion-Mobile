@@ -366,6 +366,23 @@ export default function ProfileScreen() {
         </Pressable>
       )}
 
+      {user?.role === "care_seeker" && (
+        <>
+          <ProfileLink
+            icon="lock"
+            title="Change Password"
+            colors={colors}
+            onPress={() => router.push("/change-password" as never)}
+          />
+          <ProfileLink
+            icon="help-circle"
+            title="Help & Support"
+            colors={colors}
+            onPress={() => Alert.alert("Help & Support", "Contact support through your Perfusion administrator.")}
+          />
+        </>
+      )}
+
       <Pressable
         onPress={handleLogout}
         disabled={loggingOut}
@@ -498,10 +515,6 @@ function ProviderMyProfile() {
   const [consultantId, setConsultantId] = useState<string | undefined>();
   const [loggingOut, setLoggingOut] = useState(false);
   const [busyAction, setBusyAction] = useState<string | null>(null);
-  const [passwordOpen, setPasswordOpen] = useState(false);
-  const [currentPassword, setCurrentPassword] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [passwordError, setPasswordError] = useState("");
   const [selectedPortfolioPhoto, setSelectedPortfolioPhoto] = useState<ConsultantPortfolioPhoto | null>(null);
 
   const account = useQuery<AccountProfile>({
@@ -792,28 +805,6 @@ function ProviderMyProfile() {
     ]);
   };
 
-  const savePassword = async () => {
-    setPasswordError("");
-    if (!currentPassword || !newPassword) {
-      setPasswordError("Enter your current and new passwords.");
-      return;
-    }
-    try {
-      const response = await apiFetch("/api/profile/change-password", {
-        method: "POST",
-        body: JSON.stringify({ currentPassword, newPassword }),
-      });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.message || "Could not change password.");
-      setPasswordOpen(false);
-      setCurrentPassword("");
-      setNewPassword("");
-      Alert.alert("Password updated", "Your password has been changed.");
-    } catch (error) {
-      setPasswordError(error instanceof Error ? error.message : "Could not change password.");
-    }
-  };
-
   const goEdit = () => {
     router.push({
       pathname: "/edit-provider-profile",
@@ -1001,7 +992,7 @@ function ProviderMyProfile() {
 
           <View style={providerProfileStyles.footerLinks}>
             <ProfileLink icon="calendar" title="Availability" subtitle="Weekly hours, pause consultations" colors={colors} onPress={() => router.push("/availability" as never)} />
-            <ProfileLink icon="lock" title="Change Password" colors={colors} onPress={() => { setPasswordError(""); setPasswordOpen(true); }} />
+            <ProfileLink icon="lock" title="Change Password" colors={colors} onPress={() => router.push("/change-password" as never)} />
             <ProfileLink icon="help-circle" title="Help & Support" colors={colors} onPress={() => Alert.alert("Help & Support", "Contact support through your Perfusion administrator.")} />
           </View>
           <Pressable onPress={doLogout} disabled={loggingOut} style={providerProfileStyles.logoutArea}>
@@ -1010,22 +1001,6 @@ function ProviderMyProfile() {
           </Pressable>
         </>
       )}
-      <Modal visible={passwordOpen} transparent animationType="slide" onRequestClose={() => setPasswordOpen(false)}>
-        <View style={providerProfileStyles.modalBackdrop}>
-          <View style={[providerProfileStyles.passwordModal, { backgroundColor: colors.card }]}>
-            <View style={providerProfileStyles.modalHeading}>
-              <Text style={[providerProfileStyles.modalTitle, { color: colors.foreground }]}>Change Password</Text>
-              <Pressable onPress={() => setPasswordOpen(false)} accessibilityLabel="Close"><Feather name="x" size={22} color={colors.mutedForeground} /></Pressable>
-            </View>
-            <ProviderTextInput label="Current password" value={currentPassword} onChangeText={setCurrentPassword} secureTextEntry colors={colors} />
-            <ProviderTextInput label="New password" value={newPassword} onChangeText={setNewPassword} secureTextEntry colors={colors} />
-            {passwordError ? <Text style={{ color: colors.destructive, marginBottom: 10 }}>{passwordError}</Text> : null}
-            <Pressable onPress={() => void savePassword()} style={[providerProfileStyles.saveButton, { backgroundColor: colors.primary }]}>
-              <Text style={providerProfileStyles.saveButtonText}>Update Password</Text>
-            </Pressable>
-          </View>
-        </View>
-      </Modal>
       <Modal visible={!!selectedPortfolioPhoto} transparent animationType="fade" onRequestClose={() => setSelectedPortfolioPhoto(null)}>
         <View style={providerProfileStyles.photoModalBackdrop}>
           <View style={[providerProfileStyles.photoModal, { backgroundColor: colors.card }]}>

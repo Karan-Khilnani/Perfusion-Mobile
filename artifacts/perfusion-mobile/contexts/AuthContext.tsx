@@ -71,6 +71,7 @@ export interface User {
   hospitalAddress?: string;
   city?: string;
   location?: string;
+  googleId?: string;
   needsProfile: boolean;
 }
 
@@ -147,6 +148,7 @@ function normalizeUser(data: Record<string, unknown>): User {
     hospitalAddress,
     city,
     location,
+    googleId: typeof data.googleId === "string" ? data.googleId : undefined,
     needsProfile:
       data.needsProfile === true ||
       (googleAccount && role !== "admin" && !hospitalName),
