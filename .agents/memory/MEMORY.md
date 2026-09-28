@@ -25,3 +25,4 @@
 - [Stream Android PiP bridge](stream-android-pip.md) — installed JS PiP helper references a native enter method absent from the SDK; verify the native bridge during prebuild.
 - [Expo browser preview limitation](expo-browser-preview.md) — native Stream/WebRTC views can break Expo web preview; verify mobile changes with an Android bundle.
 - [Case File video originals](case-file-video-originals.md) — keep the private original for downloads and use a private MP4 playback copy only when the original is not cross-platform playable.
+- [Shared availability compatibility](shared-availability-compatibility.md) — preserve Web schedule editing; Mobile day-off windows remain stored but must not become bookable.

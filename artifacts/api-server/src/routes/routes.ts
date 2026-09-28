@@ -6,12 +6,12 @@ import { registerAuthRoutes } from "../auth/routes";
 import type { BookingStatus, UserRole, ProviderType, ProviderStatus, ServiceStatus } from "@workspace/db";
 import { consultants, bookings } from "@workspace/db";
 import { db, getPool } from "../db";
-import { eq, or, and, isNotNull, notInArray } from "drizzle-orm";
+import { eq, or, and, isNotNull, notInArray, inArray, sql } from "drizzle-orm";
 import { fireOneBooking } from "../services/consultation-scheduler";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
-import { uploadFile as supabaseUpload, uploadPrivateCaseFile, downloadPrivateCaseFile, downloadLegacyCaseFile, createPrivateCaseFileSignedUrl, deletePrivateCaseFile } from "../services/supabase-storage";
+import { uploadFile as supabaseUpload, deletePublicFile, uploadPrivateCaseFile, downloadPrivateCaseFile, downloadLegacyCaseFile, createPrivateCaseFileSignedUrl, deletePrivateCaseFile } from "../services/supabase-storage";
 import { notifyAdminLabBooking, notifyAdminConsultantBooking, notifyUserReportReady, cancelVoiceCall, triggerVoiceCall, triggerBridgeCall, formatPhoneNumber } from "../services/msg91";
 import { generateBookingNumber } from "../services/booking-number";
 import { calculateCustomerPrice, deriveMarginFromPrice, derivePriceFromMargin } from "../services/pricing";
@@ -24,7 +24,7 @@ import { sendPushNotification, getVapidPublicKey, type PushPayload } from "../se
 import { getCallWindow } from "../services/call-window";
 import { resolveConsultationLifecycle } from "../services/consultation-lifecycle";
 import { notifyMobileCallEnded, notifyMobileIncomingCall } from "../services/mobile-call-push";
-import { getConsultantAvailabilityPreview } from "../services/consultant-availability";
+import { getConsultantAvailabilityPreview, getConsultantBookableSlots } from "../services/consultant-availability";
 import { normalizeComorbidities } from "../services/patient-comorbidities";
 import { createHash, randomUUID } from "crypto";
 import { inspectCaseFileVideo, isCaseFileVideo } from "../services/case-file-video";
@@ -37,6 +37,57 @@ function callMediaProvider(videoRoomUrl?: string | null): "daily" | "stream" {
 function bookingIdFromStreamLink(roomUrl: string): string | null {
   const match = /^stream:\/\/booking\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i.exec(roomUrl);
   return match?.[1] ?? null;
+}
+
+type ConsultantBookedSlot = { status: string | null; appointmentSlot: string | null };
+
+async function getConsultationSlotsForRange(
+  consultantIds: string[],
+  startDate: string,
+  endDate: string,
+): Promise<Map<string, ConsultantBookedSlot[]>> {
+  const slotsByConsultant = new Map<string, ConsultantBookedSlot[]>();
+  if (!consultantIds.length) return slotsByConsultant;
+
+  const start = new Date(`${startDate}T00:00:00Z`);
+  const end = new Date(`${endDate}T00:00:00Z`);
+  const datePatterns: string[] = [];
+  for (let day = new Date(start); day <= end; day.setUTCDate(day.getUTCDate() + 1)) {
+    const year = day.getUTCFullYear();
+    const dayOfMonth = day.getUTCDate();
+    const monthShort = new Intl.DateTimeFormat("en-US", { month: "short", timeZone: "UTC" }).format(day).toLowerCase();
+    const monthLong = new Intl.DateTimeFormat("en-US", { month: "long", timeZone: "UTC" }).format(day).toLowerCase();
+    const months = monthShort === "sep" ? "sep|sept|september" : `${monthShort}|${monthLong}`;
+    const dayText = String(dayOfMonth);
+    const monthNumber = String(day.getUTCMonth() + 1).padStart(2, "0");
+    const dateText = String(dayOfMonth).padStart(2, "0");
+    datePatterns.push(
+      `(?:^|[^0-9])${dayText}\\s+(?:${months})\\s+${year}(?:[^0-9]|$)`,
+      `(?:^|[^a-z])(?:${months})\\s+${dayText},?\\s+${year}(?:[^0-9]|$)`,
+      `${year}-${monthNumber}-${dateText}`,
+    );
+  }
+  if (!datePatterns.length) return slotsByConsultant;
+
+  const dateConditions = datePatterns.map(pattern => sql`${bookings.appointmentSlot} ~* ${pattern}`);
+  const rows = await db.select({
+    serviceId: bookings.serviceId,
+    status: bookings.status,
+    appointmentSlot: bookings.appointmentSlot,
+  }).from(bookings).where(and(
+    eq(bookings.bookingType, "consultation"),
+    inArray(bookings.serviceId, consultantIds),
+    notInArray(bookings.status, ["cancelled"]),
+    isNotNull(bookings.appointmentSlot),
+    or(...dateConditions),
+  ));
+  for (const row of rows) {
+    if (!row.appointmentSlot) continue;
+    const current = slotsByConsultant.get(row.serviceId) ?? [];
+    current.push({ status: row.status, appointmentSlot: row.appointmentSlot });
+    slotsByConsultant.set(row.serviceId, current);
+  }
+  return slotsByConsultant;
 }
 
 async function endStreamMediaSession(session: { videoRoomUrl: string; sessionGeneration: string }): Promise<void> {
@@ -561,10 +612,120 @@ export async function registerRoutes(
         return res.json([]);
       }
       const consultants = await storage.getConsultantsByProvider(provider.id);
-      res.json(consultants);
+      const media = consultants.length
+        ? (await getPool().query(
+            `SELECT id, consultant_id, kind, original_filename, object_path, verification_status
+             FROM consultant_profile_media WHERE consultant_id = ANY($1::varchar[])
+             ORDER BY created_at, id`,
+            [consultants.map((consultant) => consultant.id)],
+          )).rows
+        : [];
+      res.json(consultants.map((consultant) => ({
+        ...consultant,
+        registrationDocuments: [
+          ...(consultant.registrationDocumentUrl ? [{
+            id: "legacy", filename: "Registration document", url: consultant.registrationDocumentUrl, status: null,
+          }] : []),
+          ...media.filter((item: any) => item.consultant_id === consultant.id && item.kind === "registration_document")
+            .map((item: any) => ({ id: item.id, filename: item.original_filename, status: item.verification_status })),
+        ],
+        portfolioPhotos: media.filter((item: any) => item.consultant_id === consultant.id && item.kind === "portfolio_photo")
+          .map((item: any) => ({ id: item.id, url: item.object_path, filename: item.original_filename })),
+      })));
     } catch (error) {
       console.error("Error fetching provider consultants:", error);
       res.status(500).json({ message: "Failed to fetch consultants" });
+    }
+  });
+
+  // Profile media stays on the owning consultant; registration documents are private.
+  async function ownedProfileConsultant(req: any, res: any) {
+    if (req.user?.role !== "provider") {
+      res.status(403).json({ message: "Only consultant providers may manage profile media." });
+      return null;
+    }
+    const provider = await storage.getProviderByUserId(req.user.id);
+    const consultant = await storage.getConsultantById(req.params.id);
+    if (provider?.type !== "consultant" || !consultant || consultant.providerId !== provider.id) {
+      res.status(403).json({ message: "Consultant profile not found or access denied." });
+      return null;
+    }
+    return consultant;
+  }
+
+  app.post("/api/provider/consultants/:id/media", isAuthenticated, uploadDocument.single("file"), async (req: any, res) => {
+    try {
+      const consultant = await ownedProfileConsultant(req, res);
+      if (!consultant) return;
+      const kind = String(req.body?.kind || "");
+      if (!["photo", "signature", "portfolio_photo", "registration_document"].includes(kind)) {
+        return res.status(400).json({ message: "Unsupported profile media type." });
+      }
+      if (!req.file) return res.status(400).json({ message: "Choose a PDF or image." });
+      if (kind !== "registration_document" && !req.file.mimetype.startsWith("image/")) {
+        return res.status(400).json({ message: "Choose an image for this section." });
+      }
+      if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+        return res.status(503).json({ message: "Persistent file storage is unavailable. Please try again later." });
+      }
+      const id = randomUUID();
+      const filename = req.file.originalname.slice(0, 255);
+      const url = kind === "registration_document"
+        ? await uploadPrivateCaseFile(req.file.buffer, filename, req.file.mimetype, id)
+        : await supabaseUpload(req.file.buffer, filename, `provider-profile/${consultant.id}/${kind}`, req.file.mimetype);
+      if (kind === "photo" || kind === "signature") {
+        await storage.updateConsultant(consultant.id, kind === "photo" ? { photoUrl: url } : { digitalSignatureUrl: url });
+        return res.json({ id, url, kind });
+      }
+      await getPool().query(
+        `INSERT INTO consultant_profile_media (id, consultant_id, kind, original_filename, object_path)
+         VALUES ($1,$2,$3,$4,$5)`,
+        [id, consultant.id, kind, filename, url],
+      );
+      res.status(201).json({ id, filename, kind, url: kind === "portfolio_photo" ? url : undefined, status: kind === "registration_document" ? "under_review" : undefined });
+    } catch (error) {
+      req.log?.error({ err: error }, "Profile media upload failed");
+      res.status(503).json({ message: "Could not save the profile file. Please try again." });
+    }
+  });
+
+  app.get("/api/provider/consultants/:id/media/:mediaId/signed-url", isAuthenticated, async (req: any, res) => {
+    try {
+      const consultant = await ownedProfileConsultant(req, res);
+      if (!consultant) return;
+      const media = (await getPool().query(
+        `SELECT object_path, original_filename FROM consultant_profile_media
+         WHERE id = $1 AND consultant_id = $2 AND kind = 'registration_document'`,
+        [req.params.mediaId, consultant.id],
+      )).rows[0];
+      if (!media) return res.status(404).json({ message: "Document not found." });
+      const url = await createPrivateCaseFileSignedUrl(media.object_path, 300, media.original_filename);
+      res.json({ url });
+    } catch (error) {
+      req.log?.error({ err: error }, "Profile document link failed");
+      res.status(503).json({ message: "Could not open the document." });
+    }
+  });
+
+  app.delete("/api/provider/consultants/:id/media/:mediaId", isAuthenticated, async (req: any, res) => {
+    try {
+      const consultant = await ownedProfileConsultant(req, res);
+      if (!consultant) return;
+      const deleted = (await getPool().query(
+        `DELETE FROM consultant_profile_media WHERE id = $1 AND consultant_id = $2
+         AND kind = 'portfolio_photo' RETURNING object_path`,
+        [req.params.mediaId, consultant.id],
+      )).rows[0];
+      if (!deleted) return res.status(404).json({ message: "Portfolio photo not found." });
+      try {
+        await deletePublicFile(deleted.object_path);
+      } catch (error) {
+        req.log?.warn({ err: error }, "Deleted portfolio record but failed to remove stored photo");
+      }
+      res.json({ ok: true });
+    } catch (error) {
+      req.log?.error({ err: error }, "Profile photo deletion failed");
+      res.status(500).json({ message: "Could not delete the photo." });
     }
   });
 
@@ -925,12 +1086,42 @@ export async function registerRoutes(
       const allConsultants = await storage.getActiveConsultants();
       const defaultMarginSetting = await storage.getPlatformSetting("default_margin_percent");
       const defaultMargin = parseFloat(defaultMarginSetting?.settingValue || "15");
+      const mobileClient = req.query.mobile === "1" || Boolean(req.get("X-Mobile-Client"));
+      const mobileTodayParts = mobileClient ? new Intl.DateTimeFormat("en-US", {
+        timeZone: "Asia/Kolkata",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).formatToParts(new Date()) : [];
+      const todayValue = (type: Intl.DateTimeFormatPartTypes) => mobileTodayParts.find(part => part.type === type)?.value ?? "";
+      const mobileToday = mobileClient
+        ? `${todayValue("year")}-${todayValue("month")}-${todayValue("day")}`
+        : "";
+      const mobileLastDate = mobileClient ? new Date(`${mobileToday}T00:00:00Z`) : null;
+      if (mobileLastDate) mobileLastDate.setUTCDate(mobileLastDate.getUTCDate() + 29);
+      const mobileEnd = mobileLastDate
+        ? `${mobileLastDate.getUTCFullYear()}-${String(mobileLastDate.getUTCMonth() + 1).padStart(2, "0")}-${String(mobileLastDate.getUTCDate()).padStart(2, "0")}`
+        : "";
+      const bookedSlotsByConsultant = mobileClient
+        ? await getConsultationSlotsForRange(allConsultants.map(consultant => consultant.id), mobileToday, mobileEnd)
+        : new Map<string, ConsultantBookedSlot[]>();
 
       const enriched = await Promise.all(allConsultants.map(async c => {
         const baseCost = parseFloat(c.consultationFee);
         const pricing = calculateCustomerPrice(baseCost, c.customerPrice, c.marginOverride, defaultMargin);
         const slotOverrides = await storage.getSlotOverrides(c.id);
         const availabilityPreview = getConsultantAvailabilityPreview(c, slotOverrides);
+        let nextAvailableSlot: { date: string; start: string; end: string; appointmentSlot: string } | null = null;
+        if (mobileClient) {
+          const dateSlots = getConsultantBookableSlots(
+            c,
+            slotOverrides,
+            bookedSlotsByConsultant.get(c.id) ?? [],
+            mobileToday,
+            mobileEnd,
+          );
+          nextAvailableSlot = dateSlots[0]?.slots[0] ?? null;
+        }
         let photoUrl = c.photoUrl;
 
         // Files saved under the server's local uploads directory by older
@@ -965,6 +1156,7 @@ export async function registerRoutes(
           computedCustomerPrice: pricing.customerPrice.toFixed(2),
           computedMarginPercent: pricing.marginPercent.toFixed(2),
           availabilityPreview,
+          ...(mobileClient ? { nextAvailableSlot } : {}),
         };
       }));
       res.json(enriched);
@@ -1011,6 +1203,54 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error fetching consultant:", error);
       res.status(500).json({ message: "Failed to fetch consultant" });
+    }
+  });
+
+  app.get("/api/consultants/:id/bookable-slots", async (req, res): Promise<void> => {
+    try {
+      const consultant = await storage.getConsultantById(req.params.id);
+      if (!consultant) {
+        res.status(404).json({ message: "Consultant not found" });
+        return;
+      }
+      const start = typeof req.query.start === "string" ? req.query.start : "";
+      const end = typeof req.query.end === "string" ? req.query.end : "";
+      const isDate = (value: string) => {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+        const parsed = new Date(`${value}T00:00:00Z`);
+        return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
+      };
+      if (!isDate(start) || !isDate(end) || start > end) {
+        res.status(400).json({ message: "start and end must be valid YYYY-MM-DD dates with start no later than end." });
+        return;
+      }
+      const todayParts = new Intl.DateTimeFormat("en-US", {
+        timeZone: "Asia/Kolkata",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).formatToParts(new Date());
+      const todayValue = (type: Intl.DateTimeFormatPartTypes) => todayParts.find(part => part.type === type)?.value ?? "";
+      const today = `${todayValue("year")}-${todayValue("month")}-${todayValue("day")}`;
+      const lastAllowedDate = new Date(`${today}T00:00:00Z`);
+      lastAllowedDate.setUTCDate(lastAllowedDate.getUTCDate() + 29);
+      const horizonEnd = `${lastAllowedDate.getUTCFullYear()}-${String(lastAllowedDate.getUTCMonth() + 1).padStart(2, "0")}-${String(lastAllowedDate.getUTCDate()).padStart(2, "0")}`;
+      const rangeLength = (Date.parse(`${end}T00:00:00Z`) - Date.parse(`${start}T00:00:00Z`)) / 86_400_000 + 1;
+      if (rangeLength > 30 || end > horizonEnd) {
+        res.status(400).json({ message: "Requested dates must fit within the next 30-day booking horizon." });
+        return;
+      }
+
+      const [slotOverrides, bookingsByConsultant] = await Promise.all([
+        storage.getSlotOverrides(consultant.id),
+        getConsultationSlotsForRange([consultant.id], start, end),
+      ]);
+      const bookingsForConsultant = bookingsByConsultant.get(consultant.id) ?? [];
+      const dates = getConsultantBookableSlots(consultant, slotOverrides, bookingsForConsultant, start, end);
+      res.json({ dates });
+    } catch (error) {
+      console.error("Error fetching consultant bookable slots:", error);
+      res.status(500).json({ message: "Failed to fetch consultant bookable slots" });
     }
   });
 
@@ -1969,6 +2209,27 @@ export async function registerRoutes(
   });
 
   app.post("/api/bookings", isAuthenticated, async (req: any, res) => {
+    let mobileSlotLockClient: any = null;
+    let mobileSlotLockConsultantId: string | null = null;
+    const releaseMobileSlotLock = async () => {
+      if (!mobileSlotLockClient) return;
+      const client = mobileSlotLockClient;
+      const consultantId = mobileSlotLockConsultantId;
+      mobileSlotLockClient = null;
+      mobileSlotLockConsultantId = null;
+      try {
+        if (consultantId) {
+          await client.query("SELECT pg_advisory_unlock(hashtext($1))", [consultantId]);
+        }
+      } catch (error) {
+        console.error("Failed to release mobile booking advisory lock:", error);
+        client.release(true);
+        return;
+      }
+      if (client) {
+        client.release();
+      }
+    };
     try {
       const userId = req.user?.id;
       if (!userId) {
@@ -1979,6 +2240,8 @@ export async function registerRoutes(
         comorbidities: rawComorbidities,
         presentingComplaint: rawPresentingComplaint,
         presentIllness: rawPresentIllness,
+        bookableStart: rawBookableStart,
+        start: rawBookableTime,
         ...bookingFields
       } = req.body || {};
       if (rawComorbidities != null && typeof rawComorbidities !== "string") {
@@ -2034,6 +2297,46 @@ export async function registerRoutes(
       // For consultation bookings, link to the provider who owns the consultant
       if (bookingData.bookingType === "consultation" && bookingData.serviceId) {
         const consultant = await storage.getConsultantById(bookingData.serviceId);
+        if (rawBookableStart != null) {
+          if (typeof rawBookableStart !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(rawBookableStart)
+            || typeof rawBookableTime !== "string" || !/^\d{2}:\d{2}$/.test(rawBookableTime)) {
+            return res.status(400).json({ message: "Mobile booking requires bookableStart (YYYY-MM-DD) and start (HH:mm)." });
+          }
+          if (!consultant) return res.status(404).json({ message: "Consultant not found" });
+          const nowParts = new Intl.DateTimeFormat("en-US", {
+            timeZone: "Asia/Kolkata",
+            year: "numeric",
+            month: "2-digit",
+            day: "2-digit",
+          }).formatToParts(new Date());
+          const nowPart = (type: Intl.DateTimeFormatPartTypes) => nowParts.find(part => part.type === type)?.value ?? "";
+          const today = `${nowPart("year")}-${nowPart("month")}-${nowPart("day")}`;
+          const lastAllowedDate = new Date(`${today}T00:00:00Z`);
+          lastAllowedDate.setUTCDate(lastAllowedDate.getUTCDate() + 29);
+          const lastAllowed = `${lastAllowedDate.getUTCFullYear()}-${String(lastAllowedDate.getUTCMonth() + 1).padStart(2, "0")}-${String(lastAllowedDate.getUTCDate()).padStart(2, "0")}`;
+          if (rawBookableStart < today || rawBookableStart > lastAllowed) {
+            return res.status(409).json({ message: "This appointment slot is outside the current 30-day booking horizon." });
+          }
+          mobileSlotLockClient = await getPool().connect();
+          mobileSlotLockConsultantId = consultant.id;
+          await mobileSlotLockClient.query("SELECT pg_advisory_lock(hashtext($1))", [consultant.id]);
+          const [slotOverrides, bookingsByConsultant] = await Promise.all([
+            storage.getSlotOverrides(consultant.id),
+            getConsultationSlotsForRange([consultant.id], rawBookableStart, rawBookableStart),
+          ]);
+          const dateSlots = getConsultantBookableSlots(
+            consultant,
+            slotOverrides,
+            bookingsByConsultant.get(consultant.id) ?? [],
+            rawBookableStart,
+            rawBookableStart,
+          );
+          const requestedSlot = dateSlots.flatMap(item => item.slots).find(slot => slot.start === rawBookableTime);
+          if (!requestedSlot) {
+            return res.status(409).json({ message: "This appointment slot is no longer available. Please choose another time." });
+          }
+          bookingData.appointmentSlot = requestedSlot.appointmentSlot;
+        }
         if (consultant && consultant.status !== "active") {
           res.status(409).json({ message: "This consultant is currently unavailable for new bookings." });
           return;
@@ -2051,6 +2354,9 @@ export async function registerRoutes(
           bookingData.id = randomUUID();
           bookingData.videoRoomId = `stream://booking/${bookingData.id}`;
         }
+      }
+      if (rawBookableStart != null && bookingData.bookingType !== "consultation") {
+        return res.status(400).json({ message: "Mobile bookable slots are only supported for consultation bookings." });
       }
       
       // For lab bookings, auto-assign to enabled provider for that test
@@ -2141,6 +2447,7 @@ export async function registerRoutes(
           presentIllness,
         })
         : await storage.createBooking(bookingData);
+      await releaseMobileSlotLock();
 
       if (booking.bookingType === "lab") {
         const seekerProvider = await storage.getProviderByUserId(userId);
@@ -2178,6 +2485,8 @@ export async function registerRoutes(
     } catch (error: any) {
       console.error("Error creating booking:", error?.message || error, error?.stack);
       res.status(500).json({ message: error?.message || "Failed to create booking" });
+    } finally {
+      await releaseMobileSlotLock();
     }
   });
 
@@ -4960,8 +5269,8 @@ export async function registerRoutes(
         }
       }
       
-      const { availabilityFrom, availabilityTo, availableDays, slotSeries } = req.body as { availabilityFrom?: string; availabilityTo?: string; availableDays?: string[]; slotSeries?: { days: string[]; from: string; to: string }[] };
-      const consultant = await storage.updateConsultant(req.params.id, { availabilityFrom, availabilityTo, availableDays, slotSeries } as any);
+      const { availabilityFrom, availabilityTo, availableDays, availableSlots, slotSeries } = req.body as { availabilityFrom?: string; availabilityTo?: string; availableDays?: string[]; availableSlots?: string[]; slotSeries?: { days: string[]; from: string; to: string; paused?: boolean; disabled?: boolean }[] };
+      const consultant = await storage.updateConsultant(req.params.id, { availabilityFrom, availabilityTo, availableDays, slotSeries, ...(availableSlots !== undefined ? { availableSlots } : {}) } as any);
       if (!consultant) {
         return res.status(404).json({ message: "Consultant not found" });
       }

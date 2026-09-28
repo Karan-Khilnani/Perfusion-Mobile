@@ -1,0 +1,46 @@
+Scope: Provider My Profile (full), the Availability screen, the bookable-slots backend, and the Explore Consultants UI. One run. Build directly. Don't stop to ask unless truly blocked.
+
+Attached: the spec (Sections 7.7, 7.9, 7.11, 9) plus perfusion-profile.html (use the Provider view), perfusion-availability-cp19.html and perfusion-booking-flow-cs02.html. The HTML files are layout and behaviour references; the spec wins wherever they differ. Seeker profile is out of scope for this run.
+
+A. Provider My Profile. The current build has only an Available/Pause button. Build the full screen:
+
+Header: photo with a "+" badge to change it (Camera or Gallery, existing photo upload), name, specialty and hospital, a verification badge exactly as the backend reports it, and a pencil icon.
+Read-only sections: Personal Details (Display Name, Email, City, State, Contact Phone), Professional Details, Registration Documents, Signature and Portfolio.
+Editing: the pencil opens an Edit Profile page with Display Name, Email, City, State, Contact Phone, Qualification, Specialization, Years of Experience, Consultation Fee and the Portfolio text as real inputs. One "Save Changes" saves them together, the back arrow leaves without saving, and server errors show under the failing field.
+Locked fields: the locked/editable split must mirror what the existing backend already lets a provider change. Registration Number, Registered With and Affiliated Institute are locked in the reference: show them with a lock icon and grey text, and leave them out of the Edit form entirely. If the reference and the backend disagree, follow the backend and tell me.
+Registration Documents: per-file status, "View", and "Add document". If the existing upload only works during signup, report it.
+Signature: shows the current image. "Update signature" picks an image and replaces it via the existing signature upload. No drawing on screen.
+Portfolio: free multi-line text edited in Edit Profile. Photos sit in a row beneath it, with a "+" tile to add one and tap-to-open with Delete. If the backend has no portfolio storage, make the smallest backward-compatible addition and report it.
+Below the content: an Availability row (calendar icon, subtitle "Weekly hours, pause consultations", chevron) that opens the Availability screen, then Change Password, Help & Support, and a small Log Out at the very bottom. Remove any standalone Available/Pause button.
+
+B. Availability screen (reached only from that row), as in perfusion-availability-cp19.html:
+
+Status card: Available or Paused with one Pause/Resume button. It flips instantly, with no dialog, and existing bookings are untouched.
+Weekly list: seven day cards, Monday to Sunday. Each has an on/off switch and expands to its time windows. Turning a day off keeps its windows.
+Windows: tap a start or end time to open a time picker in 30-minute steps. The end must be after the start, and a window can't cross midnight, so a night shift is two windows. Each window has a delete ✕ and there is an "Add time window" row.
+Copy to all days: overwrites the other six days' windows with the source day's and switches them on. Days stay individually editable afterward.
+Long-press a window: pauses or resumes it. It stays paused until toggled again and is not offered to seekers. This is different from deleting the window.
+Saving: every change saves immediately, with no Save button. On failure the row reverts and shows an error.
+Fixed values: all times are IST and slots are 30 minutes, with no duration picker.
+
+Use the existing consultant slots and slot-override endpoints. If the model can't hold something (for example a per-window paused flag), make the smallest backward-compatible addition and list it.
+
+C. Bookable slots (backend, additive only). Computed server-side, in IST:
+
+Merge overlapping windows and cut them into 30-minute slots.
+Remove past, already-booked, paused and overridden slots.
+Return nothing for a paused consultant, or follow the web app's current behaviour for one and report which.
+
+Expose (a) each consultant's next available slot on the consultants list, or null within 30 days, and (b) bookable slots for one consultant over a date range, including which dates have any. Website behaviour must not change.
+
+D. Explore Consultants (seeker mobile UI). Build exactly as in perfusion-booking-flow-cs02.html:
+
+List: search, specialty chips, and an "Available today" toggle (off by default). Sorted soonest-available first.
+Card: a fixed-height card with photo, name, specialty, credentials, one green "Next available" chip, and an "All slots ›" link. Tapping the chip books that consultant and slot and goes to Step 2. Tapping the card or the link opens the slot sheet.
+Fully booked: a consultant with no slot in 30 days shows a grey fully-booked state, is not tappable, and sorts last.
+Slot sheet: a 14-day date strip (days with no slots greyed out) and a calendar icon for far dates. Slots sit in a 3-column grid grouped Morning, Afternoon and Evening. Footer: "All times IST · 30-minute consultation".
+Remove: the old raw-window display.
+
+Rules: mobile plus the additive backend changes only; don't change artifacts/perfusion-web behaviour. If a provider account can own several consultant profiles, add a consultant switcher at the top of Availability and tell me.
+
+At the end, one summary: what you built, every endpoint or field added or changed, any gaps or backend disagreements, and a table of all 11 screens in Section 6.1 marked built, partial or missing.

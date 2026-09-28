@@ -6,20 +6,28 @@ import React, { useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Image,
+  Linking,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Switch,
   Text,
+  TextInput,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import * as ImagePicker from "expo-image-picker";
+import * as DocumentPicker from "expo-document-picker";
+import { File as ExpoFile } from "expo-file-system";
+import { fetch as expoFetch } from "expo/fetch";
 
 import { useAuth } from "@/contexts/AuthContext";
 import { BrandMark } from "@/components/BrandMark";
 import { ScreenHeading } from "@/components/ScreenHeading";
-import { apiFetch } from "@/hooks/useApi";
+import { apiFetch, getBaseUrl, getStoredCookie } from "@/hooks/useApi";
 import { useColors } from "@/hooks/useColors";
 
 type ProviderConsultant = {
@@ -132,6 +140,10 @@ export default function ProfileScreen() {
     if (user.role === "provider") return "Healthcare Provider";
     return "Care Seeker";
   };
+
+  if (user?.role === "provider") {
+    return <ProviderMyProfile />;
+  }
 
   return (
     <ScrollView
@@ -383,6 +395,772 @@ export default function ProfileScreen() {
   );
 }
 
+type AccountProfile = {
+  id: string;
+  firstName?: string;
+  lastName?: string;
+  name?: string;
+  email?: string;
+  phone?: string;
+  city?: string;
+  state?: string;
+  location?: string;
+  profileImageUrl?: string;
+  registrationDocumentUrl?: string;
+};
+
+type ProviderProfileData = {
+  id: string;
+  type?: string;
+  name?: string;
+  location?: string;
+  phone?: string;
+  verificationStatus?: string;
+  registrationDocumentUrl?: string;
+};
+
+type ConsultantProfile = {
+  id: string;
+  name?: string;
+  displayName?: string;
+  photoUrl?: string;
+  specialization?: string;
+  qualification?: string;
+  yearsExperience?: number;
+  consultationFee?: string | number;
+  registrationNumber?: string;
+  registeredOrganization?: string;
+  affiliatedInstitution?: string;
+  registrationDocumentUrl?: string;
+  digitalSignatureUrl?: string;
+  portfolio?: string;
+  approvalStatus?: string;
+  status?: string;
+  registrationDocuments?: Array<{ id: string; filename: string; status: string | null; url?: string }>;
+  portfolioPhotos?: Array<{ id: string; url: string; filename: string }>;
+};
+type ConsultantPortfolioPhoto = NonNullable<ConsultantProfile["portfolioPhotos"]>[number];
+
+type ProfileColors = ReturnType<typeof useColors>;
+
+function absoluteFileUrl(uri?: string | null) {
+  if (!uri) return undefined;
+  return /^https?:\/\//i.test(uri) ? uri : `${getBaseUrl()}${uri}`;
+}
+
+async function uploadProfileFile(
+  base64: string,
+  filename: string,
+  mimeType: string,
+): Promise<string> {
+  const response = await apiFetch("/api/upload/document", {
+    method: "POST",
+    body: JSON.stringify({ base64, filename, mimeType }),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || typeof data.url !== "string") {
+    throw new Error(data.message || "The file could not be saved.");
+  }
+  return data.url;
+}
+
+async function uploadProviderProfileMedia(
+  consultantId: string,
+  kind: "photo" | "signature" | "portfolio_photo" | "registration_document",
+  uri: string,
+  filename: string,
+  webFile?: globalThis.File,
+): Promise<{ id: string; url?: string; status?: string }> {
+  const form = new FormData();
+  const file = Platform.OS === "web" && webFile ? webFile : new ExpoFile(uri);
+  form.append("file", file, filename);
+  form.append("kind", kind);
+  const cookie = await getStoredCookie();
+  const response = await expoFetch(
+    `${getBaseUrl()}/api/provider/consultants/${encodeURIComponent(consultantId)}/media`,
+    {
+      method: "POST",
+      credentials: "include",
+      headers: { "X-Mobile-Client": "1", ...(cookie ? { Cookie: cookie } : {}) },
+      body: form,
+    },
+  );
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.message || `Upload failed (${response.status}).`);
+  return data as { id: string; url?: string; status?: string };
+}
+
+function ProviderMyProfile() {
+  const colors = useColors();
+  const insets = useSafeAreaInsets();
+  const { user, logout, refreshUser } = useAuth();
+  const queryClient = useQueryClient();
+  const [consultantId, setConsultantId] = useState<string | undefined>();
+  const [loggingOut, setLoggingOut] = useState(false);
+  const [busyAction, setBusyAction] = useState<string | null>(null);
+  const [passwordOpen, setPasswordOpen] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [passwordError, setPasswordError] = useState("");
+  const [selectedPortfolioPhoto, setSelectedPortfolioPhoto] = useState<ConsultantPortfolioPhoto | null>(null);
+
+  const account = useQuery<AccountProfile>({
+    queryKey: ["provider-profile-account", user?.id],
+    enabled: !!user?.id,
+    queryFn: async () => {
+      const response = await apiFetch("/api/auth/user");
+      if (!response.ok) throw new Error("Unable to load account details.");
+      return response.json();
+    },
+  });
+  const provider = useQuery<ProviderProfileData>({
+    queryKey: ["provider-profile-provider", user?.id],
+    enabled: !!user?.id,
+    queryFn: async () => {
+      const response = await apiFetch("/api/providers/me");
+      if (response.status === 404) return {} as ProviderProfileData;
+      if (!response.ok) throw new Error("Unable to load provider details.");
+      return response.json();
+    },
+  });
+  const consultants = useQuery<ConsultantProfile[]>({
+    queryKey: ["provider-profile-consultants", user?.id],
+    enabled: !!user?.id,
+    queryFn: async () => {
+      const response = await apiFetch("/api/provider/my-consultants");
+      if (!response.ok) throw new Error("Unable to load professional details.");
+      return response.json();
+    },
+  });
+  const selectedConsultant = consultants.data?.find((item) => item.id === consultantId)
+    || consultants.data?.[0];
+  const displayName = [account.data?.firstName, account.data?.lastName]
+    .filter(Boolean)
+    .join(" ")
+    || account.data?.name
+    || user?.name
+    || "Provider";
+  const cityState = provider.data?.location || account.data?.location || "";
+  const [city, state] = cityState.split(",").map((part) => part.trim());
+  const status = provider.data?.verificationStatus || "Unavailable";
+  const avatarUri = absoluteFileUrl(selectedConsultant?.photoUrl || account.data?.profileImageUrl);
+  const consultantDoc = selectedConsultant?.registrationDocumentUrl;
+  const legacyDocUri = absoluteFileUrl(consultantDoc || provider.data?.registrationDocumentUrl || account.data?.registrationDocumentUrl);
+  const signatureUri = absoluteFileUrl(selectedConsultant?.digitalSignatureUrl);
+  const registrationDocuments = selectedConsultant?.registrationDocuments || [];
+  const portfolioPhotos = selectedConsultant?.portfolioPhotos || [];
+
+  const refreshProfile = async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["provider-profile-account", user?.id] }),
+      queryClient.invalidateQueries({ queryKey: ["provider-profile-provider", user?.id] }),
+      queryClient.invalidateQueries({ queryKey: ["provider-profile-consultants", user?.id] }),
+    ]);
+  };
+
+  const patchConsultant = async (id: string, payload: Record<string, unknown>) => {
+    const response = await apiFetch(`/api/provider/consultants/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.message || "Could not save the consultant profile.");
+    return data;
+  };
+
+  const chooseImage = async (useCamera: boolean) => {
+    const permission = useCamera
+      ? await ImagePicker.requestCameraPermissionsAsync()
+      : await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert("Permission needed", useCamera
+        ? "Allow camera access to take a profile photo."
+        : "Allow photo access to choose a profile photo.");
+      return;
+    }
+    const picker = useCamera ? ImagePicker.launchCameraAsync : ImagePicker.launchImageLibraryAsync;
+    const result = await picker({
+      mediaTypes: ["images"],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.82,
+      base64: true,
+    });
+    if (result.canceled || !result.assets[0]?.base64) return;
+    setBusyAction("photo");
+    try {
+      const asset = result.assets[0];
+      let url: string;
+      if (selectedConsultant?.id) {
+        const uploaded = await uploadProviderProfileMedia(
+          selectedConsultant.id,
+          "photo",
+          asset.uri,
+          asset.fileName || "provider-profile.jpg",
+          asset.file,
+        );
+        if (!uploaded.url) throw new Error("The photo upload did not return a profile photo URL.");
+        url = uploaded.url;
+      } else {
+        if (!asset.base64) throw new Error("The selected photo could not be read.");
+        url = await uploadProfileFile(
+          asset.base64,
+          asset.fileName || "provider-profile.jpg",
+          asset.mimeType || "image/jpeg",
+        );
+      }
+      if (!selectedConsultant?.id) {
+        const response = await apiFetch("/api/profile", {
+          method: "PATCH",
+          body: JSON.stringify({ profileImageUrl: url }),
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.message || "Could not update your photo.");
+      }
+      await refreshProfile();
+      await refreshUser();
+    } catch (error) {
+      Alert.alert("Photo upload failed", error instanceof Error ? error.message : "Could not update your photo.");
+    } finally {
+      setBusyAction(null);
+    }
+  };
+
+  const changePhoto = () => Alert.alert("Profile photo", "Choose a source", [
+    { text: "Camera", onPress: () => void chooseImage(true) },
+    { text: "Gallery", onPress: () => void chooseImage(false) },
+    { text: "Cancel", style: "cancel" },
+  ]);
+
+  const uploadRegistrationDocument = async () => {
+    if (!selectedConsultant?.id) {
+      Alert.alert("Unable to add document", "A consultant profile is required to save a professional registration document.");
+      return;
+    }
+    const result = await DocumentPicker.getDocumentAsync({
+      type: ["application/pdf", "image/jpeg", "image/png"],
+      copyToCacheDirectory: true,
+      multiple: false,
+    });
+    if (result.canceled || !result.assets[0]) return;
+    const file = result.assets[0];
+    if (file.size && file.size > 5 * 1024 * 1024) {
+      Alert.alert("File too large", "Choose a file smaller than 5 MB.");
+      return;
+    }
+    setBusyAction("document");
+    try {
+      await uploadProviderProfileMedia(selectedConsultant.id, "registration_document", file.uri, file.name, file.file);
+      await refreshProfile();
+    } catch (error) {
+      Alert.alert("Document upload failed", error instanceof Error ? error.message : "Could not save this document.");
+    } finally {
+      setBusyAction(null);
+    }
+  };
+
+  const updateSignature = async () => {
+    if (!selectedConsultant?.id) {
+      Alert.alert("Unable to update signature", "A consultant profile is required to save a signature.");
+      return;
+    }
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert("Permission needed", "Allow photo access to choose a signature image.");
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images"],
+      allowsEditing: true,
+      quality: 0.9,
+      base64: true,
+    });
+    if (result.canceled || !result.assets[0]?.base64) return;
+    setBusyAction("signature");
+    try {
+      const asset = result.assets[0];
+      await uploadProviderProfileMedia(
+        selectedConsultant.id,
+        "signature",
+        asset.uri,
+        asset.fileName || "provider-signature.png",
+        asset.file,
+      );
+      await refreshProfile();
+    } catch (error) {
+      Alert.alert("Signature upload failed", error instanceof Error ? error.message : "Could not save this signature.");
+    } finally {
+      setBusyAction(null);
+    }
+  };
+
+  const openDocument = async (document: { id?: string; url?: string }) => {
+    let url = document.url || (document.id === "legacy" ? legacyDocUri : undefined);
+    if (!url && document.id && selectedConsultant?.id) {
+      const response = await apiFetch(`/api/provider/consultants/${selectedConsultant.id}/media/${document.id}/signed-url`);
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.url) {
+        Alert.alert("Unable to open file", data.message || "Could not open the registration document.");
+        return;
+      }
+      url = data.url;
+    }
+    const documentUri = absoluteFileUrl(url);
+    if (!documentUri) return;
+    try {
+      await Linking.openURL(documentUri);
+    } catch {
+      Alert.alert("Unable to open file", "This document link could not be opened on this device.");
+    }
+  };
+
+  const addPortfolioPhoto = async () => {
+    if (!selectedConsultant?.id) {
+      Alert.alert("Unable to add photo", "A consultant profile is required to save portfolio photos.");
+      return;
+    }
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert("Permission needed", "Allow photo access to choose a portfolio image.");
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images"],
+      allowsEditing: true,
+      quality: 0.88,
+    });
+    if (result.canceled || !result.assets[0]) return;
+    const asset = result.assets[0];
+    setBusyAction("portfolio");
+    try {
+      await uploadProviderProfileMedia(
+        selectedConsultant.id,
+        "portfolio_photo",
+        asset.uri,
+        asset.fileName || `portfolio-${Date.now()}.jpg`,
+        asset.file,
+      );
+      await refreshProfile();
+    } catch (error) {
+      Alert.alert("Photo upload failed", error instanceof Error ? error.message : "Could not save this portfolio photo.");
+    } finally {
+      setBusyAction(null);
+    }
+  };
+
+  const deletePortfolioPhoto = (photo: ConsultantPortfolioPhoto) => {
+    if (!selectedConsultant?.id) return;
+    Alert.alert("Delete portfolio photo", "This photo will be removed from your portfolio.", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            const response = await apiFetch(`/api/provider/consultants/${selectedConsultant.id}/media/${photo.id}`, { method: "DELETE" });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(data.message || "Could not delete this photo.");
+            setSelectedPortfolioPhoto(null);
+            await refreshProfile();
+          } catch (error) {
+            Alert.alert("Delete failed", error instanceof Error ? error.message : "Could not delete this photo.");
+          }
+        },
+      },
+    ]);
+  };
+
+  const doLogout = () => {
+    if (Platform.OS === "web") {
+      void logout();
+      return;
+    }
+    Alert.alert("Log out", "You'll need to log in again to use Perfusion.", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Log Out",
+        style: "destructive",
+        onPress: async () => {
+          setLoggingOut(true);
+          try {
+            await logout();
+          } finally {
+            setLoggingOut(false);
+          }
+        },
+      },
+    ]);
+  };
+
+  const savePassword = async () => {
+    setPasswordError("");
+    if (!currentPassword || !newPassword) {
+      setPasswordError("Enter your current and new passwords.");
+      return;
+    }
+    try {
+      const response = await apiFetch("/api/profile/change-password", {
+        method: "POST",
+        body: JSON.stringify({ currentPassword, newPassword }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.message || "Could not change password.");
+      setPasswordOpen(false);
+      setCurrentPassword("");
+      setNewPassword("");
+      Alert.alert("Password updated", "Your password has been changed.");
+    } catch (error) {
+      setPasswordError(error instanceof Error ? error.message : "Could not change password.");
+    }
+  };
+
+  const goEdit = () => {
+    router.push({
+      pathname: "/edit-provider-profile",
+      params: selectedConsultant?.id ? { consultantId: selectedConsultant.id } : {},
+    });
+  };
+
+  const loading = account.isLoading || provider.isLoading || consultants.isLoading;
+  const loadError = account.error || provider.error || consultants.error;
+  const sectionStyle = [providerProfileStyles.section, { backgroundColor: colors.card, borderColor: colors.border }];
+
+  return (
+    <ScrollView
+      style={{ flex: 1, backgroundColor: colors.background }}
+      contentContainerStyle={{
+        paddingTop: Platform.OS === "web" ? 67 + insets.top : insets.top + 16,
+        paddingBottom: Platform.OS === "web" ? 34 + insets.bottom : insets.bottom + 42,
+      }}
+      showsVerticalScrollIndicator={false}
+    >
+      <View style={providerProfileStyles.pageHeading}>
+        <BrandMark compact />
+        <Text style={[providerProfileStyles.pageTitle, { color: colors.foreground }]}>My Profile</Text>
+      </View>
+      {loading ? (
+        <View style={providerProfileStyles.centerState}>
+          <ActivityIndicator color={colors.primary} />
+          <Text style={{ color: colors.mutedForeground }}>Loading provider profile…</Text>
+        </View>
+      ) : loadError ? (
+        <View style={[providerProfileStyles.centerState, { paddingHorizontal: 24 }]}>
+          <Text style={{ color: colors.destructive, textAlign: "center" }}>
+            {loadError instanceof Error ? loadError.message : "Unable to load provider profile."}
+          </Text>
+          <Pressable onPress={() => { void Promise.all([account.refetch(), provider.refetch(), consultants.refetch()]); }}>
+            <Text style={{ color: colors.primary, fontFamily: "Inter_600SemiBold" }}>Try again</Text>
+          </Pressable>
+        </View>
+      ) : (
+        <>
+          {consultants.data && consultants.data.length > 1 && (
+            <View style={providerProfileStyles.selectorWrap}>
+              <Text style={[providerProfileStyles.eyebrow, { color: colors.mutedForeground }]}>CONSULTANT PROFILE</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+                {consultants.data.map((item) => (
+                  <Pressable
+                    key={item.id}
+                    onPress={() => setConsultantId(item.id)}
+                    style={[
+                      providerProfileStyles.selector,
+                      {
+                        borderColor: selectedConsultant?.id === item.id ? colors.primary : colors.border,
+                        backgroundColor: selectedConsultant?.id === item.id ? `${colors.primary}12` : colors.card,
+                      },
+                    ]}
+                  >
+                    <Text style={{ color: selectedConsultant?.id === item.id ? colors.primary : colors.foreground, fontFamily: "Inter_500Medium" }}>
+                      {item.name || item.displayName || "Consultant"}
+                    </Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            </View>
+          )}
+          <View style={[providerProfileStyles.hero, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Pressable onPress={goEdit} style={[providerProfileStyles.editButton, { backgroundColor: colors.background }]} accessibilityRole="button" accessibilityLabel="Edit profile">
+              <Feather name="edit-2" size={16} color={colors.foreground} />
+            </Pressable>
+            <View style={providerProfileStyles.avatarWrap}>
+              {avatarUri ? (
+                <Image source={{ uri: avatarUri }} style={providerProfileStyles.avatar} />
+              ) : (
+                <View style={[providerProfileStyles.avatar, { backgroundColor: `${colors.primary}12`, alignItems: "center", justifyContent: "center" }]}>
+                  <Ionicons name="person-outline" size={32} color={colors.primary} />
+                </View>
+              )}
+              <Pressable onPress={changePhoto} style={[providerProfileStyles.cameraButton, { backgroundColor: colors.primary }]} accessibilityRole="button" accessibilityLabel="Change profile photo">
+                {busyAction === "photo" ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Feather name="plus" size={16} color="#FFFFFF" />}
+              </Pressable>
+            </View>
+            <Text style={[providerProfileStyles.heroName, { color: colors.foreground }]}>{selectedConsultant?.name || displayName}</Text>
+            <Text style={[providerProfileStyles.heroSub, { color: colors.mutedForeground }]}>
+              {[selectedConsultant?.specialization, provider.data?.name].filter(Boolean).join(" · ") || "Healthcare Provider"}
+            </Text>
+            <View style={[providerProfileStyles.verificationBadge, { backgroundColor: status.toLowerCase() === "verified" ? `${colors.success}15` : `${colors.warning}16` }]}>
+              <Ionicons name="shield-checkmark-outline" size={14} color={status.toLowerCase() === "verified" ? colors.success : colors.warning} />
+              <Text style={{ color: status.toLowerCase() === "verified" ? colors.success : colors.warning, fontFamily: "Inter_600SemiBold", fontSize: 12 }}>
+                {status}
+              </Text>
+            </View>
+          </View>
+
+          <ProfileSection title="PERSONAL DETAILS" colors={colors} style={sectionStyle}>
+            <ProfileValue label="Display Name" value={displayName} colors={colors} />
+            <ProfileValue label="Email" value={account.data?.email || user?.email} colors={colors} />
+             <ProfileValue label="City" value={provider.data?.location !== undefined ? city : account.data?.city} colors={colors} />
+             <ProfileValue label="State" value={provider.data?.location !== undefined ? state : account.data?.state} colors={colors} />
+            <ProfileValue label="Contact Phone" value={account.data?.phone || provider.data?.phone} colors={colors} last />
+          </ProfileSection>
+
+          <ProfileSection title="PROFESSIONAL DETAILS" colors={colors} style={sectionStyle}>
+            <ProfileValue label="Qualification" value={selectedConsultant?.qualification} colors={colors} />
+            <ProfileValue label="Specialization" value={selectedConsultant?.specialization} colors={colors} />
+            <ProfileValue label="Years of Experience" value={selectedConsultant?.yearsExperience === undefined ? undefined : `${selectedConsultant.yearsExperience} years`} colors={colors} />
+            <ProfileValue label="Consultation Fee" value={selectedConsultant?.consultationFee === undefined ? undefined : `₹${selectedConsultant.consultationFee}`} colors={colors} />
+            <ProfileValue label="Registration Number" value={selectedConsultant?.registrationNumber} colors={colors} />
+            <ProfileValue label="Registered With" value={selectedConsultant?.registeredOrganization} colors={colors} />
+            <ProfileValue label="Affiliated Institute" value={selectedConsultant?.affiliatedInstitution} colors={colors} last />
+          </ProfileSection>
+
+          <View style={sectionStyle}>
+            <Text style={[providerProfileStyles.sectionTitle, { color: colors.mutedForeground }]}>REGISTRATION DOCUMENTS</Text>
+            {registrationDocuments.map((document) => (
+              <View key={document.id} style={[providerProfileStyles.docRow, { borderBottomColor: colors.border }]}>
+                <View style={[providerProfileStyles.docIcon, { backgroundColor: colors.background }]}>
+                  <Feather name="file-text" size={16} color={colors.foreground} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[providerProfileStyles.docName, { color: colors.foreground }]} numberOfLines={1}>{document.filename}</Text>
+                   <Text style={{ color: document.status?.toLowerCase() === "verified" ? colors.success : document.status ? colors.warning : colors.mutedForeground, fontSize: 12 }}>{document.status || "Status not available"}</Text>
+                </View>
+                <Pressable onPress={() => void openDocument(document)}><Text style={{ color: colors.primary, fontFamily: "Inter_600SemiBold" }}>View</Text></Pressable>
+              </View>
+            ))}
+             {legacyDocUri && !registrationDocuments.some((document) => document.id === "legacy" || document.url === legacyDocUri) && (
+              <View style={[providerProfileStyles.docRow, { borderBottomColor: colors.border }]}>
+                <View style={[providerProfileStyles.docIcon, { backgroundColor: colors.background }]}>
+                  <Feather name="file-text" size={16} color={colors.foreground} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[providerProfileStyles.docName, { color: colors.foreground }]} numberOfLines={1}>Registration document</Text>
+                  <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>Legacy file</Text>
+                </View>
+                <Pressable onPress={() => void openDocument({ url: legacyDocUri })}><Text style={{ color: colors.primary, fontFamily: "Inter_600SemiBold" }}>View</Text></Pressable>
+              </View>
+            )}
+            {!registrationDocuments.length && !legacyDocUri && (
+              <Text style={[providerProfileStyles.emptyCopy, { color: colors.mutedForeground }]}>No registration document has been added.</Text>
+            )}
+            <Pressable onPress={() => void uploadRegistrationDocument()} disabled={busyAction === "document"} style={providerProfileStyles.actionRow}>
+              {busyAction === "document" ? <ActivityIndicator size="small" color={colors.primary} /> : <Feather name="plus" size={17} color={colors.primary} />}
+              <Text style={{ color: colors.primary, fontFamily: "Inter_600SemiBold" }}>{busyAction === "document" ? "Uploading…" : "Add document"}</Text>
+            </Pressable>
+          </View>
+
+          <View style={sectionStyle}>
+            <Text style={[providerProfileStyles.sectionTitle, { color: colors.mutedForeground }]}>SIGNATURE</Text>
+            {signatureUri ? (
+              <Image source={{ uri: signatureUri }} resizeMode="contain" style={[providerProfileStyles.signatureImage, { backgroundColor: colors.background }]} />
+            ) : (
+              <View style={[providerProfileStyles.signatureEmpty, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                <Feather name="edit-3" size={22} color={colors.mutedForeground} />
+                <Text style={{ color: colors.mutedForeground, fontSize: 13 }}>No signature on file</Text>
+              </View>
+            )}
+            <Pressable onPress={() => void updateSignature()} disabled={busyAction === "signature"} style={providerProfileStyles.actionRow}>
+              {busyAction === "signature" ? <ActivityIndicator size="small" color={colors.primary} /> : <Feather name="upload" size={15} color={colors.primary} />}
+              <Text style={{ color: colors.primary, fontFamily: "Inter_600SemiBold" }}>{busyAction === "signature" ? "Uploading…" : "Update signature"}</Text>
+            </Pressable>
+          </View>
+
+          <View style={[sectionStyle, { borderBottomWidth: 0 }]}>
+            <Text style={[providerProfileStyles.sectionTitle, { color: colors.mutedForeground }]}>PORTFOLIO</Text>
+            <Text style={[providerProfileStyles.portfolioText, { color: colors.foreground }]}>
+              {selectedConsultant?.portfolio || "No portfolio information has been added."}
+            </Text>
+            <Text style={[providerProfileStyles.eyebrow, { color: colors.mutedForeground, marginTop: 16, marginBottom: 8 }]}>PHOTOS</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+              {portfolioPhotos.map((photo) => (
+                <Pressable key={photo.id} onPress={() => setSelectedPortfolioPhoto(photo)}>
+                  <Image source={{ uri: absoluteFileUrl(photo.url) }} style={providerProfileStyles.portfolioPhoto} />
+                </Pressable>
+              ))}
+              <Pressable
+                onPress={() => void addPortfolioPhoto()}
+                disabled={busyAction === "portfolio"}
+                style={[providerProfileStyles.portfolioAdd, { borderColor: colors.border }]}
+                accessibilityRole="button"
+                accessibilityLabel="Add portfolio photo"
+              >
+                {busyAction === "portfolio" ? <ActivityIndicator color={colors.primary} /> : <Feather name="plus" size={22} color={colors.primary} />}
+              </Pressable>
+            </ScrollView>
+          </View>
+
+          <View style={providerProfileStyles.footerLinks}>
+            <ProfileLink icon="calendar" title="Availability" subtitle="Weekly hours, pause consultations" colors={colors} onPress={() => router.push("/availability" as never)} />
+            <ProfileLink icon="lock" title="Change Password" colors={colors} onPress={() => { setPasswordError(""); setPasswordOpen(true); }} />
+            <ProfileLink icon="help-circle" title="Help & Support" colors={colors} onPress={() => Alert.alert("Help & Support", "Contact support through your Perfusion administrator.")} />
+          </View>
+          <Pressable onPress={doLogout} disabled={loggingOut} style={providerProfileStyles.logoutArea}>
+            <Text style={[providerProfileStyles.logoutText, { color: colors.mutedForeground }]}>{loggingOut ? "Logging out…" : "Log Out"}</Text>
+            <Text style={[providerProfileStyles.logoutNote, { color: colors.mutedForeground }]}>You'll need to log in again to use Perfusion. Sessions otherwise stay signed in indefinitely.</Text>
+          </Pressable>
+        </>
+      )}
+      <Modal visible={passwordOpen} transparent animationType="slide" onRequestClose={() => setPasswordOpen(false)}>
+        <View style={providerProfileStyles.modalBackdrop}>
+          <View style={[providerProfileStyles.passwordModal, { backgroundColor: colors.card }]}>
+            <View style={providerProfileStyles.modalHeading}>
+              <Text style={[providerProfileStyles.modalTitle, { color: colors.foreground }]}>Change Password</Text>
+              <Pressable onPress={() => setPasswordOpen(false)} accessibilityLabel="Close"><Feather name="x" size={22} color={colors.mutedForeground} /></Pressable>
+            </View>
+            <ProviderTextInput label="Current password" value={currentPassword} onChangeText={setCurrentPassword} secureTextEntry colors={colors} />
+            <ProviderTextInput label="New password" value={newPassword} onChangeText={setNewPassword} secureTextEntry colors={colors} />
+            {passwordError ? <Text style={{ color: colors.destructive, marginBottom: 10 }}>{passwordError}</Text> : null}
+            <Pressable onPress={() => void savePassword()} style={[providerProfileStyles.saveButton, { backgroundColor: colors.primary }]}>
+              <Text style={providerProfileStyles.saveButtonText}>Update Password</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+      <Modal visible={!!selectedPortfolioPhoto} transparent animationType="fade" onRequestClose={() => setSelectedPortfolioPhoto(null)}>
+        <View style={providerProfileStyles.photoModalBackdrop}>
+          <View style={[providerProfileStyles.photoModal, { backgroundColor: colors.card }]}>
+            <View style={providerProfileStyles.modalHeading}>
+              <Text style={[providerProfileStyles.modalTitle, { color: colors.foreground }]} numberOfLines={1}>
+                {selectedPortfolioPhoto?.filename || "Portfolio photo"}
+              </Text>
+              <Pressable onPress={() => setSelectedPortfolioPhoto(null)} accessibilityLabel="Close photo"><Feather name="x" size={22} color={colors.mutedForeground} /></Pressable>
+            </View>
+            {selectedPortfolioPhoto && <Image source={{ uri: absoluteFileUrl(selectedPortfolioPhoto.url) }} resizeMode="contain" style={providerProfileStyles.photoPreview} />}
+            {selectedPortfolioPhoto && <Pressable onPress={() => deletePortfolioPhoto(selectedPortfolioPhoto)} style={[providerProfileStyles.deletePhoto, { borderColor: colors.destructive }]}>
+              <Feather name="trash-2" size={16} color={colors.destructive} />
+              <Text style={{ color: colors.destructive, fontFamily: "Inter_600SemiBold" }}>Delete photo</Text>
+            </Pressable>}
+          </View>
+        </View>
+      </Modal>
+    </ScrollView>
+  );
+}
+
+function ProfileSection({
+  title,
+  colors,
+  style,
+  children,
+}: {
+  title: string;
+  colors: ProfileColors;
+  style: any;
+  children: React.ReactNode;
+}) {
+  return (
+    <View style={style}>
+      <Text style={[providerProfileStyles.sectionTitle, { color: colors.mutedForeground }]}>{title}</Text>
+      {children}
+    </View>
+  );
+}
+
+function ProfileValue({
+  label,
+  value,
+  colors,
+  locked = false,
+  last = false,
+}: {
+  label: string;
+  value?: string;
+  colors: ProfileColors;
+  locked?: boolean;
+  last?: boolean;
+}) {
+  if (!value) return null;
+  return (
+    <View style={[providerProfileStyles.valueRow, { borderBottomColor: colors.border }, last && { borderBottomWidth: 0 }]}>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 5, flexShrink: 0 }}>
+        {locked && <Feather name="lock" size={11} color={colors.mutedForeground} />}
+        <Text style={[providerProfileStyles.valueLabel, { color: colors.mutedForeground }]}>{label}</Text>
+      </View>
+      <Text style={[providerProfileStyles.valueText, { color: locked ? colors.mutedForeground : colors.foreground }]} numberOfLines={2}>{value}</Text>
+    </View>
+  );
+}
+
+function ProfileLink({
+  icon,
+  title,
+  subtitle,
+  colors,
+  onPress,
+}: {
+  icon: keyof typeof Feather.glyphMap;
+  title: string;
+  subtitle?: string;
+  colors: ProfileColors;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable onPress={onPress} style={[providerProfileStyles.linkRow, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+      <View style={[providerProfileStyles.linkIcon, { backgroundColor: colors.background }]}>
+        <Feather name={icon} size={15} color={colors.foreground} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={[providerProfileStyles.linkTitle, { color: colors.foreground }]}>{title}</Text>
+        {subtitle && <Text style={[providerProfileStyles.linkSubtitle, { color: colors.mutedForeground }]}>{subtitle}</Text>}
+      </View>
+      <Feather name="chevron-right" size={17} color={colors.mutedForeground} />
+    </Pressable>
+  );
+}
+
+function ProviderTextInput({
+  label,
+  value,
+  onChangeText,
+  colors,
+  secureTextEntry = false,
+  multiline = false,
+  keyboardType = "default",
+  error,
+}: {
+  label: string;
+  value: string;
+  onChangeText: (text: string) => void;
+  colors: ProfileColors;
+  secureTextEntry?: boolean;
+  multiline?: boolean;
+  keyboardType?: "default" | "email-address" | "phone-pad" | "numeric" | "decimal-pad";
+  error?: string;
+}) {
+  return (
+    <View style={{ marginBottom: 14 }}>
+      <Text style={[providerProfileStyles.inputLabel, { color: colors.foreground }]}>{label}</Text>
+      <TextInput
+        value={value}
+        onChangeText={onChangeText}
+        placeholder={label}
+        placeholderTextColor={colors.mutedForeground}
+        autoCapitalize={keyboardType === "email-address" ? "none" : "sentences"}
+        autoCorrect={false}
+        secureTextEntry={secureTextEntry}
+        multiline={multiline}
+        keyboardType={keyboardType}
+        style={[
+          providerProfileStyles.input,
+          multiline && providerProfileStyles.multilineInput,
+          { color: colors.foreground, backgroundColor: colors.card, borderColor: error ? colors.destructive : colors.border },
+        ]}
+      />
+      {!!error && <Text style={{ color: colors.destructive, fontSize: 12, marginTop: 4 }}>{error}</Text>}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   container: {
     paddingHorizontal: 20,
@@ -482,4 +1260,57 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: "Inter_400Regular",
   },
+});
+
+const providerProfileStyles = StyleSheet.create({
+  pageHeading: { paddingHorizontal: 20, paddingBottom: 14, gap: 16 },
+  pageTitle: { fontSize: 22, fontFamily: "Sora_600SemiBold" },
+  centerState: { minHeight: 220, alignItems: "center", justifyContent: "center", gap: 12 },
+  selectorWrap: { paddingHorizontal: 20, paddingBottom: 12, gap: 8 },
+  selector: { borderWidth: 1, borderRadius: 18, paddingHorizontal: 12, paddingVertical: 8 },
+  hero: { alignItems: "center", paddingHorizontal: 20, paddingTop: 20, paddingBottom: 22, borderTopWidth: 1, borderBottomWidth: 1, position: "relative" },
+  avatarWrap: { position: "relative", marginBottom: 10 },
+  avatar: { width: 78, height: 78, borderRadius: 39 },
+  cameraButton: { position: "absolute", width: 27, height: 27, borderRadius: 14, borderWidth: 2, borderColor: "#FFFFFF", right: -2, bottom: -1, alignItems: "center", justifyContent: "center" },
+  editButton: { position: "absolute", right: 16, top: 16, width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center" },
+  heroName: { fontSize: 19, fontFamily: "Sora_600SemiBold", textAlign: "center" },
+  heroSub: { fontSize: 13, textAlign: "center", marginTop: 3 },
+  verificationBadge: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, marginTop: 10 },
+  section: { paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: StyleSheet.hairlineWidth },
+  sectionTitle: { fontSize: 11, fontFamily: "Inter_700Bold", letterSpacing: 0.4, marginBottom: 10 },
+  valueRow: { minHeight: 40, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 10, paddingVertical: 8, borderBottomWidth: StyleSheet.hairlineWidth },
+  valueLabel: { fontSize: 13, flexShrink: 0 },
+  valueText: { fontSize: 13, fontFamily: "Inter_600SemiBold", textAlign: "right", flexShrink: 1 },
+  docRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 9, borderBottomWidth: StyleSheet.hairlineWidth },
+  docIcon: { width: 32, height: 32, borderRadius: 8, alignItems: "center", justifyContent: "center" },
+  docName: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
+  emptyCopy: { fontSize: 13, lineHeight: 19 },
+  actionRow: { flexDirection: "row", alignItems: "center", gap: 8, paddingTop: 12, minHeight: 34 },
+  signatureImage: { width: "100%", height: 78, borderRadius: 10 },
+  signatureEmpty: { height: 78, borderWidth: 1, borderStyle: "dashed", borderRadius: 10, alignItems: "center", justifyContent: "center", gap: 4 },
+  portfolioPhoto: { width: 66, height: 66, borderRadius: 10, backgroundColor: "#F0F1F3" },
+  portfolioAdd: { width: 66, height: 66, borderRadius: 10, borderWidth: 1.5, borderStyle: "dashed", alignItems: "center", justifyContent: "center" },
+  portfolioText: { fontSize: 14, lineHeight: 21 },
+  eyebrow: { fontSize: 10, fontFamily: "Inter_700Bold", letterSpacing: 0.35 },
+  footerLinks: { marginTop: 18, borderTopWidth: StyleSheet.hairlineWidth, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: "#ECEDF0" },
+  linkRow: { flexDirection: "row", alignItems: "center", gap: 11, minHeight: 58, paddingHorizontal: 20, borderBottomWidth: StyleSheet.hairlineWidth },
+  linkIcon: { width: 31, height: 31, borderRadius: 8, alignItems: "center", justifyContent: "center" },
+  linkTitle: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
+  linkSubtitle: { fontSize: 11, marginTop: 2 },
+  logoutArea: { alignItems: "center", paddingTop: 15, paddingHorizontal: 24 },
+  logoutText: { fontSize: 12, fontFamily: "Inter_600SemiBold", paddingVertical: 6 },
+  logoutNote: { fontSize: 10, lineHeight: 15, textAlign: "center" },
+  modalBackdrop: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.38)" },
+  passwordModal: { borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 22, paddingBottom: 34 },
+  modalHeading: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 18 },
+  modalTitle: { fontSize: 20, fontFamily: "Sora_600SemiBold" },
+  inputLabel: { fontSize: 13, fontFamily: "Inter_500Medium", marginBottom: 6 },
+  input: { minHeight: 46, borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, fontSize: 15, fontFamily: "Inter_400Regular" },
+  multilineInput: { minHeight: 100, paddingTop: 11, textAlignVertical: "top" },
+  saveButton: { minHeight: 48, borderRadius: 24, alignItems: "center", justifyContent: "center", marginTop: 5 },
+  saveButtonText: { color: "#FFFFFF", fontSize: 15, fontFamily: "Inter_600SemiBold" },
+  photoModalBackdrop: { flex: 1, justifyContent: "center", padding: 22, backgroundColor: "rgba(0,0,0,0.62)" },
+  photoModal: { borderRadius: 16, padding: 16 },
+  photoPreview: { width: "100%", height: 360, borderRadius: 10 },
+  deletePhoto: { marginTop: 12, minHeight: 44, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, borderWidth: 1, borderRadius: 10 },
 });

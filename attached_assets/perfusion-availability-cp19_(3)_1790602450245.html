@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Perfusion — Availability (CP-19/20)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --red:#DB2841; --charcoal:#2A2A2A; --canvas:#F7F7F9; --card:#FFFFFF;
+    --hairline:#ECEDF0; --muted:#7A7F8A; --muted-2:#A6ABB4; --blue:#2F6FED; --blue-tint:#EAF1FE;
+    --green:#17A672; --green-tint:#E7F7F1; --grey-tint:#F0F1F3;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{ background:#E8E6E2; font-family:'Inter', sans-serif; display:flex; flex-direction:column; align-items:center; gap:16px; padding:40px 16px 80px; min-height:100vh; }
+  .review-bar{ font-size:12px; color:var(--muted-2); background:#fff; border:1px solid var(--hairline); border-radius:999px; padding:8px 16px; }
+  .device{ width:390px; max-width:100%; height:844px; background:#000; border-radius:46px; padding:14px; box-shadow:0 30px 60px -20px rgba(0,0,0,.35), 0 10px 20px -10px rgba(0,0,0,.2); }
+  .screen{ width:100%; height:100%; background:var(--canvas); border-radius:34px; overflow:hidden; position:relative; display:flex; flex-direction:column; }
+  .notch{ position:absolute; top:14px; left:50%; transform:translateX(-50%); width:120px; height:28px; background:#000; border-radius:20px; z-index:50; }
+  .statusbar{ display:flex; justify-content:space-between; align-items:center; padding:16px 26px 4px; font-size:13px; font-weight:600; color:var(--charcoal); background:var(--card); flex-shrink:0; }
+  .page-header{ background:var(--card); border-bottom:1px solid var(--hairline); flex-shrink:0; display:flex; align-items:center; gap:10px; padding:12px 16px; }
+  .back-btn{ width:30px; height:30px; border-radius:50%; display:flex; align-items:center; justify-content:center; color:var(--charcoal); }
+  .back-btn svg{ width:17px; height:17px; }
+  .page-title{ font-family:'Sora',sans-serif; font-weight:600; font-size:16px; color:var(--charcoal); }
+
+  .scroll{ flex:1; overflow-y:auto; }
+
+  /* pause banner */
+  .pause-card{ margin:16px; background:#fff; border-radius:14px; border:1px solid var(--hairline); padding:14px 16px; }
+  .pause-top{ display:flex; align-items:center; justify-content:space-between; }
+  .pause-status{ display:flex; align-items:center; gap:8px; }
+  .pause-dot{ width:8px; height:8px; border-radius:50%; background:var(--green); }
+  .pause-dot.paused{ background:var(--muted-2); }
+  .pause-status-text{ font-size:13.5px; font-weight:700; color:var(--charcoal); }
+  .pause-btn{ font-size:12px; font-weight:700; padding:8px 14px; border-radius:999px; background:var(--charcoal); color:#fff; cursor:pointer; }
+  .pause-btn.resume{ background:var(--green); }
+  .pause-sub{ font-size:11.5px; color:var(--muted); margin-top:8px; line-height:1.5; }
+
+  .ist-note{ margin:0 16px 14px; display:flex; align-items:center; gap:7px; font-size:11.5px; color:var(--muted); }
+  .ist-note svg{ width:13px; height:13px; color:var(--muted-2); flex-shrink:0; }
+
+  .section-title{ padding:4px 16px 10px; font-size:12px; font-weight:700; color:var(--muted-2); letter-spacing:.3px; }
+
+  .day-card{ background:#fff; border-bottom:1px solid var(--hairline); padding:13px 16px; }
+  .day-head{ display:flex; align-items:center; justify-content:space-between; }
+  .day-left{ display:flex; align-items:center; gap:11px; }
+  .day-switch{ width:38px; height:22px; border-radius:999px; background:var(--grey-tint); position:relative; cursor:pointer; flex-shrink:0; transition:background .15s ease; }
+  .day-switch::after{ content:''; position:absolute; top:2px; left:2px; width:18px; height:18px; border-radius:50%; background:#fff; box-shadow:0 1px 2px rgba(0,0,0,.2); transition:left .15s ease; }
+  .day-switch.on{ background:var(--green); }
+  .day-switch.on::after{ left:18px; }
+  .day-name{ font-size:14px; font-weight:700; color:var(--charcoal); }
+  .day-summary{ font-size:11.5px; color:var(--muted-2); }
+
+  .slot-list{ margin-top:12px; display:flex; flex-direction:column; gap:8px; }
+  .slot-row{ display:flex; align-items:center; gap:10px; }
+  .slot-time{ flex:1; height:38px; border:1px solid var(--hairline); border-radius:9px; display:flex; align-items:center; padding:0 12px; font-size:12.5px; color:var(--charcoal); background:var(--canvas); font-weight:600; }
+  .slot-sep{ color:var(--muted-2); font-size:12px; }
+  .slot-remove{ width:30px; height:30px; border-radius:50%; background:var(--grey-tint); display:flex; align-items:center; justify-content:center; color:var(--muted); cursor:pointer; flex-shrink:0; }
+  .slot-remove svg{ width:12px; height:12px; }
+  .add-slot-row{ display:flex; align-items:center; gap:6px; margin-top:9px; color:var(--red); font-weight:700; font-size:12px; cursor:pointer; }
+  .add-slot-row svg{ width:13px; height:13px; }
+  .copy-all-row{ display:flex; align-items:center; gap:6px; margin-top:9px; color:var(--blue); font-weight:700; font-size:12px; cursor:pointer; }
+  .copy-all-row svg{ width:13px; height:13px; }
+  .slot-time.slot-disabled{ background:var(--grey-tint); color:var(--muted-2); text-decoration:line-through; }
+  .day-body{ display:none; }
+  .day-card.expanded .day-body{ display:block; }
+
+  .duration-card{ background:#fff; border-radius:14px; border:1px solid var(--hairline); margin:0 16px 16px; padding:14px 16px; }
+  .duration-label{ font-size:12px; font-weight:700; color:var(--muted-2); letter-spacing:.2px; margin-bottom:10px; }
+  .duration-chips{ display:flex; gap:8px; flex-wrap:wrap; }
+  .duration-chip{ font-size:12.5px; font-weight:700; padding:8px 15px; border-radius:10px; background:var(--grey-tint); color:var(--muted); cursor:pointer; }
+  .duration-chip.active{ background:var(--charcoal); color:#fff; }
+
+  .info-note{ margin:0 16px 20px; display:flex; align-items:flex-start; gap:8px; font-size:11.5px; color:var(--muted); line-height:1.5; }
+  .info-note svg{ width:14px; height:14px; color:var(--muted-2); flex-shrink:0; margin-top:1px; }
+
+  /* confirmation sheet */
+  .sheet-backdrop{ position:absolute; inset:0; background:rgba(20,20,25,.42); z-index:80; display:none; align-items:flex-end; }
+  .sheet-backdrop.open{ display:flex; }
+  .confirm-sheet{ width:100%; background:#fff; border-radius:20px 20px 0 0; padding:10px 20px 22px; }
+  .sheet-handle{ width:34px; height:4px; border-radius:2px; background:var(--hairline); margin:0 auto 14px; }
+  .confirm-sheet-title{ font-family:'Sora',sans-serif; font-weight:600; font-size:16px; color:var(--charcoal); margin-bottom:10px; text-align:center; }
+  .confirm-sheet-body{ font-size:13px; color:var(--muted); line-height:1.6; text-align:center; margin-bottom:18px; }
+  .confirm-sheet-body b{ color:var(--charcoal); }
+  .confirm-sheet-btn{ width:100%; height:46px; border-radius:23px; font-weight:700; font-size:13.5px; border:none; margin-bottom:8px; cursor:pointer; }
+  .confirm-sheet-btn.primary{ background:var(--red); color:#fff; }
+  .confirm-sheet-btn.secondary{ background:transparent; color:var(--muted); }
+</style>
+</head>
+<body>
+
+  <div class="review-bar">Provider — Availability (CP-19) · Pause Consultations (CP-20)</div>
+
+  <div class="device">
+    <div class="screen">
+      <div class="notch"></div>
+      <div class="statusbar">
+        <span>9:41</span>
+        <span style="display:flex; gap:4px; align-items:center;">
+          <svg width="16" height="12" viewBox="0 0 16 12" fill="none"><path d="M1 4.5C4.5 1.5 11.5 1.5 15 4.5" stroke="#2A2A2A" stroke-width="1.4" stroke-linecap="round"/><path d="M3.2 7C5.5 5 10.5 5 12.8 7" stroke="#2A2A2A" stroke-width="1.4" stroke-linecap="round"/><circle cx="8" cy="9.5" r="1" fill="#2A2A2A"/></svg>
+          <svg width="18" height="11" viewBox="0 0 18 11" fill="none"><rect x="0.5" y="0.5" width="15" height="10" rx="2.5" stroke="#2A2A2A"/><rect x="2" y="2" width="10" height="7" rx="1" fill="#2A2A2A"/><rect x="16.5" y="3.5" width="1.5" height="4" rx="0.7" fill="#2A2A2A"/></svg>
+        </span>
+      </div>
+
+      <div class="page-header">
+        <div class="back-btn"><svg viewBox="0 0 24 24" fill="none"><path d="M15 5l-7 7 7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <div class="page-title">Availability</div>
+      </div>
+
+      <div class="scroll">
+
+        <div class="pause-card">
+          <div class="pause-top">
+            <div class="pause-status"><span class="pause-dot" id="pause-dot"></span><span class="pause-status-text" id="pause-status-text">Available</span></div>
+            <div class="pause-btn" id="pause-btn" onclick="togglePauseAll()">Pause</div>
+          </div>
+        </div>
+
+        <div class="ist-note"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8.5" stroke="currentColor" stroke-width="1.6"/><path d="M12 7.5V12l3 2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>All times shown in IST · each consultation slot is 30 minutes</div>
+
+        <div class="section-title">WEEKLY AVAILABILITY</div>
+
+        <div class="day-card expanded" id="day-mon">
+          <div class="day-head" onclick="toggleDayExpand('day-mon')">
+            <div class="day-left">
+              <div class="day-switch on" onclick="event.stopPropagation(); toggleDay(this,'day-mon')"></div>
+              <div><div class="day-name">Monday</div><div class="day-summary" id="day-mon-summary">2 slots</div></div>
+            </div>
+          </div>
+          <div class="day-body">
+            <div class="slot-list">
+              <div class="slot-row"><div class="slot-time">09:00 AM</div><span class="slot-sep">–</span><div class="slot-time">12:00 PM</div><div class="slot-remove" onclick="this.closest('.slot-row').remove()"><svg viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></div></div>
+              <div class="slot-row"><div class="slot-time">05:00 PM</div><span class="slot-sep">–</span><div class="slot-time">08:00 PM</div><div class="slot-remove" onclick="this.closest('.slot-row').remove()"><svg viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></div></div>
+            </div>
+            <div class="add-slot-row" onclick="alert('Add another time window for Monday')"><svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Add time window</div><div class="copy-all-row" onclick="copyToAllDays('day-mon')"><svg viewBox="0 0 24 24" fill="none"><path d="M8 8h10v10H8z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M5 14V5a1 1 0 0 1 1-1h9" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>Copy to all days</div>
+          </div>
+        </div>
+
+        <div class="day-card" id="day-tue">
+          <div class="day-head" onclick="toggleDayExpand('day-tue')">
+            <div class="day-left">
+              <div class="day-switch on" onclick="event.stopPropagation(); toggleDay(this,'day-tue')"></div>
+              <div><div class="day-name">Tuesday</div><div class="day-summary" id="day-tue-summary">1 slot</div></div>
+            </div>
+          </div>
+          <div class="day-body">
+            <div class="slot-list">
+              <div class="slot-row"><div class="slot-time">10:00 AM</div><span class="slot-sep">–</span><div class="slot-time">02:00 PM</div><div class="slot-remove" onclick="this.closest('.slot-row').remove()"><svg viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></div></div>
+            </div>
+            <div class="add-slot-row" onclick="alert('Add another time window for Tuesday')"><svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Add time window</div><div class="copy-all-row" onclick="copyToAllDays('day-tue')"><svg viewBox="0 0 24 24" fill="none"><path d="M8 8h10v10H8z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M5 14V5a1 1 0 0 1 1-1h9" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>Copy to all days</div>
+          </div>
+        </div>
+
+        <div class="day-card" id="day-wed">
+          <div class="day-head" onclick="toggleDayExpand('day-wed')">
+            <div class="day-left">
+              <div class="day-switch" onclick="event.stopPropagation(); toggleDay(this,'day-wed')"></div>
+              <div><div class="day-name">Wednesday</div><div class="day-summary" id="day-wed-summary">Unavailable</div></div>
+            </div>
+          </div>
+          <div class="day-body">
+            <div class="slot-list" id="day-wed-slots"></div>
+            <div class="add-slot-row" onclick="alert('Add a time window for Wednesday')"><svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Add time window</div><div class="copy-all-row" onclick="copyToAllDays('day-wed')"><svg viewBox="0 0 24 24" fill="none"><path d="M8 8h10v10H8z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M5 14V5a1 1 0 0 1 1-1h9" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>Copy to all days</div>
+          </div>
+        </div>
+
+        <div class="day-card" id="day-thu">
+          <div class="day-head" onclick="toggleDayExpand('day-thu')">
+            <div class="day-left">
+              <div class="day-switch on" onclick="event.stopPropagation(); toggleDay(this,'day-thu')"></div>
+              <div><div class="day-name">Thursday</div><div class="day-summary" id="day-thu-summary">1 slot</div></div>
+            </div>
+          </div>
+          <div class="day-body">
+            <div class="slot-list">
+              <div class="slot-row"><div class="slot-time">09:00 AM</div><span class="slot-sep">–</span><div class="slot-time">01:00 PM</div><div class="slot-remove" onclick="this.closest('.slot-row').remove()"><svg viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></div></div>
+            </div>
+            <div class="add-slot-row" onclick="alert('Add another time window for Thursday')"><svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Add time window</div><div class="copy-all-row" onclick="copyToAllDays('day-thu')"><svg viewBox="0 0 24 24" fill="none"><path d="M8 8h10v10H8z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M5 14V5a1 1 0 0 1 1-1h9" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>Copy to all days</div>
+          </div>
+        </div>
+
+        <div class="day-card" id="day-fri">
+          <div class="day-head" onclick="toggleDayExpand('day-fri')">
+            <div class="day-left">
+              <div class="day-switch" onclick="event.stopPropagation(); toggleDay(this,'day-fri')"></div>
+              <div><div class="day-name">Friday</div><div class="day-summary" id="day-fri-summary">Unavailable</div></div>
+            </div>
+          </div>
+          <div class="day-body"><div class="slot-list"></div><div class="add-slot-row" onclick="alert('Add a time window for Friday')"><svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Add time window</div><div class="copy-all-row" onclick="copyToAllDays('day-fri')"><svg viewBox="0 0 24 24" fill="none"><path d="M8 8h10v10H8z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M5 14V5a1 1 0 0 1 1-1h9" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>Copy to all days</div></div>
+        </div>
+
+        <div class="day-card" id="day-sat">
+          <div class="day-head" onclick="toggleDayExpand('day-sat')">
+            <div class="day-left">
+              <div class="day-switch" onclick="event.stopPropagation(); toggleDay(this,'day-sat')"></div>
+              <div><div class="day-name">Saturday</div><div class="day-summary" id="day-sat-summary">Unavailable</div></div>
+            </div>
+          </div>
+          <div class="day-body"><div class="slot-list"></div><div class="add-slot-row" onclick="alert('Add a time window for Saturday')"><svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Add time window</div><div class="copy-all-row" onclick="copyToAllDays('day-sat')"><svg viewBox="0 0 24 24" fill="none"><path d="M8 8h10v10H8z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M5 14V5a1 1 0 0 1 1-1h9" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>Copy to all days</div></div>
+        </div>
+
+        <div class="day-card" id="day-sun" style="border-bottom:none;">
+          <div class="day-head" onclick="toggleDayExpand('day-sun')">
+            <div class="day-left">
+              <div class="day-switch" onclick="event.stopPropagation(); toggleDay(this,'day-sun')"></div>
+              <div><div class="day-name">Sunday</div><div class="day-summary" id="day-sun-summary">Unavailable</div></div>
+            </div>
+          </div>
+          <div class="day-body"><div class="slot-list"></div><div class="add-slot-row" onclick="alert('Add a time window for Sunday')"><svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Add time window</div><div class="copy-all-row" onclick="copyToAllDays('day-sun')"><svg viewBox="0 0 24 24" fill="none"><path d="M8 8h10v10H8z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M5 14V5a1 1 0 0 1 1-1h9" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>Copy to all days</div></div>
+        </div>
+
+        <div class="info-note">
+          <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8.5" stroke="currentColor" stroke-width="1.6"/><path d="M12 8h.01M12 11v5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+          Changing availability never alters consultations already scheduled — it only affects what becomes bookable going forward.
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+<script>
+  function toggleDayExpand(id){
+    document.getElementById(id).classList.toggle('expanded');
+  }
+  function toggleDay(el, id){
+    const isOn = el.classList.toggle('on');
+    const summary = document.getElementById(id + '-summary');
+    const slotCount = document.querySelectorAll('#' + id + ' .slot-row').length;
+    if(isOn){
+      summary.textContent = slotCount > 0 ? (slotCount + (slotCount===1?' slot':' slots')) : 'No time windows yet';
+      document.getElementById(id).classList.add('expanded');
+    } else {
+      summary.textContent = 'Unavailable';
+      document.getElementById(id).classList.remove('expanded');
+    }
+  }
+
+  const allDayIds = ['day-mon','day-tue','day-wed','day-thu','day-fri','day-sat','day-sun'];
+  function copyToAllDays(sourceId){
+    const sourceSlots = document.querySelector('#' + sourceId + ' .slot-list').innerHTML;
+    const sourceCount = document.querySelectorAll('#' + sourceId + ' .slot-row').length;
+    allDayIds.forEach(id => {
+      if(id === sourceId) return;
+      document.querySelector('#' + id + ' .slot-list').innerHTML = sourceSlots;
+      document.querySelector('#' + id + ' .day-switch').classList.add('on');
+      document.getElementById(id + '-summary').textContent = sourceCount + (sourceCount === 1 ? ' slot' : ' slots');
+    });
+  }
+
+  // long-press a slot-time to temporarily disable it, without deleting it
+  let pressTimer = null;
+  document.querySelector('.scroll').addEventListener('pointerdown', (e) => {
+    const slot = e.target.closest('.slot-time');
+    if(!slot) return;
+    pressTimer = setTimeout(() => { slot.classList.toggle('slot-disabled'); }, 500);
+  });
+  ['pointerup','pointerleave','pointercancel'].forEach(evt => {
+    document.querySelector('.scroll').addEventListener(evt, () => { clearTimeout(pressTimer); });
+  });
+
+  let isPaused = false;
+  function togglePauseAll(){
+    isPaused = !isPaused;
+    const dot = document.getElementById('pause-dot');
+    const text = document.getElementById('pause-status-text');
+    const btn = document.getElementById('pause-btn');
+    if(isPaused){
+      dot.classList.add('paused');
+      text.textContent = 'Paused';
+      btn.textContent = 'Resume';
+      btn.classList.add('resume');
+    } else {
+      dot.classList.remove('paused');
+      text.textContent = 'Available';
+      btn.textContent = 'Pause';
+      btn.classList.remove('resume');
+    }
+  }
+
+
+  document.querySelectorAll('.duration-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      document.querySelectorAll('.duration-chip').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+    });
+  });
+</script>
+
+</body>
+</html>

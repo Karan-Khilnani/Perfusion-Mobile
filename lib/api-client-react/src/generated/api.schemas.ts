@@ -391,6 +391,15 @@ export interface ConsultantAvailabilityPreview {
   windows: ConsultantAvailabilityPreviewWindow[];
 }
 
+export interface BookableSlot {
+  date: string;
+  /** 24-hour HH:mm in IST */
+  start: string;
+  /** 24-hour HH:mm in IST */
+  end: string;
+  appointmentSlot: string;
+}
+
 export type ConsultantAvailabilityStatus = typeof ConsultantAvailabilityStatus[keyof typeof ConsultantAvailabilityStatus];
 
 
@@ -404,6 +413,23 @@ export type ConsultantAvailabilitySlotSeriesItem = {
   days: string[];
   from: string;
   to: string;
+  paused?: boolean;
+  /** Mobile-disabled day; retained for later re-enabling */
+  disabled?: boolean;
+};
+
+export type ConsultantAvailabilityRegistrationDocumentsItem = {
+  id?: string;
+  filename?: string;
+  /** @nullable */
+  status?: string | null;
+  url?: string;
+};
+
+export type ConsultantAvailabilityPortfolioPhotosItem = {
+  id?: string;
+  filename?: string;
+  url?: string;
 };
 
 export interface ConsultantAvailability {
@@ -422,6 +448,12 @@ export interface ConsultantAvailability {
   /** @nullable */
   slotSeries?: ConsultantAvailabilitySlotSeriesItem[] | null;
   availabilityPreview: ConsultantAvailabilityPreview;
+  /** Included for the mobile client only; null when no slot is bookable within 30 days */
+  nextAvailableSlot?: BookableSlot | null;
+  /** Included only on the owning provider's list. Legacy document status is null. */
+  registrationDocuments?: ConsultantAvailabilityRegistrationDocumentsItem[];
+  /** Included only on the owning provider's list. */
+  portfolioPhotos?: ConsultantAvailabilityPortfolioPhotosItem[];
   [key: string]: unknown;
  }
 
@@ -437,6 +469,39 @@ export interface ConsultantAvailabilityUpdate {
   status?: ConsultantAvailabilityUpdateStatus;
   [key: string]: unknown;
  }
+
+export type UploadProviderConsultantMediaBodyKind = typeof UploadProviderConsultantMediaBodyKind[keyof typeof UploadProviderConsultantMediaBodyKind];
+
+
+export const UploadProviderConsultantMediaBodyKind = {
+  photo: 'photo',
+  signature: 'signature',
+  registration_document: 'registration_document',
+  portfolio_photo: 'portfolio_photo',
+} as const;
+
+export type UploadProviderConsultantMediaBody = {
+  kind: UploadProviderConsultantMediaBodyKind;
+  file: Blob;
+};
+
+export type GetProviderRegistrationDocumentSignedUrl200 = {
+  url: string;
+};
+
+export type GetConsultantBookableSlotsParams = {
+start: string;
+end: string;
+};
+
+export type GetConsultantBookableSlots200DatesItem = {
+  date: string;
+  slots: BookableSlot[];
+};
+
+export type GetConsultantBookableSlots200 = {
+  dates: GetConsultantBookableSlots200DatesItem[];
+};
 
 export type UpdateBookingStatusBodyStatus = typeof UpdateBookingStatusBodyStatus[keyof typeof UpdateBookingStatusBodyStatus];
 

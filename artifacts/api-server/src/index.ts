@@ -35,6 +35,16 @@ async function startServer() {
     await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS call_sessions_generation_idx ON call_sessions(session_generation)`);
     await pool.query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS reminder_fired_at timestamptz`);
     await pool.query(`ALTER TABLE consultants ADD COLUMN IF NOT EXISTS contact_phone varchar(20)`);
+    await pool.query(`CREATE TABLE IF NOT EXISTS consultant_profile_media (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+      consultant_id varchar NOT NULL REFERENCES consultants(id) ON DELETE CASCADE,
+      kind varchar(24) NOT NULL CHECK (kind IN ('registration_document', 'portfolio_photo')),
+      original_filename varchar(255) NOT NULL,
+      object_path text NOT NULL,
+      verification_status varchar(20) NOT NULL DEFAULT 'under_review',
+      created_at timestamptz NOT NULL DEFAULT now()
+    )`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS consultant_profile_media_consultant_idx ON consultant_profile_media(consultant_id, kind, created_at)`);
     await pool.query(`CREATE TABLE IF NOT EXISTS mobile_push_tokens (
       id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
       user_id varchar NOT NULL,

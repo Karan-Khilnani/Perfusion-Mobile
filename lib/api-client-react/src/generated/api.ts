@@ -40,6 +40,9 @@ import type {
   GetCaseFileAttachmentSignedUrl200,
   GetCaseFileAttachmentSignedUrlParams,
   GetCaseFileMessagesParams,
+  GetConsultantBookableSlots200,
+  GetConsultantBookableSlotsParams,
+  GetProviderRegistrationDocumentSignedUrl200,
   HealthStatus,
   MessageResponse,
   PasswordResetPassword,
@@ -48,6 +51,7 @@ import type {
   PasswordResetVerification,
   StreamCallCredentials,
   UpdateBookingStatusBody,
+  UploadProviderConsultantMediaBody,
   VerifyCaseFileAdvisory200
 } from './api.schemas';
 
@@ -653,6 +657,235 @@ export function useGetMyConsultants<TData = Awaited<ReturnType<typeof getMyConsu
 
 
 
+export const getUploadProviderConsultantMediaUrl = (id: string,) => {
+
+
+
+
+  return `/api/provider/consultants/${id}/media`
+}
+
+/**
+ * @summary Upload an owned consultant photo, signature, private registration document or portfolio photo
+ */
+export const uploadProviderConsultantMedia = async (id: string,
+    uploadProviderConsultantMediaBody: UploadProviderConsultantMediaBody, options?: RequestInit): Promise<void> => {
+    const formData = new FormData();
+formData.append(`kind`, uploadProviderConsultantMediaBody.kind);
+formData.append(`file`, uploadProviderConsultantMediaBody.file);
+
+  return customFetch<void>(getUploadProviderConsultantMediaUrl(id),
+  {
+    ...options,
+    method: 'POST'
+    ,
+    body:
+      formData,
+  }
+);}
+
+
+
+
+export const getUploadProviderConsultantMediaMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof uploadProviderConsultantMedia>>, TError,{id: string;data: BodyType<UploadProviderConsultantMediaBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof uploadProviderConsultantMedia>>, TError,{id: string;data: BodyType<UploadProviderConsultantMediaBody>}, TContext> => {
+
+const mutationKey = ['uploadProviderConsultantMedia'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof uploadProviderConsultantMedia>>, {id: string;data: BodyType<UploadProviderConsultantMediaBody>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  uploadProviderConsultantMedia(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UploadProviderConsultantMediaMutationResult = NonNullable<Awaited<ReturnType<typeof uploadProviderConsultantMedia>>>
+    export type UploadProviderConsultantMediaMutationBody = BodyType<UploadProviderConsultantMediaBody>
+    export type UploadProviderConsultantMediaMutationError = ErrorType<void>
+
+    /**
+ * @summary Upload an owned consultant photo, signature, private registration document or portfolio photo
+ */
+export const useUploadProviderConsultantMedia = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof uploadProviderConsultantMedia>>, TError,{id: string;data: BodyType<UploadProviderConsultantMediaBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof uploadProviderConsultantMedia>>,
+        TError,
+        {id: string;data: BodyType<UploadProviderConsultantMediaBody>},
+        TContext
+      > => {
+      return useMutation(getUploadProviderConsultantMediaMutationOptions(options));
+    }
+
+export const getDeleteProviderPortfolioPhotoUrl = (id: string,
+    mediaId: string,) => {
+
+
+
+
+  return `/api/provider/consultants/${id}/media/${mediaId}`
+}
+
+/**
+ * @summary Delete an owned portfolio photo
+ */
+export const deleteProviderPortfolioPhoto = async (id: string,
+    mediaId: string, options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getDeleteProviderPortfolioPhotoUrl(id,mediaId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeleteProviderPortfolioPhotoMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteProviderPortfolioPhoto>>, TError,{id: string;mediaId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteProviderPortfolioPhoto>>, TError,{id: string;mediaId: string}, TContext> => {
+
+const mutationKey = ['deleteProviderPortfolioPhoto'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteProviderPortfolioPhoto>>, {id: string;mediaId: string}> = (props) => {
+          const {id,mediaId} = props ?? {};
+
+          return  deleteProviderPortfolioPhoto(id,mediaId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteProviderPortfolioPhotoMutationResult = NonNullable<Awaited<ReturnType<typeof deleteProviderPortfolioPhoto>>>
+
+    export type DeleteProviderPortfolioPhotoMutationError = ErrorType<void>
+
+    /**
+ * @summary Delete an owned portfolio photo
+ */
+export const useDeleteProviderPortfolioPhoto = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteProviderPortfolioPhoto>>, TError,{id: string;mediaId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteProviderPortfolioPhoto>>,
+        TError,
+        {id: string;mediaId: string},
+        TContext
+      > => {
+      return useMutation(getDeleteProviderPortfolioPhotoMutationOptions(options));
+    }
+
+export const getGetProviderRegistrationDocumentSignedUrlUrl = (id: string,
+    mediaId: string,) => {
+
+
+
+
+  return `/api/provider/consultants/${id}/media/${mediaId}/signed-url`
+}
+
+/**
+ * @summary Get a short-lived private registration document link
+ */
+export const getProviderRegistrationDocumentSignedUrl = async (id: string,
+    mediaId: string, options?: RequestInit): Promise<GetProviderRegistrationDocumentSignedUrl200> => {
+
+  return customFetch<GetProviderRegistrationDocumentSignedUrl200>(getGetProviderRegistrationDocumentSignedUrlUrl(id,mediaId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetProviderRegistrationDocumentSignedUrlQueryKey = (id: string,
+    mediaId: string,) => {
+    return [
+    `/api/provider/consultants/${id}/media/${mediaId}/signed-url`
+    ] as const;
+    }
+
+
+export const getGetProviderRegistrationDocumentSignedUrlQueryOptions = <TData = Awaited<ReturnType<typeof getProviderRegistrationDocumentSignedUrl>>, TError = ErrorType<void>>(id: string,
+    mediaId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getProviderRegistrationDocumentSignedUrl>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetProviderRegistrationDocumentSignedUrlQueryKey(id,mediaId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getProviderRegistrationDocumentSignedUrl>>> = ({ signal }) => getProviderRegistrationDocumentSignedUrl(id,mediaId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id && mediaId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getProviderRegistrationDocumentSignedUrl>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetProviderRegistrationDocumentSignedUrlQueryResult = NonNullable<Awaited<ReturnType<typeof getProviderRegistrationDocumentSignedUrl>>>
+export type GetProviderRegistrationDocumentSignedUrlQueryError = ErrorType<void>
+
+
+/**
+ * @summary Get a short-lived private registration document link
+ */
+
+export function useGetProviderRegistrationDocumentSignedUrl<TData = Awaited<ReturnType<typeof getProviderRegistrationDocumentSignedUrl>>, TError = ErrorType<void>>(
+ id: string,
+    mediaId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getProviderRegistrationDocumentSignedUrl>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetProviderRegistrationDocumentSignedUrlQueryOptions(id,mediaId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
 export const getUpdateProviderConsultantUrl = (id: string,) => {
 
 
@@ -790,6 +1023,95 @@ export function useListConsultants<TData = Awaited<ReturnType<typeof listConsult
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getListConsultantsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetConsultantBookableSlotsUrl = (id: string,
+    params: GetConsultantBookableSlotsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/consultants/${id}/bookable-slots?${stringifiedParams}` : `/api/consultants/${id}/bookable-slots`
+}
+
+/**
+ * @summary Server-computed 30-minute bookable slots across up to 30 days in IST
+ */
+export const getConsultantBookableSlots = async (id: string,
+    params: GetConsultantBookableSlotsParams, options?: RequestInit): Promise<GetConsultantBookableSlots200> => {
+
+  return customFetch<GetConsultantBookableSlots200>(getGetConsultantBookableSlotsUrl(id,params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetConsultantBookableSlotsQueryKey = (id: string,
+    params?: GetConsultantBookableSlotsParams,) => {
+    return [
+    `/api/consultants/${id}/bookable-slots`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetConsultantBookableSlotsQueryOptions = <TData = Awaited<ReturnType<typeof getConsultantBookableSlots>>, TError = ErrorType<void>>(id: string,
+    params: GetConsultantBookableSlotsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getConsultantBookableSlots>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetConsultantBookableSlotsQueryKey(id,params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getConsultantBookableSlots>>> = ({ signal }) => getConsultantBookableSlots(id,params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getConsultantBookableSlots>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetConsultantBookableSlotsQueryResult = NonNullable<Awaited<ReturnType<typeof getConsultantBookableSlots>>>
+export type GetConsultantBookableSlotsQueryError = ErrorType<void>
+
+
+/**
+ * @summary Server-computed 30-minute bookable slots across up to 30 days in IST
+ */
+
+export function useGetConsultantBookableSlots<TData = Awaited<ReturnType<typeof getConsultantBookableSlots>>, TError = ErrorType<void>>(
+ id: string,
+    params: GetConsultantBookableSlotsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getConsultantBookableSlots>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetConsultantBookableSlotsQueryOptions(id,params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

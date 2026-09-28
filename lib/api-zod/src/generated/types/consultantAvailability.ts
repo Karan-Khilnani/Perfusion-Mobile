@@ -5,7 +5,10 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { BookableSlot } from './bookableSlot';
+import type { ConsultantAvailabilityPortfolioPhotosItem } from './consultantAvailabilityPortfolioPhotosItem';
 import type { ConsultantAvailabilityPreview } from './consultantAvailabilityPreview';
+import type { ConsultantAvailabilityRegistrationDocumentsItem } from './consultantAvailabilityRegistrationDocumentsItem';
 import type { ConsultantAvailabilitySlotSeriesItem } from './consultantAvailabilitySlotSeriesItem';
 import type { ConsultantAvailabilityStatus } from './consultantAvailabilityStatus';
 
@@ -25,5 +28,11 @@ export interface ConsultantAvailability {
   /** @nullable */
   slotSeries?: ConsultantAvailabilitySlotSeriesItem[] | null;
   availabilityPreview: ConsultantAvailabilityPreview;
+  /** Included for the mobile client only; null when no slot is bookable within 30 days */
+  nextAvailableSlot?: BookableSlot | null;
+  /** Included only on the owning provider's list. Legacy document status is null. */
+  registrationDocuments?: ConsultantAvailabilityRegistrationDocumentsItem[];
+  /** Included only on the owning provider's list. */
+  portfolioPhotos?: ConsultantAvailabilityPortfolioPhotosItem[];
   [key: string]: unknown;
  }

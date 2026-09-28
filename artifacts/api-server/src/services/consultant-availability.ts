@@ -1,10 +1,12 @@
+import { parseConsultationStart } from "./consultation-lifecycle";
+
 export type ConsultantAvailabilityInput = {
   status?: string | null;
   availabilityFrom?: string | null;
   availabilityTo?: string | null;
   availableDays?: string[] | null;
   availableSlots?: string[] | null;
-  slotSeries?: { days: string[]; from: string; to: string }[] | null;
+  slotSeries?: { days: string[]; from: string; to: string; paused?: boolean; disabled?: boolean }[] | null;
 };
 
 export type ConsultantSlotOverrideInput = {
@@ -24,6 +26,18 @@ export type AvailabilityPreview = {
   label: string | null;
   date: string | null;
   windows: AvailabilityPreviewWindow[];
+};
+
+export type BookableSlot = {
+  date: string;
+  start: string;
+  end: string;
+  appointmentSlot: string;
+};
+
+export type BookableSlotsDate = {
+  date: string;
+  slots: BookableSlot[];
 };
 
 const TIME_ZONE = "Asia/Kolkata";
@@ -92,6 +106,7 @@ function getWeeklyWindows(config: ConsultantAvailabilityInput): Map<string, Time
 
   if (config.slotSeries && config.slotSeries.length > 0) {
     for (const series of config.slotSeries) {
+      if (series.paused || series.disabled) continue;
       for (const rawDay of series.days ?? []) {
         const day = normalizeDay(rawDay);
         if (!day) continue;
@@ -129,6 +144,148 @@ function getWeeklyWindows(config: ConsultantAvailabilityInput): Map<string, Time
     }
   }
   return windowsByDay;
+}
+
+function formatClock(minutes: number): string {
+  return `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
+}
+
+function formatAppointmentClock(minutes: number): string {
+  if (minutes === 1440) return "12:00 AM";
+  const hour24 = Math.floor(minutes / 60);
+  const minute = minutes % 60;
+  const hour12 = hour24 % 12 || 12;
+  return `${hour12}:${String(minute).padStart(2, "0")} ${hour24 >= 12 ? "PM" : "AM"}`;
+}
+
+function mergeWindows(windows: TimeWindow[]): Array<{ from: number; to: number }> {
+  const parsed = windows
+    .map((window) => {
+      const from = parseTimeMinutes(window.from);
+      let to = parseTimeMinutes(window.to);
+      if (to === 0 && from > 0) to = 1440;
+      return { from, to };
+    })
+    .filter((window) => window.from >= 0 && window.to > window.from)
+    .sort((a, b) => a.from - b.from || a.to - b.to);
+  const merged: Array<{ from: number; to: number }> = [];
+  for (const window of parsed) {
+    const previous = merged[merged.length - 1];
+    if (previous && window.from <= previous.to) {
+      previous.to = Math.max(previous.to, window.to);
+    } else {
+      merged.push({ ...window });
+    }
+  }
+  return merged;
+}
+
+function getDateParts(dateString: string): { year: number; month: number; day: number } | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateString);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+  if (
+    parsed.getUTCFullYear() !== year ||
+    parsed.getUTCMonth() + 1 !== month ||
+    parsed.getUTCDate() !== day
+  ) return null;
+  return { year, month, day };
+}
+
+function dateAtIstMinutes(dateString: string, minutes: number): Date {
+  const parts = getDateParts(dateString)!;
+  return new Date(Date.UTC(parts.year, parts.month - 1, parts.day, Math.floor(minutes / 60), minutes % 60) - (5 * 60 + 30) * 60_000);
+}
+
+/**
+ * Build 30-minute, server-computed appointment choices from the weekly schedule.
+ * Booked entries may be any consultation booking with a parseable full-date slot.
+ */
+export function getConsultantBookableSlots(
+  consultant: ConsultantAvailabilityInput,
+  overrides: ConsultantSlotOverrideInput[],
+  bookedConsultations: Array<{ status?: string | null; appointmentSlot?: string | null }>,
+  startDate: string,
+  endDate: string,
+  now = new Date(),
+): BookableSlotsDate[] {
+  if (consultant.status !== "active") return [];
+  const firstParts = getDateParts(startDate);
+  const lastParts = getDateParts(endDate);
+  if (!firstParts || !lastParts) return [];
+  const firstDay = Date.UTC(firstParts.year, firstParts.month - 1, firstParts.day);
+  const lastDay = Date.UTC(lastParts.year, lastParts.month - 1, lastParts.day);
+  const dayCount = Math.floor((lastDay - firstDay) / 86_400_000) + 1;
+  if (dayCount < 1 || dayCount > 30) return [];
+
+  const weeklyWindows = getWeeklyWindows(consultant);
+  const nowIst = getIstParts(now);
+  const todayString = formatDate(nowIst.year, nowIst.month, nowIst.day);
+  const bookedIntervals = bookedConsultations
+    .filter((booking) => !["cancelled", "rejected"].includes(String(booking.status ?? "").toLowerCase()))
+    .map((booking) => {
+      const parsed = parseConsultationStart(booking.appointmentSlot);
+      if (!parsed) return null;
+      let durationMinutes = 30;
+      const slotLabel = booking.appointmentSlot ?? "";
+      const separator = /[–—]|\s+-\s+/.exec(slotLabel);
+      if (separator && separator.index !== undefined) {
+        const startText = slotLabel.slice(0, separator.index);
+        const endText = slotLabel.slice(separator.index + separator[0].length);
+        const clockPattern = /\d{1,2}(?::\d{2})?\s*(?:AM|PM)/i;
+        const startClock = startText.match(clockPattern)?.[0];
+        const endClock = endText.match(clockPattern)?.[0];
+        const startMinutes = startClock ? parseTimeMinutes(startClock) : -1;
+        const endMinutes = endClock ? parseTimeMinutes(endClock) : -1;
+        if (startMinutes >= 0 && endMinutes > startMinutes) durationMinutes = endMinutes - startMinutes;
+      }
+      return { start: parsed.getTime(), end: parsed.getTime() + durationMinutes * 60_000 };
+    })
+    .filter((interval): interval is { start: number; end: number } => interval !== null);
+  const slotsByDate: BookableSlotsDate[] = [];
+
+  for (let offset = 0; offset < dayCount; offset += 1) {
+    const day = new Date(firstDay + offset * 86_400_000);
+    const date = formatDate(day.getUTCFullYear(), day.getUTCMonth() + 1, day.getUTCDate());
+    if (date < todayString) continue;
+    const weekday = SHORT_DAYS[day.getUTCDay()];
+    const scheduledWindows = weeklyWindows.get(weekday) ?? [];
+    if (!scheduledWindows.length) continue;
+
+    const override = overrides.find((item) => item.date === date);
+    if (override?.isPaused) continue;
+    const dateWindows = override && (override.customFrom || override.customTo)
+      ? [{
+          from: override.customFrom || consultant.availabilityFrom || scheduledWindows[0].from,
+          to: override.customTo || consultant.availabilityTo || scheduledWindows[0].to,
+        }]
+      : scheduledWindows;
+    const mergedWindows = mergeWindows(dateWindows);
+    const dateLabel = formatIstDateLabel(day.getUTCFullYear(), day.getUTCMonth() + 1, day.getUTCDate());
+    const slots: BookableSlot[] = [];
+
+    for (const window of mergedWindows) {
+      for (let start = window.from; start + 30 <= window.to; start += 30) {
+        const end = start + 30;
+        const startInstant = dateAtIstMinutes(date, start).getTime();
+        if (startInstant <= now.getTime()) continue;
+        if (bookedIntervals.some((booked) => startInstant < booked.end && startInstant + 30 * 60_000 > booked.start)) continue;
+        const formattedStart = formatAppointmentClock(start);
+        const formattedEnd = formatAppointmentClock(end);
+        slots.push({
+          date,
+          start: formatClock(start),
+          end: formatClock(end),
+          appointmentSlot: `${dateLabel}, ${formattedStart} – ${formattedEnd}`,
+        });
+      }
+    }
+    if (slots.length) slotsByDate.push({ date, slots });
+  }
+  return slotsByDate;
 }
 
 function formatIstDateLabel(year: number, month: number, day: number): string {
@@ -186,7 +343,7 @@ export function getConsultantAvailabilityPreview(
     const override = overrides.find((item) => item.date === dateString);
     if (override?.isPaused) continue;
 
-    const dateWindows = override
+    const dateWindows = override && (override.customFrom || override.customTo)
       ? [{
           from: override.customFrom || consultant.availabilityFrom || scheduledWindows[0].from,
           to: override.customTo || consultant.availabilityTo || scheduledWindows[0].to,

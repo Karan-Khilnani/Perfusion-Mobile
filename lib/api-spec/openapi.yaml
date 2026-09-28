@@ -153,6 +153,75 @@ paths:
                 items: { $ref: "#/components/schemas/ConsultantAvailability" }
         "401": { description: Not authenticated }
         "403": { description: Provider profile required }
+  /provider/consultants/{id}/media:
+    post:
+      operationId: uploadProviderConsultantMedia
+      tags: [consultants]
+      summary: Upload an owned consultant photo, signature, private registration document or portfolio photo
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [kind, file]
+              properties:
+                kind: { type: string, enum: [photo, signature, registration_document, portfolio_photo] }
+                file: { type: string, format: binary }
+      responses:
+        "201": { description: New profile media record }
+        "200": { description: Updated consultant photo or signature }
+        "403": { description: Not the owning consultant }
+        "503": { description: Persistent file storage unavailable }
+  /provider/consultants/{id}/media/{mediaId}:
+    delete:
+      operationId: deleteProviderPortfolioPhoto
+      tags: [consultants]
+      summary: Delete an owned portfolio photo
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - name: mediaId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200": { description: Deleted }
+        "403": { description: Not the owning consultant }
+        "404": { description: Photo not found }
+  /provider/consultants/{id}/media/{mediaId}/signed-url:
+    get:
+      operationId: getProviderRegistrationDocumentSignedUrl
+      tags: [consultants]
+      summary: Get a short-lived private registration document link
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - name: mediaId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Authorized document link
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [url]
+                properties:
+                  url: { type: string, format: uri }
+        "403": { description: Not the owning consultant }
+        "404": { description: Document not found }
   /provider/consultants/{id}:
     patch:
       operationId: updateProviderConsultant
@@ -191,6 +260,45 @@ paths:
               schema:
                 type: array
                 items: { $ref: "#/components/schemas/ConsultantAvailability" }
+  /consultants/{id}/bookable-slots:
+    get:
+      operationId: getConsultantBookableSlots
+      tags: [consultants]
+      summary: Server-computed 30-minute bookable slots across up to 30 days in IST
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - name: start
+          in: query
+          required: true
+          schema: { type: string, format: date }
+        - name: end
+          in: query
+          required: true
+          schema: { type: string, format: date }
+      responses:
+        "200":
+          description: Dates with at least one available slot
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [dates]
+                properties:
+                  dates:
+                    type: array
+                    items:
+                      type: object
+                      required: [date, slots]
+                      properties:
+                        date: { type: string, format: date }
+                        slots:
+                          type: array
+                          items: { $ref: "#/components/schemas/BookableSlot" }
+        "400": { description: Invalid date range }
+        "404": { description: Consultant not found }
   /consultants/{id}:
     get:
       operationId: getConsultant
@@ -851,6 +959,14 @@ components:
         windows:
           type: array
           items: { $ref: "#/components/schemas/ConsultantAvailabilityPreviewWindow" }
+    BookableSlot:
+      type: object
+      required: [date, start, end, appointmentSlot]
+      properties:
+        date: { type: string, format: date }
+        start: { type: string, description: "24-hour HH:mm in IST" }
+        end: { type: string, description: "24-hour HH:mm in IST" }
+        appointmentSlot: { type: string }
     ConsultantAvailability:
       type: object
       required: [id, status, availabilityPreview]
@@ -877,7 +993,33 @@ components:
                 items: { type: string }
               from: { type: string }
               to: { type: string }
+              paused: { type: boolean }
+              disabled: { type: boolean, description: "Mobile-disabled day; retained for later re-enabling" }
         availabilityPreview: { $ref: "#/components/schemas/ConsultantAvailabilityPreview" }
+        nextAvailableSlot:
+          oneOf:
+            - { $ref: "#/components/schemas/BookableSlot" }
+            - { type: "null" }
+          description: Included for the mobile client only; null when no slot is bookable within 30 days
+        registrationDocuments:
+          type: array
+          description: Included only on the owning provider's list. Legacy document status is null.
+          items:
+            type: object
+            properties:
+              id: { type: string }
+              filename: { type: string }
+              status: { type: ["string", "null"] }
+              url: { type: string }
+        portfolioPhotos:
+          type: array
+          description: Included only on the owning provider's list.
+          items:
+            type: object
+            properties:
+              id: { type: string }
+              filename: { type: string }
+              url: { type: string }
       additionalProperties: true
     ConsultantAvailabilityUpdate:
       type: object

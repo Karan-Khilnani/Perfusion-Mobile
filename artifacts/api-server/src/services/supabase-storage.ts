@@ -41,6 +41,16 @@ export async function uploadFile(
   return data.publicUrl;
 }
 
+export async function deletePublicFile(publicUrl: string): Promise<void> {
+  const client = getClient();
+  const prefix = `${process.env.SUPABASE_URL?.replace(/\/+$/, "")}/storage/v1/object/public/${BUCKET}/`;
+  if (!publicUrl.startsWith(prefix)) throw new Error("Not a managed public file");
+  const objectPath = decodeURIComponent(publicUrl.slice(prefix.length));
+  if (!objectPath.startsWith("provider-profile/")) throw new Error("Not a profile file");
+  const { error } = await client.storage.from(BUCKET).remove([objectPath]);
+  if (error) throw error;
+}
+
 export function isSupabaseUrl(url: string): boolean {
   return url.startsWith("https://") && url.includes("supabase");
 }

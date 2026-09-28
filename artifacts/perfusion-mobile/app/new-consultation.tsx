@@ -5,6 +5,7 @@ import React, { useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Image,
   Modal,
   Platform,
   Pressable,
@@ -35,18 +36,45 @@ type Consultant = {
   hospital?: string;
   institute?: string;
   city?: string;
+  photo?: string | null;
+  profilePhoto?: string | null;
   consultationFee?: string;
   computedCustomerPrice?: string;
-  availabilityPreview?: {
-    label: string | null;
-    date: string | null;
-    windows: { from: string; to: string; appointmentSlot: string }[];
-  };
-  availability?: Record<string, string[]>;
-  availableSlots?: string[];
+  yearsOfExperience?: number | string;
+  nextAvailableSlot: BookableSlot | null;
 };
 
-const SPECIALTIES = ["All", "Critical Care", "Cardiology", "Neurology", "Pulmonology"];
+type BookableSlot = { date: string; start: string; end: string; appointmentSlot: string };
+type SlotDate = { date: string; slots: BookableSlot[] };
+type SlotsResponse = { dates: SlotDate[] };
+const SPECIALTIES = ["All", "Critical Care", "Nephrology", "Orthopedics", "Cardiology"];
+
+function istDate(date: Date) {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit" }).format(date);
+}
+
+function shiftDate(value: string, amount: number) {
+  const [year, month, day] = value.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day + amount, 12));
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}-${String(date.getUTCDate()).padStart(2, "0")}`;
+}
+
+function monthDistance(start: string, end: string) {
+  const [startYear, startMonth] = start.split("-").map(Number);
+  const [endYear, endMonth] = end.split("-").map(Number);
+  return (endYear - startYear) * 12 + endMonth - startMonth;
+}
+
+function prettyDate(value: string, options: Intl.DateTimeFormatOptions = { weekday: "short", month: "short", day: "numeric" }) {
+  const [year, month, day] = value.split("-").map(Number);
+  return new Intl.DateTimeFormat("en-IN", { ...options, timeZone: "Asia/Kolkata" }).format(new Date(Date.UTC(year, month - 1, day, 12)));
+}
+
+function timeLabel(value: string) {
+  const [hour, minute] = value.split(":").map(Number);
+  const suffix = hour >= 12 ? "PM" : "AM";
+  return `${hour % 12 || 12}:${String(minute).padStart(2, "0")} ${suffix}`;
+}
 
 export default function NewConsultationScreen() {
   const palette = useColors();
@@ -56,7 +84,12 @@ export default function NewConsultationScreen() {
   const [specialty, setSpecialty] = useState("All");
   const [todayOnly, setTodayOnly] = useState(false);
   const [search, setSearch] = useState("");
-  const [selected, setSelected] = useState<{ consultant: Consultant; slot: string } | null>(null);
+  const [selected, setSelected] = useState<{ consultant: Consultant; slot: BookableSlot } | null>(null);
+  const [slotConsultant, setSlotConsultant] = useState<Consultant | null>(null);
+  const [slotSheetOpen, setSlotSheetOpen] = useState(false);
+  const [slotDate, setSlotDate] = useState(istDate(new Date()));
+  const [monthView, setMonthView] = useState(false);
+  const [monthOffset, setMonthOffset] = useState(0);
   const [confirming, setConfirming] = useState(false);
   const [allergyNotSpecified, setAllergyNotSpecified] = useState(true);
   const [reportFiles, setReportFiles] = useState<AttachmentDraft[]>([]);
@@ -79,12 +112,46 @@ export default function NewConsultationScreen() {
       return response.json();
     },
   });
+  const slotsQuery = useQuery<SlotsResponse>({
+    queryKey: ["mobile-bookable-slots", slotConsultant?.id, slotDate],
+    enabled: !!slotConsultant && slotSheetOpen,
+    queryFn: async () => {
+      if (!slotConsultant) throw new Error("Choose a consultant");
+      const start = istDate(new Date());
+      const end = shiftDate(start, 29);
+      const response = await apiFetch(`/api/consultants/${encodeURIComponent(slotConsultant.id)}/bookable-slots?start=${start}&end=${end}`);
+      if (!response.ok) throw new Error("Current availability could not be loaded. Please refresh.");
+      return response.json();
+    },
+    staleTime: 0,
+  });
+  const datesWithSlots = useMemo(() => new Map((slotsQuery.data?.dates || []).map((item) => [item.date, item.slots])), [slotsQuery.data]);
   const filtered = useMemo(() => (consultants.data || []).filter((item) => {
     const text = `${item.displayName || item.name || ""} ${item.specialization || ""} ${item.hospital || item.institute || ""}`.toLowerCase();
     const specialtyMatch = specialty === "All" || (item.specialization || "").toLowerCase().includes(specialty.toLowerCase());
-    const availabilityMatch = !todayOnly || item.availabilityPreview?.label === "Available Today";
+    const availabilityMatch = !todayOnly || item.nextAvailableSlot?.date === istDate(new Date());
     return specialtyMatch && text.includes(search.trim().toLowerCase()) && availabilityMatch;
+  }).sort((a, b) => {
+    if (!a.nextAvailableSlot) return b.nextAvailableSlot ? 1 : 0;
+    if (!b.nextAvailableSlot) return -1;
+    return `${a.nextAvailableSlot.date}T${a.nextAvailableSlot.start}`.localeCompare(`${b.nextAvailableSlot.date}T${b.nextAvailableSlot.start}`);
   }), [consultants.data, search, specialty, todayOnly]);
+
+  const openSlots = (consultant: Consultant) => {
+    if (!consultant.nextAvailableSlot) return;
+    const today = istDate(new Date());
+    const nextMonth = monthDistance(today, consultant.nextAvailableSlot.date);
+    setSlotConsultant(consultant);
+    setSlotDate(consultant.nextAvailableSlot.date);
+    setMonthView(shiftDate(today, 13) < consultant.nextAvailableSlot.date);
+    setMonthOffset(nextMonth);
+    setSlotSheetOpen(true);
+  };
+  const chooseSlot = (consultant: Consultant, slot: BookableSlot) => {
+    setSelected({ consultant, slot });
+    setSlotSheetOpen(false);
+    setStep("details");
+  };
 
   const finishBooking = (booking: { id?: string }) => {
     queryClient.invalidateQueries({ queryKey: ["consultations"] });
@@ -139,7 +206,9 @@ export default function NewConsultationScreen() {
           serviceId: selected.consultant.id,
           serviceName: selected.consultant.specialization || selected.consultant.displayName || selected.consultant.name || "Consultation",
           providerName: selected.consultant.displayName || selected.consultant.name,
-          appointmentSlot: selected.slot,
+          appointmentSlot: selected.slot.appointmentSlot,
+          bookableStart: selected.slot.date,
+          start: selected.slot.start,
           patientName: form.patientName.trim(),
           patientAge: Number(form.patientAge),
           patientGender: form.patientGender,
@@ -160,7 +229,12 @@ export default function NewConsultationScreen() {
         }),
       });
       const body = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(body.message || "Booking failed");
+      if (!response.ok) {
+        if (response.status === 409) {
+          throw new Error("That slot is no longer available. Refresh availability and choose a new time.");
+        }
+        throw new Error(body.message || "Booking failed");
+      }
       return body;
     },
     onSuccess: (booking: { id?: string }) => {
@@ -170,6 +244,10 @@ export default function NewConsultationScreen() {
       } else {
         finishBooking(booking);
       }
+    },
+    onError: () => {
+      void queryClient.invalidateQueries({ queryKey: ["mobile-bookable-slots"] });
+      void queryClient.invalidateQueries({ queryKey: ["mobile-consultants"] });
     },
   });
 
@@ -211,8 +289,8 @@ export default function NewConsultationScreen() {
             </View>
             <Switch value={todayOnly} onValueChange={setTodayOnly} trackColor={{ false: palette.muted, true: `${palette.primary}70` }} thumbColor={todayOnly ? palette.primary : palette.card} />
           </View>
-          {consultants.isLoading ? (
-            <ActivityIndicator color={palette.primary} style={{ marginTop: 40 }} />
+           {consultants.isLoading ? (
+            <View style={styles.loadingCards}>{[0, 1, 2].map((item) => <View key={item} style={[styles.skeletonCard, { backgroundColor: palette.card, borderColor: palette.border }]}><View style={[styles.skeletonAvatar, { backgroundColor: palette.accent }]} /><View style={{ flex: 1, gap: 8 }}><View style={[styles.skeletonLine, { backgroundColor: palette.accent, width: "65%" }]} /><View style={[styles.skeletonLine, { backgroundColor: palette.accent, width: "88%" }]} /></View></View>)}</View>
           ) : consultants.isError ? (
             <View style={{ alignItems: "center", gap: 10, marginTop: 32, paddingHorizontal: 24 }}>
               <Text style={{ color: palette.destructive, textAlign: "center" }}>
@@ -223,7 +301,7 @@ export default function NewConsultationScreen() {
               </Pressable>
             </View>
           ) : filtered.length ? filtered.map((consultant) => (
-            <ConsultantCard key={consultant.id} consultant={consultant} onChoose={(slot) => { setSelected({ consultant, slot }); setStep("details"); }} />
+            <ConsultantCard key={consultant.id} consultant={consultant} onChoose={(slot) => chooseSlot(consultant, slot)} onOpen={() => openSlots(consultant)} />
           )) : (
             <Text style={{ color: palette.mutedForeground, textAlign: "center", marginTop: 28 }}>
               {todayOnly
@@ -240,13 +318,14 @@ export default function NewConsultationScreen() {
           contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 28 }]}
           keyboardShouldPersistTaps="handled"
         >
-          <View style={[styles.selectedCard, { backgroundColor: palette.card, borderColor: palette.border }]}>
+          <Pressable onPress={() => setStep("explore")} style={[styles.selectedCard, { backgroundColor: palette.card, borderColor: palette.border }]}>
             <View style={[styles.photo, { backgroundColor: palette.accent }]}><Feather name="user" size={22} color={palette.mutedForeground} /></View>
             <View style={{ flex: 1 }}>
               <Text style={[styles.selectedName, { color: palette.foreground }]}>{selected?.consultant.displayName || selected?.consultant.name}</Text>
-              <Text style={[styles.selectedMeta, { color: palette.primary }]}>{selected?.consultant.specialization} · {selected?.slot}</Text>
+              <Text style={[styles.selectedMeta, { color: palette.primary }]}>{selected?.consultant.specialization} · {selected ? `${prettyDate(selected.slot.date)} · ${timeLabel(selected.slot.start)}` : ""}</Text>
             </View>
-          </View>
+            <Text style={{ color: palette.primary, fontSize: 11, fontFamily: "Inter_700Bold" }}>Change</Text>
+          </Pressable>
           <Text style={[styles.sectionTitle, { color: palette.foreground }]}>Patient details</Text>
           <Input label="Patient Name*" value={form.patientName} onChangeText={(value) => update("patientName", value)} />
           <View style={styles.twoCol}>
@@ -327,6 +406,119 @@ export default function NewConsultationScreen() {
         </KeyboardAwareScrollViewCompat>
       )}
 
+      <Modal visible={slotSheetOpen} transparent animationType="slide" onRequestClose={() => setSlotSheetOpen(false)}>
+        <View style={styles.backdrop}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setSlotSheetOpen(false)} />
+          <View style={[styles.slotSheet, { backgroundColor: palette.card, paddingBottom: Math.max(insets.bottom, 12) }]}>
+            <View style={[styles.sheetHandle, { backgroundColor: palette.border }]} />
+            <View style={styles.sheetHeading}>
+              <View style={[styles.photo, styles.sheetPhoto, { backgroundColor: palette.accent }]}>
+                {slotConsultant?.photo || slotConsultant?.profilePhoto
+                  ? <Image source={{ uri: slotConsultant.photo || slotConsultant.profilePhoto || "" }} style={styles.imagePhoto} />
+                  : <Feather name="user" size={20} color={palette.mutedForeground} />}
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text numberOfLines={1} style={[styles.consultantName, { color: palette.foreground }]}>{slotConsultant?.displayName || slotConsultant?.name}</Text>
+                <Text style={[styles.specialization, { color: palette.primary }]}>{slotConsultant?.specialization || "Consultant"}</Text>
+              </View>
+              <Pressable onPress={() => setSlotSheetOpen(false)} style={[styles.closeButton, { backgroundColor: palette.accent }]} accessibilityLabel="Close available slots">
+                <Feather name="x" size={18} color={palette.foreground} />
+              </Pressable>
+            </View>
+            <View style={[styles.dateArea, { borderBottomColor: palette.border }]}>
+              {!monthView ? (
+                <View style={styles.dateStripRow}>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.dateStrip}>
+                    {Array.from({ length: 14 }, (_, index) => shiftDate(istDate(new Date()), index)).map((date) => {
+                      const hasSlots = (datesWithSlots.get(date) || []).length > 0;
+                      const active = slotDate === date;
+                      return (
+                        <Pressable key={date} disabled={!hasSlots} onPress={() => setSlotDate(date)} style={[styles.dateChip, { borderColor: active ? palette.foreground : palette.border, backgroundColor: active ? palette.foreground : palette.card, opacity: hasSlots ? 1 : 0.36 }]}>
+                          <Text style={[styles.dateDow, { color: active ? palette.card : palette.mutedForeground }]}>{prettyDate(date, { weekday: "short" })}</Text>
+                          <Text style={[styles.dateNumber, { color: active ? palette.card : palette.foreground }]}>{Number(date.slice(-2))}</Text>
+                          <Text style={[styles.dateMonth, { color: active ? palette.card : palette.mutedForeground }]}>{prettyDate(date, { month: "short" })}</Text>
+                        </Pressable>
+                      );
+                    })}
+                  </ScrollView>
+                  <Pressable onPress={() => { setMonthView(true); setMonthOffset(0); }} style={[styles.calendarButton, { borderColor: palette.border, backgroundColor: palette.card }]} accessibilityLabel="Choose a date within 30 days">
+                    <Feather name="calendar" size={19} color={palette.foreground} />
+                  </Pressable>
+                </View>
+              ) : (
+                <View style={styles.monthPanel}>
+                  <View style={styles.monthHeader}>
+                    <Pressable onPress={() => setMonthOffset((value) => Math.max(0, value - 1))} disabled={monthOffset === 0} style={{ padding: 6, opacity: monthOffset === 0 ? 0.3 : 1 }}><Feather name="chevron-left" size={19} color={palette.foreground} /></Pressable>
+                    <Text style={[styles.monthTitle, { color: palette.foreground }]}>{(() => {
+                      const [year, month] = istDate(new Date()).split("-").map(Number);
+                      return prettyDate(new Date(Date.UTC(year, month - 1 + monthOffset, 1, 12)).toISOString().slice(0, 10), { month: "long", year: "numeric" });
+                    })()}</Text>
+                    <Pressable onPress={() => setMonthOffset((value) => Math.min(monthDistance(istDate(new Date()), shiftDate(istDate(new Date()), 29)), value + 1))} disabled={monthOffset >= monthDistance(istDate(new Date()), shiftDate(istDate(new Date()), 29))} style={{ padding: 6, opacity: monthOffset >= monthDistance(istDate(new Date()), shiftDate(istDate(new Date()), 29)) ? 0.3 : 1 }}><Feather name="chevron-right" size={19} color={palette.foreground} /></Pressable>
+                  </View>
+                  <View style={styles.calendarGrid}>
+                    {["M", "T", "W", "T", "F", "S", "S"].map((day, index) => <Text key={`${day}-${index}`} style={[styles.calendarDow, { color: palette.mutedForeground }]}>{day}</Text>)}
+                    {(() => {
+                      const base = istDate(new Date());
+                      const [baseYear, baseMonth] = base.split("-").map(Number);
+                      const firstMonth = new Date(Date.UTC(baseYear, baseMonth - 1 + monthOffset, 1, 12));
+                      const year = firstMonth.getUTCFullYear();
+                      const month = firstMonth.getUTCMonth() + 1;
+                      const offset = (firstMonth.getUTCDay() + 6) % 7;
+                      const count = new Date(Date.UTC(year, month, 0)).getUTCDate();
+                      return [...Array.from({ length: offset }, (_, i) => <View key={`blank-${i}`} style={styles.calendarDay} />), ...Array.from({ length: count }, (_, i) => {
+                        const day = i + 1;
+                        const date = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+                        const inRange = date >= base && date <= shiftDate(base, 29);
+                        const available = (datesWithSlots.get(date) || []).length > 0;
+                        const active = slotDate === date;
+                        return <Pressable key={date} disabled={!inRange || !available} onPress={() => { setSlotDate(date); setMonthView(false); }} style={[styles.calendarDay, active && { backgroundColor: palette.foreground }]}><Text style={{ color: active ? palette.card : inRange && available ? palette.foreground : palette.muted, fontSize: 12, fontFamily: "Inter_600SemiBold" }}>{day}</Text></Pressable>;
+                      })];
+                    })()}
+                  </View>
+                  <Pressable onPress={() => setMonthView(false)} style={{ alignItems: "center", paddingTop: 8 }}><Text style={{ color: palette.primary, fontSize: 11, fontFamily: "Inter_700Bold" }}>Back to next 14 days</Text></Pressable>
+                </View>
+              )}
+            </View>
+            <ScrollView style={styles.slotScroll} contentContainerStyle={styles.slotScrollContent}>
+              {slotsQuery.isFetching && !slotsQuery.data ? (
+                <View style={{ gap: 11, paddingTop: 14 }}>{[0, 1, 2].map((item) => <View key={item} style={[styles.slotSkeleton, { backgroundColor: palette.accent }]} />)}</View>
+              ) : slotsQuery.isError ? (
+                <View style={styles.slotError}>
+                  <Feather name="refresh-cw" size={22} color={palette.primary} />
+                  <Text style={[styles.emptyTitle, { color: palette.foreground }]}>Availability changed</Text>
+                  <Text style={[styles.emptyHint, { color: palette.mutedForeground }]}>Refresh to check the latest bookable times.</Text>
+                  <Pressable onPress={() => void slotsQuery.refetch()} style={[styles.refreshButton, { backgroundColor: palette.primary }]}><Text style={styles.refreshButtonText}>Refresh slots</Text></Pressable>
+                </View>
+              ) : (datesWithSlots.get(slotDate) || []).length ? (
+                <>
+                  <Text style={[styles.slotSummary, { color: palette.mutedForeground }]}>{prettyDate(slotDate, { weekday: "long", month: "long", day: "numeric" })}</Text>
+                  {(["Morning", "Afternoon", "Evening"] as const).map((group) => {
+                    const groupSlots = (datesWithSlots.get(slotDate) || []).filter((slot) => {
+                      const hour = Number(slot.start.split(":")[0]);
+                      return group === "Morning" ? hour < 12 : group === "Afternoon" ? hour >= 12 && hour < 17 : hour >= 17;
+                    });
+                    if (!groupSlots.length) return null;
+                    return <View key={group}>
+                      <Text style={[styles.slotGroupTitle, { color: palette.mutedForeground }]}>{group}</Text>
+                      <View style={styles.slotGrid}>{groupSlots.map((slot) => <Pressable key={`${slot.date}-${slot.start}`} onPress={() => slotConsultant && chooseSlot(slotConsultant, slot)} style={[styles.slotChoice, { borderColor: palette.border, backgroundColor: palette.card }]}><Text style={[styles.slotChoiceText, { color: palette.foreground }]}>{timeLabel(slot.start)}</Text></Pressable>)}</View>
+                    </View>;
+                  })}
+                </>
+              ) : (
+                <View style={styles.slotEmpty}>
+                  <Feather name="calendar" size={22} color={palette.mutedForeground} />
+                  <Text style={[styles.emptyTitle, { color: palette.foreground }]}>No slots on this date</Text>
+                  <Text style={[styles.emptyHint, { color: palette.mutedForeground }]}>Choose a highlighted day to see available times.</Text>
+                </View>
+              )}
+            </ScrollView>
+            <View style={[styles.slotFooter, { borderTopColor: palette.border }]}>
+              <Text style={[styles.footerText, { color: palette.mutedForeground }]}>All times IST · 30-minute consultation</Text>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       <Modal
         transparent
         visible={confirming}
@@ -345,12 +537,26 @@ export default function NewConsultationScreen() {
             <Text style={[styles.confirmTitle, { color: palette.foreground }]}>Confirm consultation</Text>
             <Text style={[styles.confirmLine, { color: palette.foreground }]}>{form.patientName}</Text>
             <Text style={[styles.confirmMeta, { color: palette.mutedForeground }]}>{selected?.consultant.specialization} · {selected?.consultant.displayName || selected?.consultant.name}</Text>
-            <Text style={[styles.confirmMeta, { color: palette.mutedForeground }]}>{selected?.slot}</Text>
+            <Text style={[styles.confirmMeta, { color: palette.mutedForeground }]}>{selected ? `${prettyDate(selected.slot.date)} · ${timeLabel(selected.slot.start)}` : ""}</Text>
             <View style={[styles.postpaid, { backgroundColor: palette.accent }]}>
               <Feather name="info" size={16} color={palette.foreground} />
               <Text style={[styles.postpaidText, { color: palette.foreground }]}>Postpaid, billed later. Booking cannot be undone in this app.</Text>
             </View>
-            {!!book.error && <Text style={[styles.error, { color: palette.primary }]}>{book.error.message}</Text>}
+            {!!book.error && <>
+              <Text style={[styles.error, { color: palette.primary }]}>{book.error.message}</Text>
+              <Pressable onPress={() => {
+                const consultant = selected?.consultant;
+                setConfirming(false);
+                if (consultant) {
+                  setSlotConsultant(consultant);
+                  setSlotDate(istDate(new Date()));
+                  setSlotSheetOpen(true);
+                  void queryClient.invalidateQueries({ queryKey: ["mobile-bookable-slots", consultant.id] });
+                }
+              }} style={{ paddingVertical: 9 }}>
+                <Text style={{ color: palette.primary, fontSize: 12, fontFamily: "Inter_700Bold" }}>Refresh availability and choose another slot</Text>
+              </Pressable>
+            </>}
             {!!attachmentUploadError && (
               <Text accessibilityRole="alert" style={[styles.error, { color: palette.primary }]}>
                 Booking saved, but some files need a retry: {attachmentUploadError}
@@ -374,41 +580,40 @@ export default function NewConsultationScreen() {
   );
 }
 
-function ConsultantCard({ consultant, onChoose }: { consultant: Consultant; onChoose: (slot: string) => void }) {
+function ConsultantCard({ consultant, onChoose, onOpen }: { consultant: Consultant; onChoose: (slot: BookableSlot) => void; onOpen: () => void }) {
   const palette = useColors();
-  const preview = consultant.availabilityPreview;
-  const windows = preview?.windows.slice(0, 3) ?? [];
+  const next = consultant.nextAvailableSlot;
+  const photo = consultant.photo || consultant.profilePhoto;
   return (
-    <View style={[styles.consultantCard, { backgroundColor: palette.card, borderColor: palette.border }]}>
-      <View style={styles.consultantMain}>
-        <View style={[styles.photo, { backgroundColor: palette.accent }]}><Feather name="user" size={24} color={palette.mutedForeground} /></View>
-        <View style={{ flex: 1 }}>
-          <Text style={[styles.consultantName, { color: palette.foreground }]}>{consultant.displayName || consultant.name || "Consultant"}</Text>
-          <Text style={[styles.specialization, { color: palette.primary }]}>{consultant.specialization || "Specialist"}</Text>
-          <Text style={[styles.credentials, { color: palette.mutedForeground }]}>{consultant.qualification || "Verified provider"} · {consultant.hospital || consultant.institute || consultant.city || "Perfusion network"}</Text>
+    <Pressable disabled={!next} onPress={onOpen} style={[styles.consultantCard, { backgroundColor: palette.card, borderColor: palette.border, opacity: next ? 1 : 0.82 }]}>
+      <View style={styles.cardMain}>
+        <View style={[styles.cardPhoto, { backgroundColor: palette.accent }]}>
+          {photo ? <Image source={{ uri: photo }} style={styles.cardImage} /> : <Feather name="user" size={23} color={palette.mutedForeground} />}
+        </View>
+        <View style={styles.cardCopy}>
+          <Text numberOfLines={1} style={[styles.consultantName, { color: palette.foreground }]}>{consultant.displayName || consultant.name || "Consultant"}</Text>
+          <Text numberOfLines={1} style={[styles.specialization, { color: palette.primary }]}>{consultant.specialization || "Specialist"}</Text>
+          <Text numberOfLines={2} style={[styles.credentials, { color: palette.mutedForeground }]}>{consultant.qualification || "Verified provider"} · {consultant.hospital || consultant.institute || consultant.city || "Perfusion network"}</Text>
         </View>
       </View>
-      <View style={styles.slots}>
-        {preview?.label && (
-          <Text style={[styles.tomorrowText, { color: palette.primary, marginBottom: 4 }]}>
-            {preview.label}{preview.date ? ` · ${preview.date}` : ""}
-          </Text>
-        )}
-        {windows.length ? windows.map((window) => (
-          <Pressable
-            key={window.appointmentSlot}
-            onPress={() => onChoose(window.appointmentSlot)}
-            style={[styles.slot, { backgroundColor: palette.accent }]}
-          >
-            <Text style={[styles.slotText, { color: palette.foreground }]}>{window.from}{window.to ? ` – ${window.to}` : ""}</Text>
+      <View style={[styles.nextRow, { borderTopColor: palette.border }]}>
+        {next ? <>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.nextLabel, { color: palette.mutedForeground }]}>NEXT AVAILABLE</Text>
+            <Pressable onPress={(event) => { event.stopPropagation(); onChoose(next); }} style={styles.nextChip}>
+              <Feather name="clock" size={13} color={palette.success || "#0E7C57"} />
+              <Text style={styles.nextChipText}>{next.appointmentSlot || `${prettyDate(next.date)} · ${timeLabel(next.start)}`}</Text>
+            </Pressable>
+          </View>
+          <Pressable onPress={(event) => { event.stopPropagation(); onOpen(); }} style={styles.allSlots} accessibilityRole="button">
+            <Text style={[styles.allSlotsText, { color: palette.primary }]}>All slots</Text><Feather name="chevron-right" size={15} color={palette.primary} />
           </Pressable>
-        )) : <View style={[styles.tomorrow, { backgroundColor: `${palette.warning}15` }]}>
-          <Text style={[styles.tomorrowText, { color: palette.warning }]}>
-            {preview?.label ?? "No upcoming availability"}
-          </Text>
+        </> : <View style={[styles.bookedOut, { backgroundColor: palette.accent }]}>
+          <Feather name="minus-circle" size={14} color={palette.mutedForeground} />
+          <Text style={[styles.bookedOutText, { color: palette.mutedForeground }]}>Fully booked for now</Text>
         </View>}
       </View>
-    </View>
+    </Pressable>
   );
 }
 
@@ -462,17 +667,27 @@ const styles = StyleSheet.create({
   toggleRow: { borderWidth: 1, borderRadius: 14, padding: 13, flexDirection: "row", alignItems: "center" },
   toggleTitle: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
   toggleHint: { fontSize: 10, marginTop: 3, fontFamily: "Inter_400Regular" },
-  consultantCard: { borderRadius: 17, borderWidth: 1, padding: 14, gap: 14 },
-  consultantMain: { flexDirection: "row", gap: 12 },
+  consultantCard: { height: 158, borderRadius: 15, borderWidth: 1, padding: 14, marginBottom: 12, justifyContent: "space-between" },
+  cardMain: { height: 72, flexDirection: "row", gap: 12, alignItems: "center" },
+  cardPhoto: { width: 54, height: 54, borderRadius: 27, overflow: "hidden", alignItems: "center", justifyContent: "center" },
+  cardImage: { width: "100%", height: "100%" },
+  cardCopy: { flex: 1, justifyContent: "center" },
   photo: { width: 52, height: 52, borderRadius: 26, alignItems: "center", justifyContent: "center" },
   consultantName: { fontSize: 15, fontFamily: "Sora_600SemiBold" },
   specialization: { fontSize: 12, fontFamily: "Inter_700Bold", marginTop: 3 },
-  credentials: { fontSize: 10, lineHeight: 15, fontFamily: "Inter_400Regular", marginTop: 3 },
-  slots: { flexDirection: "row", flexWrap: "wrap", gap: 7 },
-  slot: { borderRadius: 15, paddingHorizontal: 11, paddingVertical: 7 },
-  slotText: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
-  tomorrow: { borderRadius: 15, paddingHorizontal: 11, paddingVertical: 7 },
-  tomorrowText: { fontSize: 10, fontFamily: "Inter_700Bold" },
+  credentials: { fontSize: 10, lineHeight: 14, fontFamily: "Inter_400Regular", marginTop: 3 },
+  nextRow: { minHeight: 54, borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 9, flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between", gap: 8 },
+  nextLabel: { fontSize: 9, letterSpacing: 0.6, fontFamily: "Inter_700Bold", marginBottom: 4 },
+  nextChip: { minHeight: 30, alignSelf: "flex-start", flexDirection: "row", alignItems: "center", gap: 5, borderRadius: 8, paddingHorizontal: 9, paddingVertical: 6, backgroundColor: "#E7F7F1" },
+  nextChipText: { color: "#0E7C57", fontFamily: "Inter_700Bold", fontSize: 10 },
+  allSlots: { minHeight: 32, flexDirection: "row", alignItems: "center", paddingLeft: 8, paddingBottom: 2 },
+  allSlotsText: { fontSize: 11, fontFamily: "Inter_700Bold" },
+  bookedOut: { height: 32, flexDirection: "row", alignItems: "center", gap: 7, borderRadius: 9, paddingHorizontal: 10 },
+  bookedOutText: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
+  loadingCards: { gap: 12, marginTop: 6 },
+  skeletonCard: { height: 158, borderWidth: 1, borderRadius: 15, padding: 14, flexDirection: "row", alignItems: "flex-start", gap: 12 },
+  skeletonAvatar: { width: 54, height: 54, borderRadius: 27 },
+  skeletonLine: { height: 10, borderRadius: 6 },
   selectedCard: { borderRadius: 16, borderWidth: 1, padding: 13, flexDirection: "row", alignItems: "center", gap: 11 },
   selectedName: { fontSize: 14, fontFamily: "Sora_600SemiBold" },
   selectedMeta: { fontSize: 11, fontFamily: "Inter_600SemiBold", marginTop: 4 },
@@ -503,4 +718,40 @@ const styles = StyleSheet.create({
   postpaid: { borderRadius: 12, padding: 12, flexDirection: "row", gap: 9, marginTop: 18 },
   postpaidText: { flex: 1, fontSize: 11, lineHeight: 16, fontFamily: "Inter_500Medium" },
   error: { fontSize: 11, marginTop: 10, fontFamily: "Inter_500Medium" },
+  slotSheet: { height: "84%", borderTopLeftRadius: 22, borderTopRightRadius: 22, overflow: "hidden" },
+  sheetHandle: { width: 36, height: 4, borderRadius: 2, alignSelf: "center", marginTop: 10, marginBottom: 9 },
+  sheetHeading: { flexDirection: "row", alignItems: "center", gap: 11, paddingHorizontal: 18, paddingBottom: 13 },
+  sheetPhoto: { width: 42, height: 42, overflow: "hidden" },
+  imagePhoto: { width: "100%", height: "100%", borderRadius: 21 },
+  closeButton: { width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center" },
+  dateArea: { borderBottomWidth: StyleSheet.hairlineWidth, paddingBottom: 11 },
+  dateStripRow: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 16 },
+  dateStrip: { gap: 7, paddingVertical: 2 },
+  dateChip: { width: 49, height: 63, borderRadius: 11, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  dateDow: { fontSize: 9, fontFamily: "Inter_600SemiBold" },
+  dateNumber: { fontSize: 15, fontFamily: "Inter_700Bold", marginTop: 1 },
+  dateMonth: { fontSize: 8, fontFamily: "Inter_600SemiBold", marginTop: 1 },
+  calendarButton: { width: 43, height: 62, borderRadius: 11, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  monthPanel: { paddingHorizontal: 19 },
+  monthHeader: { height: 32, flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  monthTitle: { fontSize: 13, fontFamily: "Inter_700Bold" },
+  calendarGrid: { flexDirection: "row", flexWrap: "wrap" },
+  calendarDow: { width: "14.2857%", textAlign: "center", fontSize: 9, fontFamily: "Inter_700Bold", paddingVertical: 5 },
+  calendarDay: { width: "14.2857%", height: 31, alignItems: "center", justifyContent: "center", borderRadius: 9 },
+  slotScroll: { flex: 1 },
+  slotScrollContent: { paddingHorizontal: 18, paddingTop: 13, paddingBottom: 14 },
+  slotSummary: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
+  slotGroupTitle: { fontSize: 10, letterSpacing: 0.5, fontFamily: "Inter_700Bold", marginTop: 16, marginBottom: 8 },
+  slotGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  slotChoice: { width: "31%", minHeight: 40, alignItems: "center", justifyContent: "center", borderWidth: 1, borderRadius: 10 },
+  slotChoiceText: { fontSize: 11, fontFamily: "Inter_700Bold" },
+  slotEmpty: { alignItems: "center", justifyContent: "center", paddingTop: 30, gap: 8 },
+  slotError: { alignItems: "center", justifyContent: "center", paddingTop: 28, gap: 8 },
+  emptyTitle: { fontSize: 13, fontFamily: "Inter_700Bold", textAlign: "center" },
+  emptyHint: { fontSize: 11, lineHeight: 16, textAlign: "center", maxWidth: 240 },
+  refreshButton: { borderRadius: 18, paddingHorizontal: 16, paddingVertical: 9, marginTop: 5 },
+  refreshButtonText: { color: "#FFFFFF", fontSize: 11, fontFamily: "Inter_700Bold" },
+  slotSkeleton: { height: 40, borderRadius: 10 },
+  slotFooter: { borderTopWidth: StyleSheet.hairlineWidth, paddingVertical: 12, paddingHorizontal: 18 },
+  footerText: { textAlign: "center", fontSize: 10, fontFamily: "Inter_500Medium" },
 });

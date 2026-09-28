@@ -10,4 +10,7 @@ export type ConsultantAvailabilitySlotSeriesItem = {
   days: string[];
   from: string;
   to: string;
+  paused?: boolean;
+  /** Mobile-disabled day; retained for later re-enabling */
+  disabled?: boolean;
 };

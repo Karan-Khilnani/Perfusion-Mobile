@@ -133,7 +133,9 @@ export const GetMyConsultantsResponseItem = zod.object({
   "slotSeries": zod.array(zod.object({
   "days": zod.array(zod.string()),
   "from": zod.string(),
-  "to": zod.string()
+  "to": zod.string(),
+  "paused": zod.boolean().optional(),
+  "disabled": zod.boolean().optional().describe('Mobile-disabled day; retained for later re-enabling')
 })).nullish(),
   "availabilityPreview": zod.object({
   "label": zod.string().nullable(),
@@ -143,9 +145,61 @@ export const GetMyConsultantsResponseItem = zod.object({
   "to": zod.string(),
   "appointmentSlot": zod.string()
 }))
-})
+}),
+  "nextAvailableSlot": zod.union([zod.object({
+  "date": zod.coerce.date(),
+  "start": zod.string().describe('24-hour HH:mm in IST'),
+  "end": zod.string().describe('24-hour HH:mm in IST'),
+  "appointmentSlot": zod.string()
+}),zod.null()]).optional().describe('Included for the mobile client only; null when no slot is bookable within 30 days'),
+  "registrationDocuments": zod.array(zod.object({
+  "id": zod.string().optional(),
+  "filename": zod.string().optional(),
+  "status": zod.string().nullish(),
+  "url": zod.string().optional()
+})).optional().describe('Included only on the owning provider\'s list. Legacy document status is null.'),
+  "portfolioPhotos": zod.array(zod.object({
+  "id": zod.string().optional(),
+  "filename": zod.string().optional(),
+  "url": zod.string().optional()
+})).optional().describe('Included only on the owning provider\'s list.')
 })
 export const GetMyConsultantsResponse = zod.array(GetMyConsultantsResponseItem)
+
+
+/**
+ * @summary Upload an owned consultant photo, signature, private registration document or portfolio photo
+ */
+export const UploadProviderConsultantMediaParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const UploadProviderConsultantMediaBody = zod.object({
+  "kind": zod.enum(['photo', 'signature', 'registration_document', 'portfolio_photo']),
+  "file": zod.instanceof(File)
+})
+
+
+/**
+ * @summary Delete an owned portfolio photo
+ */
+export const DeleteProviderPortfolioPhotoParams = zod.object({
+  "id": zod.coerce.string(),
+  "mediaId": zod.coerce.string()
+})
+
+
+/**
+ * @summary Get a short-lived private registration document link
+ */
+export const GetProviderRegistrationDocumentSignedUrlParams = zod.object({
+  "id": zod.coerce.string(),
+  "mediaId": zod.coerce.string()
+})
+
+export const GetProviderRegistrationDocumentSignedUrlResponse = zod.object({
+  "url": zod.string().url()
+})
 
 
 /**
@@ -170,7 +224,9 @@ export const UpdateProviderConsultantResponse = zod.object({
   "slotSeries": zod.array(zod.object({
   "days": zod.array(zod.string()),
   "from": zod.string(),
-  "to": zod.string()
+  "to": zod.string(),
+  "paused": zod.boolean().optional(),
+  "disabled": zod.boolean().optional().describe('Mobile-disabled day; retained for later re-enabling')
 })).nullish(),
   "availabilityPreview": zod.object({
   "label": zod.string().nullable(),
@@ -180,7 +236,24 @@ export const UpdateProviderConsultantResponse = zod.object({
   "to": zod.string(),
   "appointmentSlot": zod.string()
 }))
-})
+}),
+  "nextAvailableSlot": zod.union([zod.object({
+  "date": zod.coerce.date(),
+  "start": zod.string().describe('24-hour HH:mm in IST'),
+  "end": zod.string().describe('24-hour HH:mm in IST'),
+  "appointmentSlot": zod.string()
+}),zod.null()]).optional().describe('Included for the mobile client only; null when no slot is bookable within 30 days'),
+  "registrationDocuments": zod.array(zod.object({
+  "id": zod.string().optional(),
+  "filename": zod.string().optional(),
+  "status": zod.string().nullish(),
+  "url": zod.string().optional()
+})).optional().describe('Included only on the owning provider\'s list. Legacy document status is null.'),
+  "portfolioPhotos": zod.array(zod.object({
+  "id": zod.string().optional(),
+  "filename": zod.string().optional(),
+  "url": zod.string().optional()
+})).optional().describe('Included only on the owning provider\'s list.')
 })
 
 
@@ -198,7 +271,9 @@ export const ListConsultantsResponseItem = zod.object({
   "slotSeries": zod.array(zod.object({
   "days": zod.array(zod.string()),
   "from": zod.string(),
-  "to": zod.string()
+  "to": zod.string(),
+  "paused": zod.boolean().optional(),
+  "disabled": zod.boolean().optional().describe('Mobile-disabled day; retained for later re-enabling')
 })).nullish(),
   "availabilityPreview": zod.object({
   "label": zod.string().nullable(),
@@ -208,9 +283,51 @@ export const ListConsultantsResponseItem = zod.object({
   "to": zod.string(),
   "appointmentSlot": zod.string()
 }))
-})
+}),
+  "nextAvailableSlot": zod.union([zod.object({
+  "date": zod.coerce.date(),
+  "start": zod.string().describe('24-hour HH:mm in IST'),
+  "end": zod.string().describe('24-hour HH:mm in IST'),
+  "appointmentSlot": zod.string()
+}),zod.null()]).optional().describe('Included for the mobile client only; null when no slot is bookable within 30 days'),
+  "registrationDocuments": zod.array(zod.object({
+  "id": zod.string().optional(),
+  "filename": zod.string().optional(),
+  "status": zod.string().nullish(),
+  "url": zod.string().optional()
+})).optional().describe('Included only on the owning provider\'s list. Legacy document status is null.'),
+  "portfolioPhotos": zod.array(zod.object({
+  "id": zod.string().optional(),
+  "filename": zod.string().optional(),
+  "url": zod.string().optional()
+})).optional().describe('Included only on the owning provider\'s list.')
 })
 export const ListConsultantsResponse = zod.array(ListConsultantsResponseItem)
+
+
+/**
+ * @summary Server-computed 30-minute bookable slots across up to 30 days in IST
+ */
+export const GetConsultantBookableSlotsParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const GetConsultantBookableSlotsQueryParams = zod.object({
+  "start": zod.date(),
+  "end": zod.date()
+})
+
+export const GetConsultantBookableSlotsResponse = zod.object({
+  "dates": zod.array(zod.object({
+  "date": zod.coerce.date(),
+  "slots": zod.array(zod.object({
+  "date": zod.coerce.date(),
+  "start": zod.string().describe('24-hour HH:mm in IST'),
+  "end": zod.string().describe('24-hour HH:mm in IST'),
+  "appointmentSlot": zod.string()
+}))
+}))
+})
 
 
 /**
@@ -231,7 +348,9 @@ export const GetConsultantResponse = zod.object({
   "slotSeries": zod.array(zod.object({
   "days": zod.array(zod.string()),
   "from": zod.string(),
-  "to": zod.string()
+  "to": zod.string(),
+  "paused": zod.boolean().optional(),
+  "disabled": zod.boolean().optional().describe('Mobile-disabled day; retained for later re-enabling')
 })).nullish(),
   "availabilityPreview": zod.object({
   "label": zod.string().nullable(),
@@ -241,7 +360,24 @@ export const GetConsultantResponse = zod.object({
   "to": zod.string(),
   "appointmentSlot": zod.string()
 }))
-})
+}),
+  "nextAvailableSlot": zod.union([zod.object({
+  "date": zod.coerce.date(),
+  "start": zod.string().describe('24-hour HH:mm in IST'),
+  "end": zod.string().describe('24-hour HH:mm in IST'),
+  "appointmentSlot": zod.string()
+}),zod.null()]).optional().describe('Included for the mobile client only; null when no slot is bookable within 30 days'),
+  "registrationDocuments": zod.array(zod.object({
+  "id": zod.string().optional(),
+  "filename": zod.string().optional(),
+  "status": zod.string().nullish(),
+  "url": zod.string().optional()
+})).optional().describe('Included only on the owning provider\'s list. Legacy document status is null.'),
+  "portfolioPhotos": zod.array(zod.object({
+  "id": zod.string().optional(),
+  "filename": zod.string().optional(),
+  "url": zod.string().optional()
+})).optional().describe('Included only on the owning provider\'s list.')
 })
 
 

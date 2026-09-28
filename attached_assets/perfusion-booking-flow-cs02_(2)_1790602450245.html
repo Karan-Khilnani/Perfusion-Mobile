@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Perfusion — New Consultation (Shortened Flow)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --red:#DB2841; --red-dim:#F6DDE1; --charcoal:#2A2A2A; --canvas:#F7F7F9; --card:#FFFFFF;
+    --hairline:#ECEDF0; --muted:#7A7F8A; --muted-2:#A6ABB4; --blue:#2F6FED; --blue-tint:#EAF1FE; --green-ink:#0E7C57;
+    --green:#17A672; --grey-tint:#F0F1F3;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{ background:#E8E6E2; font-family:'Inter', sans-serif; display:flex; flex-direction:column; align-items:center; gap:16px; padding:40px 16px 80px; min-height:100vh; }
+  .review-bar{ font-size:12px; color:var(--muted-2); background:#fff; border:1px solid var(--hairline); border-radius:999px; padding:8px 16px; text-align:center; max-width:340px; }
+  .device{ width:390px; max-width:100%; height:844px; background:#000; border-radius:46px; padding:14px; box-shadow:0 30px 60px -20px rgba(0,0,0,.35), 0 10px 20px -10px rgba(0,0,0,.2); }
+  .screen{ width:100%; height:100%; background:var(--canvas); border-radius:34px; overflow:hidden; position:relative; display:flex; flex-direction:column; }
+  .notch{ position:absolute; top:14px; left:50%; transform:translateX(-50%); width:120px; height:28px; background:#000; border-radius:20px; z-index:50; }
+  .statusbar{ display:flex; justify-content:space-between; align-items:center; padding:16px 26px 4px; font-size:13px; font-weight:600; color:var(--charcoal); background:var(--card); flex-shrink:0; }
+
+  .flow-header{ background:var(--card); border-bottom:1px solid var(--hairline); flex-shrink:0; }
+  .flow-header-top{ display:flex; align-items:center; gap:10px; padding:12px 16px; }
+  .flow-back{ width:30px; height:30px; border-radius:50%; display:flex; align-items:center; justify-content:center; color:var(--charcoal); flex-shrink:0; }
+  .flow-back svg{ width:17px; height:17px; }
+  .flow-title{ font-family:'Sora',sans-serif; font-weight:600; font-size:15.5px; color:var(--charcoal); }
+  .flow-step-label{ font-size:11px; color:var(--muted-2); font-weight:600; }
+
+  .flow-body{ flex:1; overflow-y:auto; padding:16px; }
+  .flow-body::-webkit-scrollbar{ display:none; }
+
+  .search-input{ display:flex; align-items:center; gap:9px; background:#fff; border:1px solid var(--hairline); border-radius:12px; padding:11px 14px; margin-bottom:12px; position:relative; }
+  .search-input svg{ width:16px; height:16px; color:var(--muted-2); flex-shrink:0; }
+  .search-input input{ border:none; outline:none; font-size:13px; color:var(--charcoal); flex:1; font-family:'Inter',sans-serif; background:transparent; }
+  .search-input input::placeholder{ color:var(--muted-2); }
+
+  .filter-row{ display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap; }
+  .specialty-chips{ display:flex; gap:8px; overflow-x:auto; padding-bottom:2px; }
+  .specialty-chip{ flex-shrink:0; font-size:12px; font-weight:600; padding:7px 14px; border-radius:999px; background:#fff; border:1px solid var(--hairline); color:var(--muted); white-space:nowrap; cursor:pointer; }
+  .specialty-chip.active{ background:var(--charcoal); color:#fff; border-color:var(--charcoal); }
+  .avail-toggle{ display:flex; align-items:center; gap:7px; background:#fff; border:1px solid var(--hairline); border-radius:999px; padding:7px 13px; margin-bottom:14px; width:fit-content; }
+  .avail-toggle-switch{ width:30px; height:17px; border-radius:999px; background:var(--green); position:relative; cursor:pointer; }
+  .avail-toggle-switch::after{ content:''; position:absolute; top:2px; left:15px; width:13px; height:13px; border-radius:50%; background:#fff; }
+  .avail-toggle span{ font-size:12px; font-weight:600; color:var(--charcoal); }
+
+  .provider-card{ background:#fff; border:1px solid var(--hairline); border-radius:14px; padding:14px; margin-bottom:12px; }
+  .provider-top{ display:flex; align-items:center; gap:11px; }
+  .provider-photo{ width:50px; height:50px; border-radius:50%; flex-shrink:0; background:linear-gradient(160deg,#DDE1E6,#C7CCD3); display:flex; align-items:center; justify-content:center; color:#8A9099; }
+  .provider-photo svg{ width:24px; height:24px; }
+  .provider-name{ font-size:14.5px; font-weight:700; color:var(--charcoal); }
+  .provider-spec{ font-size:12.5px; color:var(--red); font-weight:700; margin-top:2px; }
+  .provider-quals{ font-size:11px; color:var(--muted); margin-top:1px; }
+  .provider-exp{ display:flex; align-items:center; gap:5px; margin-top:9px; font-size:11.5px; color:var(--muted); font-weight:600; }
+  .provider-exp svg{ width:13px; height:13px; color:var(--muted-2); }
+
+  .selection-recap{ display:flex; align-items:center; gap:10px; background:#fff; border:1px solid var(--hairline); border-radius:12px; padding:11px 13px; margin-bottom:16px; cursor:pointer; }
+  .recap-badge{ width:36px; height:36px; border-radius:50%; flex-shrink:0; background:linear-gradient(160deg,#DDE1E6,#C7CCD3); display:flex; align-items:center; justify-content:center; color:#8A9099; }
+  .recap-badge svg{ width:17px; height:17px; }
+  .recap-text{ flex:1; min-width:0; }
+  .recap-name{ font-size:13px; font-weight:700; color:var(--charcoal); }
+  .recap-sub{ font-size:11px; color:var(--muted); margin-top:1px; }
+  .recap-change{ font-size:11.5px; font-weight:700; color:var(--red); flex-shrink:0; }
+
+  .field-label{ font-size:11.5px; font-weight:700; color:var(--muted-2); letter-spacing:.2px; margin-bottom:7px; margin-top:16px; }
+  .field-label:first-child{ margin-top:0; }
+  .textarea-field{ width:100%; min-height:74px; border:1px solid var(--hairline); border-radius:11px; padding:11px 13px; font-size:13px; font-family:'Inter',sans-serif; color:var(--charcoal); background:#fff; resize:none; }
+  .input-field{ width:100%; height:42px; border:1px solid var(--hairline); border-radius:11px; padding:0 13px; font-size:13px; color:var(--charcoal); background:#fff; font-family:'Inter',sans-serif; }
+  .field-row{ display:flex; gap:10px; }
+  .field-row > div{ flex:1; }
+
+  .patient-suggestions{ background:#fff; border:1px solid var(--hairline); border-radius:12px; margin-top:-6px; margin-bottom:12px; overflow:hidden; display:none; }
+  .patient-suggestions.show{ display:block; }
+  .suggestion-row{ display:flex; align-items:center; gap:10px; padding:10px 13px; border-bottom:1px solid var(--hairline); cursor:pointer; }
+  .suggestion-row:last-child{ border-bottom:none; }
+  .suggestion-avatar{ width:32px; height:32px; border-radius:50%; background:var(--grey-tint); display:flex; align-items:center; justify-content:center; font-weight:700; font-size:10px; color:var(--charcoal); flex-shrink:0; }
+  .suggestion-text{ flex:1; min-width:0; }
+  .suggestion-name{ font-size:13px; font-weight:700; color:var(--charcoal); }
+  .suggestion-id{ font-size:11px; color:var(--muted); margin-top:1px; }
+  .new-patient-suggestion{ display:flex; align-items:center; gap:9px; padding:11px 13px; color:var(--red); font-weight:700; font-size:12.5px; cursor:pointer; }
+  .new-patient-suggestion svg{ width:15px; height:15px; }
+
+  .new-patient-fields{ display:none; background:#fff; border:1px solid var(--hairline); border-radius:12px; padding:13px; margin-bottom:6px; }
+  .new-patient-fields.show{ display:block; }
+  .new-patient-fields .field-label{ margin-top:12px; }
+  .new-patient-fields .field-label:first-child{ margin-top:0; }
+  .selected-patient-chip{ display:none; align-items:center; gap:10px; background:var(--red-dim); border:1px solid #F0C4CC; border-radius:12px; padding:11px 13px; margin-bottom:6px; }
+  .selected-patient-chip.show{ display:flex; }
+  .selected-patient-chip .suggestion-avatar{ background:#fff; color:var(--red); }
+  .clear-patient{ color:var(--red); font-weight:700; font-size:11.5px; cursor:pointer; flex-shrink:0; }
+
+  .attach-row{ display:flex; align-items:center; gap:10px; padding:11px 12px; background:#fff; border:1px solid var(--hairline); border-radius:11px; margin-top:10px; cursor:pointer; color:var(--muted); font-size:12.5px; font-weight:600; }
+  .attach-row svg{ width:16px; height:16px; color:var(--muted-2); }
+
+  .select-field{
+    width:100%; height:42px; border:1px solid var(--hairline); border-radius:11px; padding:0 13px;
+    font-size:13px; color:var(--muted-2); background:#fff url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"><path d="M6 9l6 6 6-6" stroke="%237A7F8A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>') no-repeat right 12px center;
+    background-size:15px; appearance:none; -webkit-appearance:none; font-family:'Inter',sans-serif;
+  }
+  .select-field.filled{ color:var(--charcoal); }
+  .phone-input{ display:flex; align-items:center; border:1px solid var(--hairline); border-radius:11px; background:#fff; overflow:hidden; }
+  .phone-prefix{ padding:0 11px; height:42px; display:flex; align-items:center; font-size:13px; color:var(--muted); background:var(--grey-tint); border-right:1px solid var(--hairline); font-weight:600; }
+  .phone-input input{ flex:1; height:42px; border:none; outline:none; padding:0 12px; font-size:13px; color:var(--charcoal); font-family:'Inter',sans-serif; }
+  .field-sub-note{ font-size:10.5px; color:var(--muted-2); margin-top:4px; line-height:1.4; }
+
+  .checkbox-row{ display:flex; align-items:center; gap:9px; margin-top:14px; cursor:pointer; }
+  .checkbox-box{ width:19px; height:19px; border-radius:5px; border:1.5px solid var(--hairline); flex-shrink:0; display:flex; align-items:center; justify-content:center; }
+  .checkbox-box.checked{ background:var(--red); border-color:var(--red); }
+  .checkbox-box svg{ width:12px; height:12px; color:#fff; display:none; }
+  .checkbox-box.checked svg{ display:block; }
+  .checkbox-label{ font-size:12.5px; font-weight:600; color:var(--charcoal); }
+
+  .callback-note{ display:flex; align-items:flex-start; gap:7px; margin-bottom:8px; }
+  .callback-note svg{ width:14px; height:14px; color:var(--muted-2); flex-shrink:0; margin-top:1px; }
+  .callback-note-text{ font-size:11px; color:var(--muted); line-height:1.5; }
+
+  .upload-section-title{ font-size:11.5px; font-weight:700; color:var(--charcoal); margin-top:16px; margin-bottom:2px; }
+  .upload-hint{ font-size:10.5px; color:var(--muted-2); margin-bottom:7px; }
+  .attached-file{ display:flex; align-items:center; gap:9px; padding:9px 10px; background:#fff; border:1px solid var(--hairline); border-radius:10px; margin-top:8px; }
+  .attached-file-icon{ width:28px; height:28px; border-radius:7px; background:var(--grey-tint); display:flex; align-items:center; justify-content:center; color:var(--charcoal); flex-shrink:0; }
+  .attached-file-icon svg{ width:13px; height:13px; }
+  .attached-file-name{ flex:1; font-size:12px; font-weight:600; color:var(--charcoal); }
+  .attached-file-remove{ color:var(--muted-2); cursor:pointer; }
+
+  .flow-footer{ padding:12px 16px 20px; background:var(--card); border-top:1px solid var(--hairline); flex-shrink:0; }
+  .flow-cta{ width:100%; height:48px; border-radius:24px; background:var(--red); color:#fff; border:none; font-family:'Inter',sans-serif; font-weight:700; font-size:14px; cursor:pointer; }
+  .flow-cta:disabled{ background:var(--grey-tint); color:var(--muted-2); }
+
+  /* confirm sheet */
+  .sheet-backdrop{ position:absolute; inset:0; background:rgba(20,20,25,.42); z-index:80; display:none; align-items:flex-end; }
+  .sheet-backdrop.open{ display:flex; }
+  .confirm-sheet{ width:100%; background:#fff; border-radius:20px 20px 0 0; padding:10px 20px 22px; }
+  .sheet-handle{ width:34px; height:4px; border-radius:2px; background:var(--hairline); margin:0 auto 14px; }
+  .confirm-sheet-title{ font-family:'Sora',sans-serif; font-weight:600; font-size:16px; color:var(--charcoal); margin-bottom:10px; text-align:center; }
+  .confirm-sheet-body{ font-size:13px; color:var(--muted); line-height:1.55; text-align:center; margin-bottom:8px; }
+  .confirm-sheet-body b{ color:var(--charcoal); }
+  .warning-line{ font-size:11.5px; color:var(--muted); text-align:center; margin-bottom:18px; padding:10px 12px; background:#FFF8F5; border-radius:10px; border:1px solid #F5E2D8; }
+  .confirm-sheet-btn{ width:100%; height:46px; border-radius:23px; font-weight:700; font-size:13.5px; border:none; margin-bottom:8px; cursor:pointer; }
+  .confirm-sheet-btn.primary{ background:var(--red); color:#fff; }
+  .confirm-sheet-btn.secondary{ background:transparent; color:var(--muted); }
+
+  .confirm-screen{ flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:40px 30px; text-align:center; }
+  .confirm-check{ width:72px; height:72px; border-radius:50%; background:#E7F7F1; display:flex; align-items:center; justify-content:center; margin-bottom:20px; }
+  .confirm-check svg{ width:34px; height:34px; color:var(--green); }
+  .confirm-title{ font-family:'Sora',sans-serif; font-weight:600; font-size:19px; color:var(--charcoal); }
+  .confirm-sub{ font-size:13px; color:var(--muted); margin-top:8px; line-height:1.5; }
+  .confirm-newpatient-tag{ margin-top:14px; background:var(--green-tint,#E7F7F1); color:var(--green); font-size:11.5px; font-weight:700; padding:7px 14px; border-radius:999px; display:none; }
+  .confirm-newpatient-tag.show{ display:inline-block; }
+  .confirm-actions{ width:100%; margin-top:24px; display:flex; flex-direction:column; gap:10px; }
+  .confirm-btn{ width:100%; height:46px; border-radius:23px; font-weight:700; font-size:13.5px; cursor:pointer; border:none; }
+  .confirm-btn.primary{ background:var(--red); color:#fff; }
+  .confirm-btn.secondary{ background:#fff; border:1px solid var(--hairline); color:var(--charcoal); }
+
+  .page{ display:none; flex-direction:column; flex:1; min-height:0; position:relative; }
+  .page.active{ display:flex; }
+
+  /* ---------- explore: card with next-available + slot sheet ---------- */
+  .filter-line{ display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
+  .today-toggle{ display:flex; align-items:center; gap:8px; background:#fff; border:1px solid var(--hairline); border-radius:999px; padding:7px 13px; cursor:pointer; }
+  .today-toggle span{ font-size:12px; font-weight:600; color:var(--charcoal); }
+  .toggle-sw{ width:30px; height:17px; border-radius:999px; background:var(--grey-tint); position:relative; transition:background .15s ease; flex-shrink:0; }
+  .toggle-sw::after{ content:''; position:absolute; top:2px; left:2px; width:13px; height:13px; border-radius:50%; background:#fff; box-shadow:0 1px 2px rgba(0,0,0,.2); transition:left .15s ease; }
+  .today-toggle.on .toggle-sw{ background:var(--green); }
+  .today-toggle.on .toggle-sw::after{ left:15px; }
+  .sort-note{ font-size:11px; font-weight:600; color:var(--muted-2); }
+
+  .provider-card{ cursor:pointer; }
+  .next-row{ display:flex; align-items:flex-end; justify-content:space-between; gap:10px; margin-top:12px; padding-top:12px; border-top:1px solid var(--hairline); }
+  .next-label{ font-size:9.5px; font-weight:700; color:var(--muted-2); letter-spacing:.3px; margin-bottom:5px; }
+  .next-chip{ position:relative; display:inline-block; font-size:12px; font-weight:700; padding:6px 12px; border-radius:8px; background:#E7F7F1; color:var(--green-ink); white-space:nowrap; }
+  .next-chip::before{ content:''; position:absolute; inset:-8px -6px; }
+  .next-chip:active{ background:var(--red); color:#fff; }
+  .see-all{ display:flex; align-items:center; gap:2px; font-size:11.5px; font-weight:700; color:var(--red); flex-shrink:0; padding-bottom:5px; }
+  .see-all svg{ width:12px; height:12px; }
+  .booked-out{ display:inline-block; font-size:12px; font-weight:600; color:var(--muted); background:var(--grey-tint); padding:8px 13px; border-radius:10px; }
+  .no-results{ text-align:center; padding:40px 20px; font-size:12.5px; color:var(--muted); }
+
+  .slot-sheet{ width:100%; height:84%; background:#fff; border-radius:22px 22px 0 0; display:flex; flex-direction:column; }
+  .slot-sheet-head{ display:flex; align-items:center; gap:11px; padding:2px 18px 14px; }
+  .slot-sheet-close{ width:30px; height:30px; border-radius:50%; background:var(--grey-tint); display:flex; align-items:center; justify-content:center; color:var(--muted); flex-shrink:0; cursor:pointer; }
+  .slot-sheet-close svg{ width:13px; height:13px; }
+  .date-area{ border-bottom:1px solid var(--hairline); flex-shrink:0; }
+  .date-row{ display:flex; align-items:center; gap:8px; padding:0 18px 14px; }
+  .date-strip{ display:flex; gap:8px; overflow-x:auto; flex:1; padding:2px 0; scrollbar-width:none; }
+  .date-strip::-webkit-scrollbar{ display:none; }
+  .dchip{ flex-shrink:0; width:50px; padding:8px 0 7px; border-radius:12px; border:1px solid var(--hairline); text-align:center; cursor:pointer; background:#fff; }
+  .dchip .dow{ font-size:10px; font-weight:600; color:var(--muted); }
+  .dchip .dnum{ font-size:15.5px; font-weight:700; color:var(--charcoal); margin-top:1px; }
+  .dchip .dmon{ font-size:9px; font-weight:700; color:var(--muted-2); margin-top:1px; height:11px; }
+  .dchip.active{ background:var(--charcoal); border-color:var(--charcoal); }
+  .dchip.active .dow, .dchip.active .dmon{ color:rgba(255,255,255,.7); }
+  .dchip.active .dnum{ color:#fff; }
+  .dchip.off{ opacity:.35; cursor:default; }
+  .cal-btn{ flex-shrink:0; width:44px; height:62px; border-radius:12px; border:1px solid var(--hairline); display:flex; align-items:center; justify-content:center; color:var(--charcoal); cursor:pointer; background:#fff; }
+
+  .month-view{ display:none; padding:0 18px 12px; }
+  .month-view.show{ display:block; }
+  .month-head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
+  .month-title{ font-size:13.5px; font-weight:700; color:var(--charcoal); }
+  .month-nav{ width:30px; height:30px; border-radius:50%; background:var(--grey-tint); display:flex; align-items:center; justify-content:center; color:var(--charcoal); cursor:pointer; }
+  .month-nav.off{ opacity:.3; cursor:default; }
+  .month-grid{ display:grid; grid-template-columns:repeat(7,1fr); gap:3px; }
+  .mdow{ font-size:10px; font-weight:700; color:var(--muted-2); text-align:center; padding:3px 0; }
+  .mday{ height:34px; display:flex; align-items:center; justify-content:center; border-radius:10px; font-size:12.5px; font-weight:600; color:var(--charcoal); cursor:pointer; }
+  .mday.off{ color:#C9CDD4; cursor:default; }
+  .mday.today{ box-shadow:inset 0 0 0 1.5px var(--charcoal); }
+  .mday.sel{ background:var(--charcoal); color:#fff; }
+  .month-back{ text-align:center; margin-top:10px; font-size:12px; font-weight:700; color:var(--red); cursor:pointer; }
+
+  .slot-scroll{ flex:1; overflow-y:auto; padding:14px 18px 6px; }
+  .slot-scroll::-webkit-scrollbar{ display:none; }
+  .slot-summary{ font-size:12px; font-weight:600; color:var(--muted); margin-bottom:4px; }
+  .slot-group-title{ display:flex; align-items:baseline; gap:7px; font-size:11px; font-weight:700; color:var(--muted-2); letter-spacing:.3px; margin:16px 0 9px; }
+  .slot-group-title span{ font-weight:500; letter-spacing:0; }
+  .slot-grid3{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+  .slotb{ padding:11px 0; text-align:center; border-radius:11px; border:1px solid var(--hairline); font-size:12.5px; font-weight:700; color:var(--charcoal); background:#fff; cursor:pointer; }
+  .slotb:active{ background:var(--red); color:#fff; border-color:var(--red); }
+  .slot-foot{ padding:10px 18px 18px; font-size:11px; color:var(--muted-2); text-align:center; border-top:1px solid var(--hairline); flex-shrink:0; }
+</style>
+</head>
+<body>
+
+  <div class="review-bar">Care Seeker — New Consultation, shortened flow: Explore Consultants (next available + slot sheet) → Patient + Clinical Details → Book</div>
+
+  <div class="device">
+    <div class="screen">
+      <div class="notch"></div>
+      <div class="statusbar">
+        <span>2:35</span>
+        <span style="display:flex; gap:4px; align-items:center;">
+          <svg width="16" height="12" viewBox="0 0 16 12" fill="none"><path d="M1 4.5C4.5 1.5 11.5 1.5 15 4.5" stroke="#2A2A2A" stroke-width="1.4" stroke-linecap="round"/><path d="M3.2 7C5.5 5 10.5 5 12.8 7" stroke="#2A2A2A" stroke-width="1.4" stroke-linecap="round"/><circle cx="8" cy="9.5" r="1" fill="#2A2A2A"/></svg>
+          <svg width="18" height="11" viewBox="0 0 18 11" fill="none"><rect x="0.5" y="0.5" width="15" height="10" rx="2.5" stroke="#2A2A2A"/><rect x="2" y="2" width="10" height="7" rx="1" fill="#2A2A2A"/><rect x="16.5" y="3.5" width="1.5" height="4" rx="0.7" fill="#2A2A2A"/></svg>
+        </span>
+      </div>
+
+      <!-- ================= STEP 1: EXPLORE CONSULTANTS ================= -->
+      <div class="page active" id="step-1">
+        <div class="flow-header">
+          <div class="flow-header-top">
+            <div class="flow-back"><svg viewBox="0 0 24 24" fill="none"><path d="M15 5l-7 7 7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div style="flex:1;"><div class="flow-title">Explore Consultants</div><div class="flow-step-label">Step 1 of 2</div></div>
+          </div>
+        </div>
+        <div class="flow-body">
+          <div class="search-input"><svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="1.8"/><path d="M20 20l-4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><input id="doc-search" placeholder="Search by name or specialty…" oninput="renderDocs()"></div>
+          <div class="specialty-chips" id="spec-chips" style="margin-bottom:12px;">
+            <div class="specialty-chip active" data-spec="">All</div>
+            <div class="specialty-chip" data-spec="Critical Care">Critical Care</div>
+            <div class="specialty-chip" data-spec="Nephrology">Nephrology</div>
+            <div class="specialty-chip" data-spec="Orthopedics">Orthopedics</div>
+            <div class="specialty-chip" data-spec="Cardiology">Cardiology</div>
+          </div>
+          <div class="filter-line">
+            <div class="today-toggle" onclick="toggleToday(this)"><div class="toggle-sw"></div><span>Available today</span></div>
+            <span class="sort-note">Soonest first</span>
+          </div>
+          <div id="provider-list"></div>
+        </div>
+
+        <!-- slot sheet: opens from a consultant card -->
+        <div class="sheet-backdrop" id="slot-backdrop" onclick="closeSlotSheet()">
+          <div class="slot-sheet" onclick="event.stopPropagation()">
+            <div class="sheet-handle" style="margin:10px auto 8px;"></div>
+            <div class="slot-sheet-head">
+              <div class="provider-photo" style="width:42px;height:42px;"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8.5" r="3.6" stroke="currentColor" stroke-width="1.8"/><path d="M4.5 20.5c0-4.5 3.3-7 7.5-7s7.5 2.5 7.5 7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></div>
+              <div style="flex:1;min-width:0;"><div class="provider-name" id="sheet-name">Dr.</div><div class="provider-spec" id="sheet-spec">Specialty</div></div>
+              <div class="slot-sheet-close" onclick="closeSlotSheet()"><svg viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></div>
+            </div>
+
+            <div class="date-area">
+              <div class="date-row" id="date-row">
+                <div class="date-strip" id="date-strip"></div>
+                <div class="cal-btn" onclick="openMonth()" title="Pick another date"><svg viewBox="0 0 24 24" fill="none" width="20" height="20"><rect x="4" y="5.5" width="16" height="14.5" rx="2.2" stroke="currentColor" stroke-width="1.7"/><path d="M4 10h16M8.5 3.5v3M15.5 3.5v3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></div>
+              </div>
+              <div class="month-view" id="month-view">
+                <div class="month-head">
+                  <div class="month-nav" id="m-prev" onclick="shiftMonth(-1)"><svg viewBox="0 0 24 24" fill="none" width="14" height="14"><path d="M15 5l-7 7 7 7" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+                  <div class="month-title" id="month-title">September 2026</div>
+                  <div class="month-nav" id="m-next" onclick="shiftMonth(1)"><svg viewBox="0 0 24 24" fill="none" width="14" height="14"><path d="M9 5l7 7-7 7" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+                </div>
+                <div class="month-grid" id="month-grid"></div>
+                <div class="month-back" onclick="closeMonth()">Back to next 14 days</div>
+              </div>
+            </div>
+
+            <div class="slot-scroll" id="slot-scroll"></div>
+            <div class="slot-foot">All times IST · 30-minute consultation</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ================= STEP 2: PATIENT + CLINICAL DETAILS ================= -->
+      <div class="page" id="step-2">
+        <div class="flow-header">
+          <div class="flow-header-top">
+            <div class="flow-back" onclick="goStep(1)"><svg viewBox="0 0 24 24" fill="none"><path d="M15 5l-7 7 7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div style="flex:1;"><div class="flow-title">Patient &amp; Clinical Details</div><div class="flow-step-label">Step 2 of 2</div></div>
+          </div>
+        </div>
+        <div class="flow-body">
+          <div class="selection-recap" onclick="goStep(1)">
+            <div class="recap-badge" id="recap-badge"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8.5" r="3.6" stroke="currentColor" stroke-width="1.8"/><path d="M4.5 20.5c0-4.5 3.3-7 7.5-7s7.5 2.5 7.5 7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></div>
+            <div class="recap-text">
+              <div class="recap-name" id="recap-name">Dr. S. Sharma · Cardiology</div>
+              <div class="recap-sub" id="recap-sub">Apollo Hospitals, Hyderabad · Today, 5:30 PM</div>
+            </div>
+            <div class="recap-change">Change</div>
+          </div>
+
+          <div class="field-label">PATIENT</div>
+          <div class="selected-patient-chip" id="selected-patient-chip">
+            <div class="suggestion-avatar" id="sel-patient-avatar">27F</div>
+            <div class="suggestion-text">
+              <div class="suggestion-name" id="sel-patient-name">Priya Singh</div>
+              <div class="suggestion-id" id="sel-patient-id">PAT-00001234</div>
+            </div>
+            <div class="clear-patient" onclick="clearPatient()">Change</div>
+          </div>
+          <div class="search-input" id="patient-search-wrap">
+            <svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="1.8"/><path d="M20 20l-4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+            <input id="patient-search" placeholder="Search patient by name…" oninput="filterPatients(this.value)">
+          </div>
+          <div class="patient-suggestions" id="patient-suggestions">
+            <div class="suggestion-row" onclick="choosePatient('Priya Singh','27F','PAT-00001234')">
+              <div class="suggestion-avatar">27F</div>
+              <div class="suggestion-text"><div class="suggestion-name">Priya Singh</div><div class="suggestion-id">27F · PAT-00001234</div></div>
+            </div>
+            <div class="suggestion-row" onclick="choosePatient('Priya Verma','8F','PAT-00000971')">
+              <div class="suggestion-avatar">8F</div>
+              <div class="suggestion-text"><div class="suggestion-name">Priya Verma</div><div class="suggestion-id">8F · PAT-00000971</div></div>
+            </div>
+            <div class="new-patient-suggestion" onclick="showNewPatient()"><svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Add new patient</div>
+          </div>
+
+          <div class="new-patient-fields" id="new-patient-fields">
+            <div class="field-row">
+              <div><div class="field-label">PATIENT NAME *</div><input class="input-field" id="np-name" placeholder="Full name"></div>
+              <div><div class="field-label">AGE *</div><input class="input-field" id="np-age" placeholder="Age"></div>
+            </div>
+            <div class="field-row">
+              <div>
+                <div class="field-label">GENDER *</div>
+                <select class="select-field" onchange="this.classList.add('filled')">
+                  <option value="" disabled selected>Select gender</option>
+                  <option>Female</option><option>Male</option><option>Other</option>
+                </select>
+              </div>
+              <div>
+                <div class="field-label">PATIENT'S CONTACT NUMBER *</div>
+                <div class="phone-input"><span class="phone-prefix">+91</span><input placeholder="XXXXX XXXXX"></div>
+              </div>
+            </div>
+            <div class="field-row">
+              <div><div class="field-label">WEIGHT (KG)</div><input class="input-field" placeholder="e.g. 72"></div>
+              <div><div class="field-label">UHID / IP NUMBER</div><input class="input-field" placeholder="Hospital IP/UHID number"></div>
+            </div>
+
+            <div class="checkbox-row" onclick="toggleAllergyCheck(this)">
+              <div class="checkbox-box checked" id="allergy-checkbox"><svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+              <span class="checkbox-label">No known allergies / Not specified</span>
+            </div>
+            <div id="allergy-field-wrap" style="display:none;">
+              <div class="field-label">ALLERGIES</div>
+              <input class="input-field" placeholder="e.g. Penicillin, Sulfa drugs">
+            </div>
+
+            <div style="font-size:11px; color:var(--muted); margin-top:12px; line-height:1.5;">A unique Patient ID is generated automatically once this consultation is booked, and this patient is added to your hospital's patient list for future bookings.</div>
+          </div>
+
+          <div class="field-label">CLINICAL SUMMARY *</div>
+          <textarea class="textarea-field" style="min-height:96px;" placeholder="Describe chief complaints, history of present illness, relevant past history, examination findings…"></textarea>
+
+          <div class="field-label">PROVISIONAL DIAGNOSIS (OPTIONAL)</div>
+          <input class="input-field" placeholder="e.g. Suspected ACS, r/o NSTEMI">
+
+          <div class="field-label">INVESTIGATIONS (OPTIONAL)</div>
+          <textarea class="textarea-field" placeholder="Lab results, imaging findings, ECG findings…"></textarea>
+
+          <div class="upload-section-title">Upload Reports</div>
+          <div class="upload-hint">Lab reports, ECG, imaging — any diagnostic material</div>
+          <div class="attach-row" onclick="mockAttach('report')"><svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>Add report</div>
+          <div id="attached-list-reports"></div>
+
+          <div class="upload-section-title">Upload Treatment Chart</div>
+          <div class="upload-hint">Current medications, fluid orders, nursing chart</div>
+          <div class="attach-row" onclick="mockAttach('chart')"><svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>Add treatment chart</div>
+          <div id="attached-list-chart"></div>
+
+          <div style="font-size:10.5px; color:var(--muted-2); margin-top:10px; line-height:1.5;">No limit on number of files or file size. JPEG, PNG, PDF, DOC and related formats accepted.</div>
+        </div>
+        <div class="flow-footer"><button class="flow-cta" onclick="openConfirmSheet()">Book Consultation</button></div>
+
+        <div class="sheet-backdrop" id="confirm-backdrop" onclick="closeConfirmSheet(event)">
+          <div class="confirm-sheet" onclick="event.stopPropagation()">
+            <div class="sheet-handle"></div>
+            <div class="confirm-sheet-title">Confirm Booking</div>
+            <div class="confirm-sheet-body">Book <b id="cf-patient">Priya Singh</b> with <b id="cf-provider">Dr. S. Sharma</b><br><span id="cf-slot">Today, 5:30 PM</span> · postpaid, billed later</div>
+            <div class="warning-line">This is immediately scheduled and cannot be cancelled from the app.</div>
+            <button class="confirm-sheet-btn primary" onclick="confirmBooking()">Confirm &amp; Book</button>
+            <button class="confirm-sheet-btn secondary" onclick="closeConfirmSheet()">Go Back</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ================= CONFIRMATION ================= -->
+      <div class="page" id="step-confirm">
+        <div class="confirm-screen">
+          <div class="confirm-check"><svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="confirm-title">Consultation Scheduled</div>
+          <div class="confirm-sub" id="confirm-final-text">Priya Singh is booked with Dr. S. Sharma today at 5:30 PM. Chat is open now — you can start sending reports immediately.</div>
+          <div class="confirm-newpatient-tag" id="confirm-newpatient-tag">New patient added · PAT-00001241</div>
+          <div class="confirm-actions">
+            <button class="confirm-btn primary" onclick="alert('Opens Case File / Chat for this consultation')">Open Chat</button>
+            <button class="confirm-btn secondary" onclick="resetFlow()">Back to Dashboard</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+<script>
+  /* =====================================================================
+     DEMO DATA + SLOT LOGIC
+     In production the server computes bookable slots (merge overlapping
+     windows, split into 30-min slots, drop past + already-booked, apply
+     date overrides, IST). This mock does the same client-side so the UI
+     behaves realistically.
+     ===================================================================== */
+  const NOW = new Date(2026, 8, 28, 14, 35);          // Mon 28 Sep 2026, 2:35 PM IST
+  const HORIZON_DAYS = 30;                            // how far ahead a seeker can book
+  const DOW = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const MON_FULL = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const PHOTO = '<svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8.5" r="3.6" stroke="currentColor" stroke-width="1.8"/><path d="M4.5 20.5c0-4.5 3.3-7 7.5-7s7.5 2.5 7.5 7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
+
+  const DOCTORS = [
+    { id:'tesu',   name:'Dr. Tesu Kesharwani', spec:'Critical Care Medicine', quals:'MBBS, FCCM',
+      days:[1,2,3,4,5,6], win:[['09:30','22:00']], booked:{'2026-09-28':['15:00','15:30','16:00','18:30']} },
+    { id:'tintu',  name:'Dr. Tintu Jacob', spec:'Critical Care Medicine', quals:'MBBS, MD, DrNB',
+      days:[1,2,3,4,5], win:[['17:00','19:00']], booked:{} },
+    { id:'vaibhav',name:'Dr. Vaibhav Patel', spec:'Orthopedics', quals:'MBBS, D-Ortho, DNB Orthopedics, FDFM, MNAMS',
+      days:[2,4,6], win:[['09:00','13:00']], booked:{} },
+    { id:'sunil',  name:'Dr. Sunil Dharmani', spec:'Nephrology', quals:'MBBS, MD, DM',
+      days:[2,3,4], win:[['16:30','17:30']], booked:{} },
+    { id:'neha',   name:'Dr. Neha Kulkarni (demo: fully booked)', spec:'Cardiology', quals:'MBBS, MD, DM',
+      days:[1,2,3,4,5,6], win:[['10:00','14:00']], booked:{}, blocked:true },
+  ];
+
+  const pad = n => String(n).padStart(2,'0');
+  const sod = d => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const dkey = d => d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+  const fromKey = k => { const [y,m,d] = k.split('-').map(Number); return new Date(y, m-1, d); };
+  const addDays = (d,n) => new Date(d.getFullYear(), d.getMonth(), d.getDate()+n);
+  const diffDays = (a,b) => Math.round((sod(b)-sod(a))/86400000);
+  const toMin = t => { const [h,m] = t.split(':').map(Number); return h*60+m; };
+  const fmt = min => { let h = Math.floor(min/60); const m = min%60; const ap = h>=12 ? 'PM':'AM'; h = h%12 || 12; return h+':'+pad(m)+' '+ap; };
+
+  function dayLabel(d){
+    const n = diffDays(NOW, d);
+    if(n===0) return 'Today';
+    if(n===1) return 'Tomorrow';
+    return DOW[d.getDay()]+' '+d.getDate()+' '+MON[d.getMonth()];
+  }
+
+  function longDay(d){
+    const base = DOW[d.getDay()]+' '+d.getDate()+' '+MON[d.getMonth()];
+    const n = diffDays(NOW, d);
+    return n===0 ? 'Today, '+base : n===1 ? 'Tomorrow, '+base : base;
+  }
+
+  function slotsFor(doc, date){
+    if(doc.blocked || !doc.days.includes(date.getDay())) return [];
+    const booked = (doc.booked[dkey(date)] || []).map(toMin);
+    const isToday = diffDays(NOW, date) === 0;
+    const nowMin = NOW.getHours()*60 + NOW.getMinutes();
+    const seen = new Set(), out = [];
+    doc.win.forEach(([a,b]) => {
+      for(let t = toMin(a); t + 30 <= toMin(b); t += 30){
+        if(seen.has(t)) continue;               // overlapping windows merge here
+        seen.add(t);
+        if(booked.includes(t)) continue;
+        if(isToday && t <= nowMin) continue;
+        out.push(t);
+      }
+    });
+    return out.sort((x,y) => x-y);
+  }
+
+  function nextSlot(doc){
+    for(let i = 0; i < HORIZON_DAYS; i++){
+      const d = addDays(NOW, i);
+      const s = slotsFor(doc, d);
+      if(s.length) return { date:d, min:s[0], count:s.length };
+    }
+    return null;
+  }
+
+  /* ---------------- list ---------------- */
+  let specFilter = '', todayOnly = false;
+
+  function renderDocs(){
+    const q = document.getElementById('doc-search').value.trim().toLowerCase();
+    const rows = DOCTORS.map(d => ({ d, n: nextSlot(d) }))
+      .filter(r => !specFilter || r.d.spec.toLowerCase().includes(specFilter.toLowerCase()))
+      .filter(r => !q || (r.d.name + ' ' + r.d.spec).toLowerCase().includes(q))
+      .filter(r => !todayOnly || (r.n && diffDays(NOW, r.n.date) === 0))
+      .sort((a,b) => {
+        const ka = a.n ? a.n.date.getTime() + a.n.min*60000 : Infinity;
+        const kb = b.n ? b.n.date.getTime() + b.n.min*60000 : Infinity;
+        return ka - kb;
+      });
+    const list = document.getElementById('provider-list');
+    if(!rows.length){ list.innerHTML = '<div class="no-results">No consultants match. Try a different specialty or turn off "Available today".</div>'; return; }
+    list.innerHTML = rows.map(({d,n}) => {
+      const chip = n
+        ? '<div><div class="next-label">NEXT AVAILABLE</div><span class="next-chip" onclick="event.stopPropagation(); pickSlot(\''+d.id+'\',\''+dkey(n.date)+'\','+n.min+')">'+dayLabel(n.date)+', '+fmt(n.min)+'</span></div>'
+        : '<div><div class="next-label">AVAILABILITY</div><span class="booked-out">Fully booked for the next '+HORIZON_DAYS+' days</span></div>';
+      const see = n ? '<span class="see-all">All slots <svg viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span>' : '';
+      return '<div class="provider-card" '+(n ? 'onclick="openSlotSheet(\''+d.id+'\')"' : 'style="cursor:default"')+'>'
+        + '<div class="provider-top"><div class="provider-photo">'+PHOTO+'</div>'
+        + '<div><div class="provider-name">'+d.name+'</div><div class="provider-spec">'+d.spec+'</div><div class="provider-quals">'+d.quals+' · Perfusion network</div></div></div>'
+        + '<div class="next-row">'+chip+see+'</div></div>';
+    }).join('');
+  }
+
+  document.querySelectorAll('#spec-chips .specialty-chip').forEach(c => c.addEventListener('click', () => {
+    document.querySelectorAll('#spec-chips .specialty-chip').forEach(x => x.classList.remove('active'));
+    c.classList.add('active'); specFilter = c.dataset.spec; renderDocs();
+  }));
+  function toggleToday(el){ el.classList.toggle('on'); todayOnly = el.classList.contains('on'); renderDocs(); }
+
+  /* ---------------- slot sheet ---------------- */
+  let curDoc = null, selDate = null, stripStart = null, calMode = false, calY = 0, calM = 0;
+
+  function openSlotSheet(id){
+    curDoc = DOCTORS.find(d => d.id === id);
+    const n = nextSlot(curDoc);
+    selDate = n.date; stripStart = sod(NOW); calMode = false;
+    document.getElementById('sheet-name').textContent = curDoc.name;
+    document.getElementById('sheet-spec').textContent = curDoc.spec;
+    renderSheet();
+    document.getElementById('slot-backdrop').classList.add('open');
+  }
+  function closeSlotSheet(){ document.getElementById('slot-backdrop').classList.remove('open'); }
+
+  function renderSheet(){
+    document.getElementById('date-row').style.display = calMode ? 'none' : 'flex';
+    document.getElementById('month-view').classList.toggle('show', calMode);
+    if(calMode) renderMonth(); else renderStrip();
+    renderSlots();
+  }
+
+  function renderStrip(){
+    const strip = document.getElementById('date-strip');
+    let html = '';
+    for(let i = 0; i < 14; i++){
+      const d = addDays(stripStart, i);
+      const off = slotsFor(curDoc, d).length === 0;
+      const active = dkey(d) === dkey(selDate);
+      const dow = diffDays(NOW, d) === 0 ? 'Today' : DOW[d.getDay()];
+      const mon = (i === 0 || d.getDate() === 1) ? MON[d.getMonth()] : '';
+      html += '<div class="dchip'+(active?' active':'')+(off?' off':'')+'" '+(off?'':'onclick="pickDate(\''+dkey(d)+'\')"')+'>'
+            + '<div class="dow">'+dow+'</div><div class="dnum">'+d.getDate()+'</div><div class="dmon">'+mon+'</div></div>';
+    }
+    strip.innerHTML = html;
+    const a = strip.querySelector('.active');
+    if(a) strip.scrollLeft = Math.max(0, a.offsetLeft - 60);
+  }
+
+  function pickDate(k){ selDate = fromKey(k); renderSheet(); document.getElementById('slot-scroll').scrollTop = 0; }
+
+  function renderSlots(){
+    const s = slotsFor(curDoc, selDate);
+    const groups = [
+      ['MORNING','before 12 PM', s.filter(t => t < 720)],
+      ['AFTERNOON','12 – 5 PM',  s.filter(t => t >= 720 && t < 1020)],
+      ['EVENING','after 5 PM',   s.filter(t => t >= 1020)],
+    ];
+    let html = '<div class="slot-summary">'+s.length+' slot'+(s.length===1?'':'s')+' · '+longDay(selDate)+'</div>';
+    groups.forEach(([title, sub, arr]) => {
+      if(!arr.length) return;
+      html += '<div class="slot-group-title">'+title+' <span>'+sub+'</span></div><div class="slot-grid3">'
+            + arr.map(t => '<div class="slotb" onclick="pickSlot(\''+curDoc.id+'\',\''+dkey(selDate)+'\','+t+')">'+fmt(t)+'</div>').join('')
+            + '</div>';
+    });
+    document.getElementById('slot-scroll').innerHTML = html;
+  }
+
+  /* month calendar (for far-out dates) */
+  function openMonth(){ calMode = true; calY = selDate.getFullYear(); calM = selDate.getMonth(); renderSheet(); }
+  function closeMonth(){ calMode = false; renderSheet(); }
+  function shiftMonth(n){
+    const nm = calM + n, ny = calY + Math.floor(nm/12), mm = ((nm % 12) + 12) % 12;
+    const first = new Date(ny, mm, 1), lastOk = addDays(NOW, HORIZON_DAYS - 1);
+    if(first > lastOk || new Date(ny, mm+1, 0) < sod(NOW)) return;
+    calY = ny; calM = mm; renderMonth();
+  }
+  function renderMonth(){
+    document.getElementById('month-title').textContent = MON_FULL[calM]+' '+calY;
+    const lastOk = addDays(NOW, HORIZON_DAYS - 1);
+    document.getElementById('m-prev').classList.toggle('off', new Date(calY, calM, 0) < sod(NOW));
+    document.getElementById('m-next').classList.toggle('off', new Date(calY, calM+1, 1) > lastOk);
+    const first = new Date(calY, calM, 1), offset = (first.getDay() + 6) % 7;   // Monday-first
+    const days = new Date(calY, calM+1, 0).getDate();
+    let html = ['Mo','Tu','We','Th','Fr','Sa','Su'].map(x => '<div class="mdow">'+x+'</div>').join('');
+    for(let i = 0; i < offset; i++) html += '<div></div>';
+    for(let d = 1; d <= days; d++){
+      const date = new Date(calY, calM, d), n = diffDays(NOW, date);
+      const ok = n >= 0 && n < HORIZON_DAYS && slotsFor(curDoc, date).length > 0;
+      const cls = 'mday'+(ok?'':' off')+(n===0?' today':'')+(dkey(date)===dkey(selDate)?' sel':'');
+      html += '<div class="'+cls+'" '+(ok?'onclick="pickFromMonth(\''+dkey(date)+'\')"':'')+'>'+d+'</div>';
+    }
+    document.getElementById('month-grid').innerHTML = html;
+  }
+  function pickFromMonth(k){
+    selDate = fromKey(k);
+    stripStart = diffDays(NOW, selDate) > 13 ? selDate : sod(NOW);
+    calMode = false; renderSheet();
+  }
+
+  /* commit consultant + slot, move to step 2 */
+  function pickSlot(id, key, min){
+    const doc = DOCTORS.find(d => d.id === id), date = fromKey(key);
+    const when = dayLabel(date)+', '+fmt(min);
+    document.getElementById('recap-name').textContent = doc.name + ' · ' + doc.spec;
+    document.getElementById('recap-sub').textContent = 'Perfusion network · ' + when;
+    document.getElementById('cf-provider').textContent = doc.name;
+    document.getElementById('cf-slot').textContent = when;
+    closeSlotSheet();
+    goStep(2);
+  }
+
+  renderDocs();
+
+  let selectedPatient = null;
+  let isNewPatient = false;
+
+  function goStep(n){
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.getElementById('step-' + n).classList.add('active');
+  }
+  
+  function filterPatients(val){
+    document.getElementById('patient-suggestions').classList.toggle('show', val.length > 0);
+  }
+  function choosePatient(name, agesex, id){
+    selectedPatient = { name, agesex, id };
+    isNewPatient = false;
+    document.getElementById('sel-patient-avatar').textContent = agesex;
+    document.getElementById('sel-patient-name').textContent = name;
+    document.getElementById('sel-patient-id').textContent = agesex + ' · ' + id;
+    document.getElementById('selected-patient-chip').classList.add('show');
+    document.getElementById('patient-search-wrap').style.display = 'none';
+    document.getElementById('patient-suggestions').classList.remove('show');
+    document.getElementById('new-patient-fields').classList.remove('show');
+    document.getElementById('cf-patient').textContent = name;
+  }
+  function showNewPatient(){
+    document.getElementById('new-patient-fields').classList.add('show');
+    document.getElementById('patient-search-wrap').style.display = 'none';
+    document.getElementById('patient-suggestions').classList.remove('show');
+    isNewPatient = true;
+  }
+  function clearPatient(){
+    selectedPatient = null;
+    document.getElementById('selected-patient-chip').classList.remove('show');
+    document.getElementById('patient-search-wrap').style.display = 'flex';
+    document.getElementById('patient-search').value = '';
+  }
+  let reportCount = 0;
+  let chartCount = 0;
+  function toggleAllergyCheck(row){
+    const box = document.getElementById('allergy-checkbox');
+    const wrap = document.getElementById('allergy-field-wrap');
+    const isChecked = box.classList.toggle('checked');
+    wrap.style.display = isChecked ? 'none' : 'block';
+  }
+  function mockAttach(kind){
+    const listId = kind === 'report' ? 'attached-list-reports' : 'attached-list-chart';
+    const list = document.getElementById(listId);
+    let fileName;
+    if(kind === 'report'){
+      reportCount++;
+      fileName = 'ECG_Report_' + reportCount + '.pdf';
+    } else {
+      chartCount++;
+      fileName = 'Treatment_Chart_' + chartCount + '.pdf';
+    }
+    const div = document.createElement('div');
+    div.className = 'attached-file';
+    div.innerHTML = `
+      <div class="attached-file-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M6 3.5h8l4 4v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-16a1 1 0 0 1 1-1Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg></div>
+      <div class="attached-file-name">${fileName}</div>
+      <div class="attached-file-remove" onclick="this.closest('.attached-file').remove();">✕</div>
+    `;
+    list.appendChild(div);
+  }
+  function openConfirmSheet(){
+    if(isNewPatient){
+      const nm = document.getElementById('np-name').value || 'New Patient';
+      document.getElementById('cf-patient').textContent = nm;
+    }
+    document.getElementById('confirm-backdrop').classList.add('open');
+  }
+  function closeConfirmSheet(e){
+    document.getElementById('confirm-backdrop').classList.remove('open');
+  }
+  function confirmBooking(){
+    const patientName = document.getElementById('cf-patient').textContent;
+    const providerName = document.getElementById('cf-provider').textContent;
+    const slot = document.getElementById('cf-slot').textContent;
+    document.getElementById('confirm-final-text').textContent = patientName + ' is booked with ' + providerName + ', ' + slot.toLowerCase() + '. Chat is open now — you can start sending reports immediately.';
+    const tag = document.getElementById('confirm-newpatient-tag');
+    if(isNewPatient){
+      tag.textContent = 'New patient added · PAT-00001241';
+      tag.classList.add('show');
+    } else {
+      tag.classList.remove('show');
+    }
+    closeConfirmSheet();
+    goStep('confirm');
+  }
+  function resetFlow(){
+    goStep(1);
+  }
+</script>
+
+</body>
+</html>

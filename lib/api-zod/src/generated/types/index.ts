@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from './bookableSlot';
 export * from './bookingCallInfo';
 export * from './callbackDevice';
 export * from './callbackDeviceInput';
@@ -31,8 +32,10 @@ export * from './caseFileSummary';
 export * from './caseFileVital';
 export * from './caseFileVitalInput';
 export * from './consultantAvailability';
+export * from './consultantAvailabilityPortfolioPhotosItem';
 export * from './consultantAvailabilityPreview';
 export * from './consultantAvailabilityPreviewWindow';
+export * from './consultantAvailabilityRegistrationDocumentsItem';
 export * from './consultantAvailabilitySlotSeriesItem';
 export * from './consultantAvailabilityStatus';
 export * from './consultantAvailabilityUpdate';
@@ -41,6 +44,10 @@ export * from './getCaseFileAttachmentSignedUrl200';
 export * from './getCaseFileAttachmentSignedUrlDisposition';
 export * from './getCaseFileAttachmentSignedUrlParams';
 export * from './getCaseFileMessagesParams';
+export * from './getConsultantBookableSlots200';
+export * from './getConsultantBookableSlots200DatesItem';
+export * from './getConsultantBookableSlotsParams';
+export * from './getProviderRegistrationDocumentSignedUrl200';
 export * from './healthStatus';
 export * from './messageResponse';
 export * from './passwordResetPassword';
@@ -52,4 +59,6 @@ export * from './streamCallCredentialsCallType';
 export * from './streamCallCredentialsMediaProvider';
 export * from './updateBookingStatusBody';
 export * from './updateBookingStatusBodyStatus';
+export * from './uploadProviderConsultantMediaBody';
+export * from './uploadProviderConsultantMediaBodyKind';
 export * from './verifyCaseFileAdvisory200';
