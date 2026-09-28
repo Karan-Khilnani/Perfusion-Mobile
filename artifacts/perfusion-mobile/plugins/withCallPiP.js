@@ -1,6 +1,6 @@
 const fs = require("node:fs");
 const path = require("node:path");
-const { withAndroidManifest, withDangerousMod } = require("@expo/config-plugins");
+const { withAndroidManifest, withDangerousMod } = require("expo/config-plugins");
 
 // The installed Stream SDK has the JS enterPiPAndroid helper and PiP callbacks,
 // but does not expose the enterPipMode native method that its JS helper calls.
