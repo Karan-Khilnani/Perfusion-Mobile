@@ -1,0 +1,495 @@
+Fix ONLY the random-code/raw-data appearing in Case File Chat messages in the Perfusion MOBILE APP.
+
+IMPORTANT:
+This is a targeted Chat message rendering bug.
+
+DO NOT modify:
+- Chat functionality
+- Message sending logic
+- Message storage
+- Consultation status
+- Calling/video calling
+- Case File structure
+- File uploads
+- PDF/document functionality
+- Booking
+- Authentication
+- Any unrelated feature
+
+==================================================
+CURRENT BUG
+==================================================
+
+In the Case File Chat, when the Provider or Seeker sends a message, the Chat sometimes displays random codes/raw data before the actual message.
+
+For example, instead of displaying only:
+
+"Adv WCG 2d ECHO and urgent Trop I"
+
+the Chat may display something similar to:
+
+{"advisoryId":"655639c2-4e20-4fff-9c06-242130a0f5a5","narrative":"Adv WCG 2d ECHO and urgent Trop I"}
+
+The user should NEVER see this raw JSON/object/code.
+
+The Chat should display only the actual human-readable message:
+
+"Adv WCG 2d ECHO and urgent Trop I"
+
+==================================================
+REQUIRED BEHAVIOR
+==================================================
+
+When Provider sends a normal text message:
+
+SHOW:
+The exact human-readable text typed/sent by the Provider.
+
+When Seeker sends a normal text message:
+
+SHOW:
+The exact human-readable text typed/sent by the Seeker.
+
+Do NOT show:
+
+- JSON
+- Object representations
+- IDs
+- UUIDs
+- Database IDs
+- advisoryId
+- bookingId
+- consultationId
+- Internal metadata
+- Raw API response
+- Serialized objects
+- Debug information
+- Internal codes
+
+==================================================
+1. FIND THE ROOT CAUSE
+==================================================
+
+Before changing the UI, inspect how Case File Chat messages are created, stored, fetched, and rendered.
+
+Find:
+
+- Case File Chat screen/component
+- Message bubble component
+- Message input/send handler
+- Chat API
+- Chat message database/schema
+- API response mapping
+- Any advisory/clinical message handling
+- Any message serialization/deserialization
+- Any existing message type/content fields
+
+Determine why an object such as:
+
+{
+  advisoryId: "...",
+  narrative: "..."
+}
+
+is being rendered directly as the visible message.
+
+Do NOT simply hide random strings using a visual filter.
+
+Fix the data mapping at the correct layer.
+
+==================================================
+2. NORMAL TEXT MESSAGES
+==================================================
+
+For ordinary Chat messages, the rendered message must come from the actual text/message content field.
+
+Example:
+
+Provider types:
+
+"Patient BP is improving."
+
+Chat should show:
+
+Patient BP is improving.
+
+NOT:
+
+{"text":"Patient BP is improving."}
+
+NOT:
+
+{"message":"Patient BP is improving.","id":"..."}
+
+NOT:
+
+messageId / UUID / other metadata.
+
+==================================================
+3. ADVISORY/STRUCTURED DATA
+==================================================
+
+If the Case File Chat supports structured messages such as Clinical Advisory messages, inspect how those messages are currently represented.
+
+If the backend returns something like:
+
+{
+  "advisoryId": "...",
+  "narrative": "Adv WCG 2d ECHO and urgent Trop I"
+}
+
+the user-facing Chat bubble should display the appropriate human-readable field:
+
+Adv WCG 2d ECHO and urgent Trop I
+
+The internal:
+
+advisoryId
+
+must remain internal metadata and must NOT be rendered as message text.
+
+Do not delete the advisory ID from the backend if it is required for functionality.
+
+Only prevent internal metadata from being displayed as the visible Chat message.
+
+==================================================
+4. DO NOT BREAK STRUCTURED FEATURES
+==================================================
+
+If advisory IDs or other internal identifiers are required for:
+
+- Opening an advisory
+- Downloading an advisory
+- Linking messages
+- Case File relationships
+- Audit trails
+- Backend operations
+
+KEEP THEM.
+
+The requirement is only:
+
+INTERNAL DATA
+→ stays internal
+
+USER-FACING MESSAGE
+→ shows only readable message text
+
+Do not remove database fields or API fields unnecessarily.
+
+==================================================
+5. PROVIDER → SEEKER
+==================================================
+
+Test:
+
+Provider types:
+
+"Please repeat the ECG."
+
+Sends.
+
+Seeker should see:
+
+Please repeat the ECG.
+
+No raw JSON or codes.
+
+==================================================
+6. SEEKER → PROVIDER
+==================================================
+
+Test:
+
+Seeker types:
+
+"BP is 128/82."
+
+Sends.
+
+Provider should see:
+
+BP is 128/82.
+
+No raw JSON or codes.
+
+==================================================
+7. MESSAGE HISTORY
+==================================================
+
+Existing messages already stored in the database should also render correctly.
+
+Do not only fix newly sent messages.
+
+If an existing message contains structured JSON/object data, the Chat rendering layer should extract the appropriate human-readable message field rather than displaying the entire raw object.
+
+However:
+
+DO NOT mutate/delete historical database records unless absolutely necessary.
+
+Prefer fixing the message parsing/rendering layer.
+
+==================================================
+8. DIFFERENT MESSAGE TYPES
+==================================================
+
+Inspect all existing Case File Chat message types.
+
+Make sure the fix does not accidentally break:
+
+- Normal text messages
+- Advisory messages
+- File/document attachments
+- Images
+- PDFs
+- Other supported attachments
+- System messages, if they exist
+
+Do NOT convert every message into plain text.
+
+For attachments, continue using the existing attachment UI.
+
+For structured clinical/advisory messages, display the intended human-readable content.
+
+For normal messages, display only the message text.
+
+==================================================
+9. NO JSON STRINGIFICATION IN UI
+==================================================
+
+Search the Case File Chat code for patterns such as:
+
+JSON.stringify(...)
+String(...)
+`${object}`
+object.toString()
+rendering entire API response objects
+rendering `message.content` without checking its type
+
+Pay particular attention to cases where:
+
+message.content
+
+may sometimes be:
+
+string
+
+and sometimes:
+
+object
+
+If the message content can have multiple shapes, normalize it safely before rendering.
+
+Do NOT blindly call JSON.stringify() for user-facing message content.
+
+==================================================
+10. SAFE MESSAGE NORMALIZATION
+==================================================
+
+Create/use a single appropriate message-to-display mapping if necessary.
+
+Conceptually:
+
+Raw backend message
+        ↓
+Determine message type
+        ↓
+Extract user-facing text
+        ↓
+Render Chat bubble
+
+For a normal text message:
+
+message.text
+
+For a structured advisory:
+
+message.narrative
+
+For a file:
+
+existing attachment renderer
+
+Internal IDs remain metadata.
+
+Do not expose them in the Chat bubble.
+
+Use the actual field names discovered in the existing project rather than inventing new fields.
+
+==================================================
+11. PRESERVE MESSAGE SENDING
+==================================================
+
+Do NOT change how messages are sent unless the investigation shows the wrong field is being sent.
+
+The user should continue typing into the existing:
+
+"Message care team..."
+
+input.
+
+When Send is pressed:
+
+The message should be stored/sent exactly as required by the existing backend.
+
+The visible Chat bubble should show only the human-readable message.
+
+==================================================
+12. DO NOT CHANGE CHAT DESIGN
+==================================================
+
+Keep the existing:
+
+- Message bubble design
+- Sender alignment
+- Timestamps
+- Colors
+- Fonts
+- Spacing
+- Chat header
+- Input box
+- Send button
+- Attachment button
+
+Only remove the unwanted raw codes/data from the message content.
+
+==================================================
+13. IMPLEMENTATION PROCESS
+==================================================
+
+Before coding:
+
+1. Find Case File Chat screen.
+2. Find message rendering component.
+3. Find message send handler.
+4. Find message API.
+5. Find message response type/interface.
+6. Find database/message schema.
+7. Find advisory message handling.
+8. Identify the exact source of the random JSON/codes.
+9. Fix the mapping at the appropriate layer.
+10. Verify normal text and structured messages separately.
+
+Prefer a shared message-normalization/rendering fix if the same problem affects multiple Case File Chat screens.
+
+==================================================
+14. TESTING
+==================================================
+
+TEST 1 — Provider normal message
+
+Provider sends:
+
+"Please check the patient's vitals."
+
+Expected:
+
+Please check the patient's vitals.
+
+NOT JSON.
+
+--------------------------------------------------
+
+TEST 2 — Seeker normal message
+
+Seeker sends:
+
+"Patient is feeling better."
+
+Expected:
+
+Patient is feeling better.
+
+NOT JSON.
+
+--------------------------------------------------
+
+TEST 3 — Structured advisory
+
+If the backend contains:
+
+{
+  "advisoryId": "some-id",
+  "narrative": "Adv WCG 2d ECHO and urgent Trop I"
+}
+
+Expected visible message:
+
+Adv WCG 2d ECHO and urgent Trop I
+
+NOT:
+
+{"advisoryId":"some-id","narrative":"Adv WCG 2d ECHO and urgent Trop I"}
+
+--------------------------------------------------
+
+TEST 4 — Existing messages
+
+Open an existing Case File with previous messages.
+
+Expected:
+
+Messages display as normal human-readable content.
+
+No raw UUIDs/JSON/object strings.
+
+--------------------------------------------------
+
+TEST 5 — Attachments
+
+Open a Case File containing files/PDFs/images.
+
+Expected:
+
+Existing attachment UI continues working.
+
+Do not convert attachment metadata into visible text.
+
+--------------------------------------------------
+
+TEST 6 — IDs
+
+Verify that internal IDs such as:
+
+advisoryId
+messageId
+bookingId
+consultationId
+
+are NOT visible inside normal Chat message bubbles.
+
+They may still exist in the API/database and be used internally.
+
+==================================================
+15. FINAL REPORT
+==================================================
+
+After implementation, report:
+
+1. Root cause of the random code/JSON appearing in Chat.
+2. Exact component/API mapping responsible.
+3. What was changed.
+4. How normal text messages are now rendered.
+5. How structured advisory messages are handled.
+6. Confirmation that internal IDs remain available to the application where required.
+7. Confirmation that file/document attachments were not broken.
+8. Tests performed.
+
+FINAL REQUIREMENT:
+
+The user-facing Case File Chat must show ONLY the human-readable message.
+
+Example:
+
+WRONG:
+{"advisoryId":"655639c2-4e20-4fff-9c06-242130a0f5a5","narrative":"Adv WCG 2d ECHO and urgent Trop I"}
+
+CORRECT:
+Adv WCG 2d ECHO and urgent Trop I
+
+No random codes.
+No raw JSON.
+No internal IDs.
+No serialized objects.
+
+Do not make any unrelated feature changes.

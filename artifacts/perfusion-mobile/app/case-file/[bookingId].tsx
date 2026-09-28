@@ -453,6 +453,40 @@ function VitalCell({ label, value, detail }: { label: string; value: string; det
   );
 }
 
+function getVisibleMessageText(message: CaseFileMessage): string {
+  const body: unknown = message.body;
+
+  if (message.kind !== "clinical_advisory_reference") {
+    return typeof body === "string" ? body : "";
+  }
+
+  if (typeof body === "string") {
+    const trimmedBody = body.trim();
+    if (!trimmedBody) return "";
+
+    try {
+      const parsed: unknown = JSON.parse(trimmedBody);
+      if (typeof parsed === "string") return parsed;
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        const narrative = (parsed as { narrative?: unknown }).narrative;
+        if (typeof narrative === "string") return narrative;
+      }
+    } catch {
+      // Older advisory references may contain plain narrative text.
+      if (!trimmedBody.startsWith("{") && !trimmedBody.startsWith("[")) return body;
+    }
+
+    return "";
+  }
+
+  if (body && typeof body === "object" && !Array.isArray(body)) {
+    const narrative = (body as { narrative?: unknown }).narrative;
+    return typeof narrative === "string" ? narrative : "";
+  }
+
+  return "";
+}
+
 function MessageBubble({
   message,
   bookingId,
@@ -476,6 +510,7 @@ function MessageBubble({
       ? "Consultant"
       : "Treating team";
   const time = new Date(message.createdAt).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" });
+  const visibleMessageText = getVisibleMessageText(message);
   const bubbleStyle = [
     styles.bubble,
     own && !advisory ? styles.ownBubble : styles.otherBubble,
@@ -511,7 +546,7 @@ function MessageBubble({
           </View>
         </View>
       )}
-      {!!message.body && <Text style={[styles.messageText, { color: own && !advisory ? palette.conversationPrimaryForeground : palette.foreground }]}>{message.body}</Text>}
+      {!!visibleMessageText && <Text style={[styles.messageText, { color: own && !advisory ? palette.conversationPrimaryForeground : palette.foreground }]}>{visibleMessageText}</Text>}
       {advisory && (
         <View style={styles.advisoryFooter}>
           <Feather name="lock" size={11} color={palette.advisoryForeground} />
