@@ -1,0 +1,715 @@
+We need to fix the existing Chat attachment/file functionality AND add video attachments to the Perfusion Chat.
+
+IMPORTANT:
+This task is specifically for CHAT ATTACHMENTS.
+
+It includes:
+1. Fixing uploaded file preview/opening.
+2. Adding video recording/selecting/sending.
+3. Enforcing a maximum video duration of 2 minutes.
+4. Allowing sent videos to be played and downloaded.
+
+DO NOT modify unrelated Chat, Consultation, Case File, Calling, Booking, Availability, Authentication, or other features.
+
+==================================================
+PART A — FIX UPLOADED FILE PREVIEW AND OPENING
+==================================================
+
+CURRENT PROBLEM:
+
+When a file is uploaded/sent in Chat:
+
+- The chat currently shows only that a file was uploaded.
+- The actual file content/preview is not visible.
+- Tapping the uploaded file does not open it.
+
+REQUIRED BEHAVIOR:
+
+Uploaded files in Chat must:
+
+1. Display an appropriate preview/content when the file type supports preview.
+2. Be clearly tappable/clickable.
+3. Open the complete file when selected.
+4. Continue to be downloadable where appropriate.
+
+==================================================
+1. FIRST INSPECT EXISTING FILE/ATTACHMENT SYSTEM
+==================================================
+
+Before changing anything, inspect the existing Chat attachment implementation in BOTH Web and Mobile.
+
+Find:
+
+- Chat message component
+- Attachment upload component
+- File picker
+- Upload API
+- Backend file/attachment handling
+- Database/message attachment structure
+- File URL/signed URL generation
+- File type/MIME type handling
+- Existing download functionality
+- Existing storage provider
+- Existing permissions/authentication around files
+
+Do NOT create a second attachment system if one already exists.
+
+Extend the existing attachment architecture.
+
+==================================================
+2. SUPPORTED FILE PREVIEWS
+==================================================
+
+For uploaded files, provide an appropriate preview based on file type.
+
+Examples:
+
+IMAGE:
+- Show an image preview directly in the chat.
+- Tapping it should open the full image.
+
+PDF:
+- Show a PDF/file preview or appropriate PDF thumbnail/information.
+- Tapping it should open the complete PDF using the appropriate viewer/in-app viewer according to the existing application architecture.
+
+DOCUMENT/OTHER SUPPORTED FILE:
+- Show an appropriate file card with:
+  - File name
+  - File type
+  - File size where available
+  - Appropriate icon/thumbnail
+- Tapping should open the complete file using the appropriate supported viewer or system handler.
+
+Do NOT pretend that every file format can be previewed inside the app.
+
+If inline preview is not technically supported for a particular format, the file must still be:
+- Clearly visible as an attachment.
+- Tappable.
+- Openable using an appropriate supported viewer/system handler where possible.
+- Downloadable.
+
+==================================================
+3. FILE OPENING
+==================================================
+
+When the user taps a sent file:
+
+The app must actually open the complete file.
+
+Do not merely show:
+
+"File uploaded"
+
+or do nothing.
+
+Trace the existing file URL/signed URL mechanism and make sure the actual file can be retrieved.
+
+If the file requires a signed URL:
+- Obtain/use the valid signed URL.
+- Do not expose private storage credentials.
+- Respect existing authentication and authorization.
+
+The user must only be able to access files they are authorized to access.
+
+==================================================
+4. FILE DOWNLOAD
+==================================================
+
+Where download is supported:
+
+Provide a clear download action.
+
+The downloaded file must be the actual original uploaded file, not a placeholder.
+
+Do not break any existing file-download functionality.
+
+==================================================
+5. CHAT MESSAGE UI
+==================================================
+
+Uploaded files should appear as proper Chat attachments rather than only plain text.
+
+For example:
+
+[File preview / thumbnail]
+
+filename.pdf
+1.2 MB
+PDF
+
+or an appropriate equivalent based on the existing design system.
+
+Follow the existing Perfusion Chat UI.
+
+Do not redesign the entire Chat interface.
+
+==================================================
+PART B — ADD VIDEO ATTACHMENTS TO CHAT
+==================================================
+
+Add a VIDEO attachment feature to Chat.
+
+The Provider and Seeker should be able to send a video through the existing Chat attachment system, subject to the duration restriction below.
+
+The video must be:
+
+- Selectable from the device/gallery/files where supported.
+- Recordable from the device camera if the existing mobile permissions/camera infrastructure supports recording.
+- Sent through Chat.
+- Visible as a video attachment in Chat.
+- Playable by the recipient.
+- Downloadable.
+
+==================================================
+6. VIDEO DURATION LIMIT — CRITICAL
+==================================================
+
+A video sent through Chat MUST NOT be longer than:
+
+2 MINUTES = 120 SECONDS
+
+This is a hard limit.
+
+Allowed:
+
+0–120 seconds
+
+Not allowed:
+
+>120 seconds
+
+IMPORTANT:
+
+The duration restriction must be enforced before the video is sent/uploaded.
+
+Do NOT allow a 5-minute video to upload completely and only reject it afterward.
+
+If the selected/recorded video exceeds 120 seconds:
+
+Show a clear message such as:
+
+"Video must be 2 minutes or less."
+
+Then:
+- Do not send the video.
+- Do not create a Chat message for it.
+- Do not leave a broken attachment/message.
+- Allow the user to select/record another video.
+
+==================================================
+7. VIDEO VALIDATION
+==================================================
+
+The duration restriction must be enforced on the client AND validated by the backend/server where practical.
+
+Do not rely only on the mobile UI.
+
+The backend must not blindly accept a video attachment that violates the 120-second limit.
+
+The final system should prevent bypassing the restriction by:
+- Using a different client.
+- Manipulating the request.
+- Uploading a video directly through the API.
+
+Inspect the existing backend attachment validation architecture and integrate the duration check into it appropriately.
+
+==================================================
+8. SELECTING AN EXISTING VIDEO
+==================================================
+
+When the user selects an existing video from the device:
+
+1. Determine the video duration.
+2. If duration <= 120 seconds:
+   - Allow upload/send.
+3. If duration > 120 seconds:
+   - Reject it before sending.
+   - Show the 2-minute limit message.
+
+Do not automatically trim the video unless the existing product already has a video-trimming system.
+
+The requirement is to LIMIT videos to 2 minutes, not to automatically edit user videos.
+
+==================================================
+9. RECORDING A NEW VIDEO
+==================================================
+
+If the existing Mobile Chat supports camera access or can safely add camera recording:
+
+Allow the user to record a video for Chat.
+
+The recording must not exceed 120 seconds.
+
+Preferably:
+
+- Show recording duration.
+- Stop recording automatically at 120 seconds.
+- Do not allow recording beyond 120 seconds.
+
+At 120 seconds:
+
+Recording should stop automatically.
+
+Then allow the user to:
+- Review the video.
+- Send it.
+- Cancel/delete it.
+
+Do not automatically send the video without user confirmation.
+
+If the existing application architecture does not support recording yet, inspect the current Expo/React Native setup and implement it using the project's existing supported camera/media infrastructure rather than introducing unnecessary dependencies.
+
+==================================================
+10. VIDEO PREVIEW BEFORE SENDING
+==================================================
+
+Before sending a video, show an appropriate preview/review state.
+
+The user should be able to:
+
+- Play/review the video.
+- See its duration.
+- Cancel/remove it.
+- Send it.
+
+If the video is >120 seconds, it must be rejected before it reaches the send state.
+
+==================================================
+11. VIDEO CHAT MESSAGE
+==================================================
+
+After sending successfully, the Chat message should display a proper video attachment.
+
+It should NOT appear merely as:
+
+"Video uploaded"
+
+Instead, show an appropriate video preview/thumbnail/player.
+
+For example:
+
+[ Video thumbnail ]
+▶ Play
+
+video.mp4
+00:45
+
+Follow the existing Perfusion Chat visual design.
+
+Do not redesign unrelated Chat messages.
+
+==================================================
+12. VIDEO PLAYBACK
+==================================================
+
+When the recipient taps the video:
+
+The video should play.
+
+Support:
+
+- Play
+- Pause
+- Seek where supported
+- Volume/mute according to platform capabilities
+- Full-screen playback where appropriate
+
+Use the existing platform/media architecture where possible.
+
+Do not automatically download the entire video to permanent device storage just to play it unless required by the implementation.
+
+==================================================
+13. VIDEO DOWNLOAD
+==================================================
+
+Sent videos must be downloadable.
+
+Provide an appropriate download/save action.
+
+The user should be able to save the original video file to the device where platform permissions allow.
+
+The downloaded video must be the actual uploaded video.
+
+Do not generate a fake/empty file.
+
+Respect existing authentication and file-access permissions.
+
+==================================================
+14. VIDEO STORAGE / BACKEND
+==================================================
+
+Before implementing:
+
+Inspect how existing Chat files are stored.
+
+Determine:
+
+- Storage provider
+- Upload endpoint
+- Attachment database structure
+- Message structure
+- File URL generation
+- Signed URLs
+- MIME type handling
+- Access permissions
+
+Reuse the existing file storage architecture.
+
+Do NOT create a completely separate video storage system unless the current architecture genuinely cannot support video.
+
+The attachment should remain associated with the Chat message.
+
+Conceptually:
+
+Chat Message
+├── message text
+├── attachment type
+├── attachment URL/storage reference
+├── MIME type
+├── file name
+├── file size
+└── video duration (for video attachments)
+
+Use the existing database schema conventions where possible.
+
+==================================================
+15. VIDEO MIME TYPE
+==================================================
+
+Make sure video attachments have their correct MIME type.
+
+For example:
+
+video/mp4
+
+Do not rely only on the filename extension.
+
+Inspect the existing backend attachment validation and use the correct MIME/type handling supported by the project.
+
+==================================================
+16. SECURITY / ACCESS CONTROL
+==================================================
+
+Chat attachments may contain sensitive healthcare information.
+
+Do NOT make uploaded files or videos publicly accessible simply to make playback work.
+
+Maintain the existing Chat authorization model.
+
+A user should only be able to access attachments belonging to conversations they are authorized to access.
+
+Do not expose:
+- Storage credentials
+- Private bucket credentials
+- Signed URL generation secrets
+- Authentication tokens
+
+in the mobile app or client code.
+
+==================================================
+17. WEB + MOBILE
+==================================================
+
+Inspect whether Chat attachments are already shared between Web and Mobile.
+
+The ideal architecture is:
+
+Web Chat
+      ↓
+Shared Backend / Storage
+      ↑
+Mobile Chat
+
+Mobile should use the same Chat message/attachment infrastructure.
+
+If Web already supports file attachments, do not create a mobile-only database representation.
+
+If the current system supports only certain attachment types, extend the shared attachment model to support video.
+
+The Web and Mobile clients should be able to correctly identify the attachment type.
+
+==================================================
+18. CROSS-PLATFORM COMPATIBILITY
+==================================================
+
+Test:
+
+Mobile sends video
+→ Web receives video.
+
+Web sends video
+→ Mobile receives video.
+
+Mobile sends PDF/image/file
+→ Web receives it correctly.
+
+Web sends PDF/image/file
+→ Mobile receives it correctly.
+
+The attachment metadata must remain consistent.
+
+==================================================
+19. UPLOAD PROGRESS
+==================================================
+
+Video files can be larger than normal chat messages.
+
+Use an appropriate upload state.
+
+During upload:
+
+- Show uploading/progress state where supported.
+- Prevent accidental duplicate sends.
+- Do not create multiple Chat messages from repeated taps.
+
+If upload fails:
+
+- Show an appropriate failure state.
+- Allow retry.
+- Do not leave a falsely completed attachment.
+
+==================================================
+20. NETWORK FAILURE
+==================================================
+
+Handle:
+
+- No internet
+- Upload timeout
+- Server error
+- File retrieval error
+- Video playback error
+- Signed URL expiration
+- Download failure
+
+Do not show the video/file as successfully sent unless the backend confirms successful attachment/message creation.
+
+==================================================
+21. FILE PREVIEW + VIDEO UI
+==================================================
+
+Keep the UI consistent with the existing Perfusion Chat.
+
+Do not redesign:
+- Chat header
+- Message bubbles
+- Calling
+- Video calling
+- Consultation status
+- Case File
+- Other unrelated Chat UI
+
+Only add/improve attachment presentation.
+
+==================================================
+22. IMPORTANT DISTINCTION
+==================================================
+
+Do NOT confuse:
+
+CHAT VIDEO ATTACHMENT
+
+with:
+
+VIDEO CALLING.
+
+This task is NOT asking to change the existing video-call feature.
+
+The new video feature is:
+
+User selects/records a short video
+        ↓
+Reviews it
+        ↓
+Sends it as a Chat attachment
+        ↓
+Recipient sees video attachment
+        ↓
+Recipient can play it
+        ↓
+Recipient can download it
+
+Existing video calling must remain unchanged.
+
+==================================================
+23. TESTING — EXISTING FILES
+==================================================
+
+TEST 1 — Image
+
+Send an image in Chat.
+
+Expected:
+- Image preview visible.
+- Tapping opens full image.
+- Download/save works where supported.
+
+TEST 2 — PDF
+
+Send a PDF.
+
+Expected:
+- PDF attachment preview/card visible.
+- Tapping opens complete PDF.
+- Download works.
+
+TEST 3 — Other supported file
+
+Send an existing supported file type.
+
+Expected:
+- Appropriate attachment card appears.
+- File is tappable.
+- Complete file opens using supported viewer/system handler.
+- Download works where supported.
+
+==================================================
+24. TESTING — VIDEO UNDER 2 MINUTES
+==================================================
+
+Send a 30-second video.
+
+Expected:
+- Video accepted.
+- Upload succeeds.
+- Chat message appears.
+- Video preview/player appears.
+- Recipient can play it.
+- Recipient can download it.
+
+==================================================
+25. TESTING — VIDEO EXACTLY 2 MINUTES
+==================================================
+
+Send a video of exactly 120 seconds or within the supported measurement tolerance around 120 seconds.
+
+Expected:
+- Video is accepted if it does not exceed the 120-second limit.
+
+Do not accidentally reject valid videos shorter than or equal to the limit because of imprecise duration parsing.
+
+==================================================
+26. TESTING — VIDEO OVER 2 MINUTES
+==================================================
+
+Attempt to send a video longer than 120 seconds.
+
+Expected:
+- Video is rejected.
+- Clear error message appears.
+- Video is NOT uploaded/sent.
+- No Chat message is created.
+- User can select another video.
+
+==================================================
+27. TESTING — RECORDING
+==================================================
+
+If video recording is implemented:
+
+Start recording.
+
+Expected:
+- Duration is visible.
+- Recording cannot exceed 120 seconds.
+- Recording automatically stops at the limit.
+- User can review it.
+- User can cancel or send it.
+
+==================================================
+28. TESTING — CROSS PLATFORM
+==================================================
+
+TEST:
+
+Mobile → send video → Web receives.
+
+Expected:
+- Web sees video attachment.
+- Web can play it.
+- Web can download it.
+
+Then:
+
+Web → send video → Mobile receives.
+
+Expected:
+- Mobile sees video attachment.
+- Mobile can play it.
+- Mobile can download it.
+
+==================================================
+29. TESTING — ACCESS CONTROL
+==================================================
+
+Verify that a user who is not authorized to access the Chat cannot access its private attachments/videos through the attachment URL.
+
+Do not make files publicly accessible to solve playback.
+
+==================================================
+30. IMPLEMENTATION PROCESS
+==================================================
+
+Before changing code:
+
+1. Find existing Chat message components.
+2. Find existing file attachment UI.
+3. Find existing file picker.
+4. Find upload API.
+5. Find attachment database/schema.
+6. Find file storage implementation.
+7. Find signed URL/file-access implementation.
+8. Find MIME/type handling.
+9. Find existing download implementation.
+10. Determine whether Web already supports file previews.
+11. Determine whether any video attachment support already exists.
+12. Determine the safest way to extend the existing system.
+
+Only then implement the changes.
+
+Do not create duplicate upload/storage/message infrastructure.
+
+==================================================
+31. FINAL REPORT
+==================================================
+
+After implementation, report:
+
+1. Root cause of the current file preview problem.
+2. Root cause of why tapping files does not open them.
+3. Existing attachment/storage architecture discovered.
+4. Files/components changed.
+5. Backend/API changes.
+6. Storage changes, if any.
+7. File types now previewable/openable.
+8. Video attachment implementation.
+9. How the 120-second limit is enforced client-side.
+10. How the 120-second limit is enforced server-side.
+11. How video playback works.
+12. How video download works.
+13. How Web ↔ Mobile video attachments work.
+14. Tests performed and results.
+15. Any platform limitations or configuration still required.
+
+FINAL RULE:
+
+Do not make unrelated feature changes.
+
+The intended result is:
+
+EXISTING FILE
+→ Preview when supported
+→ Tap
+→ Open complete file
+→ Download
+
+NEW VIDEO
+→ Select/Record
+→ Maximum 120 seconds
+→ Review
+→ Send to Chat
+→ Recipient sees video preview
+→ Play video
+→ Download video
+
+The 2-minute maximum is a HARD requirement.
