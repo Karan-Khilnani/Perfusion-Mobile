@@ -1,0 +1,382 @@
+Fix ONLY the consultation card information display in the Perfusion MOBILE APP.
+
+I am attaching a screenshot showing the current issue.
+
+IMPORTANT:
+This is a very limited UI/data-display change.
+
+DO NOT modify:
+- Consultation booking logic
+- Consultation status logic
+- Scheduled/Ongoing/Paused/Completed functionality
+- Calling/video calling
+- Case File
+- Chat
+- Availability
+- Navigation
+- Sorting/filtering
+- Backend consultation logic
+- Any unrelated feature
+- Any unrelated UI
+
+Only change the information displayed in consultation cards wherever consultations are displayed.
+
+==================================================
+CURRENT PROBLEM
+==================================================
+
+In the consultation cards, the Provider/Doctor's own name is currently being displayed.
+
+For example, the current card looks approximately like:
+
+Dr. Tesu Kesharwani
+Mike
+Fortis Heath · Raigarh, Chhattisgarh
+5:00 PM
+Ongoing
+
+The Provider should NOT see their own name as part of the consultation card.
+
+==================================================
+REQUIRED CARD STRUCTURE
+==================================================
+
+Change the consultation card to display information in this exact hierarchy:
+
+1. HOSPITAL NAME — main heading
+2. PATIENT NAME — subheading
+3. CITY NAME — location information
+4. Existing consultation information such as time/status — unchanged
+
+Example:
+
+CURRENT:
+
+Dr. Tesu Kesharwani
+Mike
+Fortis Heath · Raigarh, Chhattisgarh
+5:00 PM
+Ongoing
+
+CHANGE TO:
+
+Fortis Heath
+Mike
+· Raigarh
+5:00 PM
+Ongoing
+
+The exact existing typography, spacing, icons, colors, and status styling should be preserved unless a very small adjustment is required to accommodate the new text hierarchy.
+
+==================================================
+1. REMOVE PROVIDER/DOCTOR NAME
+==================================================
+
+Remove the Provider/Doctor name from the consultation card completely.
+
+Do NOT replace it with another doctor name.
+
+Do NOT show the logged-in Provider's name anywhere in this particular consultation-card hierarchy.
+
+The consultation card should begin with the Hospital name.
+
+For example:
+
+WRONG:
+
+Dr. Tesu Kesharwani
+Mike
+Fortis Heath · Raigarh
+
+CORRECT:
+
+Fortis Heath
+Mike
+· Raigarh
+
+==================================================
+2. MAIN HEADING = HOSPITAL NAME
+==================================================
+
+The first/main heading of each consultation card must be the Hospital/Seeker Hospital name associated with that consultation.
+
+Example:
+
+Fortis Heath
+
+City Path Diagnostics
+
+City General Hospital
+
+Use the actual hospital name stored for that consultation.
+
+Do NOT hardcode any hospital name.
+
+Do NOT derive the hospital name from unrelated data.
+
+==================================================
+3. SUBHEADING = PATIENT NAME
+==================================================
+
+Immediately below the hospital name, show the Patient name.
+
+Example:
+
+Fortis Heath
+Mike
+
+City Path Diagnostics
+Sam Altman
+
+City General Hospital
+Richard
+
+The patient name should come from the existing patient/consultation data.
+
+Do NOT change patient data.
+
+==================================================
+4. LOCATION = CITY ONLY
+==================================================
+
+The location line should display ONLY the city name.
+
+Currently it may display something like:
+
+· Raigarh, Chhattisgarh
+
+Change it to:
+
+· Raigarh
+
+Similarly:
+
+· Shankar Nagar
+
+if "Shankar Nagar" is currently being used as a locality should be handled according to the existing city field — the requirement is that this line represents the CITY ONLY, not the full state/address.
+
+Do NOT display:
+
+- State
+- Full address
+- Locality
+- District
+- Extra geographic information
+
+unless the existing city field itself contains that value.
+
+Use the actual structured city value already associated with the hospital/consultation.
+
+Do NOT guess or hardcode cities.
+
+==================================================
+5. APPLY TO ALL CONSULTATION CARD LOCATIONS
+==================================================
+
+This change must be applied consistently wherever consultation cards are displayed in the Mobile App.
+
+For example, check:
+
+- Dashboard → Recent Consultations
+- Consultations tab/list
+- Any "View all" consultation list
+- Any other screen that uses the same consultation-card component
+
+If there is a shared consultation card component, fix the shared component rather than creating separate inconsistent implementations.
+
+However, do NOT change consultation detail screens unless they use the exact same consultation-card display and this requested hierarchy applies there.
+
+==================================================
+6. PRESERVE EVERYTHING ELSE
+==================================================
+
+Keep the following exactly as they currently work:
+
+- Patient age/gender avatar
+- Consultation date/time
+- Scheduled/Ongoing/Paused/Completed status
+- Schedule unavailable status
+- Expand/collapse behavior
+- Call button
+- Video button
+- Case File button
+- Advise button
+- Navigation
+- Consultation count
+- View all
+- Sorting
+- Filtering
+- Any existing icons
+- Existing colors
+- Existing fonts
+- Existing spacing as much as possible
+
+Only replace the displayed:
+
+Provider Name
+→
+Hospital Name
+
+and ensure:
+
+Patient Name = subheading
+
+City = city only.
+
+==================================================
+7. DO NOT CHANGE THE UNDERLYING CONSULTATION DATA
+==================================================
+
+This is a display correction.
+
+Do NOT rename database fields unnecessarily.
+
+Do NOT change the consultation schema just to make this UI change.
+
+First inspect the existing consultation object/data.
+
+Determine which existing fields already represent:
+
+- Provider/Doctor
+- Hospital
+- Patient
+- City
+
+Then change only the UI mapping/rendering.
+
+If the correct hospital/city fields already exist, use them.
+
+==================================================
+8. HANDLE MISSING DATA SAFELY
+==================================================
+
+If a consultation does not have a hospital name:
+
+Do not crash.
+
+Use the existing application's established fallback behavior, if one already exists.
+
+If city is unavailable:
+
+Do not display the state/address as a replacement just to fill the space.
+
+Do not invent data.
+
+If patient name is unavailable:
+
+Use the existing safe fallback behavior.
+
+Do not introduce new placeholder text unless necessary.
+
+==================================================
+9. IMPORTANT EXAMPLE
+==================================================
+
+For the screenshot provided, the current card:
+
+Dr. Tesu Kesharwani
+Mike
+Fortis Heath · Raigarh, Chhattisgarh
+5:00 PM
+Ongoing
+
+should become:
+
+Fortis Heath
+Mike
+· Raigarh
+5:00 PM
+Ongoing
+
+And:
+
+Dr. Tesu Kesharwani
+Sam Altman
+City Path Diagnostics · Pachpedi naka
+2:40 PM
+Ongoing
+
+should become approximately:
+
+City Path Diagnostics
+Sam Altman
+· [actual city]
+2:40 PM
+Ongoing
+
+Use the actual city field from the consultation data. Do NOT assume "Pachpedi naka" is the city if it is a locality/address.
+
+==================================================
+10. IMPLEMENTATION PROCESS
+==================================================
+
+Before making changes:
+
+1. Find the consultation card component used by the Dashboard.
+2. Find the consultation list/card used by the Consultations tab.
+3. Determine whether both use a shared component.
+4. Inspect the existing consultation data object.
+5. Identify the existing hospital-name field.
+6. Identify the existing patient-name field.
+7. Identify the existing city field.
+8. Remove only the Provider/Doctor name from this card display.
+9. Map the remaining fields to the requested hierarchy.
+10. Verify that no consultation functionality was changed.
+
+Prefer a shared component fix if one exists.
+
+==================================================
+11. TESTING
+==================================================
+
+Test multiple consultations with different hospitals and patients.
+
+Verify:
+
+Card:
+
+Hospital Name
+Patient Name
+· City
+Time
+Status
+
+NOT:
+
+Doctor Name
+Patient Name
+Hospital · Location
+
+Check:
+
+- Dashboard Recent Consultations
+- Consultations list
+- View All consultations
+- Expanded consultation cards if applicable
+
+Verify that:
+
+- Provider name is no longer shown in the card.
+- Correct hospital is shown.
+- Correct patient is shown.
+- Only city is shown.
+- Existing time/status remains unchanged.
+- Existing buttons/actions remain unchanged.
+- No unrelated UI has changed.
+
+==================================================
+FINAL REQUIREMENT
+==================================================
+
+This is a SMALL, TARGETED DISPLAY CHANGE.
+
+The final consultation-card hierarchy must be:
+
+HOSPITAL NAME
+PATIENT NAME
+· CITY
+TIME / EXISTING STATUS
+
+Remove the Provider/Doctor name from this hierarchy.
+
+Do not make any other feature or design changes.
