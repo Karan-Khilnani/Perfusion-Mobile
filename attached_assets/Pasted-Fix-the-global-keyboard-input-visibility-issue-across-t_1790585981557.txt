@@ -1,0 +1,450 @@
+Fix the global keyboard/input visibility issue across the Perfusion MOBILE APP.
+
+IMPORTANT:
+This is a MOBILE UI/UX and keyboard-handling fix.
+
+Do NOT modify unrelated functionality, API behavior, database logic, authentication logic, navigation logic, or business rules.
+
+==================================================
+PROBLEM
+==================================================
+
+Currently, whenever the user taps an input field and the mobile keyboard opens, the keyboard covers the area where the user is typing.
+
+This is happening across multiple screens/pages.
+
+The problem is especially visible on the Login screen:
+
+- Email/password inputs can become hidden behind the keyboard.
+- The user cannot properly see the text/cursor while typing.
+- The screen does not move/scroll enough to keep the focused input visible.
+
+This must be fixed globally wherever text input fields are used.
+
+==================================================
+EXPECTED BEHAVIOR
+==================================================
+
+Whenever the keyboard opens:
+
+1. The currently focused input must remain visible.
+2. The area containing the focused input should automatically move/scroll above the keyboard.
+3. The user must be able to see the text they are typing.
+4. The cursor and input field must remain visible.
+5. The user should still be able to scroll through the page normally.
+6. When the keyboard closes, the screen should return to its normal position.
+7. The solution must work across different Android screen sizes and keyboard sizes.
+
+The keyboard must NOT simply cover the active input.
+
+==================================================
+LOGIN SCREEN — PRIORITY
+==================================================
+
+Fix the Login screen first.
+
+Current layout includes approximately:
+
+- Logo
+- Sign In heading
+- Sign in with Google
+- Email input
+- Password input
+- Sign In button
+- Create a new account
+
+When the user taps:
+
+EMAIL:
+The email input must remain visible above the keyboard.
+
+PASSWORD:
+The password input must remain visible above the keyboard.
+
+The password field must NOT be hidden behind the keyboard.
+
+The user must be able to see the password input and cursor while typing.
+
+The Sign In button should also remain accessible by scrolling if necessary.
+
+Do not redesign the Login screen.
+
+Only fix keyboard behavior/layout.
+
+==================================================
+GLOBAL FIX
+==================================================
+
+Do NOT solve this by adding random padding/margins to individual screens.
+
+First inspect the mobile application's existing layout architecture.
+
+Find:
+
+- Root navigation layout
+- Root Stack/Tabs
+- Shared screen layout components
+- Existing ScrollView usage
+- Existing TextInput components
+- Keyboard handling
+- SafeAreaView usage
+- Expo/React Native configuration
+- Any existing KeyboardAvoidingView implementation
+- Any existing keyboard-aware scrolling library
+- Modal/bottom-sheet input screens
+
+Determine whether there is already a common layout component that can be fixed once and benefit all screens.
+
+Prefer a centralized solution.
+
+==================================================
+REACT NATIVE KEYBOARD HANDLING
+==================================================
+
+Use the appropriate React Native keyboard-handling approach for the project's existing Expo SDK/version.
+
+Consider the correct combination of:
+
+- KeyboardAvoidingView
+- ScrollView
+- FlatList
+- contentContainerStyle
+- keyboardVerticalOffset
+- automaticallyAdjustKeyboardInsets where appropriate
+- Safe Area handling
+
+Do NOT blindly wrap every screen in multiple KeyboardAvoidingViews.
+
+Avoid nested keyboard-handling components that can cause:
+
+- Double movement
+- Excessive blank space
+- Jumping layouts
+- Incorrect scrolling
+- Broken bottom navigation
+
+==================================================
+FOCUSED INPUT VISIBILITY
+==================================================
+
+The important requirement is not merely:
+
+"Move the whole screen up when keyboard opens."
+
+The actual requirement is:
+
+THE FOCUSED INPUT MUST BE VISIBLE.
+
+Example:
+
+If a form has:
+
+Input 1
+Input 2
+Input 3
+Input 4
+Input 5
+
+and the user taps Input 5:
+
+The screen should automatically scroll enough so Input 5 is above the keyboard.
+
+If the user then taps Input 2:
+
+The screen should reposition appropriately so Input 2 remains visible.
+
+Do not force the entire page to stay permanently shifted upward.
+
+==================================================
+FORMS / LONG SCREENS
+==================================================
+
+For longer forms:
+
+- User should be able to scroll while keyboard is open.
+- Tapping an input should automatically reveal it.
+- The focused field should not be obscured by the keyboard.
+- Existing form spacing should remain visually consistent.
+
+This should work for:
+
+- Login
+- Registration
+- Forgot Password
+- Profile forms
+- Booking forms
+- Case File inputs
+- Chat message input
+- Advisory/clinical inputs
+- Any other text-input screen
+
+==================================================
+CHAT INPUT
+==================================================
+
+Pay special attention to Chat.
+
+When the user taps:
+
+"Message care team..."
+
+the keyboard must not cover the message input.
+
+The input should remain attached to/above the keyboard according to the existing Chat design.
+
+Do NOT break:
+
+- Message list scrolling
+- Sending messages
+- Attachments
+- File uploads
+- Video attachments
+- Calling
+- Video calling
+
+Only correct keyboard/input positioning.
+
+==================================================
+MODALS / BOTTOM SHEETS
+==================================================
+
+Inspect any screens where inputs appear inside:
+
+- Modals
+- Bottom sheets
+- Dialogs
+- Drawers
+- Overlays
+
+The keyboard must not cover the focused input in these components either.
+
+Use the appropriate keyboard-aware behavior for each component rather than applying arbitrary global offsets.
+
+==================================================
+ANDROID PRIORITY
+==================================================
+
+This issue is especially important on Android.
+
+Test with the Android Expo/development build used by this project.
+
+Make sure the keyboard behavior works with:
+
+- Standard Android keyboard
+- Different screen heights
+- Password fields
+- Multiple inputs
+- Long forms
+
+Do not assume behavior from iOS only.
+
+==================================================
+PASSWORD FIELD
+==================================================
+
+Specifically test:
+
+Login → tap Password.
+
+Expected:
+
+- Keyboard opens.
+- Password field moves/scrolls above keyboard.
+- Password text/cursor remains visible.
+- User can type normally.
+- Password visibility toggle, if present, remains usable.
+- Sign In button remains reachable.
+
+Do not modify password validation or authentication.
+
+==================================================
+SAFE AREA
+==================================================
+
+Preserve the existing safe-area behavior.
+
+Do not cause:
+
+- Content behind status bar
+- Content behind navigation bar
+- Excessive top padding
+- Excessive bottom padding
+
+Keyboard avoidance should work together with the existing Safe Area implementation.
+
+==================================================
+DO NOT USE A HARDCODED SCREEN OFFSET
+==================================================
+
+Do NOT solve this with something like:
+
+paddingBottom: 300
+
+or:
+
+translateY: -300
+
+or a fixed keyboard height.
+
+Keyboard height varies by:
+
+- Device
+- Keyboard
+- Orientation
+- Navigation mode
+- Android version
+
+The solution must respond dynamically to the keyboard.
+
+==================================================
+DO NOT BREAK EXISTING UI
+==================================================
+
+Preserve:
+
+- Existing typography
+- Colors
+- Spacing
+- Buttons
+- Navigation
+- Headers
+- Bottom tabs
+- Forms
+- Cards
+- Existing screen designs
+
+Only change layout behavior necessary to keep focused inputs visible.
+
+==================================================
+IMPLEMENTATION PROCESS
+==================================================
+
+Before making changes:
+
+1. Inspect the mobile application's root layout.
+2. Inspect navigation structure.
+3. Find shared layout components.
+4. Search for all KeyboardAvoidingView usage.
+5. Search for all ScrollView/FlatList form screens.
+6. Search for TextInput components.
+7. Identify whether a common keyboard-handling pattern already exists.
+8. Identify the Login screen implementation.
+9. Identify Chat input implementation.
+10. Identify modal/bottom-sheet input implementations.
+
+Then implement the smallest centralized solution that correctly handles keyboard visibility.
+
+If a shared component can solve most screens, modify that instead of duplicating code.
+
+For screens that require specialized handling, make the minimum screen-specific adjustment necessary.
+
+==================================================
+TESTING CHECKLIST
+==================================================
+
+TEST 1 — Login Email
+
+Open Login.
+
+Tap Email.
+
+Expected:
+Email field remains visible above keyboard.
+
+TEST 2 — Login Password
+
+Tap Password.
+
+Expected:
+Password field remains completely visible above keyboard.
+
+TEST 3 — Login Password + typing
+
+Type a long password.
+
+Expected:
+Input remains visible while typing.
+
+TEST 4 — Long form
+
+Open a long form and tap an input near the bottom.
+
+Expected:
+Focused input automatically scrolls above keyboard.
+
+TEST 5 — Multiple inputs
+
+Tap different inputs one after another.
+
+Expected:
+Focused input is always visible.
+
+TEST 6 — Keyboard dismissal
+
+Close keyboard.
+
+Expected:
+Screen returns to normal position without excessive blank space.
+
+TEST 7 — Chat
+
+Open Chat and tap message input.
+
+Expected:
+Message input remains visible above keyboard.
+
+TEST 8 — Modal/bottom sheet
+
+Open any input modal/bottom sheet.
+
+Expected:
+Focused input remains visible above keyboard.
+
+TEST 9 — Android
+
+Test on Android using the project's actual Expo/development build.
+
+Expected:
+No input is hidden behind the keyboard.
+
+TEST 10 — Navigation
+
+Open a screen, type into an input, close keyboard, navigate away and return.
+
+Expected:
+No broken scroll position or persistent keyboard offset.
+
+==================================================
+FINAL REPORT
+==================================================
+
+After implementation, report:
+
+1. Root cause of the keyboard covering inputs.
+2. Whether the issue was caused by the root layout, individual screens, Android window behavior, or a combination.
+3. Which shared component(s) were modified.
+4. Which individual screens required special handling.
+5. How focused-input visibility is now handled.
+6. How Android keyboard behavior was handled.
+7. Tests performed.
+8. Any remaining screens where keyboard handling could not be automatically applied.
+
+FINAL REQUIREMENT:
+
+The goal is:
+
+USER TAPS INPUT
+        ↓
+KEYBOARD OPENS
+        ↓
+FOCUSED INPUT AUTOMATICALLY REMAINS VISIBLE ABOVE KEYBOARD
+        ↓
+USER CAN SEE AND TYPE INTO THE FIELD
+        ↓
+KEYBOARD CLOSES
+        ↓
+SCREEN RETURNS TO NORMAL
+
+Fix this as a reusable/global keyboard-handling solution wherever possible.
+
+Do not make unrelated feature changes.
