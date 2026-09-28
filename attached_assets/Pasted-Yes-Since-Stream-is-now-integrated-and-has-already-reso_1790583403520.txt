@@ -1,0 +1,119 @@
+Yes. Since **Stream is now integrated and has already resolved many of the previous issues**, we should **not reopen the architecture**. These are now targeted fixes.
+
+Also, I would separate **PIP** and **incoming full-screen call UI** because both may require native Android/Stream configuration rather than just changing the React Native screen.
+
+Use this **short Replit prompt**:
+
+We have now migrated the Perfusion mobile calling system to Stream and tested it.
+
+Many previous calling problems are resolved. DO NOT change or redesign anything that is already working.
+
+Fix ONLY these 6 remaining issues:
+
+### 1. Android Back button / PiP
+
+Current:
+During an active call, pressing Android Back shows:
+"Call will end — Stay / Leave"
+
+Required:
+Android Back must NOT end or leave the call.
+
+It should minimize the active call into PiP/minimized call UI, while the call continues in the background.
+
+User should be able to tap the PiP and return to the active call.
+
+Do not show the "Call will end" confirmation for simply pressing Back during an active call.
+
+### 2. Caller ringback sound
+
+Current:
+After pressing Call, caller hears a "beep beep" waiting sound.
+
+Required:
+Use a conventional phone-style outgoing ringback tone ("tring tring" style), continuously repeating while waiting for the receiver to answer.
+
+It must stop immediately when:
+
+* receiver answers
+* receiver rejects
+* caller cancels
+* call times out
+
+Do not change the receiver's incoming ringtone if that is already working.
+
+### 3. City name in seeker details
+
+When seeker/patient details are displayed during the call, also display the seeker's CITY along with the existing details.
+
+Use the existing seeker/hospital data already available in the app/backend. Do not create duplicate data fields.
+
+### 4. "Something went wrong" after disconnecting
+
+Current:
+When the call is disconnected/ended, "Something went wrong" appears and the user is asked to reload.
+
+Required:
+Normal call termination must NOT produce an error.
+
+After either participant ends the call:
+→ cleanly terminate Stream call
+→ stop timer
+→ clear call state
+→ close media
+→ remove call UI
+→ return to normal app screen
+
+No "Something went wrong".
+No reload required.
+
+Also check for stale/duplicate call state causing this error.
+
+### 5. Loading after answering
+
+Current:
+Receiver presses Answer → loading screen → video starts.
+
+Required:
+Minimize this transition as much as technically possible.
+
+After Answer:
+→ directly transition to the active call UI
+→ establish Stream audio/video in the same call screen
+
+Do not show a separate video-room/join/loading experience.
+
+If Stream requires a short media connection delay, keep it within the call UI rather than showing a separate loading screen.
+
+Do not repeatedly request permissions that have already been granted.
+
+### 6. Full-screen incoming call
+
+Current:
+Incoming call appears only as a top-bar notification.
+
+Required:
+For an incoming call when the app is backgrounded/closed and the phone screen is locked/off where Android permits it:
+
+→ full-screen incoming-call UI
+→ caller information
+→ Answer
+→ Reject
+
+It should feel like an actual phone/WhatsApp incoming call, NOT merely a top notification.
+
+Use Stream's appropriate native Android incoming-call / Telecom / full-screen intent mechanism rather than creating a fake React Native notification.
+
+IMPORTANT:
+
+* Do not migrate away from Stream.
+* Do not change unrelated functionality.
+* Do not redesign the existing call UI.
+* Preserve all previously fixed calling behavior.
+* Make the smallest targeted changes possible.
+
+After fixing, briefly report:
+
+1. Files changed
+2. What was fixed
+3. Any issue requiring Android native configuration rather than React Native code.
