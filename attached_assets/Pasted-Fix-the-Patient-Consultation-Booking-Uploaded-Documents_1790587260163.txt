@@ -1,0 +1,642 @@
+Fix the Patient Consultation Booking → Uploaded Documents → Provider Case File Chat attachment flow in BOTH WEB and MOBILE where applicable.
+
+IMPORTANT:
+This is a bug fix for patient documents/files uploaded during consultation booking.
+
+The required behavior is:
+
+SEEKER BOOKING FORM
+        ↓
+Patient documents uploaded
+        ↓
+Consultation booked successfully
+        ↓
+Documents remain permanently associated with that consultation/booking
+        ↓
+Provider opens the Case File
+        ↓
+Uploaded documents are immediately visible in the Case File Chat
+        ↓
+Provider can preview/open the documents
+        ↓
+Provider can download the original files
+
+Do NOT modify unrelated consultation, chat, authentication, calling, booking, or Case File functionality.
+
+==================================================
+1. CURRENT BUG
+==================================================
+
+Currently:
+
+1. Seeker/Hospital opens the Consultation Booking Form.
+2. Patient documents/reports are uploaded.
+3. Consultation is booked successfully.
+4. Provider opens the corresponding Case File.
+5. The uploaded documents are NOT visible in the Case File Chat.
+
+This means the uploaded files are either:
+
+- not being persisted correctly,
+- not being associated with the booking/consultation,
+- not being returned by the Case File API,
+- not being converted into Chat attachments/messages,
+- or not being rendered by the Provider Mobile/Web Case File Chat.
+
+Find the actual root cause.
+
+Do NOT simply hide/show UI elements to make the problem appear fixed.
+
+==================================================
+2. REQUIRED FINAL BEHAVIOR
+==================================================
+
+When the Seeker uploads patient documents during consultation booking and successfully books the consultation:
+
+The uploaded documents must become associated with THAT exact consultation/case.
+
+When the Provider opens the corresponding Case File:
+
+The documents must already be visible in the Case File Chat.
+
+The Provider should NOT need to:
+
+- refresh repeatedly,
+- re-upload the documents,
+- manually search for them somewhere else,
+- reopen the booking form,
+- wait for another unrelated action.
+
+The documents should appear immediately after the consultation has been successfully booked and the Provider opens the Case File.
+
+==================================================
+3. IMPORTANT — USE EXISTING ATTACHMENT SYSTEM
+==================================================
+
+Before implementing anything, inspect the existing file/attachment architecture.
+
+Find:
+
+- Consultation Booking Form
+- File/document picker
+- Upload handler
+- Upload API
+- Storage implementation
+- Database/file metadata model
+- Booking/consultation model
+- Case File API
+- Case File Chat API
+- Chat message model
+- Chat attachment model
+- Signed URL/download mechanism
+- Existing file preview functionality
+
+Determine exactly what happens to an uploaded file during booking.
+
+DO NOT create a completely separate document-upload system if the application already has one.
+
+Reuse the existing file storage and attachment infrastructure.
+
+==================================================
+4. TRACE THE COMPLETE DATA FLOW
+==================================================
+
+Trace this exact flow:
+
+BOOKING FORM
+    ↓
+File selected
+    ↓
+File uploaded
+    ↓
+Upload response
+    ↓
+File/storage ID
+    ↓
+Booking submission
+    ↓
+Consultation/Booking record
+    ↓
+Case File
+    ↓
+Chat
+    ↓
+Attachment rendering
+
+Identify where the chain currently breaks.
+
+The final implementation must preserve the uploaded file's identity throughout the entire flow.
+
+==================================================
+5. FILES MUST BE ASSOCIATED WITH THE CORRECT CONSULTATION
+==================================================
+
+This is critical.
+
+If Patient A books Consultation A and uploads:
+
+- ECG.pdf
+- Blood_Report.pdf
+- Prescription.jpg
+
+those files must be associated with Consultation A.
+
+They must NOT:
+
+- appear in another patient's Case File,
+- appear in another consultation,
+- be associated only with the patient without consultation context if the existing architecture requires consultation-level association,
+- disappear after booking.
+
+Use the existing booking/consultation identifiers and relationship structure.
+
+Do not rely only on filename matching or patient name matching.
+
+==================================================
+6. UPLOAD BEFORE BOOKING
+==================================================
+
+The booking flow may upload files before the consultation is finally created.
+
+Handle this correctly.
+
+If files are uploaded before the booking ID/consultation ID exists:
+
+1. Temporarily retain the uploaded file metadata/reference.
+2. Successfully create the consultation.
+3. Associate the uploaded files with the newly created consultation.
+4. Create the appropriate Case File Chat attachment/message records if required by the existing architecture.
+5. Make them available to the Provider.
+
+Do not lose uploaded files simply because the consultation ID did not exist at the moment of file selection.
+
+==================================================
+7. BOOKING FAILURE
+==================================================
+
+Handle unsuccessful bookings correctly.
+
+If the consultation booking fails:
+
+Do not create a fake Case File Chat message.
+
+Do not associate documents with a non-existent consultation.
+
+Existing upload cleanup/orphan-file behavior should be preserved or improved where necessary.
+
+Do not delete a file that is still required by a successfully created booking.
+
+==================================================
+8. CREATE CASE FILE CHAT ATTACHMENT
+==================================================
+
+After the consultation is successfully booked, the uploaded patient documents should be available in the corresponding Case File Chat.
+
+If the existing Chat architecture represents attachments as Chat messages, create the appropriate attachment/message records using the existing mechanism.
+
+For example:
+
+Consultation A
+    ↓
+Chat
+    ↓
+Attachment message
+    ↓
+ECG.pdf
+
+The attachment should appear as a normal file attachment in the Case File Chat.
+
+Do NOT create a fake text message such as:
+
+"File uploaded"
+
+without actually attaching the file.
+
+==================================================
+9. IMMEDIATE VISIBILITY
+==================================================
+
+When the Provider opens the Case File after booking:
+
+The uploaded documents should already be present in the Chat.
+
+The Provider should not have to manually trigger synchronization.
+
+If the Case File Chat is already open when the booking/attachment becomes available:
+
+Use the existing chat refresh/realtime mechanism where available.
+
+Do not add unnecessary polling if the existing architecture already supports realtime updates.
+
+If realtime is not currently implemented for this flow, make sure the attachment is returned immediately when the Case File Chat is fetched/opened.
+
+==================================================
+10. FILE PREVIEW
+==================================================
+
+The Provider must be able to preview/open the uploaded document directly from the Case File Chat.
+
+Use the existing attachment preview functionality where available.
+
+For example:
+
+PDF:
+
+[PDF preview/card]
+ECG_Report.pdf
+1.2 MB
+
+Tap →
+Open/preview complete PDF.
+
+Image:
+
+[Image preview]
+
+Tap →
+Open full image.
+
+Other supported document:
+
+[File icon]
+filename.ext
+size/type
+
+Tap →
+Open using the supported viewer/system handler.
+
+Do not show only:
+
+"Document uploaded"
+
+if the actual attachment is available.
+
+==================================================
+11. DOWNLOAD
+==================================================
+
+The Provider must be able to download the original uploaded document where supported.
+
+The downloaded file must be the original file uploaded by the Seeker/Hospital.
+
+Do not generate a placeholder.
+
+Do not change the file contents.
+
+Use the existing authenticated/signed file-access mechanism.
+
+==================================================
+12. SECURITY / PATIENT DATA
+==================================================
+
+These are patient documents and may contain sensitive healthcare information.
+
+Do NOT make the uploaded files publicly accessible just to make previewing work.
+
+Maintain existing authorization.
+
+Only authorized users participating in the corresponding consultation should be able to access the documents.
+
+Do not expose:
+
+- Storage credentials
+- Private bucket credentials
+- Signing secrets
+- Authentication tokens
+
+in client-side code.
+
+==================================================
+13. WEB + MOBILE
+==================================================
+
+Verify the complete flow across the application's Web and Mobile clients.
+
+At minimum test:
+
+WEB SEEKER BOOKING
+        ↓
+Provider MOBILE CASE FILE
+
+and:
+
+MOBILE SEEKER BOOKING
+        ↓
+Provider MOBILE CASE FILE
+
+Also verify the corresponding Web Case File if it uses the same consultation/chat backend.
+
+The backend must remain the shared source of truth.
+
+Do NOT implement a mobile-only workaround that stores files separately from Web.
+
+==================================================
+14. EXISTING UPLOAD TYPES
+==================================================
+
+Do not restrict the booking upload system unnecessarily.
+
+Existing supported patient documents such as:
+
+- PDF
+- Images
+- Reports
+- Prescriptions
+- Treatment charts
+- Other currently supported file types
+
+should continue to work.
+
+The bug fix should preserve existing supported upload types.
+
+==================================================
+15. DO NOT DUPLICATE FILES UNNECESSARILY
+==================================================
+
+Avoid uploading the same physical file multiple times merely to make it appear in Chat.
+
+Prefer:
+
+ONE STORED FILE
+    ↓
+Referenced by the consultation
+    ↓
+Referenced by the Chat attachment
+
+If the existing architecture intentionally creates a separate Chat attachment record, that's fine.
+
+But do not create duplicate storage objects unnecessarily.
+
+==================================================
+16. FILE METADATA
+==================================================
+
+Preserve appropriate metadata:
+
+- Original filename
+- MIME type
+- File size
+- Storage/file ID
+- Upload timestamp
+- Consultation/booking ID
+- Patient/case association
+- Sender/uploader where supported
+
+Do not lose the original filename and type when converting the booking upload into a Chat attachment.
+
+==================================================
+17. CASE FILE CHAT ORDER
+==================================================
+
+The uploaded documents should appear in the appropriate chronological location in the Case File Chat.
+
+They should not randomly appear as the newest message if the existing Chat ordering is based on message timestamps.
+
+Use the actual upload/booking timestamp according to the existing product behavior.
+
+Do not modify unrelated message ordering.
+
+==================================================
+18. EXISTING FILE PREVIEW BUG
+==================================================
+
+There is also an existing requirement that uploaded Chat files should:
+
+- show an appropriate preview,
+- be tappable,
+- open completely,
+- and be downloadable where supported.
+
+Reuse/fix that existing attachment preview functionality for these booking documents.
+
+Do NOT build a separate preview implementation specifically for booking documents if the Chat already has an attachment preview component.
+
+==================================================
+19. ERROR HANDLING
+==================================================
+
+Handle these cases correctly:
+
+A. File upload succeeds + booking succeeds
+→ Document appears in Case File Chat.
+
+B. File upload fails
+→ Booking should handle the failure according to existing product behavior.
+→ Do not create a broken attachment.
+
+C. Booking fails after upload
+→ Do not associate the file with a fake consultation.
+
+D. File metadata exists but storage file is missing
+→ Show an appropriate unavailable/error state rather than crashing.
+
+E. Provider cannot access the file
+→ Return appropriate authorization/access error.
+
+F. Multiple files uploaded
+→ ALL successfully uploaded documents should appear.
+
+==================================================
+20. MULTIPLE FILES
+==================================================
+
+If the Seeker uploads:
+
+1. ECG.pdf
+2. Blood_Report.pdf
+3. Prescription.jpg
+4. Treatment_Chart.pdf
+
+and then books the consultation:
+
+ALL FOUR must be available in the Provider's Case File Chat.
+
+Do not only associate the first uploaded file.
+
+==================================================
+21. DUPLICATE SUBMISSION PROTECTION
+==================================================
+
+Be careful with:
+
+- Double tapping Book Consultation
+- Network retry
+- API retry
+- App restart during upload
+- Reopening the booking screen
+
+Do not create duplicate Chat attachment messages for the same uploaded document if the booking request is retried.
+
+Use existing IDs/idempotency mechanisms where available.
+
+==================================================
+22. IMPLEMENTATION PROCESS
+==================================================
+
+Before coding:
+
+1. Find the Web booking form.
+2. Find the Mobile booking form.
+3. Find the existing upload component.
+4. Find the upload API.
+5. Find the storage implementation.
+6. Find the booking creation API.
+7. Find the consultation/case creation logic.
+8. Find the Case File Chat API.
+9. Find the Chat attachment/message model.
+10. Find the existing file preview component.
+11. Find the signed URL/download mechanism.
+12. Trace one uploaded file from selection through booking.
+13. Identify exactly where the file association is lost.
+
+Then fix the root cause.
+
+Do NOT immediately create new database tables or duplicate upload APIs.
+
+Reuse existing structures wherever possible.
+
+==================================================
+23. TEST SCENARIO — SINGLE FILE
+==================================================
+
+Create a test booking.
+
+Upload:
+
+ECG.pdf
+
+Book consultation.
+
+Then login/open Provider Case File.
+
+Expected:
+
+ECG.pdf is immediately visible in the Case File Chat.
+
+Tap ECG.pdf.
+
+Expected:
+
+PDF preview/opening works.
+
+Download ECG.pdf.
+
+Expected:
+
+Original PDF downloads successfully.
+
+==================================================
+24. TEST SCENARIO — MULTIPLE FILES
+==================================================
+
+Upload:
+
+ECG.pdf
+Blood_Report.pdf
+Prescription.jpg
+
+Book consultation.
+
+Expected:
+
+All three appear in the correct Case File Chat.
+
+Each file:
+
+- Shows correct filename.
+- Shows appropriate preview/card.
+- Opens correctly.
+- Downloads correctly where supported.
+
+==================================================
+25. TEST SCENARIO — MOBILE BOOKING
+==================================================
+
+Use Mobile Seeker.
+
+Upload patient documents.
+
+Book consultation.
+
+Then open Provider Mobile Case File.
+
+Expected:
+
+Documents appear in Case File Chat immediately.
+
+==================================================
+26. TEST SCENARIO — WEB BOOKING
+==================================================
+
+Use Web Seeker.
+
+Upload patient documents.
+
+Book consultation.
+
+Then open Provider Mobile Case File.
+
+Expected:
+
+Documents appear in the same Case File Chat.
+
+This confirms Web and Mobile are using the same backend/source of truth.
+
+==================================================
+27. TEST SCENARIO — EXISTING CONSULTATION
+==================================================
+
+Open an existing consultation that already contains Chat attachments.
+
+Expected:
+
+Existing Chat attachments continue to work.
+
+Do not break existing files while fixing booking attachments.
+
+==================================================
+28. FINAL REPORT
+==================================================
+
+After implementation, report:
+
+1. Root cause of why booking documents were not appearing in Provider Case File Chat.
+2. Where the data flow was breaking.
+3. Existing upload/storage architecture discovered.
+4. Existing Chat attachment architecture discovered.
+5. Whether any database/schema changes were required.
+6. Backend/API changes.
+7. Web changes.
+8. Mobile changes.
+9. How uploaded files are associated with the correct consultation.
+10. How files are inserted/retrieved in Case File Chat.
+11. How file preview/opening works.
+12. How download works.
+13. How multiple files are handled.
+14. How duplicate submissions are prevented.
+15. Security/access-control handling.
+16. Tests performed and their results.
+
+FINAL REQUIREMENT:
+
+The final flow MUST be:
+
+Seeker/Hospital
+    ↓
+Consultation Booking Form
+    ↓
+Upload patient documents
+    ↓
+Book Consultation
+    ↓
+Documents permanently associated with that consultation
+    ↓
+Provider opens Case File
+    ↓
+Documents immediately visible in Case File Chat
+    ↓
+Provider can preview/open the document
+    ↓
+Provider can download the original document
+
+Do not make unrelated feature changes.
