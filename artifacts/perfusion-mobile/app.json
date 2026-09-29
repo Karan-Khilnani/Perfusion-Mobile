@@ -9,9 +9,9 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/images/icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#F7F7F9"
+      "image": "./assets/images/splash.png",
+      "resizeMode": "cover",
+      "backgroundColor": "#5C2039"
     },
     "ios": {
       "supportsTablet": false,
@@ -27,7 +27,7 @@
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/icon.png",
-        "backgroundColor": "#F7F7F9"
+        "backgroundColor": "#FDF6F1"
       },
       "permissions": [
         "CAMERA",
@@ -51,7 +51,7 @@
         "expo-notifications",
         {
           "icon": "./assets/images/icon.png",
-          "color": "#DB2841"
+          "color": "#F0654A"
         }
       ],
       "@stream-io/video-react-native-sdk",

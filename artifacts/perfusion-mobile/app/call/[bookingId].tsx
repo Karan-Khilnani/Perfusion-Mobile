@@ -547,6 +547,12 @@ export default function CallScreen() {
             credentials={streamCredentials}
             voiceCall={callMode === "voice"}
             compact={isInPiPMode}
+            bookingId={bookingId}
+            participantTitle={booking?.patientName || callTitle}
+            participantSubtitle={booking?.seekerHospitalName || booking?.serviceName}
+            onEndCall={() => void handleEndCall()}
+            endPending={endPending}
+            endError={endError}
           />
         ) : streamCredentialsTimedOut ? (
           <View style={styles.roomError}>
@@ -576,7 +582,7 @@ export default function CallScreen() {
             )}
           </View>
         )}
-        {!isInPiPMode && <View style={[styles.roomHeader, { top: insets.top + 8 }]}>
+        {!isInPiPMode && !streamCredentials && <View style={[styles.roomHeader, { top: insets.top + 8 }]}>
           <Pressable
             onPress={handleEndCall}
             disabled={endPending}

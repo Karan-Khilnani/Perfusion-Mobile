@@ -15,15 +15,12 @@ import { setBaseUrl } from "@workspace/api-client-react";
 import { Redirect, Stack, usePathname, type Href } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect } from "react";
-import {
-  ActivityIndicator,
-  View,
-} from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { BrandedLoading } from "@/components/BrandedLoading";
 import { IncomingCallOverlay } from "@/components/IncomingCallOverlay";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { CallProvider } from "@/contexts/CallContext";
@@ -48,18 +45,7 @@ function RootLayoutNav() {
   const pathname = usePathname();
 
   if (loading || (user?.role !== "admin" && user && callbackDeviceLoading)) {
-    return (
-      <View
-        style={{
-          flex: 1,
-          backgroundColor: colors.background,
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        <ActivityIndicator size="large" color={colors.primary} />
-      </View>
-    );
+    return <BrandedLoading />;
   }
 
   const publicPaths = [

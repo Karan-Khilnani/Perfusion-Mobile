@@ -1,10 +1,10 @@
 import { Feather } from "@expo/vector-icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import React from "react";
 import {
   Alert,
-  ActivityIndicator,
   Platform,
   Pressable,
   RefreshControl,
@@ -16,11 +16,11 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { BookingCard } from "@/components/BookingCard";
-import { BrandMark } from "@/components/BrandMark";
-import { ScreenHeading } from "@/components/ScreenHeading";
+import { ConsultationSkeletons, StateCard } from "@/components/SharedStates";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiFetch } from "@/hooks/useApi";
 import { useColors } from "@/hooks/useColors";
+import { BRAND_GRADIENT, designTokens } from "@/constants/designTokens";
 import { Booking, isSeekerRole } from "@/lib/mobile-models";
 
 function useConsultations(role?: string) {
@@ -88,52 +88,68 @@ export default function DashboardScreen() {
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: palette.background }}
-      contentContainerStyle={[
-        styles.container,
-        {
-          paddingTop: Platform.OS === "web" ? 76 : insets.top + 16,
-          paddingBottom: Platform.OS === "web" ? 126 : insets.bottom + 98,
-        },
-      ]}
+      contentContainerStyle={{ paddingBottom: Platform.OS === "web" ? 126 : insets.bottom + 98 }}
       refreshControl={<RefreshControl refreshing={consultations.isRefetching} onRefresh={consultations.refetch} tintColor={palette.primary} />}
       showsVerticalScrollIndicator={false}
     >
-      <View style={styles.brandRow}>
-        <BrandMark />
-        <View style={styles.headerActions}>
-          <Pressable style={[styles.headerIcon, { borderColor: palette.border }]} accessibilityLabel="Help">
-            <Feather name="help-circle" size={18} color={palette.foreground} />
-          </Pressable>
-          <Pressable style={[styles.headerIcon, { borderColor: palette.border }]} accessibilityLabel="Notifications">
-            <Feather name="bell" size={18} color={palette.foreground} />
-            {liveCount > 0 && <View style={[styles.notificationDot, { backgroundColor: palette.primary }]} />}
+      <LinearGradient
+        colors={BRAND_GRADIENT}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={[styles.hero, { paddingTop: Platform.OS === "web" ? 76 : insets.top + 18 }]}
+      >
+        <View style={styles.heroTop}>
+          <Text style={styles.heroEyebrow}>PERFUSION</Text>
+          <Pressable
+            style={({ pressed }) => [styles.headerIcon, { opacity: pressed ? 0.8 : 1 }]}
+            accessibilityLabel="Notifications"
+            accessibilityRole="button"
+          >
+            <Feather name="bell" size={19} color="#FFFFFF" />
+            {liveCount > 0 && <View style={styles.notificationDot} />}
           </Pressable>
         </View>
-      </View>
+        <Text style={styles.heroGreeting}>{greeting()}</Text>
+        <Text style={styles.heroName}>
+          {user?.role === "provider" && !/^dr\.?\s/i.test(name) ? `Dr. ${name}` : name}
+        </Text>
+        <Text style={styles.heroSubtitle}>
+          {date}{seeker && user?.hospitalName ? ` · ${user.hospitalName}${hospitalPlace ? ` · ${hospitalPlace}` : ""}` : ""}
+        </Text>
+        {liveCount > 0 && (
+          <View style={styles.livePill}>
+            <View style={styles.livePulse} />
+            <Text style={styles.livePillText}>{liveCount} ongoing</Text>
+          </View>
+        )}
+      </LinearGradient>
 
-      <View style={styles.greetingBlock}>
-        <ScreenHeading
-          title={`${greeting()}, Dr. ${name}`}
-          subtitle={`${date}${seeker && user?.hospitalName ? ` · ${user.hospitalName}${hospitalPlace ? ` · ${hospitalPlace}` : ""}` : ""}`}
-        />
-      </View>
+      <View style={styles.content}>
 
       {seeker ? (
         <Pressable
-          style={({ pressed }) => [styles.newConsultation, { backgroundColor: palette.primary, opacity: pressed ? 0.9 : 1 }]}
           onPress={() => router.push("/new-consultation")}
           testID="new-consultation-button"
         >
-          <View style={styles.newConsultationIcon}><Feather name="plus" size={20} color={palette.primary} /></View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.newConsultationTitle}>New Consultation</Text>
-            <Text style={styles.newConsultationSubtitle}>Find a specialist for your patient</Text>
-          </View>
-          <Feather name="arrow-right" size={19} color="#FFFFFF" />
+          {({ pressed }) => (
+            <LinearGradient
+              colors={BRAND_GRADIENT}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={[styles.newConsultation, { transform: [{ scale: pressed ? 0.985 : 1 }] }]}
+            >
+              <View style={styles.newConsultationIcon}><Feather name="plus" size={20} color={palette.primary} /></View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.newConsultationTitle}>New Consultation</Text>
+                <Text style={styles.newConsultationSubtitle}>Find a specialist for your patient</Text>
+              </View>
+              <Feather name="arrow-right" size={19} color="#FFFFFF" />
+            </LinearGradient>
+          )}
         </Pressable>
       ) : liveCount > 0 ? (
-        <View style={[styles.liveBanner, { borderColor: `${palette.primary}25`, backgroundColor: `${palette.primary}08` }]}>
-          <View style={[styles.livePulse, { backgroundColor: palette.primary }]} />
+        <View style={[styles.providerLiveBanner, { backgroundColor: palette.card, borderColor: palette.border }]}>
+          <View style={styles.livePulse} />
           <Text style={[styles.liveBannerText, { color: palette.foreground }]}>
             {liveCount} consultation{liveCount > 1 ? "s" : ""} ongoing
           </Text>
@@ -148,30 +164,30 @@ export default function DashboardScreen() {
           <Text style={[styles.sectionMeta, { color: palette.mutedForeground }]}>{bookings.length} of {consultations.data?.length || 0}</Text>
         </View>
         <Pressable onPress={() => router.push("/(tabs)/consultations")}>
-          <Text style={[styles.viewAll, { color: palette.foreground }]}>View all</Text>
+          <Text style={[styles.viewAll, { color: palette.primary }]}>View all consultations</Text>
         </Pressable>
       </View>
 
-      <View style={[styles.list, { backgroundColor: palette.card, borderColor: palette.border }]}>
+      <View style={styles.list}>
         {consultations.isLoading ? (
-          <View style={styles.state}>
-            <ActivityIndicator color={palette.primary} />
-            <Text style={[styles.stateText, { color: palette.mutedForeground }]}>Loading consultations…</Text>
-          </View>
+          <ConsultationSkeletons count={2} />
         ) : consultations.isError ? (
-          <View style={styles.state}>
-            <Feather name="alert-circle" size={30} color={palette.primary} />
-            <Text style={[styles.stateTitle, { color: palette.foreground }]}>Couldn’t load consultations</Text>
-            <Pressable onPress={() => consultations.refetch()}><Text style={[styles.retry, { color: palette.primary }]}>Retry</Text></Pressable>
-          </View>
+          <StateCard
+            variant="error"
+            icon="wifi-off"
+            title="Couldn’t load consultations"
+            message="Check your connection and try again."
+            actionLabel="Retry"
+            onAction={() => void consultations.refetch()}
+          />
         ) : bookings.length === 0 ? (
-          <View style={styles.state}>
-            <Feather name="phone-call" size={30} color={palette.mutedForeground} />
-            <Text style={[styles.stateTitle, { color: palette.foreground }]}>No consultations yet</Text>
-            <Text style={[styles.stateText, { color: palette.mutedForeground }]}>
-              {seeker ? "Book a specialist consultation to begin." : "Your consultation history will appear here once patients are booked in."}
-            </Text>
-          </View>
+          <StateCard
+            icon="phone-call"
+            title="No consultations yet"
+            message={seeker ? "Book a specialist consultation to begin." : "Your consultation history will appear here once patients are booked in."}
+            actionLabel={seeker ? "Find a consultant" : undefined}
+            onAction={seeker ? () => router.push("/new-consultation") : undefined}
+          />
         ) : (
           bookings.map((booking) => (
             <BookingCard
@@ -183,33 +199,33 @@ export default function DashboardScreen() {
           ))
         )}
       </View>
+      </View>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { paddingHorizontal: 18 },
-  brandRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  headerActions: { flexDirection: "row", gap: 8 },
-  headerIcon: { width: 38, height: 38, borderRadius: 19, borderWidth: 1, alignItems: "center", justifyContent: "center" },
-  notificationDot: { position: "absolute", top: 8, right: 8, width: 6, height: 6, borderRadius: 3 },
-  greetingBlock: { marginTop: 30, marginBottom: 22, gap: 5 },
-  greeting: { fontSize: 25, lineHeight: 31, fontFamily: "Sora_700Bold", letterSpacing: -0.6 },
-  date: { fontSize: 13, fontFamily: "Inter_400Regular" },
-  newConsultation: { borderRadius: 16, minHeight: 76, paddingHorizontal: 16, flexDirection: "row", alignItems: "center", gap: 13, marginBottom: 26 },
-  newConsultationIcon: { width: 38, height: 38, borderRadius: 19, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center" },
+  hero: { paddingHorizontal: 20, paddingBottom: 24, borderBottomLeftRadius: 26, borderBottomRightRadius: 26 },
+  heroTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  heroEyebrow: { color: "rgba(255,255,255,.78)", fontSize: 11, letterSpacing: 1.5, fontFamily: "Inter_700Bold" },
+  headerIcon: { width: 44, height: 44, borderRadius: 22, backgroundColor: "rgba(255,255,255,.16)", alignItems: "center", justifyContent: "center" },
+  notificationDot: { position: "absolute", top: 8, right: 8, width: 7, height: 7, borderRadius: 4, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: designTokens.color.coral },
+  heroGreeting: { marginTop: 20, color: "rgba(255,255,255,.86)", fontSize: 14, fontFamily: "Inter_500Medium" },
+  heroName: { color: "#FFFFFF", fontSize: 27, lineHeight: 35, fontFamily: "Sora_700Bold", letterSpacing: -0.5, marginTop: 1 },
+  heroSubtitle: { color: "rgba(255,255,255,.78)", fontSize: 12, lineHeight: 18, fontFamily: "Inter_400Regular", marginTop: 5 },
+  livePill: { marginTop: 14, alignSelf: "flex-start", flexDirection: "row", alignItems: "center", gap: 7, minHeight: 28, paddingHorizontal: 11, borderRadius: 999, backgroundColor: "rgba(255,255,255,.16)" },
+  livePulse: { width: 7, height: 7, borderRadius: 4, backgroundColor: designTokens.color.greenBright },
+  livePillText: { color: "#FFFFFF", fontSize: 11, fontFamily: "Inter_600SemiBold" },
+  content: { paddingHorizontal: 16, paddingTop: 20, gap: 18 },
+  newConsultation: { borderRadius: 18, minHeight: 76, paddingHorizontal: 16, flexDirection: "row", alignItems: "center", gap: 13, ...designTokens.shadow.card },
+  newConsultationIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center" },
   newConsultationTitle: { color: "#FFFFFF", fontSize: 16, fontFamily: "Sora_600SemiBold" },
-  newConsultationSubtitle: { color: "rgba(255,255,255,.78)", fontSize: 12, marginTop: 3, fontFamily: "Inter_400Regular" },
-  liveBanner: { borderWidth: 1, borderRadius: 13, minHeight: 50, paddingHorizontal: 14, flexDirection: "row", alignItems: "center", gap: 9, marginBottom: 24 },
-  livePulse: { width: 8, height: 8, borderRadius: 4 },
+  newConsultationSubtitle: { color: "rgba(255,255,255,.82)", fontSize: 12, marginTop: 3, fontFamily: "Inter_400Regular" },
+  providerLiveBanner: { borderWidth: 1, borderRadius: 16, minHeight: 48, paddingHorizontal: 14, flexDirection: "row", alignItems: "center", gap: 9 },
   liveBannerText: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
   sectionHeader: { flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 11 },
-  sectionTitle: { fontSize: 17, fontFamily: "Sora_600SemiBold" },
+  sectionTitle: { fontSize: 18, fontFamily: "Sora_600SemiBold" },
   sectionMeta: { fontSize: 11, fontFamily: "Inter_400Regular", marginTop: 3 },
-  viewAll: { fontSize: 12, fontFamily: "Inter_600SemiBold", textDecorationLine: "underline" },
-  list: { borderWidth: 1, borderRadius: 18, paddingHorizontal: 14, overflow: "hidden" },
-  state: { alignItems: "center", paddingVertical: 44, paddingHorizontal: 20, gap: 9 },
-  stateTitle: { fontSize: 15, fontFamily: "Inter_600SemiBold", textAlign: "center" },
-  stateText: { fontSize: 13, lineHeight: 19, fontFamily: "Inter_400Regular", textAlign: "center" },
-  retry: { fontSize: 13, fontFamily: "Inter_600SemiBold", padding: 6 },
+  viewAll: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
+  list: { gap: 12 },
 });

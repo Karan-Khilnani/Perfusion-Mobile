@@ -29,6 +29,7 @@ import { BrandMark } from "@/components/BrandMark";
 import { ScreenHeading } from "@/components/ScreenHeading";
 import { apiFetch, getBaseUrl, getStoredCookie } from "@/hooks/useApi";
 import { useColors } from "@/hooks/useColors";
+import { designTokens } from "@/constants/designTokens";
 
 type ProviderConsultant = {
   id: string;
@@ -160,27 +161,27 @@ export default function ProfileScreen() {
     >
       <View style={styles.brandRow}><BrandMark compact /></View>
       <ScreenHeading title="Profile" subtitle="Account and hospital details" />
-      <View style={styles.avatarSection}>
+      <View style={[styles.avatarSection, { backgroundColor: colors.quiet }]}>
         <View
           style={[
             styles.avatarLarge,
-            { backgroundColor: `${colors.primary}15` },
+            { backgroundColor: `${colors.card}22` },
           ]}
         >
-          <Text style={[styles.avatarInitial, { color: colors.primary }]}>
+          <Text style={[styles.avatarInitial, { color: colors.card }]}>
             {(user?.name || user?.email || "U")[0].toUpperCase()}
           </Text>
         </View>
-        <Text style={[styles.userName, { color: colors.foreground }]}>
+        <Text style={[styles.userName, { color: colors.card }]}>
           {user?.name || user?.email || "User"}
         </Text>
         <View
           style={[
             styles.rolePill,
-            { backgroundColor: `${colors.primary}12`, borderColor: `${colors.primary}25` },
+            { backgroundColor: `${colors.card}E8`, borderColor: colors.card },
           ]}
         >
-          <Text style={[styles.roleText, { color: colors.primary }]}>
+          <Text style={[styles.roleText, { color: colors.quiet }]}>
             {roleLabel()}
           </Text>
         </View>
@@ -359,7 +360,7 @@ export default function ProfileScreen() {
           style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border, padding: 16 }]}
           testID="edit-callback-device"
         >
-          <Text style={[styles.cardTitle, { color: colors.foreground, padding: 0 }]}>Callback Device  ›</Text>
+          <Text style={[styles.cardTitle, { color: colors.foreground, padding: 0 }]}>Callback Device</Text>
           <Text style={[styles.rowValue, { color: colors.mutedForeground, marginTop: 6 }]}>
             {callbackDevice ? `${callbackDevice.deviceName} · ${callbackDevice.phoneNumber}` : "Set up your callback number"}
           </Text>
@@ -827,7 +828,7 @@ function ProviderMyProfile() {
     >
       <View style={providerProfileStyles.pageHeading}>
         <BrandMark compact />
-        <Text style={[providerProfileStyles.pageTitle, { color: colors.foreground }]}>My Profile</Text>
+        <Text style={[providerProfileStyles.pageTitle, { color: colors.quiet }]}>My Profile</Text>
       </View>
       {loading ? (
         <View style={providerProfileStyles.centerState}>
@@ -869,27 +870,27 @@ function ProviderMyProfile() {
               </ScrollView>
             </View>
           )}
-          <View style={[providerProfileStyles.hero, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Pressable onPress={goEdit} style={[providerProfileStyles.editButton, { backgroundColor: colors.background }]} accessibilityRole="button" accessibilityLabel="Edit profile">
+          <View style={[providerProfileStyles.hero, { backgroundColor: colors.quiet, borderColor: colors.quiet }]}>
+            <Pressable onPress={goEdit} style={[providerProfileStyles.editButton, { backgroundColor: colors.card }]} accessibilityRole="button" accessibilityLabel="Edit profile">
               <Feather name="edit-2" size={16} color={colors.foreground} />
             </Pressable>
             <View style={providerProfileStyles.avatarWrap}>
               {avatarUri ? (
                 <Image source={{ uri: avatarUri }} style={providerProfileStyles.avatar} />
               ) : (
-                <View style={[providerProfileStyles.avatar, { backgroundColor: `${colors.primary}12`, alignItems: "center", justifyContent: "center" }]}>
-                  <Ionicons name="person-outline" size={32} color={colors.primary} />
+                <View style={[providerProfileStyles.avatar, { backgroundColor: `${colors.card}22`, alignItems: "center", justifyContent: "center" }]}>
+                  <Ionicons name="person-outline" size={32} color={colors.card} />
                 </View>
               )}
               <Pressable onPress={changePhoto} style={[providerProfileStyles.cameraButton, { backgroundColor: colors.primary }]} accessibilityRole="button" accessibilityLabel="Change profile photo">
-                {busyAction === "photo" ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Feather name="plus" size={16} color="#FFFFFF" />}
+                {busyAction === "photo" ? <ActivityIndicator size="small" color={colors.card} /> : <Feather name="plus" size={16} color={colors.card} />}
               </Pressable>
             </View>
-            <Text style={[providerProfileStyles.heroName, { color: colors.foreground }]}>{selectedConsultant?.name || displayName}</Text>
-            <Text style={[providerProfileStyles.heroSub, { color: colors.mutedForeground }]}>
+            <Text style={[providerProfileStyles.heroName, { color: colors.card }]}>{selectedConsultant?.name || displayName}</Text>
+            <Text style={[providerProfileStyles.heroSub, { color: `${colors.card}D9` }]}>
               {[selectedConsultant?.specialization, provider.data?.name].filter(Boolean).join(" · ") || "Healthcare Provider"}
             </Text>
-            <View style={[providerProfileStyles.verificationBadge, { backgroundColor: status.toLowerCase() === "verified" ? `${colors.success}15` : `${colors.warning}16` }]}>
+            <View style={[providerProfileStyles.verificationBadge, { backgroundColor: colors.card }]}>
               <Ionicons name="shield-checkmark-outline" size={14} color={status.toLowerCase() === "verified" ? colors.success : colors.warning} />
               <Text style={{ color: status.toLowerCase() === "verified" ? colors.success : colors.warning, fontFamily: "Inter_600SemiBold", fontSize: 12 }}>
                 {status}
@@ -926,7 +927,7 @@ function ProviderMyProfile() {
                   <Text style={[providerProfileStyles.docName, { color: colors.foreground }]} numberOfLines={1}>{document.filename}</Text>
                    <Text style={{ color: document.status?.toLowerCase() === "verified" ? colors.success : document.status ? colors.warning : colors.mutedForeground, fontSize: 12 }}>{document.status || "Status not available"}</Text>
                 </View>
-                <Pressable onPress={() => void openDocument(document)}><Text style={{ color: colors.primary, fontFamily: "Inter_600SemiBold" }}>View</Text></Pressable>
+                <Pressable onPress={() => void openDocument(document)} style={providerProfileStyles.inlineAction}><Text style={{ color: colors.primary, fontFamily: "Inter_600SemiBold" }}>View</Text></Pressable>
               </View>
             ))}
              {legacyDocUri && !registrationDocuments.some((document) => document.id === "legacy" || document.url === legacyDocUri) && (
@@ -938,7 +939,7 @@ function ProviderMyProfile() {
                   <Text style={[providerProfileStyles.docName, { color: colors.foreground }]} numberOfLines={1}>Registration document</Text>
                   <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>Legacy file</Text>
                 </View>
-                <Pressable onPress={() => void openDocument({ url: legacyDocUri })}><Text style={{ color: colors.primary, fontFamily: "Inter_600SemiBold" }}>View</Text></Pressable>
+                <Pressable onPress={() => void openDocument({ url: legacyDocUri })} style={providerProfileStyles.inlineAction}><Text style={{ color: colors.primary, fontFamily: "Inter_600SemiBold" }}>View</Text></Pressable>
               </View>
             )}
             {!registrationDocuments.length && !legacyDocUri && (
@@ -1138,18 +1139,24 @@ function ProviderTextInput({
 
 const styles = StyleSheet.create({
   container: {
-    paddingHorizontal: 20,
-    gap: 20,
+    paddingHorizontal: designTokens.spacing.gutter,
+    gap: designTokens.spacing.lg,
   },
-  brandRow: { alignItems: "flex-start", marginBottom: 2 },
+  brandRow: { alignItems: "flex-start", marginBottom: 0 },
   avatarSection: {
     alignItems: "center",
     gap: 8,
-    paddingVertical: 8,
+    paddingVertical: 24,
+    borderRadius: designTokens.radius.hero,
+    shadowColor: designTokens.shadow.card.color,
+    shadowOpacity: 0.16,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 5,
   },
   avatarLarge: {
-    width: 80,
-    height: 80,
+    width: 84,
+    height: 84,
     borderRadius: 40,
     alignItems: "center",
     justifyContent: "center",
@@ -1160,14 +1167,18 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_700Bold",
   },
   userName: {
-    fontSize: 22,
-    fontFamily: "Inter_700Bold",
+    fontSize: 21,
+    fontFamily: "Sora_700Bold",
+    letterSpacing: -0.3,
   },
   rolePill: {
     paddingHorizontal: 14,
-    paddingVertical: 5,
-    borderRadius: 20,
+    minHeight: 32,
+    paddingVertical: 6,
+    borderRadius: designTokens.radius.pill,
     borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
   },
   roleText: {
     fontSize: 13,
@@ -1178,8 +1189,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 6,
     paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderRadius: 20,
+    minHeight: 32,
+    paddingVertical: 6,
+    borderRadius: designTokens.radius.pill,
     borderWidth: 1,
   },
   pendingText: {
@@ -1187,13 +1199,18 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_500Medium",
   },
   card: {
-    borderRadius: 14,
+    borderRadius: designTokens.radius.card,
     borderWidth: 1,
     overflow: "hidden",
+    shadowColor: designTokens.shadow.card.color,
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 3,
   },
   cardTitle: {
     fontSize: 15,
-    fontFamily: "Inter_600SemiBold",
+    fontFamily: "Sora_600SemiBold",
     padding: 16,
     paddingBottom: 12,
   },
@@ -1202,6 +1219,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 12,
     paddingHorizontal: 16,
+    minHeight: 60,
     paddingVertical: 12,
     borderBottomWidth: 1,
   },
@@ -1222,8 +1240,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
-    padding: 14,
-    borderRadius: 12,
+    minHeight: 52,
+    paddingHorizontal: 16,
+    borderRadius: designTokens.radius.pill,
     borderWidth: 1,
   },
   logoutText: {
@@ -1238,52 +1257,53 @@ const styles = StyleSheet.create({
 });
 
 const providerProfileStyles = StyleSheet.create({
-  pageHeading: { paddingHorizontal: 20, paddingBottom: 14, gap: 16 },
-  pageTitle: { fontSize: 22, fontFamily: "Sora_600SemiBold" },
+  pageHeading: { paddingHorizontal: designTokens.spacing.gutter, paddingBottom: 8, gap: 14 },
+  pageTitle: { fontSize: 22, fontFamily: "Sora_600SemiBold", letterSpacing: -0.3 },
   centerState: { minHeight: 220, alignItems: "center", justifyContent: "center", gap: 12 },
-  selectorWrap: { paddingHorizontal: 20, paddingBottom: 12, gap: 8 },
-  selector: { borderWidth: 1, borderRadius: 18, paddingHorizontal: 12, paddingVertical: 8 },
-  hero: { alignItems: "center", paddingHorizontal: 20, paddingTop: 20, paddingBottom: 22, borderTopWidth: 1, borderBottomWidth: 1, position: "relative" },
+  selectorWrap: { paddingHorizontal: designTokens.spacing.gutter, paddingBottom: 4, gap: 8 },
+  selector: { minHeight: 44, borderWidth: 1, borderRadius: designTokens.radius.pill, paddingHorizontal: 14, paddingVertical: 8, justifyContent: "center" },
+  hero: { marginHorizontal: designTokens.spacing.gutter, alignItems: "center", paddingHorizontal: 20, paddingTop: 24, paddingBottom: 24, borderWidth: 1, borderRadius: designTokens.radius.hero, position: "relative", shadowColor: designTokens.shadow.card.color, shadowOpacity: 0.16, shadowRadius: 16, shadowOffset: { width: 0, height: 8 }, elevation: 5 },
   avatarWrap: { position: "relative", marginBottom: 10 },
-  avatar: { width: 78, height: 78, borderRadius: 39 },
-  cameraButton: { position: "absolute", width: 27, height: 27, borderRadius: 14, borderWidth: 2, borderColor: "#FFFFFF", right: -2, bottom: -1, alignItems: "center", justifyContent: "center" },
-  editButton: { position: "absolute", right: 16, top: 16, width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center" },
-  heroName: { fontSize: 19, fontFamily: "Sora_600SemiBold", textAlign: "center" },
+  avatar: { width: 84, height: 84, borderRadius: 42 },
+  cameraButton: { position: "absolute", width: 38, height: 38, borderRadius: 19, borderWidth: 2, borderColor: designTokens.color.card, right: -4, bottom: -4, alignItems: "center", justifyContent: "center" },
+  editButton: { position: "absolute", right: 16, top: 16, width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center" },
+  heroName: { fontSize: 19, fontFamily: "Sora_600SemiBold", textAlign: "center", letterSpacing: -0.2 },
   heroSub: { fontSize: 13, textAlign: "center", marginTop: 3 },
-  verificationBadge: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, marginTop: 10 },
-  section: { paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: StyleSheet.hairlineWidth },
-  sectionTitle: { fontSize: 11, fontFamily: "Inter_700Bold", letterSpacing: 0.4, marginBottom: 10 },
-  valueRow: { minHeight: 40, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 10, paddingVertical: 8, borderBottomWidth: StyleSheet.hairlineWidth },
+  verificationBadge: { flexDirection: "row", alignItems: "center", gap: 5, minHeight: 32, paddingHorizontal: 12, paddingVertical: 6, borderRadius: designTokens.radius.pill, marginTop: 10 },
+  section: { marginHorizontal: designTokens.spacing.gutter, marginTop: designTokens.spacing.md, paddingHorizontal: 16, paddingVertical: 16, borderWidth: 1, borderRadius: designTokens.radius.card, shadowColor: designTokens.shadow.card.color, shadowOpacity: 0.1, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 3 },
+  sectionTitle: { fontSize: 11, fontFamily: "Sora_600SemiBold", letterSpacing: 0.4, marginBottom: 10 },
+  valueRow: { minHeight: 44, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 10, paddingVertical: 8, borderBottomWidth: StyleSheet.hairlineWidth },
   valueLabel: { fontSize: 13, flexShrink: 0 },
   valueText: { fontSize: 13, fontFamily: "Inter_600SemiBold", textAlign: "right", flexShrink: 1 },
-  docRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 9, borderBottomWidth: StyleSheet.hairlineWidth },
+  docRow: { minHeight: 56, flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 9, borderBottomWidth: StyleSheet.hairlineWidth },
   docIcon: { width: 32, height: 32, borderRadius: 8, alignItems: "center", justifyContent: "center" },
   docName: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
   emptyCopy: { fontSize: 13, lineHeight: 19 },
-  actionRow: { flexDirection: "row", alignItems: "center", gap: 8, paddingTop: 12, minHeight: 34 },
+  actionRow: { flexDirection: "row", alignItems: "center", gap: 8, paddingTop: 12, minHeight: 44 },
   signatureImage: { width: "100%", height: 78, borderRadius: 10 },
   signatureEmpty: { height: 78, borderWidth: 1, borderStyle: "dashed", borderRadius: 10, alignItems: "center", justifyContent: "center", gap: 4 },
-  portfolioPhoto: { width: 66, height: 66, borderRadius: 10, backgroundColor: "#F0F1F3" },
-  portfolioAdd: { width: 66, height: 66, borderRadius: 10, borderWidth: 1.5, borderStyle: "dashed", alignItems: "center", justifyContent: "center" },
+  portfolioPhoto: { width: 72, height: 72, borderRadius: designTokens.radius.small, backgroundColor: designTokens.color.plumTint },
+  portfolioAdd: { width: 72, height: 72, borderRadius: designTokens.radius.small, borderWidth: 1.5, borderStyle: "dashed", alignItems: "center", justifyContent: "center" },
   portfolioText: { fontSize: 14, lineHeight: 21 },
   eyebrow: { fontSize: 10, fontFamily: "Inter_700Bold", letterSpacing: 0.35 },
-  footerLinks: { marginTop: 18, borderTopWidth: StyleSheet.hairlineWidth, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: "#ECEDF0" },
-  linkRow: { flexDirection: "row", alignItems: "center", gap: 11, minHeight: 58, paddingHorizontal: 20, borderBottomWidth: StyleSheet.hairlineWidth },
-  linkIcon: { width: 31, height: 31, borderRadius: 8, alignItems: "center", justifyContent: "center" },
+  footerLinks: { marginTop: 6, gap: 8 },
+  linkRow: { flexDirection: "row", alignItems: "center", gap: 11, minHeight: 60, marginHorizontal: 16, paddingHorizontal: 16, borderWidth: 1, borderRadius: designTokens.radius.medium, shadowColor: designTokens.shadow.card.color, shadowOpacity: 0.07, shadowRadius: 9, shadowOffset: { width: 0, height: 3 }, elevation: 2 },
+  linkIcon: { width: 36, height: 36, borderRadius: 11, alignItems: "center", justifyContent: "center" },
   linkTitle: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
   linkSubtitle: { fontSize: 11, marginTop: 2 },
   logoutArea: { alignItems: "center", paddingTop: 15, paddingHorizontal: 24 },
   logoutText: { fontSize: 12, fontFamily: "Inter_600SemiBold", paddingVertical: 6 },
   logoutNote: { fontSize: 10, lineHeight: 15, textAlign: "center" },
   modalBackdrop: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.38)" },
-  passwordModal: { borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 22, paddingBottom: 34 },
+  passwordModal: { borderTopLeftRadius: designTokens.radius.sheet, borderTopRightRadius: designTokens.radius.sheet, padding: 22, paddingBottom: 34 },
   modalHeading: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 18 },
   modalTitle: { fontSize: 20, fontFamily: "Sora_600SemiBold" },
   inputLabel: { fontSize: 13, fontFamily: "Inter_500Medium", marginBottom: 6 },
   input: { minHeight: 46, borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, fontSize: 15, fontFamily: "Inter_400Regular" },
   multilineInput: { minHeight: 100, paddingTop: 11, textAlignVertical: "top" },
-  saveButton: { minHeight: 48, borderRadius: 24, alignItems: "center", justifyContent: "center", marginTop: 5 },
-  saveButtonText: { color: "#FFFFFF", fontSize: 15, fontFamily: "Inter_600SemiBold" },
+  saveButton: { minHeight: 52, borderRadius: designTokens.radius.pill, alignItems: "center", justifyContent: "center", marginTop: 5 },
+  saveButtonText: { color: designTokens.color.card, fontSize: 15, fontFamily: "Inter_600SemiBold" },
+  inlineAction: { minHeight: 44, minWidth: 44, alignItems: "center", justifyContent: "center" },
   photoModalBackdrop: { flex: 1, justifyContent: "center", padding: 22, backgroundColor: "rgba(0,0,0,0.62)" },
   photoModal: { borderRadius: 16, padding: 16 },
   photoPreview: { width: "100%", height: 360, borderRadius: 10 },

@@ -21,6 +21,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { apiFetch } from "@/hooks/useApi";
 import { useColors } from "@/hooks/useColors";
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
+import { designTokens } from "@/constants/designTokens";
 import {
   type AttachmentDraft,
   pickCaseFileAttachment,
@@ -256,10 +257,10 @@ export default function NewConsultationScreen() {
 
   return (
     <View style={[styles.screen, { backgroundColor: palette.background, paddingTop: Platform.OS === "web" ? 67 : insets.top }]}>
-      <View style={[styles.header, { borderBottomColor: palette.border }]}>
-        <Pressable onPress={() => step === "details" ? setStep("explore") : router.back()} style={styles.iconButton}><Feather name="arrow-left" size={21} color={palette.foreground} /></Pressable>
+      <View style={[styles.header, { backgroundColor: palette.card, borderBottomColor: palette.border }]}>
+        <Pressable onPress={() => step === "details" ? setStep("explore") : router.back()} style={[styles.iconButton, { backgroundColor: palette.accent }]}><Feather name="arrow-left" size={21} color={palette.foreground} /></Pressable>
         <View style={{ flex: 1 }}>
-          <Text style={[styles.headerTitle, { color: palette.foreground }]}>New Consultation</Text>
+          <Text style={[styles.headerTitle, { color: palette.quiet }]}>New Consultation</Text>
           <Text style={[styles.headerStep, { color: palette.mutedForeground }]}>{step === "explore" ? "1 of 2 · Explore consultants" : "2 of 2 · Patient & clinical details"}</Text>
         </View>
       </View>
@@ -277,8 +278,8 @@ export default function NewConsultationScreen() {
           </View>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
             {SPECIALTIES.map((item) => (
-              <Pressable key={item} onPress={() => setSpecialty(item)} style={[styles.chip, { backgroundColor: specialty === item ? palette.foreground : palette.card, borderColor: specialty === item ? palette.foreground : palette.border }]}>
-                <Text style={[styles.chipText, { color: specialty === item ? palette.card : palette.foreground }]}>{item}</Text>
+              <Pressable key={item} onPress={() => setSpecialty(item)} style={[styles.chip, { backgroundColor: specialty === item ? palette.primary : palette.card, borderColor: specialty === item ? palette.primary : palette.border }]}>
+                <Text style={[styles.chipText, { color: specialty === item ? palette.primaryForeground : palette.foreground }]}>{item}</Text>
               </Pressable>
             ))}
           </ScrollView>
@@ -322,9 +323,9 @@ export default function NewConsultationScreen() {
             <View style={[styles.photo, { backgroundColor: palette.accent }]}><Feather name="user" size={22} color={palette.mutedForeground} /></View>
             <View style={{ flex: 1 }}>
               <Text style={[styles.selectedName, { color: palette.foreground }]}>{selected?.consultant.displayName || selected?.consultant.name}</Text>
-              <Text style={[styles.selectedMeta, { color: palette.primary }]}>{selected?.consultant.specialization} · {selected ? `${prettyDate(selected.slot.date)} · ${timeLabel(selected.slot.start)}` : ""}</Text>
+              <Text style={[styles.selectedMeta, { color: palette.quiet }]}>{selected?.consultant.specialization} · {selected ? `${prettyDate(selected.slot.date)} · ${timeLabel(selected.slot.start)}` : ""}</Text>
             </View>
-            <Text style={{ color: palette.primary, fontSize: 11, fontFamily: "Inter_700Bold" }}>Change</Text>
+              <Text style={{ color: palette.primary, fontSize: 11, fontFamily: "Inter_700Bold" }}>Change</Text>
           </Pressable>
           <Text style={[styles.sectionTitle, { color: palette.foreground }]}>Patient details</Text>
           <Input label="Patient Name*" value={form.patientName} onChangeText={(value) => update("patientName", value)} />
@@ -401,7 +402,7 @@ export default function NewConsultationScreen() {
           <Text style={[styles.patientIdNote, { color: palette.mutedForeground }]}>Selected files are added to the private Case File after the booking is created.</Text>
           <Text style={[styles.patientIdNote, { color: palette.mutedForeground }]}>A unique Perfusion Patient ID will be generated for a new patient and saved for future consultations.</Text>
           <Pressable disabled={!valid} onPress={() => setConfirming(true)} style={[styles.bookButton, { backgroundColor: valid ? palette.primary : palette.muted }]}>
-            <Text style={[styles.bookButtonText, { color: valid ? "#FFFFFF" : palette.mutedForeground }]}>Book Consultation</Text>
+            <Text style={[styles.bookButtonText, { color: valid ? palette.primaryForeground : palette.mutedForeground }]}>Book Consultation</Text>
           </Pressable>
         </KeyboardAwareScrollViewCompat>
       )}
@@ -433,10 +434,10 @@ export default function NewConsultationScreen() {
                       const hasSlots = (datesWithSlots.get(date) || []).length > 0;
                       const active = slotDate === date;
                       return (
-                        <Pressable key={date} disabled={!hasSlots} onPress={() => setSlotDate(date)} style={[styles.dateChip, { borderColor: active ? palette.foreground : palette.border, backgroundColor: active ? palette.foreground : palette.card, opacity: hasSlots ? 1 : 0.36 }]}>
-                          <Text style={[styles.dateDow, { color: active ? palette.card : palette.mutedForeground }]}>{prettyDate(date, { weekday: "short" })}</Text>
-                          <Text style={[styles.dateNumber, { color: active ? palette.card : palette.foreground }]}>{Number(date.slice(-2))}</Text>
-                          <Text style={[styles.dateMonth, { color: active ? palette.card : palette.mutedForeground }]}>{prettyDate(date, { month: "short" })}</Text>
+                        <Pressable key={date} disabled={!hasSlots} onPress={() => setSlotDate(date)} style={[styles.dateChip, { borderColor: active ? palette.primary : palette.border, backgroundColor: active ? palette.primary : palette.card, opacity: hasSlots ? 1 : 0.36 }]}>
+                           <Text style={[styles.dateDow, { color: active ? palette.primaryForeground : palette.mutedForeground }]}>{prettyDate(date, { weekday: "short" })}</Text>
+                           <Text style={[styles.dateNumber, { color: active ? palette.primaryForeground : palette.foreground }]}>{Number(date.slice(-2))}</Text>
+                           <Text style={[styles.dateMonth, { color: active ? palette.primaryForeground : palette.mutedForeground }]}>{prettyDate(date, { month: "short" })}</Text>
                         </Pressable>
                       );
                     })}
@@ -471,7 +472,7 @@ export default function NewConsultationScreen() {
                         const inRange = date >= base && date <= shiftDate(base, 29);
                         const available = (datesWithSlots.get(date) || []).length > 0;
                         const active = slotDate === date;
-                        return <Pressable key={date} disabled={!inRange || !available} onPress={() => { setSlotDate(date); setMonthView(false); }} style={[styles.calendarDay, active && { backgroundColor: palette.foreground }]}><Text style={{ color: active ? palette.card : inRange && available ? palette.foreground : palette.muted, fontSize: 12, fontFamily: "Inter_600SemiBold" }}>{day}</Text></Pressable>;
+                        return <Pressable key={date} disabled={!inRange || !available} onPress={() => { setSlotDate(date); setMonthView(false); }} style={[styles.calendarDay, active && { backgroundColor: palette.primary }]}><Text style={{ color: active ? palette.primaryForeground : inRange && available ? palette.foreground : palette.muted, fontSize: 12, fontFamily: "Inter_600SemiBold" }}>{day}</Text></Pressable>;
                       })];
                     })()}
                   </View>
@@ -568,8 +569,8 @@ export default function NewConsultationScreen() {
               style={[styles.bookButton, { backgroundColor: palette.primary, opacity: book.isPending || uploadingAttachments ? 0.75 : 1 }]}
             >
               {book.isPending || uploadingAttachments
-                ? <ActivityIndicator color="#FFFFFF" />
-                : <Text style={[styles.bookButtonText, { color: "#FFFFFF" }]}>
+                ? <ActivityIndicator color={palette.primaryForeground} />
+                : <Text style={[styles.bookButtonText, { color: palette.primaryForeground }]}>
                     {createdBooking && attachmentUploadError ? "Retry document uploads" : "Confirm Booking"}
                   </Text>}
             </Pressable>
@@ -601,7 +602,7 @@ function ConsultantCard({ consultant, onChoose, onOpen }: { consultant: Consulta
           <View style={{ flex: 1 }}>
             <Text style={[styles.nextLabel, { color: palette.mutedForeground }]}>NEXT AVAILABLE</Text>
             <Pressable onPress={(event) => { event.stopPropagation(); onChoose(next); }} style={styles.nextChip}>
-              <Feather name="clock" size={13} color={palette.success || "#0E7C57"} />
+              <Feather name="clock" size={13} color={palette.success} />
               <Text style={styles.nextChipText}>{next.appointmentSlot || `${prettyDate(next.date)} · ${timeLabel(next.start)}`}</Text>
             </Pressable>
           </View>
@@ -654,48 +655,48 @@ function UploadPrompt({
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  header: { height: 64, paddingHorizontal: 10, flexDirection: "row", alignItems: "center", borderBottomWidth: StyleSheet.hairlineWidth },
-  iconButton: { width: 42, height: 42, alignItems: "center", justifyContent: "center" },
-  headerTitle: { fontSize: 17, fontFamily: "Sora_600SemiBold" },
+  header: { minHeight: 68, paddingHorizontal: 8, flexDirection: "row", alignItems: "center", borderBottomWidth: StyleSheet.hairlineWidth },
+  iconButton: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center" },
+  headerTitle: { fontSize: 17, fontFamily: "Sora_600SemiBold", letterSpacing: -0.2 },
   headerStep: { fontSize: 10, marginTop: 2, fontFamily: "Inter_400Regular" },
-  content: { padding: 18, gap: 13 },
-  search: { height: 46, borderRadius: 14, borderWidth: 1, flexDirection: "row", alignItems: "center", paddingHorizontal: 13, gap: 8 },
+  content: { padding: designTokens.spacing.gutter, gap: designTokens.spacing.md },
+  search: { height: 48, borderRadius: designTokens.radius.medium, borderWidth: 1, flexDirection: "row", alignItems: "center", paddingHorizontal: 14, gap: 8, shadowColor: designTokens.shadow.card.color, shadowOpacity: 0.06, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 1 },
   searchInput: { flex: 1, fontSize: 13, fontFamily: "Inter_400Regular" },
-  chips: { gap: 7 },
-  chip: { height: 32, borderRadius: 16, borderWidth: 1, paddingHorizontal: 13, alignItems: "center", justifyContent: "center" },
+  chips: { gap: 8, paddingVertical: 2 },
+  chip: { minHeight: 40, borderRadius: designTokens.radius.pill, borderWidth: 1, paddingHorizontal: 14, alignItems: "center", justifyContent: "center" },
   chipText: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
-  toggleRow: { borderWidth: 1, borderRadius: 14, padding: 13, flexDirection: "row", alignItems: "center" },
+  toggleRow: { borderWidth: 1, borderRadius: designTokens.radius.card, padding: 14, flexDirection: "row", alignItems: "center", shadowColor: designTokens.shadow.card.color, shadowOpacity: 0.06, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 1 },
   toggleTitle: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
   toggleHint: { fontSize: 10, marginTop: 3, fontFamily: "Inter_400Regular" },
-  consultantCard: { height: 158, borderRadius: 15, borderWidth: 1, padding: 14, marginBottom: 12, justifyContent: "space-between" },
+  consultantCard: { minHeight: 164, borderRadius: designTokens.radius.card, borderWidth: 1, padding: 14, marginBottom: 12, justifyContent: "space-between", shadowColor: designTokens.shadow.card.color, shadowOpacity: 0.1, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 3 },
   cardMain: { height: 72, flexDirection: "row", gap: 12, alignItems: "center" },
-  cardPhoto: { width: 54, height: 54, borderRadius: 27, overflow: "hidden", alignItems: "center", justifyContent: "center" },
+  cardPhoto: { width: 56, height: 56, borderRadius: 18, overflow: "hidden", alignItems: "center", justifyContent: "center" },
   cardImage: { width: "100%", height: "100%" },
   cardCopy: { flex: 1, justifyContent: "center" },
   photo: { width: 52, height: 52, borderRadius: 26, alignItems: "center", justifyContent: "center" },
-  consultantName: { fontSize: 15, fontFamily: "Sora_600SemiBold" },
+  consultantName: { fontSize: 15, fontFamily: "Sora_600SemiBold", letterSpacing: -0.15 },
   specialization: { fontSize: 12, fontFamily: "Inter_700Bold", marginTop: 3 },
   credentials: { fontSize: 10, lineHeight: 14, fontFamily: "Inter_400Regular", marginTop: 3 },
-  nextRow: { minHeight: 54, borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 9, flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between", gap: 8 },
+  nextRow: { minHeight: 58, borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 10, flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between", gap: 8 },
   nextLabel: { fontSize: 9, letterSpacing: 0.6, fontFamily: "Inter_700Bold", marginBottom: 4 },
-  nextChip: { minHeight: 30, alignSelf: "flex-start", flexDirection: "row", alignItems: "center", gap: 5, borderRadius: 8, paddingHorizontal: 9, paddingVertical: 6, backgroundColor: "#E7F7F1" },
-  nextChipText: { color: "#0E7C57", fontFamily: "Inter_700Bold", fontSize: 10 },
-  allSlots: { minHeight: 32, flexDirection: "row", alignItems: "center", paddingLeft: 8, paddingBottom: 2 },
+  nextChip: { minHeight: 40, alignSelf: "flex-start", flexDirection: "row", alignItems: "center", gap: 5, borderRadius: designTokens.radius.small, paddingHorizontal: 10, paddingVertical: 7, backgroundColor: designTokens.color.greenTint },
+  nextChipText: { color: designTokens.color.green, fontFamily: "Inter_700Bold", fontSize: 10 },
+  allSlots: { minHeight: 44, flexDirection: "row", alignItems: "center", paddingLeft: 8, paddingBottom: 2 },
   allSlotsText: { fontSize: 11, fontFamily: "Inter_700Bold" },
   bookedOut: { height: 32, flexDirection: "row", alignItems: "center", gap: 7, borderRadius: 9, paddingHorizontal: 10 },
   bookedOutText: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
   loadingCards: { gap: 12, marginTop: 6 },
-  skeletonCard: { height: 158, borderWidth: 1, borderRadius: 15, padding: 14, flexDirection: "row", alignItems: "flex-start", gap: 12 },
+  skeletonCard: { height: 164, borderWidth: 1, borderRadius: designTokens.radius.card, padding: 14, flexDirection: "row", alignItems: "flex-start", gap: 12 },
   skeletonAvatar: { width: 54, height: 54, borderRadius: 27 },
   skeletonLine: { height: 10, borderRadius: 6 },
-  selectedCard: { borderRadius: 16, borderWidth: 1, padding: 13, flexDirection: "row", alignItems: "center", gap: 11 },
+  selectedCard: { borderRadius: designTokens.radius.card, borderWidth: 1, padding: 14, flexDirection: "row", alignItems: "center", gap: 11, shadowColor: designTokens.shadow.card.color, shadowOpacity: 0.08, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 2 },
   selectedName: { fontSize: 14, fontFamily: "Sora_600SemiBold" },
   selectedMeta: { fontSize: 11, fontFamily: "Inter_600SemiBold", marginTop: 4 },
-  sectionTitle: { fontSize: 16, fontFamily: "Sora_600SemiBold", marginTop: 8 },
+  sectionTitle: { fontSize: 16, fontFamily: "Sora_600SemiBold", marginTop: 8, letterSpacing: -0.2 },
   twoCol: { flexDirection: "row", gap: 10 },
   field: { gap: 6 },
   label: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
-  input: { height: 46, borderRadius: 12, borderWidth: 1, paddingHorizontal: 12, fontSize: 13, fontFamily: "Inter_400Regular" },
+  input: { minHeight: 48, borderRadius: designTokens.radius.medium, borderWidth: 1, paddingHorizontal: 13, fontSize: 13, fontFamily: "Inter_400Regular", shadowColor: designTokens.shadow.card.color, shadowOpacity: 0.04, shadowRadius: 7, shadowOffset: { width: 0, height: 2 }, elevation: 1 },
   textarea: { minHeight: 98, height: "auto", paddingVertical: 12, textAlignVertical: "top" },
   checkboxRow: { flexDirection: "row", alignItems: "center", gap: 9, paddingVertical: 5 },
   checkbox: { width: 20, height: 20, borderRadius: 5, borderWidth: 1, alignItems: "center", justifyContent: "center" },
@@ -708,22 +709,22 @@ const styles = StyleSheet.create({
   selectedFileName: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
   selectedFileMeta: { fontSize: 9, textTransform: "capitalize", marginTop: 2, fontFamily: "Inter_400Regular" },
   patientIdNote: { fontSize: 10, lineHeight: 15, fontFamily: "Inter_400Regular" },
-  bookButton: { height: 50, borderRadius: 14, alignItems: "center", justifyContent: "center", marginTop: 3 },
+  bookButton: { minHeight: 52, borderRadius: designTokens.radius.pill, alignItems: "center", justifyContent: "center", marginTop: 3, shadowColor: designTokens.color.coral, shadowOpacity: 0.2, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 2 },
   bookButtonText: { fontSize: 14, fontFamily: "Sora_600SemiBold" },
   backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,.38)", justifyContent: "flex-end" },
-  confirmSheet: { padding: 20, borderTopLeftRadius: 24, borderTopRightRadius: 24 },
-  confirmTitle: { fontSize: 19, fontFamily: "Inter_700Bold", marginBottom: 18 },
+  confirmSheet: { padding: 20, borderTopLeftRadius: designTokens.radius.sheet, borderTopRightRadius: designTokens.radius.sheet, shadowColor: designTokens.shadow.elevated.color, shadowOpacity: 0.16, shadowRadius: 18, shadowOffset: { width: 0, height: -8 }, elevation: 6 },
+  confirmTitle: { fontSize: 19, fontFamily: "Sora_600SemiBold", marginBottom: 18 },
   confirmLine: { fontSize: 16, fontFamily: "Inter_700Bold" },
   confirmMeta: { fontSize: 12, marginTop: 5, fontFamily: "Inter_400Regular" },
   postpaid: { borderRadius: 12, padding: 12, flexDirection: "row", gap: 9, marginTop: 18 },
   postpaidText: { flex: 1, fontSize: 11, lineHeight: 16, fontFamily: "Inter_500Medium" },
   error: { fontSize: 11, marginTop: 10, fontFamily: "Inter_500Medium" },
-  slotSheet: { height: "84%", borderTopLeftRadius: 22, borderTopRightRadius: 22, overflow: "hidden" },
+  slotSheet: { height: "84%", borderTopLeftRadius: designTokens.radius.sheet, borderTopRightRadius: designTokens.radius.sheet, overflow: "hidden", shadowColor: designTokens.shadow.elevated.color, shadowOpacity: 0.16, shadowRadius: 18, shadowOffset: { width: 0, height: -8 }, elevation: 6 },
   sheetHandle: { width: 36, height: 4, borderRadius: 2, alignSelf: "center", marginTop: 10, marginBottom: 9 },
   sheetHeading: { flexDirection: "row", alignItems: "center", gap: 11, paddingHorizontal: 18, paddingBottom: 13 },
   sheetPhoto: { width: 42, height: 42, overflow: "hidden" },
   imagePhoto: { width: "100%", height: "100%", borderRadius: 21 },
-  closeButton: { width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center" },
+  closeButton: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center" },
   dateArea: { borderBottomWidth: StyleSheet.hairlineWidth, paddingBottom: 11 },
   dateStripRow: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 16 },
   dateStrip: { gap: 7, paddingVertical: 2 },
@@ -743,14 +744,14 @@ const styles = StyleSheet.create({
   slotSummary: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
   slotGroupTitle: { fontSize: 10, letterSpacing: 0.5, fontFamily: "Inter_700Bold", marginTop: 16, marginBottom: 8 },
   slotGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  slotChoice: { width: "31%", minHeight: 40, alignItems: "center", justifyContent: "center", borderWidth: 1, borderRadius: 10 },
+  slotChoice: { width: "31%", minHeight: 44, alignItems: "center", justifyContent: "center", borderWidth: 1, borderRadius: designTokens.radius.small },
   slotChoiceText: { fontSize: 11, fontFamily: "Inter_700Bold" },
   slotEmpty: { alignItems: "center", justifyContent: "center", paddingTop: 30, gap: 8 },
   slotError: { alignItems: "center", justifyContent: "center", paddingTop: 28, gap: 8 },
   emptyTitle: { fontSize: 13, fontFamily: "Inter_700Bold", textAlign: "center" },
   emptyHint: { fontSize: 11, lineHeight: 16, textAlign: "center", maxWidth: 240 },
   refreshButton: { borderRadius: 18, paddingHorizontal: 16, paddingVertical: 9, marginTop: 5 },
-  refreshButtonText: { color: "#FFFFFF", fontSize: 11, fontFamily: "Inter_700Bold" },
+  refreshButtonText: { color: designTokens.color.card, fontSize: 11, fontFamily: "Inter_700Bold" },
   slotSkeleton: { height: 40, borderRadius: 10 },
   slotFooter: { borderTopWidth: StyleSheet.hairlineWidth, paddingVertical: 12, paddingHorizontal: 18 },
   footerText: { textAlign: "center", fontSize: 10, fontFamily: "Inter_500Medium" },

@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useAudioPlayer } from "expo-audio";
+import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
@@ -15,12 +16,11 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useCall } from "@/contexts/CallContext";
-import { useColors } from "@/hooks/useColors";
+import { ACCEPT_CALL_GRADIENT, INCOMING_CALL_GRADIENT, designTokens } from "@/constants/designTokens";
 
 export function IncomingCallOverlay() {
   const { incomingCall, acceptCall, declineCall } = useCall();
   const ringtone = useAudioPlayer(require("../assets/audio/perfusion_ring.wav"));
-  const colors = useColors();
   const insets = useSafeAreaInsets();
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const [responding, setResponding] = useState(false);
@@ -57,6 +57,13 @@ export function IncomingCallOverlay() {
   }, [incomingCall?.bookingId, incomingCall?.sessionGeneration, pulseAnim, ringtone]);
 
   if (!incomingCall) return null;
+  const callerInitials = incomingCall.callerName
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join("") || "•";
 
   const handleAccept = async () => {
     if (responding) return;
@@ -100,7 +107,10 @@ export function IncomingCallOverlay() {
   };
 
   return (
-    <View
+    <LinearGradient
+      colors={INCOMING_CALL_GRADIENT}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
       style={[
         styles.overlay,
         {
@@ -115,11 +125,11 @@ export function IncomingCallOverlay() {
           <Animated.View
             style={[
               styles.avatarRing,
-              { borderColor: `${colors.primary}40`, transform: [{ scale: pulseAnim }] },
+              { borderColor: "rgba(255,255,255,.28)", transform: [{ scale: pulseAnim }] },
             ]}
           >
-            <View style={[styles.avatar, { backgroundColor: colors.primary }]}>
-              <Ionicons name="medical" size={40} color="#fff" />
+            <View style={styles.avatar}>
+              <Text style={styles.avatarInitials}>{callerInitials}</Text>
             </View>
           </Animated.View>
           <Text style={styles.callerName}>{incomingCall.callerName}</Text>
@@ -143,9 +153,10 @@ export function IncomingCallOverlay() {
               disabled={responding}
               style={({ pressed }) => [
                 styles.actionButton,
-                styles.declineButton,
-                { opacity: pressed ? 0.8 : 1 },
+                  { backgroundColor: designTokens.color.callDecline, opacity: responding ? 0.65 : pressed ? 0.82 : 1, transform: [{ scale: pressed ? 0.96 : 1 }] },
               ]}
+                accessibilityRole="button"
+                accessibilityLabel="Decline incoming call"
             >
               <Ionicons name="call" size={28} color="#fff" style={{ transform: [{ rotate: "135deg" }] }} />
             </Pressable>
@@ -157,25 +168,26 @@ export function IncomingCallOverlay() {
               onPress={handleAccept}
               disabled={responding}
               style={({ pressed }) => [
-                styles.actionButton,
-                styles.acceptButton,
-                { opacity: pressed ? 0.8 : 1 },
+                  { opacity: responding ? 0.65 : pressed ? 0.9 : 1, transform: [{ scale: pressed ? 0.96 : 1 }] },
               ]}
+                accessibilityRole="button"
+                accessibilityLabel="Accept incoming call"
             >
-              <Ionicons name={incomingCall.callType === "voice" ? "call" : "videocam"} size={28} color="#fff" />
+                <LinearGradient colors={ACCEPT_CALL_GRADIENT} style={styles.acceptButton}>
+                  <Ionicons name={incomingCall.callType === "voice" ? "call" : "videocam"} size={28} color="#fff" />
+                </LinearGradient>
             </Pressable>
             <Text style={styles.actionLabel}>Accept</Text>
           </View>
         </View>
       </View>
-    </View>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
   overlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "#0F0F0F",
     zIndex: 9999,
     alignItems: "center",
     justifyContent: "space-between",
@@ -190,7 +202,7 @@ const styles = StyleSheet.create({
   topSection: {
     alignItems: "center",
     gap: 12,
-    marginTop: 40,
+    marginTop: 32,
   },
   incomingLabel: {
     fontSize: 15,
@@ -199,24 +211,26 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   avatarRing: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    borderWidth: 3,
+    width: 136,
+    height: 136,
+    borderRadius: 68,
+    borderWidth: 2,
     alignItems: "center",
     justifyContent: "center",
     marginVertical: 8,
   },
   avatar: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+    width: 118,
+    height: 118,
+    borderRadius: 59,
+    backgroundColor: "rgba(255,255,255,.14)",
     alignItems: "center",
     justifyContent: "center",
   },
+  avatarInitials: { color: "#FFFFFF", fontSize: 32, fontFamily: "Sora_700Bold" },
   callerName: {
-    fontSize: 28,
-    fontFamily: "Inter_700Bold",
+    fontSize: 25,
+    fontFamily: "Sora_700Bold",
     color: "#FFFFFF",
     textAlign: "center",
   },
@@ -244,8 +258,8 @@ const styles = StyleSheet.create({
   actions: {
     flexDirection: "row",
     justifyContent: "center",
-    gap: 64,
-    marginBottom: 32,
+    gap: 56,
+    marginBottom: 20,
     width: "100%",
   },
   actionItem: {
@@ -253,17 +267,18 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   actionButton: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
+    width: 66,
+    height: 66,
+    borderRadius: 33,
     alignItems: "center",
     justifyContent: "center",
   },
-  declineButton: {
-    backgroundColor: "#EF4444",
-  },
   acceptButton: {
-    backgroundColor: "#16A34A",
+    width: 66,
+    height: 66,
+    borderRadius: 33,
+    alignItems: "center",
+    justifyContent: "center",
   },
   actionLabel: {
     fontSize: 13,

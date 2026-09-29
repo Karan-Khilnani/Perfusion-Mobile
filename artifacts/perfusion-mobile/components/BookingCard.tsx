@@ -1,7 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React, { useState } from "react";
-import { Alert, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { Alert, LayoutAnimation, Platform, Pressable, StyleSheet, Text, UIManager, View } from "react-native";
 import * as Haptics from "expo-haptics";
 
 import { useAuth } from "@/contexts/AuthContext";
@@ -14,6 +14,7 @@ import {
 } from "@/lib/mobile-models";
 import { useColors } from "@/hooks/useColors";
 import { apiFetch } from "@/hooks/useApi";
+import { designTokens } from "@/constants/designTokens";
 
 export type { Booking };
 
@@ -48,12 +49,15 @@ export function BookingCard({ booking, onStatusToggle, statusTogglePending = fal
     booking.bookingType === "consultation" &&
     booking.consultationLifecycleAvailable !== false &&
     ["ongoing", "paused"].includes(booking.status.toLowerCase());
-  const city = (booking.providerCity || booking.city || "").slice(0, 3).toUpperCase();
-  const initials = seeker
-    ? city || "—"
-    : `${booking.patientAge || "—"}${booking.patientGender ? booking.patientGender.slice(0, 1).toUpperCase() : ""}`;
-  const service = booking.providerSpecialization || booking.serviceName || "Consultation";
   const person = seeker ? booking.providerName : booking.patientName;
+  const initials = (person || "")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join("") || "—";
+  const service = booking.providerSpecialization || booking.serviceName || "Consultation";
   const hospital = seeker ? booking.providerHospital : booking.seekerHospitalName || booking.hospitalName;
   const location = seeker
     ? booking.providerCity || booking.city
@@ -69,6 +73,21 @@ export function BookingCard({ booking, onStatusToggle, statusTogglePending = fal
     booking.consultationLifecycleAvailable !== false &&
     booking.status.toLowerCase() === "ongoing";
   const videoAvailable = callsAvailable;
+  const statusTint = status.text === palette.success
+    ? designTokens.color.greenTint
+    : status.text === palette.warning
+      ? designTokens.color.goldTint
+      : status.text === palette.blue
+        ? designTokens.color.blueTint
+        : status.text === palette.quiet
+          ? designTokens.color.plumTint
+          : palette.muted;
+
+  const toggleExpanded = () => {
+    if (Platform.OS === "android") UIManager.setLayoutAnimationEnabledExperimental?.(true);
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setExpanded((value) => !value);
+  };
 
   const startCall = async (callType: "voice" | "video") => {
     if (startingCall) return;
@@ -102,21 +121,21 @@ export function BookingCard({ booking, onStatusToggle, statusTogglePending = fal
   };
 
   return (
-    <View style={[styles.row, { borderBottomColor: palette.border }]}>
+    <View style={[styles.row, { backgroundColor: palette.card, borderColor: palette.border }]}>
       <View style={styles.rowMain}>
-        <View style={[styles.badge, { backgroundColor: seeker ? `${palette.blue}12` : palette.accent }]}>
-          <Text style={[styles.badgeText, { color: seeker ? palette.blue : palette.foreground }]}>{initials}</Text>
+        <View style={[styles.badge, { backgroundColor: seeker ? designTokens.color.coralTint : designTokens.color.plumTint }]}>
+          <Text style={[styles.badgeText, { color: seeker ? palette.primary : palette.quiet }]}>{initials}</Text>
         </View>
         <View style={styles.rowBody}>
           <Pressable
             style={styles.rowDetails}
-            onPress={() => setExpanded((value) => !value)}
+            onPress={toggleExpanded}
             accessibilityRole="button"
             accessibilityState={{ expanded }}
             testID={`consultation-row-${booking.id}`}
           >
-            <Text style={[styles.title, { color: palette.foreground }]}>{title}</Text>
             <Text style={[styles.person, { color: palette.foreground }]}>{person || (seeker ? "Consultant" : "Patient")}</Text>
+            <Text style={[styles.title, { color: palette.mutedForeground }]}>{title}</Text>
             {patientContext ? <Text style={[styles.patientContext, { color: palette.mutedForeground }]}>For patient: {patientContext}</Text> : null}
             {providerConsultation ? (
               location ? (
@@ -134,7 +153,7 @@ export function BookingCard({ booking, onStatusToggle, statusTogglePending = fal
             <Text style={[styles.time, { color: palette.mutedForeground }]}>{time}</Text>
             {canToggleStatus ? (
               <Pressable
-                style={styles.status}
+                style={[styles.status, { backgroundColor: statusTint }]}
                 onPress={() => onStatusToggle?.(booking)}
                 disabled={statusTogglePending}
                 accessibilityRole="button"
@@ -147,7 +166,7 @@ export function BookingCard({ booking, onStatusToggle, statusTogglePending = fal
                 <Feather name={paused ? "play" : "pause"} size={12} color={status.text} />
               </Pressable>
             ) : (
-              <View style={styles.status}>
+              <View style={[styles.status, { backgroundColor: statusTint }]}>
                 <View style={[styles.dot, { backgroundColor: status.dot }]} />
                 <Text style={[styles.statusText, { color: status.text }]}>{status.label}</Text>
               </View>
@@ -155,7 +174,7 @@ export function BookingCard({ booking, onStatusToggle, statusTogglePending = fal
           </View>
         </View>
         <Pressable
-          onPress={() => setExpanded((value) => !value)}
+          onPress={toggleExpanded}
           style={styles.expandButton}
           accessibilityLabel={expanded ? "Collapse consultation actions" : "Expand consultation actions"}
         >
@@ -169,27 +188,31 @@ export function BookingCard({ booking, onStatusToggle, statusTogglePending = fal
             icon="phone"
             label={startingCall === "voice" ? "Calling…" : "Call"}
             disabled={!callsAvailable || !!startingCall}
-            color={palette.foreground}
+            color={callsAvailable ? palette.success : palette.terminal}
+            tint={designTokens.color.greenTint}
             onPress={() => startCall("voice")}
           />
           <Action
             icon="video"
             label={startingCall === "video" ? "Calling…" : "Video"}
             disabled={!videoAvailable || !!startingCall}
-            color={palette.foreground}
+            color={videoAvailable ? palette.blue : palette.terminal}
+            tint={designTokens.color.blueTint}
             onPress={() => startCall("video")}
           />
           <Action
             icon="folder"
             label="Case File"
-            color={palette.foreground}
+            color={palette.quiet}
+            tint={designTokens.color.plumTint}
             onPress={() => router.push(`/case-file/${booking.id}`)}
           />
           <Action
             icon={seeker ? "file-text" : "edit-3"}
             label={seeker ? "Advisory" : "Advise"}
             disabled={!seeker && !callsAvailable}
-            color={palette.foreground}
+            color={palette.primary}
+            tint={designTokens.color.coralTint}
             badge={seeker ? booking.caseFileUnreadAdvisories : undefined}
             onPress={() => router.push(`/case-file/${booking.id}?focus=advisory`)}
           />
@@ -204,6 +227,7 @@ function Action({
   label,
   disabled,
   color,
+  tint,
   badge,
   onPress,
 }: {
@@ -211,20 +235,27 @@ function Action({
   label: string;
   disabled?: boolean;
   color: string;
+  tint: string;
   badge?: number;
   onPress: () => void;
 }) {
   const palette = useColors();
   return (
     <Pressable
-      style={({ pressed }) => [styles.action, { opacity: disabled ? 0.35 : pressed ? 0.65 : 1 }]}
+      style={({ pressed }) => [
+        styles.action,
+        {
+          opacity: disabled ? 0.42 : pressed ? 0.75 : 1,
+          transform: [{ scale: pressed ? 0.96 : 1 }],
+        },
+      ]}
       disabled={disabled}
       onPress={onPress}
       accessibilityRole="button"
       testID={`consultation-action-${label.toLowerCase().replace(" ", "-")}`}
     >
-      <View>
-        <Feather name={icon} size={19} color={color} />
+      <View style={[styles.actionIcon, { backgroundColor: tint }]}>
+        <Feather name={icon} size={18} color={color} />
         {!!badge && (
           <View style={[styles.badgeCount, { backgroundColor: palette.primary }]}>
             <Text style={[styles.badgeCountText, { color: palette.primaryForeground }]}>{badge}</Text>
@@ -237,26 +268,27 @@ function Action({
 }
 
 const styles = StyleSheet.create({
-  row: { paddingVertical: 14, borderBottomWidth: StyleSheet.hairlineWidth },
-  rowMain: { flexDirection: "row", alignItems: "flex-start", gap: 12 },
-  badge: { width: 48, height: 48, borderRadius: 24, alignItems: "center", justifyContent: "center", marginTop: 1 },
+  row: { paddingVertical: 14, paddingHorizontal: 14, borderWidth: 1, borderRadius: 18, ...designTokens.shadow.card },
+  rowMain: { flexDirection: "row", alignItems: "center", gap: 12 },
+  badge: { width: 46, height: 46, borderRadius: 14, alignItems: "center", justifyContent: "center" },
   badgeText: { fontSize: 13, fontFamily: "Inter_700Bold", letterSpacing: -0.2 },
   rowBody: { flex: 1, minWidth: 0 },
-  rowDetails: { gap: 5 },
-  title: { fontSize: 15, lineHeight: 20, fontFamily: "Inter_600SemiBold" },
-  person: { fontSize: 13, lineHeight: 18, fontFamily: "Inter_500Medium" },
+  rowDetails: { gap: 3 },
+  title: { fontSize: 12, lineHeight: 17, fontFamily: "Inter_400Regular" },
+  person: { fontSize: 15, lineHeight: 20, fontFamily: "Sora_600SemiBold" },
   patientContext: { fontSize: 12, lineHeight: 17, fontFamily: "Inter_400Regular" },
   placeLine: { flexDirection: "row", flexWrap: "wrap", alignItems: "baseline", gap: 2 },
   placeStrong: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
   place: { fontSize: 12, fontFamily: "Inter_400Regular" },
   time: { fontSize: 12, fontFamily: "Inter_600SemiBold", marginLeft: 1 },
-  scheduleLine: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 4, flexWrap: "wrap" },
-  status: { flexDirection: "row", alignItems: "center", gap: 5, marginLeft: "auto" },
+  scheduleLine: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 8, flexWrap: "wrap" },
+  status: { flexDirection: "row", alignItems: "center", gap: 5, marginLeft: "auto", minHeight: 24, paddingHorizontal: 8, borderRadius: 999 },
   dot: { width: 7, height: 7, borderRadius: 4 },
-  statusText: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
-  expandButton: { padding: 7, marginRight: -5, marginTop: -4 },
-  actions: { marginTop: 12, marginLeft: 60, paddingTop: 12, flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", borderTopWidth: StyleSheet.hairlineWidth },
-  action: { alignItems: "center", gap: 5, minWidth: 53 },
+  statusText: { fontSize: 10, fontFamily: "Inter_600SemiBold" },
+  expandButton: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center", marginRight: -7 },
+  actions: { marginTop: 14, marginLeft: 58, paddingTop: 12, flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", borderTopWidth: StyleSheet.hairlineWidth },
+  action: { alignItems: "center", gap: 5, minWidth: 52, minHeight: 56 },
+  actionIcon: { width: 38, height: 38, borderRadius: 19, alignItems: "center", justifyContent: "center" },
   actionText: { fontSize: 11, fontFamily: "Inter_500Medium" },
   badgeCount: { position: "absolute", top: -7, right: -9, minWidth: 16, height: 16, paddingHorizontal: 4, borderRadius: 8, alignItems: "center", justifyContent: "center" },
   badgeCountText: { fontSize: 10, fontFamily: "Inter_700Bold" },
