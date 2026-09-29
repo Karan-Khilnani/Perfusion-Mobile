@@ -1,0 +1,1859 @@
+IMPORTANT — READ THIS BEFORE MODIFYING ANY CODE
+
+I am providing reference files containing the approved Perfusion Mobile UI/UX.
+
+You MUST inspect and use ALL provided reference files before making UI changes.
+
+The reference files are the source of truth for the visual design.
+
+Do NOT rely on your own design preferences, generic medical-app patterns, or assumptions.
+
+Do NOT invent UI elements, colors, typography, layouts, interactions, icons, animations, or states that are not supported by the provided references.
+
+Where the written design specification and the executable HTML reference differ or are ambiguous, use the executable HTML reference as the visual tie-breaker.
+
+First inspect the existing `artifacts/perfusion-mobile/` implementation and identify which existing files/components correspond to each reference screen.
+
+Then make the minimum necessary changes to reproduce the approved design while preserving all existing application functionality.
+
+DO NOT modify `artifacts/perfusion-web/`.
+
+DO NOT modify backend/API/database/business logic unless absolutely necessary for an existing UI state to function.
+
+Do not replace real application data with mock/reference data.
+
+Do not hardcode example names, hospitals, patients, doctors, IDs, or other reference data into the production app.
+
+============================================================
+PERFUSION MOBILE — MASTER UI/UX IMPLEMENTATION PROMPT
+============================================================
+
+## 1. ROLE
+
+You are modifying the existing Perfusion Mobile application.
+
+Your task is to bring the existing mobile application's UI/UX into exact visual and interaction alignment with the provided Perfusion UI/UX Design System and executable HTML reference.
+
+This is a production medical application.
+
+The goal is:
+
+EXISTING PERFUSION FUNCTIONALITY
++
+APPROVED PERFUSION UI/UX DESIGN
+=
+FINAL IMPLEMENTATION
+
+Do not redesign the application yourself.
+
+Do not "improve" or reinterpret the approved design.
+
+Do not substitute your own colors, fonts, spacing, icons, layouts, or interaction patterns.
+
+============================================================
+2. SOURCE OF TRUTH
+============================================================
+
+Use the provided reference files in this order:
+
+1. `perfusion-uiux-final-b.html`
+2. `Perfusion_UIUX_Design_System.docx`
+3. `perfusion-splash-and-icon-preview.html`
+4. `perfusion-app-icon-1024.png`
+5. `perfusion-logo-all-white.png`
+6. Any additional PDFs, screenshots, or reference files provided with this task
+
+The executable HTML reference is the most important visual reference.
+
+If the written specification is ambiguous, use the executable HTML reference as the tie-breaker.
+
+Do not make assumptions where the reference files provide an answer.
+
+============================================================
+3. FIRST — AUDIT THE EXISTING MOBILE APPLICATION
+============================================================
+
+Before changing any files, inspect the complete:
+
+`artifacts/perfusion-mobile/`
+
+implementation.
+
+Identify:
+
+- navigation structure
+- screen files
+- route files
+- shared components
+- contexts
+- hooks
+- API usage
+- theme/constants
+- typography/font loading
+- icon system
+- safe-area handling
+- bottom navigation
+- headers
+- cards
+- buttons
+- inputs
+- consultation rows
+- Case File
+- chat
+- Clinical Advisory
+- vitals
+- call UI
+- video-call UI
+- loading states
+- empty states
+- error states
+- profile
+- availability
+- consultant search
+
+Determine which existing components are shared across multiple screens.
+
+Reuse the existing architecture whenever possible.
+
+Do not duplicate components unnecessarily.
+
+Do not rewrite working business logic simply to change appearance.
+
+Before modifying a screen, understand how its current data and interactions work.
+
+============================================================
+4. UI/UX ONLY — PRESERVE FUNCTIONALITY
+============================================================
+
+This task is primarily a UI/UX implementation task.
+
+DO NOT change:
+
+- backend APIs
+- API contracts
+- database schema
+- authentication logic
+- consultation/business logic
+- booking logic
+- availability logic
+- call/video business logic
+- Case File data structure
+- PDF generation
+- Clinical Advisory backend behavior
+- payment/billing logic
+- navigation/business rules
+
+Unless a very small change is absolutely required for an existing UI state to function correctly.
+
+Keep existing functionality intact.
+
+The visual layer must adapt to the existing functionality.
+
+============================================================
+5. NEVER USE MOCK DATA
+============================================================
+
+Names shown in the reference such as:
+
+- Priya Singh
+- Rahul Sharma
+- Dr. S. Sharma
+- City Hospital, Bemetara
+
+are visual reference examples only.
+
+DO NOT hardcode them.
+
+Use the existing application's real:
+
+- provider data
+- patient data
+- hospital data
+- city
+- consultation data
+- status
+- timestamps
+- vitals
+- messages
+- availability
+- consultant information
+
+The result must be:
+
+REAL APPLICATION DATA + REFERENCE UI
+
+NOT:
+
+REFERENCE MOCK DATA + REFERENCE UI
+
+============================================================
+6. CENTRALIZED DESIGN TOKENS
+============================================================
+
+Create or reuse a centralized design-token system.
+
+Do not scatter arbitrary color values throughout the application.
+
+Use the following exact colors where specified by the design system:
+
+CORAL
+#F0654A
+
+PLUM
+#7A2E4D
+
+CANVAS
+#FDF6F1
+
+CARD
+#FFFFFF
+
+INK
+#2E2220
+
+INK-SOFT
+#8C7A75
+
+INK-FAINT
+#B8A9A2
+
+CORAL TINT
+#FDE6E0
+
+PLUM TINT
+#F1DEE7
+
+GOLD
+#E8A33D
+
+GOLD TINT
+#FBEFDA
+
+SCHEDULED
+#2F6FED
+
+SCHEDULED TINT
+#E8EFFD
+
+ONGOING / LIVE
+#F0654A
+
+COMPLETED / PAID
+#1FA971
+
+COMPLETED TINT
+#E3F3EA
+
+CANCELLED / EXPIRED
+#9AA0AC
+
+CANCELLED TINT
+#F0EDE9
+
+Do not introduce random colors.
+
+Do not use generic Material colors.
+
+Do not use pure black as the primary text color.
+
+Do not use cold grey as the global background.
+
+============================================================
+7. PRIMARY GRADIENT
+============================================================
+
+Use the Perfusion gradient:
+
+`linear-gradient(135deg, #F0654A, #7A2E4D)`
+
+Translate this correctly into React Native where required.
+
+Use the gradient for the components specified by the reference, including:
+
+- Dashboard hero
+- Case File header
+- Profile hero
+- primary buttons
+- outgoing chat bubbles
+- important brand elements
+- appropriate active controls
+
+Do NOT use the gradient on every component.
+
+Do NOT replace it with a flat color unless the reference specifically does so.
+
+============================================================
+8. APPLICATION BACKGROUND
+============================================================
+
+The primary application canvas must use:
+
+`#FDF6F1`
+
+This is the warm cream application background.
+
+Do not replace the global background with:
+
+- #FFFFFF
+- #F5F5F5
+- #F7F7F7
+- generic light grey
+
+White should primarily be used for cards and surfaces.
+
+============================================================
+9. TYPOGRAPHY
+============================================================
+
+Use the two specified font families:
+
+SORA
+for:
+
+- screen titles
+- greetings
+- patient/consultant names where specified
+- important numbers
+- vitals
+- fees
+- dashboard statistics
+- key numerical information
+
+INTER
+for:
+
+- body text
+- descriptions
+- chat messages
+- metadata
+- timestamps
+- hospital names
+- labels
+- forms
+- supporting information
+
+Approximate hierarchy:
+
+Greeting:
+22–24px
+Sora Bold/ExtraBold
+
+Screen title:
+18px
+Sora Semibold
+
+Card headline:
+15–16px
+Sora Bold
+
+Key number:
+16–20px
+Sora Bold/ExtraBold
+
+Body:
+14px
+Inter Regular/Medium
+
+Secondary/meta:
+12–13px
+Inter Regular
+
+Eyebrow/section label:
+11px
+Inter Bold
+small letter spacing
+
+Do not randomly change font sizes between screens.
+
+============================================================
+10. SPACING SYSTEM
+============================================================
+
+Use a 4px base spacing system.
+
+Preferred values:
+
+4px
+8px
+12px
+16px
+20px
+24px
+32px
+
+Use approximately:
+
+4px
+icon → label
+
+8px
+closely related elements
+
+12px
+card-to-card spacing
+internal sections
+
+16px
+standard screen left/right margin
+
+20px
+large card internal padding
+
+24px
+major section separation
+
+32px
+large vertical separation
+
+Do not introduce arbitrary spacing values unless required by the exact reference.
+
+============================================================
+11. SAFE AREA
+============================================================
+
+Respect Android/device safe areas.
+
+Do not manually fake status-bar spacing using arbitrary padding.
+
+Use the correct React Native safe-area implementation.
+
+Bottom navigation must also respect the bottom safe area.
+
+============================================================
+12. CORNER RADIUS
+============================================================
+
+Use the reference's rounded visual language.
+
+Approximately:
+
+8–10px
+small chips/badges
+
+14–16px
+avatars and compact icon containers
+
+16–20px
+standard cards
+
+20–24px
+hero headers/sheets
+
+999px
+buttons
+chips
+status pills
+circular controls
+
+Standard cards should generally use approximately 18–20px radius.
+
+Do not introduce sharp rectangular cards unless the reference explicitly contains one.
+
+============================================================
+13. SHADOWS
+============================================================
+
+Use soft warm-tinted shadows.
+
+Reference shadow:
+
+`0 6px 18px -8px rgba(58,25,20,0.18)`
+
+Large shadow:
+
+`0 16px 36px -12px rgba(58,25,20,0.28)`
+
+Translate these appropriately into React Native shadow/elevation properties.
+
+Do not use harsh black borders as the primary card separation.
+
+============================================================
+14. ICONOGRAPHY
+============================================================
+
+Use one consistent line-icon visual language.
+
+Target:
+
+1.6–1.8px visual stroke
+rounded joins
+rounded caps
+
+Do not mix random:
+
+- Material icons
+- filled icons
+- emoji
+- thick icons
+- thin icons
+- unrelated icon libraries
+
+unless the reference explicitly requires them.
+
+Inactive icons should remain clean and restrained.
+
+Active icons may use the specified active treatment.
+
+============================================================
+15. ACTION STATE COLORS
+============================================================
+
+Do not make every action grey.
+
+Grey should communicate unavailable/disabled.
+
+Available Call:
+
+#1FA971
+
+Available Video:
+
+#2F6FED
+
+Case File:
+
+neutral Ink-soft
+
+Advise:
+
+neutral Ink-soft
+
+Disabled actions:
+
+muted grey
+
+Preserve the application's existing logic for whether an action is enabled or disabled.
+
+Only update its visual representation.
+
+Do not alter the business rules.
+
+============================================================
+16. DASHBOARD
+============================================================
+
+Update the existing Provider Dashboard to visually match the reference.
+
+HEADER
+
+Use:
+
+Coral → Plum gradient
+
+Rounded bottom corners approximately 24px.
+
+Approximate hero height:
+
+130–150px
+
+Horizontal padding:
+
+20px
+
+Greeting:
+
+"Good morning"
+
+followed by the REAL logged-in provider name.
+
+Use Sora for the greeting.
+
+Do not hardcode a provider name.
+
+NOTIFICATION
+
+Use the circular notification control shown in the reference.
+
+Keep the notification badge small.
+
+Do not create a large notification card unless explicitly shown in the reference.
+
+STATISTICS
+
+If the existing dashboard already has statistics, style them like the reference.
+
+Do not invent new statistics.
+
+CONSULTATION ROWS
+
+Use:
+
+white cards
+18–20px radius
+approximately 14px internal padding
+approximately 12px vertical card spacing
+soft warm shadow
+
+Avatar:
+
+approximately 46 × 46px
+rounded
+
+Patient name:
+
+Sora
+15px
+Bold
+
+Hospital:
+
+Inter
+12px
+Ink-soft
+
+Time:
+
+11–12px
+Ink-soft
+
+Status:
+
+small pill
+999px radius
+small status dot
+
+Status colors:
+
+Scheduled:
+#2F6FED
+
+Ongoing:
+#F0654A
+
+Completed:
+#1FA971
+
+Cancelled/Expired:
+#9AA0AC
+
+Do not turn the entire consultation card into a status color.
+
+============================================================
+17. DASHBOARD EXPANDABLE ACTIONS
+============================================================
+
+When a consultation row expands, show the action area according to the reference.
+
+Actions:
+
+Call
+Video
+Case File
+Advise
+
+Each should have:
+
+- circular icon area
+- icon
+- label
+- correct state color
+
+Call:
+green
+
+Video:
+blue
+
+Case File:
+neutral
+
+Advise:
+neutral
+
+For completed consultations:
+
+Call = disabled
+Video = disabled
+Advise = disabled
+Case File = enabled
+
+Do not change this behavior.
+
+Expansion should animate smoothly.
+
+Do not use a hard visual cut.
+
+============================================================
+18. BOTTOM NAVIGATION
+============================================================
+
+Maintain the existing navigation structure.
+
+Style the primary bottom navigation consistently.
+
+Approximate height:
+
+70–80px including safe area.
+
+Tabs should use the existing application routes.
+
+Use:
+
+Dashboard
+Consultations
+Billing
+Profile
+
+if those are the existing tabs.
+
+Inactive:
+
+Ink-faint/grey
+line icon
+
+Active:
+
+Coral-based active treatment
+
+Do not change route/business logic.
+
+============================================================
+19. CASE FILE / CHAT
+============================================================
+
+This is one of the most important screens.
+
+The Case File should feel like a modern messaging application.
+
+The intended mental model is:
+
+"Clinical WhatsApp"
+
+NOT:
+
+"hospital enterprise log"
+
+Use:
+
+- real chat bubbles
+- avatars
+- comfortable spacing
+- readable messages
+- timestamps
+- clear sender/receiver distinction
+
+HEADER
+
+Use Coral → Plum gradient.
+
+Rounded bottom corners approximately 22–24px.
+
+Header should contain:
+
+Back
+Avatar
+Patient name
+Hospital/consultation information as specified
+Call
+Video
+
+Use REAL application data.
+
+Do not show unnecessary internal information.
+
+============================================================
+20. VITALS STRIP
+============================================================
+
+Place the vitals section immediately below the Case File header as shown in the reference.
+
+Use separate mini cards for:
+
+BP
+HR
+GCS
+SpO2
+
+Use the specified tint hierarchy:
+
+BP:
+Coral tint
+
+HR:
+Plum tint
+
+GCS:
+Gold tint
+
+SpO2:
+Green tint
+
+Key values:
+
+Sora
+
+Labels:
+
+Inter
+
+Do not merge all vitals into one dense block if the reference shows separate cards.
+
+============================================================
+21. CHAT BUBBLES
+============================================================
+
+INCOMING MESSAGE
+
+Use:
+
+white/Card background
+Ink text
+soft shadow
+
+Include the appropriate sender/avatar treatment.
+
+OUTGOING MESSAGE
+
+Use:
+
+Coral → Plum gradient
+white text
+
+Messages must visually resemble modern chat bubbles.
+
+Do not render messages as:
+
+- plain text rows
+- raw clinical logs
+- JSON
+- API response objects
+
+Use comfortable vertical spacing.
+
+============================================================
+22. CRITICAL CHAT BUG PREVENTION
+============================================================
+
+Only show the human-readable message.
+
+NEVER show:
+
+- message IDs
+- UUIDs
+- sender IDs
+- receiver IDs
+- database IDs
+- API metadata
+- raw JSON
+- debugging text
+- internal codes
+
+If the API returns multiple fields, map only the intended human-readable message field to the UI.
+
+The visible Case File should look like a normal messaging application.
+
+============================================================
+23. CLINICAL ADVISORY
+============================================================
+
+Clinical Advisory must NOT look like a normal chat bubble.
+
+It should be a distinct permanent-record card.
+
+Use:
+
+Plum tint / #F1DEE7
+Plum accent
+appropriate pencil/edit icon
+
+Eyebrow:
+
+CLINICAL ADVISORY
+
+Use uppercase Inter.
+
+Actual advisory content:
+
+normal readable body text.
+
+Do not convert it into:
+
+- generic chat bubble
+- red alert
+- prescription pad
+- full-screen modal
+
+Preserve the existing Clinical Advisory functionality.
+
+============================================================
+24. CHAT COMPOSER
+============================================================
+
+Bottom composer should feel like a modern messaging application.
+
+Structure:
+
+Attachment/Add
+Message input
+Send
+
+Use:
+
+warm cream screen background
+white/Card input
+soft shadow
+rounded shape
+
+Send button:
+
+Coral → Plum gradient
+circular
+white send icon
+
+Keyboard behavior must remain correct.
+
+============================================================
+25. EXPLORE CONSULTANTS
+============================================================
+
+Match the reference.
+
+HEADER
+
+Use the specified white/card header treatment.
+
+Include:
+
+Back
+Explore Consultants
+Step of 2 indicator if present in existing flow
+
+TITLE
+
+"Explore Consultants"
+
+Use Sora.
+
+SUBTITLE
+
+Use the existing flow's correct subtitle.
+
+SEARCH
+
+Use rounded grey-tint search field.
+
+Placeholder:
+
+"Search by name or specialty…"
+
+Do not hardcode search behavior.
+
+FILTERS
+
+Use the filters supported by the existing application/reference.
+
+Active filter:
+
+Coral → Plum gradient
+white text
+pill
+
+Inactive filters:
+
+grey tint
+Ink-soft
+
+AVAILABLE-TODAY FILTER
+
+Match the reference styling.
+
+CONSULTANT CARDS
+
+White
+18px radius
+soft shadow
+approximately 14px padding
+
+Information hierarchy:
+
+Doctor name
+Specialty
+Qualifications
+Next available
+
+Doctor name:
+Sora
+
+Specialty:
+Plum
+
+Supporting information:
+Ink-soft
+
+"NEXT AVAILABLE":
+small uppercase eyebrow
+
+Availability:
+Coral tint
+
+Do not invent consultant data.
+
+============================================================
+26. MY PROFILE
+============================================================
+
+Profile should visually match the reference.
+
+HERO
+
+Use Coral → Plum gradient.
+
+Rounded bottom corners approximately 28px.
+
+Avatar:
+
+approximately 74px
+
+Name:
+
+Sora
+18px
+Bold/ExtraBold
+white
+
+Subtitle:
+
+approximately 12px
+white with reduced opacity
+
+Verified Provider:
+
+white/translucent pill
+appropriate text treatment
+
+PERSONAL DETAILS
+
+Use clean white cards.
+
+PROFESSIONAL DETAILS
+
+Use clean white cards.
+
+Fields should be:
+
+label
+value
+
+with subtle dividers where appropriate.
+
+Do not create unnecessarily dense forms.
+
+Locked fields should be visually muted.
+
+============================================================
+27. PROVIDER AVAILABILITY
+============================================================
+
+The existing Availability feature in My Profile must retain its current functionality.
+
+Style the row according to the reference:
+
+white navigation row
+Coral-tint icon container
+title
+secondary description
+chevron
+
+Do not change the availability business logic.
+
+Only update presentation.
+
+============================================================
+28. INCOMING CALL
+============================================================
+
+Incoming Call must feel like a native high-priority calling experience.
+
+Use the visual treatment shown in the reference.
+
+Background should use the specified dark Plum/Coral treatment.
+
+Center the patient identity.
+
+Avatar:
+
+approximately 118px
+
+Patient name:
+
+Sora
+approximately 23px
+ExtraBold
+white
+
+Hospital:
+
+approximately 13px
+white with reduced opacity
+
+Incoming type:
+
+"Incoming video call…"
+
+BOTTOM ACTIONS
+
+Decline:
+
+dark treatment
+
+Accept:
+
+green treatment
+
+Accept should use the specified green gradient/treatment.
+
+Buttons approximately 66px diameter.
+
+Labels should appear below.
+
+Do not make Accept and Decline visually identical.
+
+============================================================
+29. VIDEO CALL
+============================================================
+
+Do not simplify the video call screen.
+
+The reference contains a layered full-screen video-call experience.
+
+Layer order:
+
+1. Remote video
+2. Top dark scrim
+3. Bottom dark scrim
+4. Top identity controls
+5. Self-view
+6. Bottom controls
+
+Scrims must remain visually fixed independently of video content.
+
+TOP IDENTITY
+
+Show the existing real:
+
+patient avatar
+patient name
+connection state
+timer
+
+Connection state must use the existing call state.
+
+Possible states may include:
+
+Connected
+Connecting
+Reconnecting
+
+Do not invent state values.
+
+SELF-VIEW
+
+Self-view should:
+
+- be rounded
+- have soft shadow
+- float above remote video
+- remain draggable
+- stay within screen bounds
+
+Show mute indicator only when actually muted.
+
+============================================================
+30. VIDEO CALL CONTROLS
+============================================================
+
+SECONDARY CONTROLS
+
+Above the main controls:
+
+Chat
+Case File
+Advise
+
+Use approximately 42px circular controls.
+
+These should be visually quieter than the main call controls.
+
+MAIN CONTROLS
+
+Use approximately 50px controls for:
+
+Mute
+Camera
+Speaker
+Flip
+
+END CALL
+
+Use approximately 68px.
+
+End Call must be visually dominant.
+
+Do not make every control identical.
+
+Preserve all existing call functionality.
+
+============================================================
+31. VIDEO CALL AUTO-HIDE
+============================================================
+
+Controls should automatically hide after approximately 4 seconds without interaction, matching the reference.
+
+Tapping the screen should reveal them again.
+
+Do not remove this behavior if it already exists in the reference implementation.
+
+============================================================
+32. LOADING STATES
+============================================================
+
+Use content-shaped skeleton loading.
+
+Do not use generic full-screen spinners where the reference expects skeletons.
+
+Skeleton geometry should correspond to the final content.
+
+Examples:
+
+avatar → avatar skeleton
+name → text-width skeleton
+hospital → text-width skeleton
+status → pill skeleton
+header → corresponding skeleton
+
+Use subtle shimmer.
+
+Avoid layout jumping when real content loads.
+
+============================================================
+33. EMPTY STATES
+============================================================
+
+Use the consistent reference template:
+
+large circular icon background
+headline
+short explanation
+optional primary action
+
+Example structure:
+
+No consultations today
+
+New bookings will appear here as soon as a seeker schedules one with you.
+
+[ Check Availability ]
+
+Do not use alarming error styling for an empty state.
+
+Keep the visual tone calm.
+
+============================================================
+34. ERROR STATES
+============================================================
+
+Error states must visually differ from empty states.
+
+Use:
+
+red-tinted icon circle
+warning/error icon
+headline
+short explanation
+Retry button where appropriate
+
+Example:
+
+Couldn't load your dashboard
+
+Check your connection and try again.
+
+[ Retry ]
+
+Do not make the entire screen red.
+
+============================================================
+35. MOTION
+============================================================
+
+Use subtle, tactile animation.
+
+Buttons, chips, cards, and tappable actions should provide immediate press feedback.
+
+Prefer subtle scale/compression.
+
+Do not use dramatic animations.
+
+Sheets:
+
+slide upward with easing
+
+Dismiss:
+
+slide downward/swipe where applicable
+
+New messages:
+
+animate naturally into the feed
+
+New Clinical Advisory:
+
+animate naturally into the feed
+
+Use haptic feedback where supported for important actions such as:
+
+- Book
+- Confirm
+- End Call
+- Send Clinical Advisory
+- Accept Call
+- Decline Call
+
+Do not add:
+
+- excessive bounce
+- flashy transitions
+- confetti
+- gamification
+- unnecessary animations
+
+============================================================
+36. SPLASH SCREEN
+============================================================
+
+Use the supplied actual Perfusion logo asset.
+
+Do not recreate the logo manually.
+
+Splash screen:
+
+full-screen Coral → Plum gradient
+
+centered all-white Perfusion logo
+
+Use the provided:
+
+`perfusion-logo-all-white.png`
+
+Do not substitute another logo.
+
+If the approved splash reference contains additional approved text/tagline, preserve it exactly.
+
+Do not invent new splash copy.
+
+============================================================
+37. APP ICON
+============================================================
+
+Use the supplied:
+
+`perfusion-app-icon-1024.png`
+
+Do not redesign the icon.
+
+Do not recreate the icon using generic shapes.
+
+Do not replace the icon with the full wordmark.
+
+============================================================
+38. LOGO RULES
+============================================================
+
+LIGHT / CREAM SURFACES
+
+Use the approved full-color Perfusion lockup if provided.
+
+DARK / GRADIENT / COLORED SURFACES
+
+Use the all-white Perfusion lockup.
+
+Do not use the full-color logo on dark/gradient backgrounds.
+
+Do not use the white logo on light backgrounds unless the reference explicitly does so.
+
+============================================================
+39. NO DECORATIVE ILLUSTRATIONS IN CLINICAL UI
+============================================================
+
+Do not add decorative illustrations to:
+
+- Dashboard
+- Case File
+- vitals
+- consultation rows
+- clinical screens
+
+Illustrations should only appear where the reference explicitly supports them, such as onboarding or approved empty/permission states.
+
+============================================================
+40. MEDICAL UX PRINCIPLE
+============================================================
+
+The application should feel like:
+
+"Clinical WhatsApp"
+
+rather than:
+
+"hospital enterprise software"
+
+Therefore prioritize:
+
+- familiar interactions
+- comfortable spacing
+- readable information
+- obvious actions
+- fast scanning
+- strong hierarchy
+- professional but approachable appearance
+
+Do not make the UI:
+
+- sterile
+- overly dense
+- overly corporate
+- dashboard-heavy
+- border-heavy
+- full of tiny text
+- visually intimidating
+
+============================================================
+41. TOUCH TARGETS
+============================================================
+
+Every tappable control must have an effective touch area of at least:
+
+44 × 44px
+
+Even if the visible icon is smaller, provide appropriate touch padding.
+
+Do not make icons difficult to tap.
+
+============================================================
+42. RESPONSIVE BEHAVIOR
+============================================================
+
+The HTML reference may use a 390×844 reference device.
+
+Do NOT hardcode the entire React Native application to that exact resolution.
+
+Translate the design into responsive React Native layouts.
+
+Maintain:
+
+- safe areas
+- proportional spacing
+- scrolling
+- keyboard behavior
+- bottom navigation
+- correct header heights
+- touch areas
+- correct behavior on smaller Android devices
+- correct behavior on larger Android devices
+
+============================================================
+43. COMPONENTIZATION
+============================================================
+
+Reuse shared components where appropriate.
+
+Potential reusable components include:
+
+PerfusionHeader
+GradientHeader
+ScreenTitle
+StatusPill
+ConsultationCard
+ConsultationActions
+Avatar
+VitalCard
+ChatBubble
+ClinicalAdvisoryCard
+PrimaryButton
+SecondaryButton
+IconButton
+BottomTabBar
+Skeleton
+EmptyState
+ErrorState
+ProfileSection
+ProfileField
+ProfileNavigationRow
+IncomingCall
+VideoCallControls
+
+Do not create abstractions unnecessarily.
+
+Do not duplicate the same UI logic across many screens if a reusable component is appropriate.
+
+============================================================
+44. DO NOT MODIFY THE WEB APPLICATION
+============================================================
+
+This task is specifically for:
+
+`artifacts/perfusion-mobile/`
+
+Do NOT modify:
+
+`artifacts/perfusion-web/`
+
+unless there is an unavoidable shared dependency and it is demonstrably required.
+
+The mobile UI must be implemented independently.
+
+============================================================
+45. DO NOT BREAK EXISTING FUNCTIONALITY
+============================================================
+
+After UI changes verify:
+
+DASHBOARD
+
+- consultation data loads
+- status loads correctly
+- consultation expansion works
+- Call works
+- Video works
+- Case File works
+- Advise works
+- completed-state restrictions work
+
+CASE FILE
+
+- messages load
+- messages send
+- real sender/receiver data works
+- vitals load
+- Clinical Advisory works
+- existing attachments continue working
+- navigation works
+
+EXPLORE CONSULTANTS
+
+- search works
+- filters work
+- availability filter works
+- real consultant data loads
+- booking flow works
+
+PROFILE
+
+- profile data loads
+- Availability navigation works
+- change password works
+- support works
+- logout works
+
+CALLS
+
+- incoming call works
+- accept works
+- decline works
+- video works
+- mute works
+- camera works
+- speaker works
+- flip works
+- end call works
+- self-view works
+
+============================================================
+46. IMPLEMENTATION PROCESS
+============================================================
+
+Follow this order.
+
+STEP 1
+
+Inspect the existing mobile application.
+
+STEP 2
+
+Inspect ALL supplied reference files.
+
+STEP 3
+
+Map each reference screen to the corresponding existing mobile screen/component.
+
+STEP 4
+
+Create/reuse centralized design tokens:
+
+- colors
+- typography
+- spacing
+- radius
+- shadows
+- gradients
+
+STEP 5
+
+Load and correctly apply:
+
+Sora
+Inter
+
+STEP 6
+
+Implement shared visual primitives.
+
+STEP 7
+
+Update screens systematically:
+
+1. Dashboard
+2. Case File
+3. Explore Consultants
+4. My Profile
+5. Incoming Call
+6. Video Call
+7. Loading states
+8. Empty states
+9. Error states
+10. Splash/icon usage where applicable
+
+STEP 8
+
+Verify existing navigation.
+
+STEP 9
+
+Verify existing business functionality.
+
+STEP 10
+
+Run TypeScript checks.
+
+STEP 11
+
+Run lint/build checks available in the project.
+
+STEP 12
+
+Fix warnings/errors caused by the changes.
+
+STEP 13
+
+Perform a final visual consistency pass.
+
+============================================================
+47. VISUAL QA CHECKLIST
+============================================================
+
+Before declaring the task complete, compare every implemented screen against the supplied reference files.
+
+COLORS
+
+[ ] Coral is correct
+[ ] Plum is correct
+[ ] Canvas is correct
+[ ] Card is correct
+[ ] Ink is correct
+[ ] Status colors are correct
+[ ] Gradient direction is correct
+
+TYPOGRAPHY
+
+[ ] Sora is used correctly
+[ ] Inter is used correctly
+[ ] hierarchy matches reference
+[ ] font weights match reference
+[ ] key numbers use Sora
+
+LAYOUT
+
+[ ] standard screen margins are correct
+[ ] card spacing is correct
+[ ] header heights are correct
+[ ] bottom navigation is correct
+[ ] safe areas are correct
+[ ] no accidental clipping
+[ ] scrolling works correctly
+
+COMPONENTS
+
+[ ] card radius is correct
+[ ] buttons are pill-shaped where required
+[ ] shadows are subtle
+[ ] avatars match reference
+[ ] touch targets are accessible
+[ ] iconography is consistent
+
+STATES
+
+[ ] Scheduled
+[ ] Ongoing
+[ ] Completed
+[ ] Cancelled/Expired
+[ ] Enabled
+[ ] Disabled
+[ ] Loading
+[ ] Empty
+[ ] Error
+
+CHAT
+
+[ ] real message bubbles
+[ ] incoming/outgoing distinction
+[ ] sender/avatar treatment
+[ ] timestamps
+[ ] Clinical Advisory card
+[ ] vitals mini-cards
+[ ] no UUIDs/internal IDs/raw API objects visible
+
+VIDEO
+
+[ ] remote video
+[ ] top scrim
+[ ] bottom scrim
+[ ] identity information
+[ ] timer
+[ ] draggable self-view
+[ ] mute indicator
+[ ] auto-hide controls
+[ ] secondary Chat/Case File/Advise controls
+[ ] main call controls
+[ ] dominant End Call control
+
+============================================================
+48. IMPORTANT VISUAL RULE
+============================================================
+
+If there is a choice between:
+
+A) an existing implementation that is technically convenient
+
+and
+
+B) the visual/interaction behavior shown in the approved reference
+
+follow the approved reference for the UI.
+
+However, do NOT sacrifice existing business functionality.
+
+The desired result is:
+
+EXISTING PERFUSION FUNCTIONALITY
++
+EXACT PERFUSION DESIGN SYSTEM IMPLEMENTATION
+
+NOT:
+
+A completely new application.
+
+============================================================
+49. FINAL RESTRICTIONS
+============================================================
+
+DO NOT:
+
+- invent new screens
+- invent new colors
+- invent new typography
+- invent new icons
+- invent new business logic
+- change API behavior
+- change database structures
+- modify the web application
+- hardcode mock patient/provider data
+- expose internal IDs
+- expose UUIDs
+- expose raw API responses
+- use random Material colors
+- use generic spinners instead of skeletons where skeletons are specified
+- make every screen Coral
+- make every icon colorful
+- add unnecessary animations
+- add gamification
+- add mascots
+- add decorative clinical illustrations
+- replace real functionality with placeholders
+- remove existing working features
+- rewrite working functionality just for styling
+
+DO:
+
+- inspect the existing implementation first
+- inspect every reference file
+- use the exact design tokens
+- match the reference closely
+- preserve existing functionality
+- use real application data
+- use reusable components
+- maintain safe areas
+- maintain touch accessibility
+- maintain smooth interactions
+- verify every state
+- verify every screen
+- keep the implementation production-ready
+
+============================================================
+50. DEFINITION OF DONE
+============================================================
+
+The task is complete ONLY when the Perfusion Mobile application visually and interactively matches the supplied approved reference while retaining existing production functionality.
+
+A screen is NOT complete merely because:
+
+"the colors look similar."
+
+It must match in:
+
+LAYOUT
++
+SPACING
++
+TYPOGRAPHY
++
+COLOR
++
+RADIUS
++
+SHADOWS
++
+ICONOGRAPHY
++
+VISUAL HIERARCHY
++
+STATES
++
+INTERACTIONS
++
+MOTION
+
+Perform a final screen-by-screen comparison against all provided reference files.
+
+Correct all visible inconsistencies before declaring the task complete.
+
+============================================================
+51. VERY IMPORTANT — DO NOT RUSH INTO CODE
+============================================================
+
+Before making modifications:
+
+1. Inspect the repository.
+2. Inspect the existing mobile screens.
+3. Inspect all provided design/reference files.
+4. Map the existing implementation to the reference screens.
+5. Identify exactly which files need to change.
+6. Make only the necessary changes.
+7. Verify that existing functionality remains intact.
+
+Do NOT immediately rewrite large portions of the project.
+
+Do NOT make broad architectural changes.
+
+Do NOT modify unrelated files.
+
+At the end, provide a concise summary of:
+
+- files changed
+- components changed
+- screens updated
+- any functionality intentionally left untouched
+- any issues that could not be resolved
+
+============================================================
+END OF MASTER PROMPT
+============================================================
