@@ -57,6 +57,8 @@ interface StreamCallMediaProps {
   participantTitle: string;
   participantSubtitle?: string;
   onEndCall: () => void;
+  onMinimizeCall: () => void;
+  onNavigateAway: () => void;
   endPending?: boolean;
   endError?: string | null;
 }
@@ -71,6 +73,8 @@ export function StreamCallMedia({
   participantTitle,
   participantSubtitle,
   onEndCall,
+  onMinimizeCall,
+  onNavigateAway,
   endPending = false,
   endError,
 }: StreamCallMediaProps) {
@@ -192,6 +196,8 @@ export function StreamCallMedia({
           participantSubtitle={participantSubtitle}
           localDisplayName={credentials.userName}
           onEndCall={onEndCall}
+          onMinimizeCall={onMinimizeCall}
+          onNavigateAway={onNavigateAway}
           endPending={endPending}
           endError={endError}
         />
@@ -208,6 +214,8 @@ function ActiveStreamCall({
   participantSubtitle,
   localDisplayName,
   onEndCall,
+  onMinimizeCall,
+  onNavigateAway,
   endPending,
   endError,
 }: {
@@ -218,6 +226,8 @@ function ActiveStreamCall({
   participantSubtitle?: string;
   localDisplayName: string;
   onEndCall: () => void;
+  onMinimizeCall: () => void;
+  onNavigateAway: () => void;
   endPending: boolean;
   endError?: string | null;
 }) {
@@ -464,6 +474,7 @@ function ActiveStreamCall({
 
   const openCaseFile = (focus?: "summary" | "advisory") => {
     revealControls();
+    onNavigateAway();
     const destination = focus
       ? `/case-file/${encodeURIComponent(bookingId)}?focus=${focus}`
       : `/case-file/${encodeURIComponent(bookingId)}`;
@@ -581,6 +592,16 @@ function ActiveStreamCall({
                 </Text>
               </View>
             </View>
+            <Pressable
+              style={({ pressed }) => [styles.topCaseButton, { opacity: pressed ? 0.78 : 1 }]}
+              onPress={onMinimizeCall}
+              onPressIn={revealControls}
+              accessibilityRole="button"
+              accessibilityLabel="Minimize call and explore app"
+              testID="stream-minimize-call"
+            >
+              <Ionicons name="chevron-down-outline" size={22} color="#FFFFFF" />
+            </Pressable>
             <Pressable
               style={({ pressed }) => [styles.topCaseButton, { opacity: pressed ? 0.78 : 1 }]}
               onPress={() => openCaseFile("summary")}
@@ -790,7 +811,7 @@ const styles = StyleSheet.create({
   topScrim: { position: "absolute", top: 0, left: 0, right: 0, height: 220 },
   bottomScrim: { position: "absolute", bottom: 0, left: 0, right: 0, height: 370 },
   topBar: { position: "absolute", left: 16, right: 16, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
-  identityPill: { minHeight: 54, maxWidth: "82%", flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 13, paddingVertical: 8, borderRadius: 18, backgroundColor: "rgba(46,31,40,.78)" },
+  identityPill: { minHeight: 54, flex: 1, minWidth: 0, flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 13, paddingVertical: 8, borderRadius: 18, backgroundColor: "rgba(46,31,40,.78)" },
   liveDot: { width: 8, height: 8, borderRadius: 4 },
   identityText: { minWidth: 0, flex: 1 },
   identityTitle: { color: "#FFFFFF", fontSize: 14, fontFamily: "Sora_600SemiBold" },

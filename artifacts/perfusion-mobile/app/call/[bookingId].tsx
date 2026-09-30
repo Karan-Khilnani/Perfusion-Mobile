@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAudioPlayer } from "expo-audio";
-import { router, useLocalSearchParams } from "expo-router";
+import { router, useFocusEffect, useLocalSearchParams, usePathname } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -20,11 +20,12 @@ import { AppAlert } from "@/components/AppAlert";
 import { CallMedia } from "@/components/CallMedia";
 import { StreamCallMedia } from "@/components/StreamCallMedia";
 import { useAuth } from "@/contexts/AuthContext";
+import { useCall, type ActiveCallSession } from "@/contexts/CallContext";
 import { apiFetch } from "@/hooks/useApi";
 import { useColors } from "@/hooks/useColors";
 import { endNativeCallForSession } from "@/lib/native-calls";
 import { getPushDeviceId } from "@/lib/push-device";
-import { enterPiPAndroid, useIsInPiPMode } from "@/lib/stream-pip";
+import { exitPiPAndroid, useIsInPiPMode } from "@/lib/stream-pip";
 
 interface CallInfo {
   videoRoomId?: string;
@@ -62,15 +63,55 @@ async function getRequiredInstallationId(): Promise<string> {
 }
 
 export default function CallScreen() {
-  const { user } = useAuth();
-  const colors = useColors();
-  const insets = useSafeAreaInsets();
-  const queryClient = useQueryClient();
   const { bookingId, mode, generation } = useLocalSearchParams<{
     bookingId: string;
     mode?: "voice" | "video";
     generation?: string;
   }>();
+  const { activeCall, startActiveCall } = useCall();
+  const colors = useColors();
+  const { data: status, isLoading } = useQuery<CallStatus>({
+    queryKey: ["call-status", bookingId, generation || "current"],
+    queryFn: async () => {
+      const res = await apiFetch(`/api/call/status/${bookingId}`);
+      if (!res.ok) throw new Error("Call status unavailable");
+      return res.json();
+    },
+    enabled: !!bookingId,
+    staleTime: 0,
+    refetchOnMount: "always",
+    refetchInterval: (query) => {
+      const state = query.state.data?.status;
+      return state === "ringing" ? 1000 : state === "accepted" ? 2000 : false;
+    },
+  });
+  const liveStream = status?.mediaProvider === "stream" &&
+    (!generation || !status.sessionGeneration || status.sessionGeneration === generation) &&
+    (status.status === "ringing" || status.status === "accepted");
+  useFocusEffect(useCallback(() => {
+    if (activeCall && (activeCall.bookingId !== bookingId ||
+      (generation && activeCall.generation && generation !== activeCall.generation))) {
+      router.replace(`/call/${encodeURIComponent(activeCall.bookingId)}?mode=${activeCall.mode || "video"}&generation=${encodeURIComponent(activeCall.generation || "")}` as never);
+      return;
+    }
+    if (bookingId && liveStream) startActiveCall({ bookingId, mode, generation: status?.sessionGeneration || generation });
+  }, [activeCall, bookingId, mode, generation, liveStream, startActiveCall, status?.sessionGeneration]));
+  if (isLoading || liveStream || activeCall?.bookingId === bookingId) {
+    return <View style={[styles.roomContainer, { backgroundColor: colors.callBackground }]} />;
+  }
+  // The explicit Daily rollback remains route-owned, as before.
+  return <PersistentCallScreen bookingId={bookingId} mode={mode} generation={generation} persistent={false} />;
+}
+
+export function PersistentCallScreen({ bookingId, mode, generation, persistent = true }: ActiveCallSession & { persistent?: boolean }) {
+  const { user } = useAuth();
+  const { callMinimized: globalMinimized, setCallMinimized, clearActiveCall } = useCall();
+  const callMinimized = persistent && globalMinimized;
+  const colors = useColors();
+  const insets = useSafeAreaInsets();
+  const queryClient = useQueryClient();
+  const pathname = usePathname();
+  const isCallRoute = pathname === `/call/${bookingId}`;
   const [roomAttempt, setRoomAttempt] = useState(0);
   const [permissionsReady, setPermissionsReady] = useState(Platform.OS !== "android");
   const [permissionDenied, setPermissionDenied] = useState(false);
@@ -84,7 +125,6 @@ export default function CallScreen() {
   const [streamCredentialRetry, setStreamCredentialRetry] = useState(0);
   const [cancelingOutgoingCall, setCancelingOutgoingCall] = useState(false);
   const isInPiPMode = useIsInPiPMode();
-  const pipEnteringRef = useRef(false);
   const returningFromCallRef = useRef(false);
   const dismissBackConfirmationRef = useRef<(() => void) | null>(null);
   const acceptedGenerationRef = useRef<string | null>(null);
@@ -148,9 +188,25 @@ export default function CallScreen() {
     queryClient.removeQueries({
       queryKey: ["stream-call-credentials", bookingId, callStatus?.sessionGeneration],
     });
-    if (router.canGoBack()) router.back();
-    else router.replace("/(tabs)");
-  }, [bookingId, callStatus?.sessionGeneration, generation, queryClient]);
+    if (isInPiPMode) void exitPiPAndroid().catch(() => {});
+    if (isCallRoute) {
+      if (router.canGoBack()) router.back();
+      else router.replace("/(tabs)");
+    }
+    if (persistent) clearActiveCall({ bookingId, generation });
+  }, [bookingId, callStatus?.sessionGeneration, clearActiveCall, generation, isCallRoute, isInPiPMode, persistent, queryClient]);
+
+  const minimizeCall = useCallback(() => {
+    setCallMinimized(true);
+    if (isCallRoute) {
+      if (router.canGoBack()) router.back();
+      else router.replace("/(tabs)");
+    }
+  }, [isCallRoute, setCallMinimized]);
+
+  useEffect(() => {
+    if (persistent && isStreamCall && !isCallRoute && !callMinimized && !isInPiPMode) setCallMinimized(true);
+  }, [callMinimized, isCallRoute, isInPiPMode, isStreamCall, persistent, setCallMinimized]);
 
   const requestMediaPermissions = useCallback(async () => {
     if (Platform.OS !== "android") return true;
@@ -422,26 +478,17 @@ export default function CallScreen() {
     statusLoading,
   ]);
 
-  // A normal Back would unmount the Stream media while leaving the server call
-  // accepted. Keep the Activity and media mounted in Android picture-in-picture.
+  // Back minimizes into the persistent in-app call layer, without leaving the call.
   useEffect(() => {
     if (Platform.OS !== "android") return;
     const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
       if (isInPiPMode) return true;
+      if (callMinimized) return false;
       if (endPending || dismissBackConfirmationRef.current) return true;
       if (statusLoading && generation) return true;
       if (currentStatus !== "accepted" && currentStatus !== "ringing") return false;
       if (currentStatus === "accepted" && isStreamCall) {
-        if (pipEnteringRef.current) return true;
-        pipEnteringRef.current = true;
-        void Promise.resolve(enterPiPAndroid(9, 16))
-          .then((entered) => {
-            if (entered === false) {
-              AppAlert.alert("Picture-in-picture unavailable", "The call is still active. Stay on this screen and use the red button when you want to end it.");
-            }
-          })
-          .catch(() => AppAlert.alert("Picture-in-picture unavailable", "The call is still active. Stay on this screen and use the red button when you want to end it."))
-          .finally(() => { pipEnteringRef.current = false; });
+        minimizeCall();
       } else {
         dismissBackConfirmationRef.current = AppAlert.alert(
           currentStatus === "ringing" ? "Cancel this call?" : "Call still connecting",
@@ -458,7 +505,7 @@ export default function CallScreen() {
       return true;
     });
     return () => subscription.remove();
-  }, [currentStatus, endPending, generation, handleEndCall, isInPiPMode, isStreamCall, statusLoading]);
+  }, [callMinimized, currentStatus, endPending, generation, handleEndCall, isInPiPMode, isStreamCall, minimizeCall, statusLoading]);
 
   const showConnectingCallUi =
     statusLoading ||
@@ -599,11 +646,13 @@ export default function CallScreen() {
             key={`${streamCredentials.callId}:${streamCredentials.sessionGeneration}:${streamAttempt}`}
             credentials={streamCredentials}
             voiceCall={callMode === "voice"}
-            compact={isInPiPMode}
+            compact={isInPiPMode || callMinimized}
             bookingId={bookingId}
             participantTitle={booking?.patientName || callTitle}
             participantSubtitle={booking?.seekerHospitalName || booking?.serviceName}
             onEndCall={() => void handleEndCall()}
+            onMinimizeCall={minimizeCall}
+            onNavigateAway={() => setCallMinimized(true)}
             endPending={endPending}
             endError={endError}
           />

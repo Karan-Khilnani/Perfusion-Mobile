@@ -12,24 +12,26 @@ import {
 } from "@expo-google-fonts/sora";
 import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { setBaseUrl } from "@workspace/api-client-react";
-import { Redirect, Stack, usePathname, type Href } from "expo-router";
+import { Redirect, Stack, router, usePathname, type Href } from "expo-router";
 import * as Notifications from "expo-notifications";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect, useRef, useState } from "react";
-import { Platform } from "react-native";
+import { AppState, Platform, Pressable, StyleSheet, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { SafeAreaProvider } from "react-native-safe-area-context";
+import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { BrandedLoading } from "@/components/BrandedLoading";
 import { IncomingCallOverlay } from "@/components/IncomingCallOverlay";
 import { AppAlertHost } from "@/components/AppAlert";
+import { PersistentCallScreen } from "@/app/call/[bookingId]";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
-import { CallProvider } from "@/contexts/CallContext";
+import { CallProvider, useCall } from "@/contexts/CallContext";
 import { useColors } from "@/hooks/useColors";
 import { getBaseUrl } from "@/hooks/useApi";
 import { getPushDeviceId } from "@/lib/push-device";
+import { useIsInPiPMode } from "@/lib/stream-pip";
 
 setBaseUrl(getBaseUrl());
 SplashScreen.setOptions({ duration: 220, fade: true });
@@ -43,6 +45,78 @@ const queryClient = new QueryClient({
     },
   },
 });
+
+function ActiveCallHost() {
+  const { activeCall, callMinimized, setCallMinimized } = useCall();
+  const insets = useSafeAreaInsets();
+  const pathname = usePathname();
+  const isInPiPMode = useIsInPiPMode();
+  const [appState, setAppState] = useState(AppState.currentState);
+  const hadSystemPiP = useRef(false);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", setAppState);
+    return () => subscription.remove();
+  }, []);
+
+  useEffect(() => {
+    if (!activeCall) {
+      hadSystemPiP.current = false;
+      return;
+    }
+    if (isInPiPMode) {
+      hadSystemPiP.current = true;
+    } else if (hadSystemPiP.current && appState === "active" && activeCall) {
+      hadSystemPiP.current = false;
+      const callPath = `/call/${encodeURIComponent(activeCall.bookingId)}`;
+      if (pathname === callPath) setCallMinimized(false);
+      else {
+        router.push(`${callPath}?mode=${activeCall.mode || "video"}&generation=${encodeURIComponent(activeCall.generation || "")}` as never);
+      }
+    }
+  }, [activeCall, appState, isInPiPMode, pathname, setCallMinimized]);
+
+  if (!activeCall) return null;
+  const mini = callMinimized && !isInPiPMode;
+  return (
+    <View
+      pointerEvents="box-none"
+      style={[
+        StyleSheet.absoluteFillObject,
+        mini
+          ? { top: insets.top + 62, right: 12, bottom: undefined, left: undefined, width: 156, height: 220 }
+          : null,
+        { zIndex: 20 },
+      ]}
+    >
+      <View style={{
+        flex: 1,
+        overflow: "hidden",
+        borderRadius: mini ? 16 : 0,
+        borderWidth: mini ? 1 : 0,
+        borderColor: "#FFFFFF",
+        backgroundColor: "#20121B",
+        elevation: mini ? 14 : 0,
+      }}>
+        <PersistentCallScreen
+          key={`${activeCall.bookingId}:${activeCall.generation || ""}`}
+          {...activeCall}
+        />
+        {mini && (
+          <Pressable
+            style={StyleSheet.absoluteFillObject}
+            onPress={() => {
+              router.push(`/call/${encodeURIComponent(activeCall.bookingId)}?mode=${activeCall.mode || "video"}&generation=${encodeURIComponent(activeCall.generation || "")}` as never);
+            }}
+            accessibilityRole="button"
+            accessibilityLabel="Return to video call"
+            testID="restore-in-app-call"
+          />
+        )}
+      </View>
+    </View>
+  );
+}
 
 function RootLayoutNav({ fontsReady }: { fontsReady: boolean }) {
   const { user, loading, callbackDevices, callbackDevicesLoading, callbackDevicesError } = useAuth();
@@ -240,6 +314,7 @@ function RootLayoutNav({ fontsReady }: { fontsReady: boolean }) {
       </Stack>
       {redirectHref && <Redirect href={redirectHref} />}
       {user && <IncomingCallOverlay />}
+      {user && <ActiveCallHost />}
     </>
   );
 }

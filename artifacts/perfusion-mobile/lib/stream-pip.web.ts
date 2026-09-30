@@ -4,6 +4,10 @@ export function useIsInPiPMode(): boolean {
   return false;
 }
 
+export async function exitPiPAndroid(): Promise<boolean> {
+  return false;
+}
+
 export async function enterPiPAndroid(
   _aspectRatioWidth: number,
   _aspectRatioHeight: number,

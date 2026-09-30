@@ -34,8 +34,19 @@ export interface IncomingCallData {
   callType?: "voice" | "video";
 }
 
+export interface ActiveCallSession {
+  bookingId: string;
+  mode?: "voice" | "video";
+  generation?: string;
+}
+
 interface CallContextType {
   incomingCall: IncomingCallData | null;
+  activeCall: ActiveCallSession | null;
+  callMinimized: boolean;
+  startActiveCall: (session: ActiveCallSession) => void;
+  setCallMinimized: (minimized: boolean) => void;
+  clearActiveCall: (session: ActiveCallSession) => void;
   acceptCall: (bookingId: string) => Promise<void>;
   declineCall: (bookingId: string) => Promise<void>;
   dismissCall: () => void;
@@ -63,9 +74,39 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
   const [incomingCall, setIncomingCall] = useState<IncomingCallData | null>(
     null
   );
+  const [activeCall, setActiveCall] = useState<ActiveCallSession | null>(null);
+  const [callMinimized, setCallMinimized] = useState(false);
+  const endedSessionRef = useRef<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const nativeReportedSessionRef = useRef<string | null>(null);
   const incomingCheckInFlightRef = useRef(false);
+
+  const startActiveCall = useCallback((session: ActiveCallSession) => {
+    const normalized = { ...session, generation: session.generation || undefined };
+    if (endedSessionRef.current === `${normalized.bookingId}:${normalized.generation || ""}`) return;
+    // A stale route must not replace or tear down an already mounted session.
+    setActiveCall((current) =>
+      current
+        ? current
+        : normalized,
+    );
+    setCallMinimized(false);
+  }, []);
+  const clearActiveCall = useCallback((session: ActiveCallSession) => {
+    const generation = session.generation || undefined;
+    endedSessionRef.current = `${session.bookingId}:${generation || ""}`;
+    setActiveCall((current) =>
+      current?.bookingId === session.bookingId && current.generation === generation
+        ? null
+        : current,
+    );
+  }, []);
+
+  useEffect(() => {
+    if (user) return;
+    setActiveCall(null);
+    setCallMinimized(false);
+  }, [user]);
 
   useEffect(() => {
     if (Platform.OS !== "android" || !user?.id) return;
@@ -356,7 +397,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <CallContext.Provider
-      value={{ incomingCall, acceptCall, declineCall, dismissCall }}
+      value={{ incomingCall, activeCall, callMinimized, startActiveCall, setCallMinimized, clearActiveCall, acceptCall, declineCall, dismissCall }}
     >
       {children}
     </CallContext.Provider>

@@ -1,6 +1,6 @@
 const fs = require("node:fs");
 const path = require("node:path");
-const { withAndroidManifest, withDangerousMod } = require("expo/config-plugins");
+const { withAndroidManifest, withDangerousMod, withMainActivity } = require("expo/config-plugins");
 
 // The installed Stream SDK has the JS enterPiPAndroid helper and PiP callbacks,
 // but does not expose the enterPipMode native method that its JS helper calls.
@@ -22,6 +22,37 @@ module.exports = function withCallPiP(config) {
       changes.add(change);
     }
     main.$["android:configChanges"] = [...changes].join("|");
+    return updated;
+  });
+
+  config = withMainActivity(config, (updated) => {
+    const marker = "// Perfusion: Home-to-PiP on Android 8–11";
+    const source = updated.modResults.contents;
+    if (source.includes(marker)) return updated;
+    if (updated.modResults.language !== "kt" || source.includes("override fun onUserLeaveHint")) {
+      throw new Error("Cannot enable call PiP: MainActivity leave-hint implementation changed");
+    }
+    const end = source.lastIndexOf("\n}");
+    if (end < 0) throw new Error("Cannot enable call PiP: MainActivity class boundary missing");
+    updated.modResults.contents = source.slice(0, end) + `
+    ${marker}
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O &&
+            android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.S &&
+            com.streamvideo.reactnative.StreamVideoReactNative.canAutoEnterPictureInPictureMode &&
+            packageManager.hasSystemFeature(android.content.pm.PackageManager.FEATURE_PICTURE_IN_PICTURE)) {
+            try {
+                enterPictureInPictureMode(
+                    android.app.PictureInPictureParams.Builder()
+                        .setAspectRatio(android.util.Rational(9, 16)).build()
+                )
+            } catch (error: Exception) {
+                android.util.Log.w("PerfusionCall", "Could not enter call PiP", error)
+            }
+        }
+    }
+` + source.slice(end);
     return updated;
   });
 
