@@ -1,5 +1,6 @@
 import { useEffect, useRef, useCallback } from "react";
 import { useAuth } from "./use-auth";
+import { getCallbackInstallationId } from "@/lib/callback-device";
 
 export type CallEventType =
   | "incoming_call"
@@ -29,7 +30,7 @@ export interface CallEvent {
 type CallEventHandler = (event: CallEvent) => void;
 
 export function useCallEvents(onEvent: CallEventHandler, onOpen?: () => void) {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const eventSourceRef = useRef<EventSource | null>(null);
   const handlerRef = useRef<CallEventHandler>(onEvent);
   const onOpenRef = useRef(onOpen);
@@ -48,11 +49,13 @@ export function useCallEvents(onEvent: CallEventHandler, onOpen?: () => void) {
 
     let reconnectTimeout: ReturnType<typeof setTimeout>;
     let active = true;
+    const installationId = user?.role === "care_seeker" ? getCallbackInstallationId() : null;
 
     function connect() {
       if (!active) return;
 
-      const es = new EventSource("/api/call-events", { withCredentials: true });
+      const query = installationId ? `?installationId=${encodeURIComponent(installationId)}` : "";
+      const es = new EventSource(`/api/call-events${query}`, { withCredentials: true });
       eventSourceRef.current = es;
 
       es.onopen = () => {
@@ -88,5 +91,5 @@ export function useCallEvents(onEvent: CallEventHandler, onOpen?: () => void) {
       eventSourceRef.current?.close();
       eventSourceRef.current = null;
     };
-  }, [isAuthenticated]);
+  }, [isAuthenticated, user?.role]);
 }

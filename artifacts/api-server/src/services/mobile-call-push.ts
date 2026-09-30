@@ -11,6 +11,7 @@ interface IncomingCallPush {
   callerId: string;
   callerName: string;
   callerRole: "seeker" | "provider";
+  recipientInstallationId?: string | null;
   callType: string;
   videoRoomUrl: string;
   mediaProvider: "daily" | "stream";
@@ -19,9 +20,29 @@ interface IncomingCallPush {
 }
 
 type TokenRow = { token: string; platform: string; token_type: string; device_id: string | null };
+type IncomingCallTokenLookup = { query: string; values: string[] } | null;
 const APP_NAME = "perfusion-call-push";
 const PROJECT_ID = "perfusion-4f89a";
 let credentialsWarningShown = false;
+
+export function buildIncomingCallTokenLookup(
+  userId: string,
+  callerRole: IncomingCallPush["callerRole"],
+  recipientInstallationId?: string | null,
+): IncomingCallTokenLookup {
+  if (callerRole === "provider") {
+    if (typeof recipientInstallationId !== "string" || !recipientInstallationId.trim()) return null;
+    return {
+      query: "SELECT token, platform, token_type, device_id FROM mobile_push_tokens WHERE user_id = $1 AND device_id = $2",
+      values: [userId, recipientInstallationId],
+    };
+  }
+
+  return {
+    query: "SELECT token, platform, token_type, device_id FROM mobile_push_tokens WHERE user_id = $1",
+    values: [userId],
+  };
+}
 
 function getFirebaseMessaging() {
   const raw = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
@@ -66,10 +87,13 @@ export async function verifyMobileCallPush(): Promise<void> {
 }
 
 export async function notifyMobileIncomingCall(userId: string, call: IncomingCallPush): Promise<void> {
+  const lookup = buildIncomingCallTokenLookup(userId, call.callerRole, call.recipientInstallationId);
+  if (!lookup) return;
+
   const pool = getPool();
   const { rows } = await pool.query<TokenRow>(
-    "SELECT token, platform, token_type, device_id FROM mobile_push_tokens WHERE user_id = $1",
-    [userId],
+    lookup.query,
+    lookup.values,
   );
   if (!rows.length) return;
 

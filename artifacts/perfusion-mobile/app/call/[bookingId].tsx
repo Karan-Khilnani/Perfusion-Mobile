@@ -20,9 +20,11 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AppAlert } from "@/components/AppAlert";
 import { CallMedia } from "@/components/CallMedia";
 import { StreamCallMedia } from "@/components/StreamCallMedia";
+import { useAuth } from "@/contexts/AuthContext";
 import { apiFetch } from "@/hooks/useApi";
 import { useColors } from "@/hooks/useColors";
 import { endNativeCallForSession } from "@/lib/native-calls";
+import { getPushDeviceId } from "@/lib/push-device";
 
 interface CallInfo {
   videoRoomId?: string;
@@ -51,7 +53,16 @@ interface StreamCredentials {
   sessionGeneration: string;
 }
 
+async function getRequiredInstallationId(): Promise<string> {
+  const installationId = await getPushDeviceId();
+  if (!installationId.trim()) {
+    throw new Error("This device does not have a valid installation identity.");
+  }
+  return installationId;
+}
+
 export default function CallScreen() {
+  const { user } = useAuth();
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
@@ -321,9 +332,16 @@ export default function CallScreen() {
         if (!sessionGeneration) throw new Error("Call identity is missing. Please try again.");
         const failureMessage = "Could not end the call. Please try again.";
         for (let attempt = 0; attempt < 2; attempt++) {
+          const installationId =
+            action === "decline" && user?.role === "care_seeker"
+              ? await getRequiredInstallationId()
+              : undefined;
           const response = await apiFetch(`/api/call/${action}/${bookingId}`, {
             method: "POST",
-            body: JSON.stringify({ sessionGeneration }),
+            body: JSON.stringify({
+              sessionGeneration,
+              ...(installationId ? { installationId } : {}),
+            }),
           });
           if (response.ok || response.status === 404) break;
           if (response.status !== 409) throw new Error(failureMessage);

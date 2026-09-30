@@ -6710,9 +6710,12 @@ export async function registerRoutes(
     try {
       const userId = req.user?.id;
       if (!userId) return res.status(401).json({ error: "Not authenticated" });
-      const { endpoint, p256dh, auth } = req.body;
+      const { endpoint, p256dh, auth, installationId } = req.body;
       if (!endpoint || !p256dh || !auth) return res.status(400).json({ error: "Missing subscription fields" });
-      await storage.savePushSubscription(userId, endpoint, p256dh, auth);
+      if (typeof installationId !== "string" || !installationId.trim() || installationId.length > 120) {
+        return res.status(400).json({ error: "Missing or invalid installationId" });
+      }
+      await storage.savePushSubscription(userId, endpoint, p256dh, auth, installationId.trim());
       res.json({ success: true });
     } catch (error) {
       console.error("[Push] Subscribe error:", error);
@@ -6780,7 +6783,8 @@ export async function registerRoutes(
     try {
       const userId = req.user?.id;
       if (!userId) return res.status(401).json({ error: "Not authenticated" });
-      const sessions = await storage.getActiveCallSessionsForRecipient(userId);
+      const installationId = typeof req.query.installationId === "string" ? req.query.installationId.trim() : undefined;
+      const sessions = await storage.getActiveCallSessionsForRecipient(userId, installationId);
       const session = sessions.find(s => s.status === "ringing");
       if (!session) return res.json(null);
       res.json({
@@ -6800,14 +6804,15 @@ export async function registerRoutes(
   });
 
   // ─── Call Session State (DB-backed — shared across all autoscale instances) ──
-  const sseClients = new Map<string, Set<any>>(); // key = userId → set of res objects
+  const sseClients = new Map<string, Set<{ res: any; installationId?: string }>>(); // key = userId
 
-  function broadcastCallEvent(userId: string, event: object) {
+  function broadcastCallEvent(userId: string, event: object, recipientInstallationId?: string | null) {
     const clients = sseClients.get(userId);
     if (!clients || clients.size === 0) return;
     const data = `data: ${JSON.stringify(event)}\n\n`;
     Array.from(clients).forEach(client => {
-      try { client.write(data); } catch {}
+      if (recipientInstallationId && client.installationId !== recipientInstallationId) return;
+      try { client.res.write(data); } catch {}
     });
   }
 
@@ -6870,6 +6875,9 @@ export async function registerRoutes(
   app.get("/api/call-events", isAuthenticated, (req: any, res) => {
     const userId = req.user?.id;
     if (!userId) return res.status(401).end();
+    const installationId = typeof req.query.installationId === "string" && req.query.installationId.trim()
+      ? req.query.installationId.trim()
+      : undefined;
 
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");
@@ -6882,13 +6890,14 @@ export async function registerRoutes(
       try { res.write(": heartbeat\n\n"); } catch { clearInterval(heartbeat); }
     }, 25000);
 
+    const client = { res, installationId };
     if (!sseClients.has(userId)) sseClients.set(userId, new Set());
-    sseClients.get(userId)!.add(res);
+    sseClients.get(userId)!.add(client);
 
     // Replay any active ringing session for this user so they see the
     // incoming call overlay when opening the app directly (e.g. after
     // hearing a Twilio voice alert) rather than via push notification.
-    storage.getActiveCallSessionsForRecipient(userId).then(activeSessions => {
+    storage.getActiveCallSessionsForRecipient(userId, installationId).then(activeSessions => {
       const s = activeSessions.find(session => session.status === "ringing");
       if (s) {
         try {
@@ -6910,7 +6919,7 @@ export async function registerRoutes(
 
     req.on("close", () => {
       clearInterval(heartbeat);
-      sseClients.get(userId)?.delete(res);
+      sseClients.get(userId)?.delete(client);
     });
   });
 
@@ -6932,6 +6941,7 @@ export async function registerRoutes(
       if (!isSeeker && !isProviderUser) return res.status(403).json({ error: "Not part of this booking" });
 
       const callerRole: "seeker" | "provider" = isSeeker ? "seeker" : "provider";
+      let recipientInstallationId: string | null = null;
 
       const lifecycle = resolveConsultationLifecycle(booking);
       if (!lifecycle.scheduleAvailable || lifecycle.status !== "ongoing") {
@@ -6992,6 +7002,20 @@ export async function registerRoutes(
       // Find recipient userId
       const recipientUserId = isSeeker ? provider?.userId : booking.userId;
       if (!recipientUserId) return res.status(400).json({ error: "Cannot find recipient" });
+      if (callerRole === "provider") {
+        const { rows } = await getPool().query(
+          `SELECT installation_id AS "installationId"
+           FROM consultation_callback_devices
+           WHERE id = $1 AND user_id = $2 AND archived_at IS NULL
+             AND NULLIF(btrim(staff_name), '') IS NOT NULL
+             AND NULLIF(btrim(installation_id), '') IS NOT NULL`,
+          [booking.callbackDeviceId || null, booking.userId],
+        );
+        recipientInstallationId = rows[0]?.installationId?.trim() || null;
+        if (!recipientInstallationId) {
+          return res.status(409).json({ error: "The selected seeker callback installation is unavailable" });
+        }
+      }
 
       // Persist call session to DB — shared across all autoscale instances
       const SESSION_TTL_MS = 300_000; // 5 minutes
@@ -7039,6 +7063,7 @@ export async function registerRoutes(
         callerName: displayCallerName,
         callerRole,
         recipientUserId,
+        recipientInstallationId,
         videoRoomUrl,
         callType,
         serviceName: booking.serviceName || "",
@@ -7082,10 +7107,13 @@ export async function registerRoutes(
         serviceName: booking.serviceName,
         subtitle,
         callType,
-      });
+      }, recipientInstallationId);
 
       // Send push notification to recipient (even if browser closed)
-      const subscriptions = await storage.getPushSubscriptionsByUserId(recipientUserId);
+      const subscriptions = await storage.getPushSubscriptionsByUserId(
+        recipientUserId,
+        recipientInstallationId || undefined,
+      );
       req.log.info({ recipientUserId, subscriptions: subscriptions.length }, "Loaded recipient push subscriptions");
       if (subscriptions.length === 0) {
         req.log.info({ recipientUserId }, "Recipient has no push subscriptions");
@@ -7098,6 +7126,7 @@ export async function registerRoutes(
         callerName: displayCallerName,
         callerRole,
         recipientRole,
+        installationId: recipientInstallationId || undefined,
         videoRoomUrl,
         mediaProvider,
         subtitle,
@@ -7124,6 +7153,7 @@ export async function registerRoutes(
         mediaProvider,
         serviceName: booking.serviceName || "",
         subtitle,
+        recipientInstallationId,
       }).catch((error) => req.log.error({ err: error }, "Mobile incoming-call push failed"));
 
       res.json({ success: true, session: { bookingId, sessionGeneration, status: "ringing", callType, videoRoomUrl, mediaProvider } });
@@ -7152,6 +7182,11 @@ export async function registerRoutes(
       const isProviderUser = provider?.userId === userId;
       if (!isSeeker && !isProviderUser) return res.status(403).json({ error: "Not part of this booking" });
       if (session.callerId === userId) return res.status(403).json({ error: "Caller cannot accept their own call" });
+      if (session.callerRole === "provider" && isSeeker &&
+          (typeof req.body?.installationId !== "string" ||
+           req.body.installationId.trim() !== session.recipientInstallationId)) {
+        return res.status(403).json({ error: "This call is targeted to another installation" });
+      }
 
       if (booking.bookingType === "consultation") {
         const lifecycle = resolveConsultationLifecycle(booking);
@@ -7253,6 +7288,11 @@ export async function registerRoutes(
       const isProviderUser = provider?.userId === userId;
       if (!isSeeker && !isProviderUser) return res.status(403).json({ error: "Not part of this booking" });
       if (session.callerId === userId) return res.status(403).json({ error: "Caller should use cancel endpoint" });
+      if (session.callerRole === "provider" && isSeeker &&
+          (typeof req.body?.installationId !== "string" ||
+           req.body.installationId.trim() !== session.recipientInstallationId)) {
+        return res.status(403).json({ error: "This call is targeted to another installation" });
+      }
 
       const declinedSession = await storage.transitionCallSession(bookingId, session.sessionGeneration, ["ringing"], { status: "declined" });
       if (!declinedSession) return res.status(409).json({ error: "Call is no longer ringing or has changed" });

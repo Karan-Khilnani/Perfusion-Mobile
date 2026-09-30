@@ -44,6 +44,7 @@ export type PushPayload =
       recipientRole: "seeker" | "provider";
       videoRoomUrl: string;
       mediaProvider: "daily" | "stream";
+      installationId?: string;
       title: string;
       body: string;
       subtitle?: string;

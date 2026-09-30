@@ -50,6 +50,14 @@ function sessionKey(
   return `${call.bookingId}:${call.sessionGeneration || ""}`;
 }
 
+async function getRequiredInstallationId(): Promise<string> {
+  const installationId = await getPushDeviceId();
+  if (!installationId.trim()) {
+    throw new Error("This device does not have a valid installation identity.");
+  }
+  return installationId;
+}
+
 export function CallProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   const [incomingCall, setIncomingCall] = useState<IncomingCallData | null>(
@@ -101,7 +109,25 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
     if (!user || incomingCheckInFlightRef.current) return;
     incomingCheckInFlightRef.current = true;
     try {
-      const res = await apiFetch("/api/call/incoming");
+      let installationId: string;
+      try {
+        installationId = await getRequiredInstallationId();
+      } catch (error) {
+        setIncomingCall(null);
+        console.warn(
+          "[call-context] Could not load the installation identity for incoming calls",
+          error,
+        );
+        return;
+      }
+      if (!installationId) {
+        setIncomingCall(null);
+        console.warn("[call-context] No installation identity is available for incoming calls");
+        return;
+      }
+      const res = await apiFetch(
+        `/api/call/incoming?installationId=${encodeURIComponent(installationId)}`,
+      );
       if (res.ok) {
         const data = (await res.json()) as IncomingCallData | null;
         if (data?.bookingId) {
@@ -209,9 +235,14 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
     let cancelled = false;
     initializeNativeCalls({
       onAnswered: async (bookingId, sessionGeneration) => {
+        const installationId =
+          user.role === "care_seeker" ? await getRequiredInstallationId() : undefined;
         const response = await apiFetch(`/api/call/accept/${bookingId}`, {
           method: "POST",
-          body: JSON.stringify({ sessionGeneration }),
+          body: JSON.stringify({
+            sessionGeneration,
+            ...(installationId ? { installationId } : {}),
+          }),
         });
         if (!response.ok) throw new Error("Could not accept call");
         const result: { callType?: "voice" | "video"; sessionGeneration?: string } = await response.json();
@@ -244,9 +275,16 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
                 : "decline"
               : null;
         if (action) {
+          const installationId =
+            action === "decline" && user.role === "care_seeker"
+              ? await getRequiredInstallationId()
+              : undefined;
           const response = await apiFetch(`/api/call/${action}/${bookingId}`, {
             method: "POST",
-            body: JSON.stringify({ sessionGeneration }),
+            body: JSON.stringify({
+              sessionGeneration,
+              ...(installationId ? { installationId } : {}),
+            }),
           });
           if (!response.ok && response.status !== 404 && response.status !== 409) {
             throw new Error("Could not end the system call");
@@ -281,9 +319,14 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
   }, [user]);
 
   const acceptCall = async (bookingId: string) => {
+    const installationId =
+      user?.role === "care_seeker" ? await getRequiredInstallationId() : undefined;
     const response = await apiFetch(`/api/call/accept/${bookingId}`, {
       method: "POST",
-      body: JSON.stringify({ sessionGeneration: incomingCall?.sessionGeneration }),
+      body: JSON.stringify({
+        sessionGeneration: incomingCall?.sessionGeneration,
+        ...(installationId ? { installationId } : {}),
+      }),
     });
     if (!response.ok) {
       const data = await response.json().catch(() => ({}));
@@ -293,9 +336,14 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
   };
 
   const declineCall = async (bookingId: string) => {
+    const installationId =
+      user?.role === "care_seeker" ? await getRequiredInstallationId() : undefined;
     const response = await apiFetch(`/api/call/decline/${bookingId}`, {
       method: "POST",
-      body: JSON.stringify({ sessionGeneration: incomingCall?.sessionGeneration }),
+      body: JSON.stringify({
+        sessionGeneration: incomingCall?.sessionGeneration,
+        ...(installationId ? { installationId } : {}),
+      }),
     });
     if (!response.ok) {
       const data = await response.json().catch(() => ({}));

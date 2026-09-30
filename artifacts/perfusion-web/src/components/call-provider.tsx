@@ -6,6 +6,7 @@ import { subscribeToPush, isPushSupported, getNotificationPermission, hasPushSub
 import { useToast } from "@/hooks/use-toast";
 import { Bell } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { getCallbackInstallationId } from "@/lib/callback-device";
 
 const PUSH_DISMISSED_KEY = "push_prompt_dismissed_until";
 
@@ -94,6 +95,19 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
   }, [incomingCall]);
 
   const pendingSwCall = useRef<CallEvent | null>(null);
+
+  // Keep the service worker aware of this browser installation for notification actions.
+  useEffect(() => {
+    if (!isAuthenticated || !("serviceWorker" in navigator)) return;
+    const installationId = getCallbackInstallationId();
+    const sendInstallationId = (worker?: ServiceWorker | null) => {
+      worker?.postMessage({ type: "SET_CALLBACK_INSTALLATION_ID", installationId });
+    };
+    sendInstallationId(navigator.serviceWorker.controller);
+    navigator.serviceWorker.ready.then((registration) => {
+      sendInstallationId(registration.active);
+    }).catch(() => {});
+  }, [isAuthenticated]);
 
   const dismissNotification = useCallback((bookingId: string, sessionGeneration?: string) => {
     if (!("serviceWorker" in navigator)) return;

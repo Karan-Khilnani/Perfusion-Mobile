@@ -487,6 +487,7 @@ export type SeekerWardContact = typeof seekerWardContacts.$inferSelect;
 export const pushSubscriptions = pgTable("push_subscriptions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull(),
+  installationId: varchar("installation_id", { length: 120 }),
   endpoint: text("endpoint").notNull(),
   p256dh: text("p256dh").notNull(),
   auth: text("auth").notNull(),
@@ -520,6 +521,7 @@ export const callSessionsTable = pgTable("call_sessions", {
   callerName: varchar("caller_name", { length: 255 }).notNull(),
   callerRole: varchar("caller_role", { length: 20 }).notNull(),
   recipientUserId: varchar("recipient_user_id").notNull(),
+  recipientInstallationId: varchar("recipient_installation_id", { length: 120 }),
   videoRoomUrl: text("video_room_url").notNull(),
   callType: varchar("call_type", { length: 10 }).notNull().default("video"),
   serviceName: varchar("service_name", { length: 255 }).notNull().default(""),

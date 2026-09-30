@@ -1,4 +1,4 @@
-import { eq, and, desc, gte, lte, or, inArray, notInArray } from "drizzle-orm";
+import { eq, and, desc, gte, lte, or, ne, inArray, notInArray } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { db } from "./db";
 import {
@@ -234,8 +234,8 @@ export interface IStorage {
   getOverdueBookings(): Promise<Booking[]>;
 
   // Push Subscriptions
-  savePushSubscription(userId: string, endpoint: string, p256dh: string, auth: string): Promise<void>;
-  getPushSubscriptionsByUserId(userId: string): Promise<Array<{ endpoint: string; p256dh: string; auth: string }>>;
+  savePushSubscription(userId: string, endpoint: string, p256dh: string, auth: string, installationId?: string): Promise<void>;
+  getPushSubscriptionsByUserId(userId: string, installationId?: string): Promise<Array<{ endpoint: string; p256dh: string; auth: string; installationId: string | null }>>;
   deletePushSubscription(userId: string, endpoint: string): Promise<void>;
   deleteAllPushSubscriptionsForUser(userId: string): Promise<void>;
 
@@ -251,7 +251,7 @@ export interface IStorage {
   expireRingingCallSession(bookingId: string, generation: string): Promise<DbCallSession | undefined>;
   endExpiredAcceptedCallSession(bookingId: string, generation: string): Promise<DbCallSession | undefined>;
   deleteCallSession(bookingId: string, generation: string, statuses: string[], onlyIfExpired?: boolean): Promise<void>;
-  getActiveCallSessionsForRecipient(recipientUserId: string): Promise<DbCallSession[]>;
+  getActiveCallSessionsForRecipient(recipientUserId: string, installationId?: string): Promise<DbCallSession[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -950,16 +950,25 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(bookings.createdAt));
   }
 
-  async savePushSubscription(userId: string, endpoint: string, p256dh: string, auth: string): Promise<void> {
-    await db.delete(pushSubscriptions).where(
+  async savePushSubscription(userId: string, endpoint: string, p256dh: string, auth: string, installationId?: string): Promise<void> {
+    const existing = await db.update(pushSubscriptions).set({
+      p256dh,
+      auth,
+      installationId: installationId || null,
+    }).where(
       and(eq(pushSubscriptions.userId, userId), eq(pushSubscriptions.endpoint, endpoint))
-    );
-    await db.insert(pushSubscriptions).values({ userId, endpoint, p256dh, auth });
+    ).returning({ id: pushSubscriptions.id });
+    if (existing.length === 0) {
+      await db.insert(pushSubscriptions).values({ userId, endpoint, p256dh, auth, installationId: installationId || null });
+    }
   }
 
-  async getPushSubscriptionsByUserId(userId: string): Promise<Array<{ endpoint: string; p256dh: string; auth: string }>> {
-    const subs = await db.select().from(pushSubscriptions).where(eq(pushSubscriptions.userId, userId));
-    return subs.map(s => ({ endpoint: s.endpoint, p256dh: s.p256dh, auth: s.auth }));
+  async getPushSubscriptionsByUserId(userId: string, installationId?: string): Promise<Array<{ endpoint: string; p256dh: string; auth: string; installationId: string | null }>> {
+    const condition = installationId === undefined
+      ? eq(pushSubscriptions.userId, userId)
+      : and(eq(pushSubscriptions.userId, userId), eq(pushSubscriptions.installationId, installationId));
+    const subs = await db.select().from(pushSubscriptions).where(condition);
+    return subs.map(s => ({ endpoint: s.endpoint, p256dh: s.p256dh, auth: s.auth, installationId: s.installationId }));
   }
 
   async deletePushSubscription(userId: string, endpoint: string): Promise<void> {
@@ -1039,12 +1048,18 @@ export class DatabaseStorage implements IStorage {
     await db.delete(callSessionsTable).where(and(...conditions));
   }
 
-  async getActiveCallSessionsForRecipient(recipientUserId: string): Promise<DbCallSession[]> {
+  async getActiveCallSessionsForRecipient(recipientUserId: string, installationId?: string): Promise<DbCallSession[]> {
+    // Provider-originated calls target one seeker installation. Never expose
+    // legacy/null-target sessions through an account-wide fallback.
+    const callerTarget = typeof installationId === "string"
+      ? or(ne(callSessionsTable.callerRole, "provider"), eq(callSessionsTable.recipientInstallationId, installationId))
+      : ne(callSessionsTable.callerRole, "provider");
     return await db.select().from(callSessionsTable).where(
       and(
         eq(callSessionsTable.recipientUserId, recipientUserId),
         eq(callSessionsTable.status, "ringing"),
         gte(callSessionsTable.expiresAt, new Date()),
+        callerTarget,
       )
     );
   }

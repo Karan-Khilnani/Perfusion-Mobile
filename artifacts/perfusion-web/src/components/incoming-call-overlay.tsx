@@ -5,6 +5,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import type { CallEvent } from "@/hooks/use-call-events";
+import { getCallbackInstallationId } from "@/lib/callback-device";
 
 interface Props {
   callEvent: CallEvent | null;
@@ -36,7 +37,10 @@ export function IncomingCallOverlay({ callEvent, onDismiss }: Props) {
     try {
       const sessionGeneration = callEvent.sessionGeneration;
       if (!sessionGeneration) throw new Error("The call session has changed. Please wait for the latest call alert.");
-      const result = await apiRequest("POST", `/api/call/accept/${callEvent.bookingId}`, { sessionGeneration });
+      const result = await apiRequest("POST", `/api/call/accept/${callEvent.bookingId}`, {
+        sessionGeneration,
+        installationId: getCallbackInstallationId(),
+      });
       const data = await result.json().catch(() => ({}));
       dismissNotification(callEvent.bookingId, sessionGeneration);
       onDismiss();
@@ -73,6 +77,7 @@ export function IncomingCallOverlay({ callEvent, onDismiss }: Props) {
       if (!callEvent.sessionGeneration) throw new Error("The call session has changed");
       await apiRequest("POST", `/api/call/decline/${callEvent.bookingId}`, {
         sessionGeneration: callEvent.sessionGeneration,
+        installationId: getCallbackInstallationId(),
       });
     } catch {}
     if (callEvent.sessionGeneration) dismissNotification(callEvent.bookingId, callEvent.sessionGeneration);

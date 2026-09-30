@@ -1,4 +1,5 @@
 const CACHE_NAME = "perfusion-v1";
+let callbackInstallationId = null;
 const appBasePath = new URL(self.registration.scope).pathname.replace(/\/$/, "");
 const caseFilePath = (bookingId) =>
   `${appBasePath}/case-file/${encodeURIComponent(bookingId)}`;
@@ -9,6 +10,12 @@ self.addEventListener("install", (event) => {
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(clients.claim());
+});
+
+self.addEventListener("message", (event) => {
+  if (event.data?.type === "SET_CALLBACK_INSTALLATION_ID" && typeof event.data.installationId === "string") {
+    callbackInstallationId = event.data.installationId;
+  }
 });
 
 self.addEventListener("push", (event) => {
@@ -64,6 +71,7 @@ self.addEventListener("push", (event) => {
         mediaProvider: payload.mediaProvider,
         serviceName: payload.serviceName,
         callType: payload.callType,
+        installationId: payload.installationId || payload.callbackInstallationId || callbackInstallationId,
         url: `/video/${encodeURIComponent(videoRoomUrl)}?returnTo=${returnTo}&accepted=true&sessionGeneration=${encodeURIComponent(sessionGeneration)}`,
       },
       actions: [
@@ -131,6 +139,7 @@ self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   const data = event.notification.data || {};
   const { bookingId, sessionGeneration, videoRoomUrl, url } = data;
+  const installationId = data.installationId || callbackInstallationId;
 
   if (data.type === "callback_device_reminder") {
     const targetUrl = url || (bookingId ? caseFilePath(bookingId) : `${appBasePath}/user/orders`);
@@ -154,7 +163,7 @@ self.addEventListener("notificationclick", (event) => {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sessionGeneration }),
+        body: JSON.stringify({ sessionGeneration, ...(installationId ? { installationId } : {}) }),
       }).then((response) => {
         if (!response.ok) console.info("[SW] Ignored stale incoming-call decline", bookingId);
       }).catch((error) => console.error("[SW] Could not decline incoming call", error))
@@ -173,7 +182,7 @@ self.addEventListener("notificationclick", (event) => {
           method: "POST",
           credentials: "include",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ sessionGeneration }),
+          body: JSON.stringify({ sessionGeneration, ...(installationId ? { installationId } : {}) }),
         });
         if (!response.ok) {
           console.info("[SW] Ignored stale incoming-call accept", bookingId);
@@ -207,7 +216,12 @@ self.addEventListener("notificationclose", (event) => {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ sessionGeneration }),
+      body: JSON.stringify({
+        sessionGeneration,
+        ...((data.installationId || callbackInstallationId)
+          ? { installationId: data.installationId || callbackInstallationId }
+          : {}),
+      }),
     }).catch((error) => console.error("[SW] Could not decline dismissed incoming call", error)));
   }
 });
