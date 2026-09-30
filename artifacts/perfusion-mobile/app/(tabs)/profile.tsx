@@ -998,7 +998,6 @@ function ProviderMyProfile() {
           </View>
           <Pressable onPress={doLogout} disabled={loggingOut} style={providerProfileStyles.logoutArea}>
             <Text style={[providerProfileStyles.logoutText, { color: colors.mutedForeground }]}>{loggingOut ? "Logging out…" : "Log Out"}</Text>
-            <Text style={[providerProfileStyles.logoutNote, { color: colors.mutedForeground }]}>You'll need to log in again to use Perfusion. Sessions otherwise stay signed in indefinitely.</Text>
           </Pressable>
         </>
       )}
@@ -1293,7 +1292,6 @@ const providerProfileStyles = StyleSheet.create({
   linkSubtitle: { fontSize: 11, marginTop: 2 },
   logoutArea: { alignItems: "center", paddingTop: 15, paddingHorizontal: 24 },
   logoutText: { fontSize: 12, fontFamily: "Inter_600SemiBold", paddingVertical: 6 },
-  logoutNote: { fontSize: 10, lineHeight: 15, textAlign: "center" },
   modalBackdrop: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.38)" },
   passwordModal: { borderTopLeftRadius: designTokens.radius.sheet, borderTopRightRadius: designTokens.radius.sheet, padding: 22, paddingBottom: 34 },
   modalHeading: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 18 },
