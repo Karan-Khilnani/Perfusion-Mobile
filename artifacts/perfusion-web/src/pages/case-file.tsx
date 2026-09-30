@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { useParams, Link } from "wouter";
 import { useQueryClient, useInfiniteQuery } from "@tanstack/react-query";
 import {
@@ -107,7 +107,7 @@ export default function CaseFilePage() {
     }
   });
 
-  const { data: callbackDevices = [], isError: callbackDevicesError, error: callbackDevicesErrorDetails } = useListConsultationDevices({
+  const { data: callbackDevices, isLoading: callbackDevicesLoading, isError: callbackDevicesError, error: callbackDevicesErrorDetails } = useListConsultationDevices({
     query: {
       queryKey: [...getListConsultationDevicesQueryKey(), user?.id],
       enabled: !!caseFile?.capabilities.canManageCallbackDevice,
@@ -116,6 +116,10 @@ export default function CaseFilePage() {
       staleTime: 0,
     },
   });
+  const eligibleCallbackDevices = useMemo(
+    () => (callbackDevices ?? []).filter((device) => !!device.installationId?.trim() && !!device.staffName?.trim()),
+    [callbackDevices],
+  );
   const assignCallbackDeviceMutation = useAssignConsultationCallbackDevice({
     mutation: {
       onSuccess: () => {
@@ -194,6 +198,11 @@ export default function CaseFilePage() {
 
   const [messageInput, setMessageInput] = useState("");
   const [selectedCallbackDeviceId, setSelectedCallbackDeviceId] = useState("");
+  useEffect(() => {
+    if (selectedCallbackDeviceId && !eligibleCallbackDevices.some((device) => device.id === selectedCallbackDeviceId)) {
+      setSelectedCallbackDeviceId("");
+    }
+  }, [eligibleCallbackDevices, selectedCallbackDeviceId]);
   const [activeTab, setActiveTab] = useState(() => {
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
@@ -363,7 +372,11 @@ export default function CaseFilePage() {
   const caps = caseFile.capabilities;
   const comorbidityEntries = getComorbidityEntries(caseFile.summary.comorbidities);
   const callbackDevice = caseFile.booking.callbackDevice;
-  const selectedCallbackDevice = selectedCallbackDeviceId || callbackDevice?.deviceId || "";
+  const selectedCallbackDeviceIsEligible = eligibleCallbackDevices.some((device) => device.id === selectedCallbackDeviceId);
+  const assignedCallbackDeviceIsEligible = eligibleCallbackDevices.some((device) => device.id === callbackDevice?.deviceId);
+  const selectedCallbackDevice = selectedCallbackDeviceIsEligible
+    ? selectedCallbackDeviceId
+    : assignedCallbackDeviceIsEligible ? callbackDevice?.deviceId || "" : "";
 
   const vts = vitals || [];
   const advs = advisories || [];
@@ -422,13 +435,15 @@ export default function CaseFilePage() {
         </div>
       </header>
 
-      {caseFile.booking.bookingType === "consultation" && <section className="flex-none border-b bg-card px-4 py-2" data-testid="case-file-callback-device">
+      {user?.role === "care_seeker" && caseFile.booking.bookingType === "consultation" && <section className="flex-none border-b bg-card px-4 py-2" data-testid="case-file-callback-device">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-2">
             <PhoneCall className="h-4 w-4 shrink-0 text-primary" />
             <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Consultation call-back device</span>
             <span className="truncate text-sm font-medium" data-testid="text-callback-device-name">
-              {callbackDevice?.deviceName || "Not selected"}
+              {callbackDevice?.deviceId
+                ? `${callbackDevice.staffName?.trim() || "Staff name missing"} · ${callbackDevice.deviceName || "Device name missing"}`
+                : "Not selected"}
             </span>
             {callbackDevice?.due && (
               <Badge variant="destructive" className="gap-1" data-testid="badge-callback-device-due">
@@ -439,21 +454,25 @@ export default function CaseFilePage() {
           {caps.canManageCallbackDevice && (
             <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
               {callbackDevicesError && <p role="alert" className="w-full text-xs text-destructive">Could not load registered devices. {callbackDevicesErrorDetails?.message}</p>}
-              {callbackDevices.length ? (
+              {callbackDevicesLoading ? (
+                <span className="text-xs text-muted-foreground">Loading staff/device pairs…</span>
+              ) : eligibleCallbackDevices.length ? (
                 <Select value={selectedCallbackDevice} onValueChange={setSelectedCallbackDeviceId}>
                   <SelectTrigger className="h-8 w-full sm:w-56" data-testid="select-case-file-callback-device">
-                    <SelectValue placeholder="Choose a registered device" />
+                    <SelectValue placeholder="Choose staff and device" />
                   </SelectTrigger>
                   <SelectContent>
-                    {callbackDevices.map((device) => (
-                      <SelectItem key={device.id} value={device.id}>{device.deviceName}</SelectItem>
+                    {eligibleCallbackDevices.map((device) => (
+                      <SelectItem key={device.id} value={device.id} data-testid={`option-case-file-callback-device-${device.id}`}>
+                        {device.staffName?.trim() || "Staff name missing"} · {device.deviceName}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               ) : (
-                <Link href="/user/profile" className="text-xs text-primary underline">Register a callback device in Profile</Link>
+                <Link href="/user/profile" className="text-xs text-primary underline">Register a staff/device pair in Profile</Link>
               )}
-              {callbackDevices.length > 0 && (
+              {!callbackDevicesLoading && eligibleCallbackDevices.length > 0 && (
                 <Button
                   type="button"
                   size="sm"
@@ -463,7 +482,7 @@ export default function CaseFilePage() {
                   onClick={() => assignCallbackDeviceMutation.mutate({ bookingId, data: { deviceId: selectedCallbackDevice } })}
                   data-testid="button-confirm-callback-device"
                 >
-                  {callbackDevice?.deviceId === selectedCallbackDevice ? "Reconfirm device" : "Choose device"}
+                  {callbackDevice?.deviceId === selectedCallbackDevice ? "Reconfirm pair" : "Choose pair"}
                 </Button>
               )}
             </div>

@@ -354,7 +354,7 @@ export default function ProfileScreen() {
         </View>
       )}
 
-      {user?.role !== "admin" && (
+      {user?.role === "care_seeker" && (
         <Pressable
           onPress={() => router.push("/callback-device")}
           style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border, padding: 16 }]}

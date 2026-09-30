@@ -8,6 +8,11 @@
 
 export interface ConsultationDevice {
   id: string;
+  /**
+     * @maxLength 100
+     * @nullable
+     */
+  staffName: string | null;
   deviceName: string;
   phoneNumber: string;
   /** @nullable */

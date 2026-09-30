@@ -231,7 +231,7 @@ export const getListConsultationDevicesUrl = () => {
 }
 
 /**
- * @summary List the signed-in hospital's registered callback devices
+ * @summary List the signed-in seeker's registered callback devices
  */
 export const listConsultationDevices = async ( options?: RequestInit): Promise<ConsultationDevice[]> => {
 
@@ -278,7 +278,7 @@ export type ListConsultationDevicesQueryError = ErrorType<void>
 
 
 /**
- * @summary List the signed-in hospital's registered callback devices
+ * @summary List the signed-in seeker's registered callback devices
  */
 
 export function useListConsultationDevices<TData = Awaited<ReturnType<typeof listConsultationDevices>>, TError = ErrorType<void>>(
@@ -308,7 +308,7 @@ export const getCreateConsultationDeviceUrl = () => {
 }
 
 /**
- * @summary Register a named callback device
+ * @summary Register a named callback device for a seeker installation
  */
 export const createConsultationDevice = async (consultationDeviceInput: ConsultationDeviceInput, options?: RequestInit): Promise<ConsultationDevice> => {
 
@@ -357,7 +357,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type CreateConsultationDeviceMutationError = ErrorType<void>
 
     /**
- * @summary Register a named callback device
+ * @summary Register a named callback device for a seeker installation
  */
 export const useCreateConsultationDevice = <TError = ErrorType<void>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createConsultationDevice>>, TError,{data: BodyType<ConsultationDeviceInput>}, TContext>, request?: SecondParameter<typeof customFetch>}

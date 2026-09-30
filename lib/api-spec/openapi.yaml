@@ -49,7 +49,7 @@ paths:
     get:
       operationId: listConsultationDevices
       tags: [profile]
-      summary: List the signed-in hospital's registered callback devices
+      summary: List the signed-in seeker's registered callback devices
       responses:
         "200":
           description: Active registered devices
@@ -59,10 +59,11 @@ paths:
                 type: array
                 items: { $ref: "#/components/schemas/ConsultationDevice" }
         "401": { description: Not authenticated }
+        "403": { description: Seeker account required }
     post:
       operationId: createConsultationDevice
       tags: [profile]
-      summary: Register a named callback device
+      summary: Register a named callback device for a seeker installation
       requestBody:
         required: true
         content:
@@ -76,6 +77,7 @@ paths:
               schema: { $ref: "#/components/schemas/ConsultationDevice" }
         "400": { description: Invalid device details }
         "409": { description: This installation is already registered }
+        "403": { description: Seeker account required }
   /profile/callback-devices/{id}:
     parameters:
       - name: id
@@ -100,6 +102,7 @@ paths:
         "400": { description: Invalid device details }
         "404": { description: Device not found }
         "409": { description: This installation is already registered }
+        "403": { description: Seeker account required }
     delete:
       operationId: deleteConsultationDevice
       tags: [profile]
@@ -108,6 +111,7 @@ paths:
         "204": { description: Device removed }
         "404": { description: Device not found }
         "409": { description: Reassign active consultations first }
+        "403": { description: Seeker account required }
   /bookings/{bookingId}/callback-device:
     put:
       operationId: assignConsultationCallbackDevice
@@ -129,9 +133,9 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ConsultationCallbackAssignment" }
-        "400": { description: Invalid selection }
+        "400": { description: Invalid or unlinked device selection }
         "403": { description: Not the consultation's seeker or Case File closed }
-        "404": { description: Consultation or device not found }
+        "404": { description: Consultation not found }
   /admin/bookings/{bookingId}/callback-device:
     get:
       operationId: getAdminConsultationCallbackDevice
@@ -808,9 +812,10 @@ components:
         phoneNumber: { type: string, minLength: 7, maxLength: 25 }
     ConsultationDevice:
       type: object
-      required: [id, deviceName, phoneNumber, installationId, createdAt, updatedAt]
+      required: [id, staffName, deviceName, phoneNumber, installationId, createdAt, updatedAt]
       properties:
         id: { type: string }
+        staffName: { type: ["string", "null"], maxLength: 100 }
         deviceName: { type: string }
         phoneNumber: { type: string }
         installationId: { type: ["string", "null"] }
@@ -820,12 +825,14 @@ components:
       type: object
       required: [deviceName, phoneNumber]
       properties:
+        staffName: { type: string, minLength: 1, maxLength: 100 }
         deviceName: { type: string, minLength: 1, maxLength: 100 }
         phoneNumber: { type: string, minLength: 7, maxLength: 25 }
         installationId: { type: string, minLength: 1, maxLength: 120 }
     ConsultationDeviceUpdate:
       type: object
       properties:
+        staffName: { type: string, minLength: 1, maxLength: 100 }
         deviceName: { type: string, minLength: 1, maxLength: 100 }
         phoneNumber: { type: string, minLength: 7, maxLength: 25 }
         installationId: { type: ["string", "null"], maxLength: 120 }
@@ -836,10 +843,11 @@ components:
         deviceId: { type: string }
     ConsultationCallbackAssignment:
       type: object
-      required: [deviceId, deviceName, confirmedAt, dueAt, due]
+      required: [deviceId, deviceName, staffName, confirmedAt, dueAt, due]
       properties:
         deviceId: { type: ["string", "null"] }
         deviceName: { type: ["string", "null"] }
+        staffName: { type: ["string", "null"], maxLength: 100 }
         confirmedAt: { type: ["string", "null"], format: date-time }
         dueAt: { type: ["string", "null"], format: date-time }
         due: { type: boolean }

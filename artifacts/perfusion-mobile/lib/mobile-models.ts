@@ -46,6 +46,7 @@ export type CaseFileCapabilities = {
 
 export type CaseFileCallbackDevice = {
   deviceId: string | null;
+  staffName: string | null;
   deviceName: string | null;
   confirmedAt: string | null;
   dueAt: string | null;

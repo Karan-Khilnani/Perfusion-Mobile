@@ -285,9 +285,11 @@ function CallbackDevicesCard({ userId }: { userId: string }) {
     },
   });
   const browserInstallationId = getCallbackInstallationId();
+  const [staffName, setStaffName] = useState("");
   const [deviceName, setDeviceName] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingStaffName, setEditingStaffName] = useState("");
   const [editingName, setEditingName] = useState("");
   const [editingPhone, setEditingPhone] = useState("");
   const createDevice = useCreateConsultationDevice();
@@ -296,12 +298,18 @@ function CallbackDevicesCard({ userId }: { userId: string }) {
   const refresh = () => queryClient.invalidateQueries({ queryKey: getListConsultationDevicesQueryKey() });
 
   const saveNewDevice = () => {
-    if (!deviceName.trim() || !phoneNumber.trim()) {
-      toast({ title: "Device name and personal number are required", variant: "destructive" });
+    if (!staffName.trim() || !deviceName.trim() || !phoneNumber.trim()) {
+      toast({ title: "Staff name, device name, and contact number are required", variant: "destructive" });
       return;
     }
-    createDevice.mutate({ data: { deviceName: deviceName.trim(), phoneNumber: phoneNumber.trim() } }, {
+    createDevice.mutate({ data: {
+      staffName: staffName.trim(),
+      deviceName: deviceName.trim(),
+      phoneNumber: phoneNumber.trim(),
+      installationId: browserInstallationId,
+    } }, {
       onSuccess: () => {
+        setStaffName("");
         setDeviceName("");
         setPhoneNumber("");
         void refresh();
@@ -312,11 +320,13 @@ function CallbackDevicesCard({ userId }: { userId: string }) {
   };
 
   const saveEdit = (device: ConsultationDevice) => {
-    if (!editingName.trim() || !editingPhone.trim()) {
-      toast({ title: "Device name and personal number are required", variant: "destructive" });
+    if (!editingStaffName.trim() || !editingName.trim() || !editingPhone.trim()) {
+      toast({ title: "Staff name, device name, and contact number are required", variant: "destructive" });
       return;
     }
-    updateDevice.mutate({ id: device.id, data: { deviceName: editingName.trim(), phoneNumber: editingPhone.trim() } }, {
+    updateDevice.mutate({ id: device.id, data: {
+      staffName: editingStaffName.trim(), deviceName: editingName.trim(), phoneNumber: editingPhone.trim(),
+    } }, {
       onSuccess: () => {
         setEditingId(null);
         void refresh();
@@ -327,6 +337,10 @@ function CallbackDevicesCard({ userId }: { userId: string }) {
   };
 
   const toggleLinkedDevice = (device: ConsultationDevice) => {
+    if (device.installationId && device.installationId !== browserInstallationId &&
+        !window.confirm("This pair is linked to another installation. Move it to this browser? That installation will stop receiving calls assigned to this pair.")) {
+      return;
+    }
     const installationId = browserInstallationId;
     updateDevice.mutate({
       id: device.id,
@@ -343,10 +357,10 @@ function CallbackDevicesCard({ userId }: { userId: string }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base flex items-center gap-2"><Phone className="h-4 w-4" />Callback Devices</CardTitle>
+        <CardTitle className="text-base flex items-center gap-2"><Phone className="h-4 w-4" />Staff & Devices</CardTitle>
         <CardDescription>
-          Register personal phones for consultation call-backs. This directory is separate from Ward Contacts.
-          Link a device to this browser to use it as the booking default.
+          Register the staff member, installation, and contact number as one pair. Choose a pair on each consultation;
+          changing shifts means reassigning the booking, not moving another staff member's installation.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -361,13 +375,16 @@ function CallbackDevicesCard({ userId }: { userId: string }) {
               <div key={device.id} className="rounded-md border p-3 space-y-2" data-testid={`callback-device-${device.id}`}>
                 {editingId === device.id ? (
                   <div className="grid gap-2 sm:grid-cols-2">
+                    <Input aria-label="Staff name" value={editingStaffName} onChange={(event) => setEditingStaffName(event.target.value)} />
                     <Input aria-label="Device name" value={editingName} onChange={(event) => setEditingName(event.target.value)} />
-                    <Input aria-label="Personal number" value={editingPhone} onChange={(event) => setEditingPhone(event.target.value)} />
+                    <Input aria-label="Contact number" value={editingPhone} onChange={(event) => setEditingPhone(event.target.value)} />
                   </div>
                 ) : (
                   <div>
-                    <p className="text-sm font-medium">{device.deviceName}</p>
-                    <p className="text-xs text-muted-foreground">{device.phoneNumber}</p>
+                    <p className="text-sm font-medium">{device.staffName?.trim() || "Staff name needed"} · {device.deviceName}</p>
+                    <p className="text-xs text-muted-foreground">Contact: {device.phoneNumber}</p>
+                    {(!device.staffName?.trim() || !device.installationId) &&
+                      <p className="text-xs text-amber-700">Add a staff name and link an installation before assigning this pair to a booking.</p>}
                   </div>
                 )}
                 <div className="flex flex-wrap items-center gap-2">
@@ -380,7 +397,7 @@ function CallbackDevicesCard({ userId }: { userId: string }) {
                       <Button type="button" size="sm" variant="ghost" onClick={() => setEditingId(null)}>Cancel</Button>
                     </>
                   ) : (
-                    <Button type="button" size="sm" variant="ghost" onClick={() => { setEditingId(device.id); setEditingName(device.deviceName); setEditingPhone(device.phoneNumber); }} data-testid={`button-edit-device-${device.id}`}><Pencil className="mr-1 h-3.5 w-3.5" />Edit</Button>
+                    <Button type="button" size="sm" variant="ghost" onClick={() => { setEditingId(device.id); setEditingStaffName(device.staffName || ""); setEditingName(device.deviceName); setEditingPhone(device.phoneNumber); }} data-testid={`button-edit-device-${device.id}`}><Pencil className="mr-1 h-3.5 w-3.5" />Edit</Button>
                   )}
                   <Button type="button" size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => deleteDevice.mutate({ id: device.id }, { onSuccess: () => { void refresh(); toast({ title: "Callback device deleted" }); }, onError: (error) => toast({ title: "Could not delete device", description: error.message, variant: "destructive" }) })} disabled={deleteDevice.isPending} data-testid={`button-delete-device-${device.id}`}>
                     <Trash2 className="mr-1 h-3.5 w-3.5" />Delete
@@ -392,10 +409,11 @@ function CallbackDevicesCard({ userId }: { userId: string }) {
           </div>
         )}
         <div className="rounded-md border p-3 space-y-3">
-          <p className="text-sm font-medium">Add a callback device</p>
+          <p className="text-sm font-medium">Register staff and this browser</p>
           <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1"><Label htmlFor="callback-staff-name">Staff name</Label><Input id="callback-staff-name" placeholder="e.g. Duty nurse" value={staffName} onChange={(event) => setStaffName(event.target.value)} data-testid="input-callback-staff-name" /></div>
             <div className="space-y-1"><Label htmlFor="callback-device-name">Device name</Label><Input id="callback-device-name" placeholder="e.g. Personal mobile" value={deviceName} onChange={(event) => setDeviceName(event.target.value)} data-testid="input-callback-device-name" /></div>
-            <div className="space-y-1"><Label htmlFor="callback-device-phone">Personal number</Label><Input id="callback-device-phone" type="tel" placeholder="+91 98765 43210" value={phoneNumber} onChange={(event) => setPhoneNumber(event.target.value)} data-testid="input-callback-device-phone" /></div>
+            <div className="space-y-1"><Label htmlFor="callback-device-phone">Contact number</Label><Input id="callback-device-phone" type="tel" placeholder="+91 98765 43210" value={phoneNumber} onChange={(event) => setPhoneNumber(event.target.value)} data-testid="input-callback-device-phone" /></div>
           </div>
           <Button type="button" size="sm" onClick={saveNewDevice} disabled={createDevice.isPending} data-testid="button-add-callback-device">
             {createDevice.isPending ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <Plus className="mr-1 h-3.5 w-3.5" />}Add device

@@ -53,6 +53,13 @@ import {
   statusPresentation,
 } from "@/lib/mobile-models";
 
+type SeekerStaffDevice = {
+  id: string;
+  staffName: string | null;
+  deviceName: string;
+  installationId: string | null;
+};
+
 const CATEGORY_LABELS: { label: string; value: AttachmentCategory }[] = [
   { label: "Lab", value: "lab" },
   { label: "Radiology", value: "radiology" },
@@ -96,7 +103,7 @@ export default function CaseFileScreen() {
   const [startingCall, setStartingCall] = useState<"voice" | "video" | null>(null);
   const [callError, setCallError] = useState<string | null>(null);
   const [callbackPickerOpen, setCallbackPickerOpen] = useState(false);
-  const callbackDevices = useQuery<Array<{ id: string; deviceName: string; phoneNumber: string; installationId: string | null }>>({
+  const callbackDevices = useQuery<SeekerStaffDevice[]>({
     queryKey: ["mobile-callback-devices"],
     enabled: seeker,
     queryFn: async () => {
@@ -113,8 +120,12 @@ export default function CaseFileScreen() {
     onSuccess: async () => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["case-file", bookingId] }),
+        queryClient.invalidateQueries({ queryKey: ["booking", bookingId] }),
+        queryClient.invalidateQueries({ queryKey: ["bookings"] }),
+        queryClient.invalidateQueries({ queryKey: ["consultations"] }),
         queryClient.invalidateQueries({ queryKey: ["mobile-callback-device-reminders"] }),
       ]);
+      setCallbackPickerOpen(false);
     },
   });
 
@@ -243,6 +254,10 @@ export default function CaseFileScreen() {
     () => [...(messages.data?.messages || [])].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
     [messages.data?.messages],
   );
+  const eligibleStaffDevices = useMemo(
+    () => (callbackDevices.data || []).filter((device) => !!device.staffName?.trim() && !!device.installationId?.trim()),
+    [callbackDevices.data],
+  );
 
   if (aggregate.isLoading) {
     return <StateView loading label="Opening Case File…" />;
@@ -306,10 +321,10 @@ export default function CaseFileScreen() {
       </LinearGradient>
 
       <View style={{ paddingHorizontal: 12, paddingTop: 9, paddingBottom: 8, backgroundColor: palette.background }}>
-        <CallbackDeviceRow
+        {seeker && <CallbackDeviceRow
           assignment={booking.callbackDevice || null}
           canManage={seeker && capabilities.canManageCallbackDevice === true}
-          devices={callbackDevices.data || []}
+          devices={eligibleStaffDevices}
           loading={callbackDevices.isLoading}
           directoryError={callbackDevices.isError ? (callbackDevices.error instanceof Error ? callbackDevices.error.message : "Could not load callback devices.") : null}
           saving={callbackDeviceMutation.isPending}
@@ -319,9 +334,8 @@ export default function CaseFileScreen() {
           onRefreshDevices={() => void callbackDevices.refetch()}
           onSelect={(deviceId) => {
             callbackDeviceMutation.mutate(deviceId);
-            setCallbackPickerOpen(false);
           }}
-        />
+        />}
       </View>
 
       {callError && <Text style={[styles.callError, { color: palette.primary, backgroundColor: palette.conversationCard }]} accessibilityRole="alert">{callError}</Text>}
@@ -494,7 +508,7 @@ function CallbackDeviceRow({
 }: {
   assignment: CaseFileCallbackDevice | null;
   canManage: boolean;
-  devices: Array<{ id: string; deviceName: string; phoneNumber: string; installationId: string | null }>;
+  devices: SeekerStaffDevice[];
   loading: boolean;
   directoryError: string | null;
   saving: boolean;
@@ -519,7 +533,8 @@ function CallbackDeviceRow({
     return () => animation.stop();
   }, [assignment?.due, canManage, opacity]);
 
-  const currentDeviceName = assignment?.deviceName || "No callback device selected";
+  const assignedStaffName = assignment?.staffName?.trim() || null;
+  const currentDeviceName = assignment?.deviceName || null;
   const dueLabel = assignment?.dueAt
     ? `Confirmation due ${new Date(assignment.dueAt).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}`
     : "Confirmation required";
@@ -527,14 +542,19 @@ function CallbackDeviceRow({
   return (
     <View style={{ borderWidth: 1, borderColor: palette.border, backgroundColor: palette.background, borderRadius: 14, padding: 13, gap: 9 }}>
       <View style={{ flexDirection: "row", alignItems: "center", gap: 9 }}>
-        <Feather name="phone-call" size={17} color={palette.primary} />
-        <Text style={{ flex: 1, color: palette.mutedForeground, fontSize: 10, letterSpacing: 0.5, fontFamily: "Inter_700Bold" }}>CALLBACK DEVICE</Text>
-        <Text numberOfLines={1} style={{ color: palette.foreground, fontSize: 13, fontFamily: "Inter_600SemiBold", maxWidth: "60%" }}>{currentDeviceName}</Text>
+        <Feather name="users" size={17} color={palette.primary} />
+        <View style={{ flex: 1 }}>
+          <Text style={{ color: palette.mutedForeground, fontSize: 10, letterSpacing: 0.5, fontFamily: "Inter_700Bold" }}>ASSIGNED STAFF · DEVICE</Text>
+          <Text numberOfLines={1} style={{ color: palette.foreground, fontSize: 13, fontFamily: "Inter_600SemiBold", marginTop: 3 }}>
+            {assignedStaffName || "No staff assigned"}
+          </Text>
+          {!!currentDeviceName && <Text numberOfLines={1} style={{ color: palette.mutedForeground, fontSize: 11, marginTop: 2 }}>{currentDeviceName}</Text>}
+        </View>
       </View>
       {canManage && loading && (
         <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
           <ActivityIndicator size="small" color={palette.primary} />
-          <Text style={{ color: palette.mutedForeground, fontSize: 11 }}>Loading callback device directory…</Text>
+          <Text style={{ color: palette.mutedForeground, fontSize: 11 }}>Loading eligible staff and devices…</Text>
         </View>
       )}
       {canManage && assignment?.confirmedAt && (
@@ -555,7 +575,7 @@ function CallbackDeviceRow({
           >
             {saving ? <ActivityIndicator size="small" color={palette.primary} /> : <Feather name={assignment?.deviceId ? "check-circle" : "edit-2"} size={15} color={palette.primary} />}
             <Text style={{ color: palette.primary, fontSize: 12, fontFamily: "Inter_600SemiBold" }}>
-              {saving ? "Saving…" : assignment?.deviceId ? "Change or confirm device" : "Choose callback device"}
+            {saving ? "Saving…" : assignment?.deviceId ? "Change assigned staff/device" : "Assign staff and device"}
             </Text>
           </Pressable>
           {!!mutationError && <Text style={{ color: palette.destructive, fontSize: 12 }} accessibilityRole="alert">{mutationError}</Text>}
@@ -575,12 +595,15 @@ function CallbackDeviceRow({
                   accessibilityRole="button"
                 >
                   <Feather name={device.id === assignment?.deviceId ? "check-circle" : "smartphone"} size={15} color={device.id === assignment?.deviceId ? palette.primary : palette.mutedForeground} />
-                  <Text style={{ color: palette.foreground, fontSize: 13, fontFamily: "Inter_600SemiBold" }}>{device.deviceName}</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: palette.foreground, fontSize: 13, fontFamily: "Inter_600SemiBold" }}>{device.staffName}</Text>
+                    <Text style={{ color: palette.mutedForeground, fontSize: 11, marginTop: 2 }}>{device.deviceName}</Text>
+                  </View>
                 </Pressable>
               )) : (
                 <View style={{ gap: 6 }}>
-                  <Text style={{ color: palette.mutedForeground, fontSize: 12 }}>No registered devices. Add one to your directory first.</Text>
-                  <Pressable onPress={() => router.push("/callback-device")}><Text style={{ color: palette.primary, fontFamily: "Inter_600SemiBold" }}>Manage devices</Text></Pressable>
+                  <Text style={{ color: palette.mutedForeground, fontSize: 12 }}>No eligible staff/device pairs. Each registered pair needs a staff name and linked installation.</Text>
+                  <Pressable onPress={() => router.push("/callback-device")}><Text style={{ color: palette.primary, fontFamily: "Inter_600SemiBold" }}>Manage registered devices</Text></Pressable>
                 </View>
               )}
             </View>

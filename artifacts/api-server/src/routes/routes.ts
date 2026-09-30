@@ -1627,13 +1627,14 @@ export async function registerRoutes(
       const readOnly = caseFileReadOnly(booking);
       const providerUser = access.provider?.userId;
       const isOwnerProvider = access.isProvider;
-      const callbackDeviceName = booking.callbackDeviceId
-        ? (await pool.query<{ deviceName: string }>(
-            `SELECT device_name AS "deviceName" FROM consultation_callback_devices
+      const callbackDevice = booking.callbackDeviceId
+        ? (await pool.query<{ deviceName: string | null; staffName: string | null }>(
+            `SELECT device_name AS "deviceName", staff_name AS "staffName"
+             FROM consultation_callback_devices
              WHERE id = $1 AND user_id = $2`,
             [booking.callbackDeviceId, booking.userId],
-          )).rows[0]?.deviceName ?? null
-        : null;
+          )).rows[0] ?? { deviceName: null, staffName: null }
+        : { deviceName: null, staffName: null };
       const caseFileBooking = {
         id: booking.id,
         bookingNumber: booking.bookingNumber || null,
@@ -1649,7 +1650,7 @@ export async function registerRoutes(
         userId: booking.userId,
         providerId: booking.providerId || null,
         callbackDevice: booking.bookingType === "consultation"
-          ? callbackDeviceAssignment(booking, callbackDeviceName)
+          ? callbackDeviceAssignment(booking, callbackDevice.deviceName, callbackDevice.staffName)
           : null,
         postRxCallsEnabled: lifecycle
           ? lifecycle.scheduleAvailable && lifecycle.status === "ongoing"
@@ -2319,6 +2320,12 @@ export async function registerRoutes(
       // The client may choose a directory entry but cannot supply confirmation or reminder timestamps.
       delete bookingData.callbackDeviceConfirmedAt;
       delete bookingData.callbackDeviceRemindedAt;
+      const requiresCallbackDevice = req.user?.role === "care_seeker" &&
+        bookingData.bookingType === "consultation";
+      if (requiresCallbackDevice && (typeof rawCallbackDeviceId !== "string" ||
+          !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(rawCallbackDeviceId))) {
+        return res.status(400).json({ message: "Select a registered, linked callback device with a staff name for this consultation." });
+      }
       if (rawCallbackDeviceId !== undefined && rawCallbackDeviceId !== null) {
         if (bookingData.bookingType !== "consultation" ||
             typeof rawCallbackDeviceId !== "string" ||
@@ -2328,14 +2335,21 @@ export async function registerRoutes(
         const client = await getPool().connect();
         callbackDeviceGuardClient = client;
         await client.query("BEGIN");
-        // Deletion takes FOR UPDATE on this row. Keep our KEY SHARE lock until
-        // the booking is inserted, including its FK check on a separate client.
+        // Keep this row stable against unlink/edit/archive until the booking is
+        // inserted on a separate client.
         const device = await client.query(
           `SELECT id FROM consultation_callback_devices
-           WHERE id = $1 AND user_id = $2 AND archived_at IS NULL FOR KEY SHARE`,
+           WHERE id = $1 AND user_id = $2 AND archived_at IS NULL
+             AND installation_id IS NOT NULL AND btrim(installation_id) <> ''
+             AND staff_name IS NOT NULL AND btrim(staff_name) <> ''
+           FOR SHARE`,
           [rawCallbackDeviceId, userId],
         );
-        if (!device.rows.length) return res.status(400).json({ message: "That callback device is not registered to your account." });
+        if (!device.rows.length) {
+          return res.status(400).json({
+            message: "Select a registered, linked callback device with a staff name for this consultation.",
+          });
+        }
         bookingData.callbackDeviceId = rawCallbackDeviceId;
         bookingData.callbackDeviceConfirmedAt = new Date();
         bookingData.callbackDeviceRemindedAt = null;
@@ -4481,12 +4495,16 @@ export async function registerRoutes(
   });
 
   // ── Account device directory and per-consultation assignment ────────────
-  const callbackDeviceColumns = `id, device_name AS "deviceName", phone_number AS "phoneNumber",
+  const callbackDeviceColumns = `id, staff_name AS "staffName", device_name AS "deviceName", phone_number AS "phoneNumber",
     installation_id AS "installationId", created_at AS "createdAt", updated_at AS "updatedAt"`;
   const validCallbackPhone = (phone: string) =>
     /^\+?[\d\s\-().]{7,25}$/.test(phone) && phone.replace(/\D/g, "").length >= 7;
 
   app.get("/api/profile/callback-devices", isAuthenticated, async (req: any, res) => {
+    if (req.user.role !== "care_seeker") {
+      res.status(403).json({ message: "Only seeker accounts can manage callback devices." });
+      return;
+    }
     try {
       await migrateLegacyCallbackDevice(req.user.id);
       const { rows } = await getPool().query(
@@ -4502,17 +4520,23 @@ export async function registerRoutes(
   });
 
   app.post("/api/profile/callback-devices", isAuthenticated, async (req: any, res) => {
+    if (req.user.role !== "care_seeker") {
+      return res.status(403).json({ message: "Only seeker accounts can manage callback devices." });
+    }
     const parsed = CreateConsultationDeviceBody.safeParse(req.body);
-    if (!parsed.success || !parsed.data.deviceName.trim() || !validCallbackPhone(parsed.data.phoneNumber.trim())) {
+    if (!parsed.success ||
+        !parsed.data.deviceName.trim() ||
+        !validCallbackPhone(parsed.data.phoneNumber.trim()) ||
+        (parsed.data.staffName !== undefined && !parsed.data.staffName.trim())) {
       return res.status(400).json({ message: "Enter a device name and valid personal mobile number." });
     }
     try {
       await migrateLegacyCallbackDevice(req.user.id);
       const { rows } = await getPool().query(
-        `INSERT INTO consultation_callback_devices (user_id, device_name, phone_number, installation_id)
-         VALUES ($1, $2, $3, $4)
+        `INSERT INTO consultation_callback_devices (user_id, staff_name, device_name, phone_number, installation_id)
+         VALUES ($1, $2, $3, $4, $5)
          RETURNING ${callbackDeviceColumns}`,
-        [req.user.id, parsed.data.deviceName.trim(), parsed.data.phoneNumber.trim(),
+        [req.user.id, parsed.data.staffName?.trim() || null, parsed.data.deviceName.trim(), parsed.data.phoneNumber.trim(),
           parsed.data.installationId?.trim() || null],
       );
       return res.status(201).json(rows[0]);
@@ -4524,45 +4548,75 @@ export async function registerRoutes(
   });
 
   app.patch("/api/profile/callback-devices/:id", isAuthenticated, async (req: any, res) => {
+    if (req.user.role !== "care_seeker") {
+      return res.status(403).json({ message: "Only seeker accounts can manage callback devices." });
+    }
     const parsed = UpdateConsultationDeviceBody.safeParse(req.body);
     if (!parsed.success || !Object.keys(parsed.data).length ||
+        (parsed.data.staffName !== undefined && !parsed.data.staffName.trim()) ||
         (parsed.data.deviceName !== undefined && !parsed.data.deviceName.trim()) ||
         (parsed.data.phoneNumber !== undefined && !validCallbackPhone(parsed.data.phoneNumber.trim())) ||
         (typeof parsed.data.installationId === "string" && !parsed.data.installationId.trim())) {
       return res.status(400).json({ message: "Enter valid device details." });
     }
+    let client: any = null;
     try {
-      const { rows } = await getPool().query<{ legacyUserId: string | null } & Record<string, any>>(
+      client = await getPool().connect();
+      await client.query("BEGIN");
+      const locked = await client.query(
+        `SELECT id FROM consultation_callback_devices
+         WHERE id = $1 AND user_id = $2 AND archived_at IS NULL FOR UPDATE`,
+        [req.params.id, req.user.id],
+      );
+      if (!locked.rows.length) {
+        await client.query("ROLLBACK");
+        return res.status(404).json({ message: "Device not found." });
+      }
+      if (parsed.data.installationId === null &&
+          await hasActiveCallbackAssignments(req.user.id, req.params.id)) {
+        await client.query("ROLLBACK");
+        return res.status(409).json({
+          message: "Reassign this device's active consultations before unlinking its installation.",
+        });
+      }
+      const { rows } = await client.query(
         `UPDATE consultation_callback_devices SET
-           device_name = COALESCE($3, device_name),
-           phone_number = COALESCE($4, phone_number),
-           installation_id = CASE WHEN $5::boolean THEN $6 ELSE installation_id END,
+           staff_name = COALESCE($3, staff_name),
+           device_name = COALESCE($4, device_name),
+           phone_number = COALESCE($5, phone_number),
+           installation_id = CASE WHEN $6::boolean THEN $7 ELSE installation_id END,
            updated_at = now()
          WHERE id = $1 AND user_id = $2 AND archived_at IS NULL
          RETURNING ${callbackDeviceColumns}, legacy_user_id AS "legacyUserId"`,
-        [req.params.id, req.user.id, parsed.data.deviceName?.trim() ?? null,
-          parsed.data.phoneNumber?.trim() ?? null,
+         [req.params.id, req.user.id, parsed.data.staffName?.trim() ?? null,
+           parsed.data.deviceName?.trim() ?? null, parsed.data.phoneNumber?.trim() ?? null,
           Object.prototype.hasOwnProperty.call(parsed.data, "installationId"),
           parsed.data.installationId?.trim() || null],
       );
-      if (!rows.length) return res.status(404).json({ message: "Device not found." });
       const { legacyUserId, ...device } = rows[0];
       if (legacyUserId) {
-        await getPool().query(
+        await client.query(
           `UPDATE mobile_callback_devices SET device_name = $2, phone_number = $3, updated_at = now()
            WHERE user_id = $1`,
           [req.user.id, device.deviceName, device.phoneNumber],
         );
       }
+      await client.query("COMMIT");
       return res.json(device);
     } catch (error: any) {
+      if (client) await client.query("ROLLBACK").catch(() => {});
       if (error?.code === "23505") return res.status(409).json({ message: "This device installation is already registered." });
       req.log?.error({ err: error }, "Could not update callback device");
       return res.status(500).json({ message: "Could not update device" });
+    } finally {
+      client?.release();
     }
   });
 
   app.delete("/api/profile/callback-devices/:id", isAuthenticated, async (req: any, res) => {
+    if (req.user.role !== "care_seeker") {
+      return res.status(403).json({ message: "Only seeker accounts can manage callback devices." });
+    }
     let client: any = null;
     try {
       client = await getPool().connect();
@@ -4613,13 +4667,19 @@ export async function registerRoutes(
       client = await getPool().connect();
       await client.query("BEGIN");
       const device = (await client.query(
-        `SELECT device_name AS "deviceName" FROM consultation_callback_devices
-         WHERE id = $1 AND user_id = $2 AND archived_at IS NULL FOR KEY SHARE`,
+        `SELECT device_name AS "deviceName", staff_name AS "staffName"
+         FROM consultation_callback_devices
+         WHERE id = $1 AND user_id = $2 AND archived_at IS NULL
+           AND installation_id IS NOT NULL AND btrim(installation_id) <> ''
+           AND staff_name IS NOT NULL AND btrim(staff_name) <> ''
+         FOR SHARE`,
         [parsed.data.deviceId, req.user.id],
       )).rows[0];
       if (!device) {
         await client.query("ROLLBACK");
-        return res.status(404).json({ message: "Registered device not found." });
+        return res.status(400).json({
+          message: "Select a registered callback device linked to an installation and named staff member.",
+        });
       }
       const latest = (await client.query(
         `SELECT id, booking_type AS "bookingType", status,
@@ -4651,7 +4711,11 @@ export async function registerRoutes(
       broadcastCaseFileUpdate(access.booking, {
         type: "case_file_updated", bookingId: access.booking.id, change: "callback_device_changed",
       });
-      return res.json(callbackDeviceAssignment({ ...latest, ...rows[0] }, device.deviceName));
+      return res.json(callbackDeviceAssignment(
+        { ...latest, ...rows[0] },
+        device.deviceName,
+        device.staffName,
+      ));
     } catch (error) {
       if (client) await client.query("ROLLBACK").catch(() => {});
       req.log?.error({ err: error }, "Could not assign consultation callback device");
@@ -4699,6 +4763,10 @@ export async function registerRoutes(
   });
 
   app.get("/api/callback-device/reminders", isAuthenticated, async (req: any, res) => {
+    if (req.user.role !== "care_seeker") {
+      res.status(403).json({ message: "Only seeker accounts can view callback-device reminders." });
+      return;
+    }
     try {
       res.json(await listDueCallbackDeviceReminders(req.user.id));
     } catch (error) {
@@ -4711,6 +4779,9 @@ export async function registerRoutes(
   // with the directory until all installed clients use the collection API.
   // ── Mobile Callback Device (legacy compatibility) ────────────────────────
   app.get("/api/profile/callback-device", isAuthenticated, async (req: any, res) => {
+    if (req.user.role !== "care_seeker") {
+      return res.status(403).json({ message: "Only seeker accounts can manage callback devices." });
+    }
     try {
       await migrateLegacyCallbackDevice(req.user.id);
       const result = await getPool().query(
@@ -4726,6 +4797,9 @@ export async function registerRoutes(
   });
 
   app.put("/api/profile/callback-device", isAuthenticated, async (req: any, res) => {
+    if (req.user.role !== "care_seeker") {
+      return res.status(403).json({ message: "Only seeker accounts can manage callback devices." });
+    }
     const { deviceName, phoneNumber } = req.body ?? {};
     if (typeof deviceName !== "string" || !deviceName.trim() || deviceName.trim().length > 100) {
       return res.status(400).json({ message: "Device name is required (up to 100 characters)" });

@@ -41,10 +41,15 @@ export const SaveCallbackDeviceResponse = zod.object({
 
 
 /**
- * @summary List the signed-in hospital's registered callback devices
+ * @summary List the signed-in seeker's registered callback devices
  */
+export const listConsultationDevicesResponseStaffNameMax = 100;
+
+
+
 export const ListConsultationDevicesResponseItem = zod.object({
   "id": zod.string(),
+  "staffName": zod.string().max(listConsultationDevicesResponseStaffNameMax).nullable(),
   "deviceName": zod.string(),
   "phoneNumber": zod.string(),
   "installationId": zod.string().nullable(),
@@ -55,8 +60,10 @@ export const ListConsultationDevicesResponse = zod.array(ListConsultationDevices
 
 
 /**
- * @summary Register a named callback device
+ * @summary Register a named callback device for a seeker installation
  */
+export const createConsultationDeviceBodyStaffNameMax = 100;
+
 export const createConsultationDeviceBodyDeviceNameMax = 100;
 
 export const createConsultationDeviceBodyPhoneNumberMin = 7;
@@ -67,6 +74,7 @@ export const createConsultationDeviceBodyInstallationIdMax = 120;
 
 
 export const CreateConsultationDeviceBody = zod.object({
+  "staffName": zod.string().min(1).max(createConsultationDeviceBodyStaffNameMax).optional(),
   "deviceName": zod.string().min(1).max(createConsultationDeviceBodyDeviceNameMax),
   "phoneNumber": zod.string().min(createConsultationDeviceBodyPhoneNumberMin).max(createConsultationDeviceBodyPhoneNumberMax),
   "installationId": zod.string().min(1).max(createConsultationDeviceBodyInstallationIdMax).optional()
@@ -80,6 +88,8 @@ export const UpdateConsultationDeviceParams = zod.object({
   "id": zod.coerce.string()
 })
 
+export const updateConsultationDeviceBodyStaffNameMax = 100;
+
 export const updateConsultationDeviceBodyDeviceNameMax = 100;
 
 export const updateConsultationDeviceBodyPhoneNumberMin = 7;
@@ -90,13 +100,19 @@ export const updateConsultationDeviceBodyInstallationIdMax = 120;
 
 
 export const UpdateConsultationDeviceBody = zod.object({
+  "staffName": zod.string().min(1).max(updateConsultationDeviceBodyStaffNameMax).optional(),
   "deviceName": zod.string().min(1).max(updateConsultationDeviceBodyDeviceNameMax).optional(),
   "phoneNumber": zod.string().min(updateConsultationDeviceBodyPhoneNumberMin).max(updateConsultationDeviceBodyPhoneNumberMax).optional(),
   "installationId": zod.string().max(updateConsultationDeviceBodyInstallationIdMax).nullish()
 })
 
+export const updateConsultationDeviceResponseStaffNameMax = 100;
+
+
+
 export const UpdateConsultationDeviceResponse = zod.object({
   "id": zod.string(),
+  "staffName": zod.string().max(updateConsultationDeviceResponseStaffNameMax).nullable(),
   "deviceName": zod.string(),
   "phoneNumber": zod.string(),
   "installationId": zod.string().nullable(),
@@ -124,9 +140,14 @@ export const AssignConsultationCallbackDeviceBody = zod.object({
   "deviceId": zod.string()
 })
 
+export const assignConsultationCallbackDeviceResponseStaffNameMax = 100;
+
+
+
 export const AssignConsultationCallbackDeviceResponse = zod.object({
   "deviceId": zod.string().nullable(),
   "deviceName": zod.string().nullable(),
+  "staffName": zod.string().max(assignConsultationCallbackDeviceResponseStaffNameMax).nullable(),
   "confirmedAt": zod.coerce.date().nullable(),
   "dueAt": zod.coerce.date().nullable(),
   "due": zod.boolean()
@@ -577,6 +598,10 @@ export const GetCaseFileParams = zod.object({
   "bookingId": zod.coerce.string()
 })
 
+export const getCaseFileResponseBookingCallbackDeviceOneStaffNameMax = 100;
+
+
+
 export const GetCaseFileResponse = zod.object({
   "booking": zod.object({
   "id": zod.string(),
@@ -594,6 +619,7 @@ export const GetCaseFileResponse = zod.object({
   "callbackDevice": zod.union([zod.object({
   "deviceId": zod.string().nullable(),
   "deviceName": zod.string().nullable(),
+  "staffName": zod.string().max(getCaseFileResponseBookingCallbackDeviceOneStaffNameMax).nullable(),
   "confirmedAt": zod.coerce.date().nullable(),
   "dueAt": zod.coerce.date().nullable(),
   "due": zod.boolean()

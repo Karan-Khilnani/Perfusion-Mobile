@@ -10,7 +10,7 @@ import {
   Sora_600SemiBold,
   Sora_700Bold,
 } from "@expo-google-fonts/sora";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { setBaseUrl } from "@workspace/api-client-react";
 import { Redirect, Stack, usePathname, type Href } from "expo-router";
 import * as Notifications from "expo-notifications";
@@ -29,6 +29,7 @@ import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { CallProvider } from "@/contexts/CallContext";
 import { useColors } from "@/hooks/useColors";
 import { getBaseUrl } from "@/hooks/useApi";
+import { getPushDeviceId } from "@/lib/push-device";
 
 setBaseUrl(getBaseUrl());
 SplashScreen.setOptions({ duration: 220, fade: true });
@@ -45,14 +46,33 @@ const queryClient = new QueryClient({
 
 function RootLayoutNav({ fontsReady }: { fontsReady: boolean }) {
   const { user, loading, callbackDevices, callbackDevicesLoading, callbackDevicesError } = useAuth();
+  const currentInstallation = useQuery({
+    queryKey: ["mobile-push-device-id"],
+    queryFn: getPushDeviceId,
+    enabled: user?.role === "care_seeker" && user.approvalStatus === "approved" && !user.needsProfile,
+    staleTime: Infinity,
+  });
   const colors = useColors();
   const pathname = usePathname();
   const splashDismissed = useRef(false);
   const handledReminderResponses = useRef(new Set<string>());
   const [notificationHref, setNotificationHref] = useState<string | null>(null);
 
+  const seekerNeedsCallbackDevice = Boolean(
+    user &&
+    user.role === "care_seeker" &&
+    !user.needsProfile &&
+    user.approvalStatus === "approved",
+  );
   const waitingForCallbackDevice = Boolean(
-    user && user.role !== "admin" && callbackDevicesLoading,
+    seekerNeedsCallbackDevice &&
+    (callbackDevicesLoading || currentInstallation.isLoading),
+  );
+  const linkedCurrentInstallation = callbackDevices.some(
+    (device) =>
+      !!currentInstallation.data &&
+      device.installationId === currentInstallation.data &&
+      !!device.staffName?.trim(),
   );
 
   const publicPaths = [
@@ -89,13 +109,18 @@ function RootLayoutNav({ fontsReady }: { fontsReady: boolean }) {
       redirectHref = "/account-status";
     } else if (
       !isRecoveryFlow &&
-      user &&
-      user.role !== "admin" &&
-      user.approvalStatus === "approved" &&
-      (!callbackDevices.length || callbackDevicesError) &&
+      seekerNeedsCallbackDevice &&
+      (!currentInstallation.data || !linkedCurrentInstallation || callbackDevicesError || currentInstallation.isError) &&
       pathname !== "/callback-device"
     ) {
       redirectHref = "/callback-device";
+    } else if (
+      !isRecoveryFlow &&
+      user &&
+      user.role !== "care_seeker" &&
+      pathname === "/callback-device"
+    ) {
+      redirectHref = "/(tabs)";
     } else if (
       !isRecoveryFlow &&
       user &&
@@ -108,10 +133,11 @@ function RootLayoutNav({ fontsReady }: { fontsReady: boolean }) {
   if (
     !loading &&
     !waitingForCallbackDevice &&
+    seekerNeedsCallbackDevice &&
     user &&
     !user.needsProfile &&
     user.approvalStatus === "approved" &&
-    callbackDevices.length > 0 &&
+    linkedCurrentInstallation &&
     !callbackDevicesError &&
     notificationHref &&
     pathname !== notificationHref
@@ -197,7 +223,7 @@ function RootLayoutNav({ fontsReady }: { fontsReady: boolean }) {
         />
         <Stack.Screen
           name="callback-device"
-          options={{ title: "Callback Devices", gestureEnabled: callbackDevices.length > 0 }}
+          options={{ title: "Callback Devices", gestureEnabled: linkedCurrentInstallation }}
         />
         <Stack.Screen
           name="booking/[id]"

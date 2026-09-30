@@ -82,6 +82,7 @@ export interface User {
 
 export interface CallbackDevice {
   id: string;
+  staffName: string | null;
   deviceName: string;
   phoneNumber: string;
   installationId: string | null;
@@ -262,7 +263,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const authenticatedUser = normalizeUser(data);
     setUser(authenticatedUser);
     if (
-      authenticatedUser.role === "admin" ||
+      authenticatedUser.role !== "care_seeker" ||
       authenticatedUser.needsProfile ||
       authenticatedUser.approvalStatus !== "approved"
     ) {

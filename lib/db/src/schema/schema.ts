@@ -253,6 +253,7 @@ export type PaymentStatus = "pending" | "partial" | "paid" | "overdue";
 export const consultationCallbackDevices = pgTable("consultation_callback_devices", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  staffName: varchar("staff_name", { length: 100 }),
   deviceName: varchar("device_name", { length: 100 }).notNull(),
   phoneNumber: varchar("phone_number", { length: 25 }).notNull(),
   installationId: varchar("installation_id", { length: 120 }),

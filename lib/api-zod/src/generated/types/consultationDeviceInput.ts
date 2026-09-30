@@ -11,6 +11,11 @@ export interface ConsultationDeviceInput {
      * @minLength 1
      * @maxLength 100
      */
+  staffName?: string;
+  /**
+     * @minLength 1
+     * @maxLength 100
+     */
   deviceName: string;
   /**
      * @minLength 7

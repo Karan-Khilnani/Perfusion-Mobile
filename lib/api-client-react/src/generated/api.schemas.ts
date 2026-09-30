@@ -26,6 +26,11 @@ export interface CallbackDeviceInput {
 
 export interface ConsultationDevice {
   id: string;
+  /**
+     * @maxLength 100
+     * @nullable
+     */
+  staffName: string | null;
   deviceName: string;
   phoneNumber: string;
   /** @nullable */
@@ -35,6 +40,11 @@ export interface ConsultationDevice {
 }
 
 export interface ConsultationDeviceInput {
+  /**
+     * @minLength 1
+     * @maxLength 100
+     */
+  staffName?: string;
   /**
      * @minLength 1
      * @maxLength 100
@@ -53,6 +63,11 @@ export interface ConsultationDeviceInput {
 }
 
 export interface ConsultationDeviceUpdate {
+  /**
+     * @minLength 1
+     * @maxLength 100
+     */
+  staffName?: string;
   /**
      * @minLength 1
      * @maxLength 100
@@ -79,6 +94,11 @@ export interface ConsultationCallbackAssignment {
   deviceId: string | null;
   /** @nullable */
   deviceName: string | null;
+  /**
+     * @maxLength 100
+     * @nullable
+     */
+  staffName: string | null;
   /** @nullable */
   confirmedAt: string | null;
   /** @nullable */

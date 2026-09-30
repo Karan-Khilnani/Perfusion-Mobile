@@ -3,8 +3,8 @@ name: Consultation callback devices
 description: Account-level device directory and per-consultation assignment remain separate from ward and patient contacts
 ---
 
-Maintain an account-level directory of named devices, but assign one directory device to each consultation. The registered personal number is for admin emergency use only; it is not a patient emergency contact, ward contact, or booking-specific cellular callback number.
+Maintain an account-level directory of staff/device pairs, but assign one pair to each consultation. The registered contact number is currently available only for audited admin emergency use; the planned appointment reminder is separate from the booking's cellular callback number. It is not a patient emergency contact or ward contact.
 
 **Why:** One hospital account can have simultaneous consultations in different locations. A global active device would send callbacks to the wrong location, and reusing ward or patient numbers can expose the wrong person's contact details.
 
-**How to apply:** Register and manage devices at the account level; choose the active one when booking and change or reconfirm it only in that consultation's Case File. The four-hour due state belongs to that booking and clears only for it. Surface reminders in the Dashboard bell and push notifications, never a second blinking Dashboard body card. Do not repurpose the existing ward/cellular callback number; saving a personal number alone does not activate a telephone bridge.
+**How to apply:** Register and manage staff/device pairs at the account level; allow a seeker to assign any linked pair on that shared account, not just the installation they are currently using. A shift handoff changes one booking's pair in its Case File rather than relinking another staff member's installation. The four-hour due state belongs to that booking and clears only for it. Surface existing confirmation reminders in the Dashboard bell and push notifications, never a second blinking Dashboard body card. Do not repurpose the existing ward/cellular callback number; saving a contact number alone does not activate a telephone bridge or Twilio reminder.

@@ -11,6 +11,11 @@ export interface ConsultationCallbackAssignment {
   deviceId: string | null;
   /** @nullable */
   deviceName: string | null;
+  /**
+     * @maxLength 100
+     * @nullable
+     */
+  staffName: string | null;
   /** @nullable */
   confirmedAt: Date | null;
   /** @nullable */

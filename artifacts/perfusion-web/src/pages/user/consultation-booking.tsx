@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useParams, Link } from "wouter";
 import { useForm } from "react-hook-form";
@@ -198,8 +198,9 @@ export default function ConsultationBookingPage() {
   const queryClient = useQueryClient();
   const [showCallbackDeviceForm, setShowCallbackDeviceForm] = useState(false);
   const [newCallbackDeviceName, setNewCallbackDeviceName] = useState("");
+  const [newCallbackDeviceStaffName, setNewCallbackDeviceStaffName] = useState("");
   const [newCallbackDevicePhone, setNewCallbackDevicePhone] = useState("");
-  const { data: callbackDevices = [], isLoading: callbackDevicesLoading, isError: callbackDevicesError, error: callbackDevicesErrorDetails } = useListConsultationDevices({
+  const { data: callbackDevices, isLoading: callbackDevicesLoading, isError: callbackDevicesError, error: callbackDevicesErrorDetails } = useListConsultationDevices({
     query: {
       queryKey: [...getListConsultationDevicesQueryKey(), user?.id],
       refetchOnWindowFocus: true,
@@ -208,6 +209,10 @@ export default function ConsultationBookingPage() {
     },
   });
   const createCallbackDevice = useCreateConsultationDevice();
+  const eligibleCallbackDevices = useMemo(
+    () => (callbackDevices ?? []).filter((device) => !!device.installationId?.trim() && !!device.staffName?.trim()),
+    [callbackDevices],
+  );
 
   const { data: consultant, isLoading } = useQuery<Consultant>({
     queryKey: ["/api/consultants", id],
@@ -292,23 +297,35 @@ export default function ConsultationBookingPage() {
   });
 
   useEffect(() => {
-    if (callbackDevicesLoading || form.getValues("callbackDeviceId")) return;
+    if (callbackDevicesLoading) return;
+    const selectedId = form.getValues("callbackDeviceId");
+    if (selectedId && !eligibleCallbackDevices.some((device) => device.id === selectedId)) {
+      form.setValue("callbackDeviceId", "", { shouldValidate: true });
+    } else if (selectedId) {
+      return;
+    }
     const installationId = getCallbackInstallationId();
-    const linked = callbackDevices.filter((device) => device.installationId === installationId);
-    if (linked.length === 1) form.setValue("callbackDeviceId", linked[0].id);
-  }, [callbackDevices, callbackDevicesLoading, form]);
+    const linked = eligibleCallbackDevices.filter((device) => device.installationId === installationId);
+    form.setValue("callbackDeviceId", linked.length === 1 ? linked[0].id : "", { shouldValidate: true });
+  }, [callbackDevicesLoading, eligibleCallbackDevices, form]);
 
   const addCallbackDevice = () => {
-    if (!newCallbackDeviceName.trim() || !newCallbackDevicePhone.trim()) {
-      toast({ title: "Device name and personal number are required", variant: "destructive" });
+    if (!newCallbackDeviceStaffName.trim() || !newCallbackDeviceName.trim() || !newCallbackDevicePhone.trim()) {
+      toast({ title: "Staff name, device name, and personal number are required", variant: "destructive" });
       return;
     }
     createCallbackDevice.mutate({
-      data: { deviceName: newCallbackDeviceName.trim(), phoneNumber: newCallbackDevicePhone.trim() },
+      data: {
+        staffName: newCallbackDeviceStaffName.trim(),
+        deviceName: newCallbackDeviceName.trim(),
+        phoneNumber: newCallbackDevicePhone.trim(),
+        installationId: getCallbackInstallationId(),
+      },
     }, {
       onSuccess: (device) => {
         queryClient.invalidateQueries({ queryKey: getListConsultationDevicesQueryKey() });
         form.setValue("callbackDeviceId", device.id, { shouldValidate: true });
+        setNewCallbackDeviceStaffName("");
         setNewCallbackDeviceName("");
         setNewCallbackDevicePhone("");
         setShowCallbackDeviceForm(false);
@@ -328,13 +345,13 @@ export default function ConsultationBookingPage() {
           <Select value={field.value || ""} onValueChange={field.onChange} disabled={callbackDevicesLoading}>
             <FormControl>
               <SelectTrigger data-testid="select-callback-device">
-                <SelectValue placeholder={callbackDevicesLoading ? "Loading devices…" : callbackDevicesError ? "Unable to load devices" : callbackDevices.length ? "Select a registered device" : "No devices registered"} />
+                <SelectValue placeholder={callbackDevicesLoading ? "Loading staff and devices…" : callbackDevicesError ? "Unable to load devices" : eligibleCallbackDevices.length ? "Select staff and device" : "No eligible staff devices"} />
               </SelectTrigger>
             </FormControl>
             <SelectContent>
-              {callbackDevices.map((device) => (
+              {eligibleCallbackDevices.map((device) => (
                 <SelectItem key={device.id} value={device.id} data-testid={`option-callback-device-${device.id}`}>
-                  {device.deviceName} · {device.phoneNumber}
+                  {device.staffName!.trim()} · {device.deviceName}
                   {device.installationId === getCallbackInstallationId() ? " (this browser)" : ""}
                 </SelectItem>
               ))}
@@ -342,8 +359,8 @@ export default function ConsultationBookingPage() {
           </Select>
           <FormMessage />
           {callbackDevicesError && <p role="alert" className="text-sm text-destructive">Could not load callback devices. {callbackDevicesErrorDetails?.message}</p>}
-          <p className="text-xs text-muted-foreground">This is the personal device used for consultation call-backs, not a ward contact.</p>
-          {callbackDevices.length === 0 && !showCallbackDeviceForm && (
+          <p className="text-xs text-muted-foreground">Assign the staff member and registered installation responsible for this consultation. The contact number is separate from Ward Contacts.</p>
+          {eligibleCallbackDevices.length === 0 && !showCallbackDeviceForm && (
             <div className="flex flex-wrap items-center gap-2">
               <Button type="button" variant="outline" size="sm" onClick={() => setShowCallbackDeviceForm(true)} data-testid="button-add-booking-callback-device">Add a device here</Button>
               <Link href="/user/profile" className="text-sm text-primary underline">Manage devices in Profile</Link>
@@ -351,8 +368,9 @@ export default function ConsultationBookingPage() {
           )}
           {showCallbackDeviceForm && (
             <div className="space-y-3 rounded-md border p-3">
-              <p className="text-sm font-medium">Register callback device</p>
+              <p className="text-sm font-medium">Register staff callback device</p>
               <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1"><Label htmlFor="booking-callback-device-staff-name">Staff name</Label><Input id="booking-callback-device-staff-name" value={newCallbackDeviceStaffName} onChange={(event) => setNewCallbackDeviceStaffName(event.target.value)} data-testid="input-booking-callback-device-staff-name" /></div>
                 <div className="space-y-1"><Label htmlFor="booking-callback-device-name">Device name</Label><Input id="booking-callback-device-name" value={newCallbackDeviceName} onChange={(event) => setNewCallbackDeviceName(event.target.value)} data-testid="input-booking-callback-device-name" /></div>
                 <div className="space-y-1"><Label htmlFor="booking-callback-device-phone">Personal number</Label><Input id="booking-callback-device-phone" type="tel" value={newCallbackDevicePhone} onChange={(event) => setNewCallbackDevicePhone(event.target.value)} data-testid="input-booking-callback-device-phone" /></div>
               </div>
@@ -535,8 +553,9 @@ export default function ConsultationBookingPage() {
     if (step === "details") {
       const fields: (keyof BookingFormData)[] = ["patientName", "patientAge", "patientGender", "contactNumber", "callbackDeviceId"];
       const formValid = await form.trigger(fields);
-      if (!form.getValues("callbackDeviceId")) {
-        form.setError("callbackDeviceId", { message: "Choose a registered call-back device" });
+      const selectedDeviceId = form.getValues("callbackDeviceId");
+      if (!selectedDeviceId || !eligibleCallbackDevices.some((device) => device.id === selectedDeviceId)) {
+        form.setError("callbackDeviceId", { message: "Choose an eligible staff and call-back device pair" });
         return false;
       }
 
@@ -713,8 +732,9 @@ export default function ConsultationBookingPage() {
     const handleFollowUpSubmit = async () => {
       const isValid = await form.trigger(["presentIllness", ...(hasSlots ? ["appointmentSlot" as const] : [])]);
       if (!isValid) return;
-      if (!form.getValues("callbackDeviceId")) {
-        form.setError("callbackDeviceId", { message: "Choose a registered call-back device" });
+      const selectedDeviceId = form.getValues("callbackDeviceId");
+      if (!selectedDeviceId || !eligibleCallbackDevices.some((device) => device.id === selectedDeviceId)) {
+        form.setError("callbackDeviceId", { message: "Choose an eligible staff and call-back device pair" });
         return;
       }
       if (pendingBooking) void attachBookingDocuments(pendingBooking);

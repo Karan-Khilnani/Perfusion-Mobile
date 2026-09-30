@@ -3,7 +3,6 @@ import { Platform } from "react-native";
 
 const KEY = "perfusion_push_device_id";
 let deviceIdPromise: Promise<string> | null = null;
-let webDeviceId: string | null = null;
 
 function createDeviceId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`;
@@ -14,14 +13,15 @@ export function getPushDeviceId(): Promise<string> {
     deviceIdPromise = (async () => {
       if (Platform.OS === "web") {
         try {
-          const saved = globalThis.localStorage?.getItem(KEY);
+          const storage = globalThis.localStorage;
+          if (!storage) throw new Error("Local storage is unavailable");
+          const saved = storage.getItem(KEY);
           if (saved) return saved;
           const id = createDeviceId();
-          globalThis.localStorage?.setItem(KEY, id);
-          webDeviceId = id;
+          storage.setItem(KEY, id);
           return id;
         } catch {
-          return webDeviceId || (webDeviceId = createDeviceId());
+          throw new Error("This browser cannot save an installation identity. Enable local storage and try again.");
         }
       }
       try {
@@ -31,7 +31,7 @@ export function getPushDeviceId(): Promise<string> {
         await SecureStore.setItemAsync(KEY, id);
         return id;
       } catch {
-        return createDeviceId();
+        throw new Error("This device cannot securely save its installation identity. Check device storage and try again.");
       }
     })().catch((error) => {
       deviceIdPromise = null;

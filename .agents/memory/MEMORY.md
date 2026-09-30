@@ -29,3 +29,4 @@
 - [Shared availability compatibility](shared-availability-compatibility.md) — preserve Web schedule editing; Mobile day-off windows remain stored but must not become bookable.
 - [Inverted FlatList orientation](inverted-flatlist-orientation.md) — React Native already compensates header/footer wrappers in inverted lists; avoid extra child flips.
 - [Hospital location labels](hospital-location-labels.md) — prefer a verified city; do not guess one from a free-form hospital address in consultation cards.
+- [Development schema push safety](db-schema-push-safety.md) — schema push can propose unrelated data loss; review prompts and never force a destructive drift fix.

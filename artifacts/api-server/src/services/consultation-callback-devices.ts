@@ -13,6 +13,7 @@ type CallbackBooking = {
 export function callbackDeviceAssignment(
   booking: CallbackBooking,
   deviceName: string | null,
+  staffName: string | null = null,
   now = new Date(),
 ) {
   const confirmed = booking.callbackDeviceConfirmedAt
@@ -26,6 +27,7 @@ export function callbackDeviceAssignment(
   return {
     deviceId: booking.callbackDeviceId ?? null,
     deviceName: booking.callbackDeviceId ? deviceName : null,
+    staffName: booking.callbackDeviceId ? staffName : null,
     confirmedAt: confirmed?.toISOString() ?? null,
     dueAt: dueAt?.toISOString() ?? null,
     due: active && (!booking.callbackDeviceId || !deviceName || !dueAt || now >= dueAt),
