@@ -1,6 +1,5 @@
 import { db } from "../db";
 import { bookings, consultants, providers } from "@workspace/db";
-import { users } from "@workspace/db";
 import { eq, and, inArray, isNull } from "drizzle-orm";
 import { triggerVoiceCall } from "./msg91";
 
@@ -152,7 +151,6 @@ async function markFired(bookingList: any[], now: Date): Promise<void> {
 /**
  * Fire reminders for a batch of bookings that share the same consultant and slot.
  * - One consolidated voice call to the consultant listing all patients.
- * - Individual voice calls to each seeker.
  * - One consolidated voice call to admin.
  */
 async function fireBatchedBookings(batchBookings: any[], now: Date): Promise<void> {
@@ -183,34 +181,6 @@ async function fireBatchedBookings(batchBookings: any[], now: Date): Promise<voi
     }
   } catch (e: any) {
     console.error("[Scheduler] Consultant batch lookup error:", e?.message, e?.stack);
-  }
-
-  // ── Seeker calls — individual per booking ─────────────────────────────────
-  for (const booking of batchBookings) {
-    try {
-      let seekerPhone: string | null = null;
-      if (booking.userId) {
-        const [seekerUser] = await db
-          .select({ phone: users.phone })
-          .from(users)
-          .where(eq(users.id, booking.userId));
-        seekerPhone = seekerUser?.phone || null;
-      }
-      if (seekerPhone) {
-        const seekerMsg =
-          `Hello. This is a reminder from Perfusion Healthcare. ` +
-          `Your consultation is scheduled to start now. ` +
-          `Please log in to the Perfusion portal to join the call.`;
-        console.log(`[Scheduler]   → Calling seeker (${booking.patientName || "patient"}): ${seekerPhone}`);
-        triggerVoiceCall(seekerPhone, seekerMsg).catch((e) =>
-          console.error("[Scheduler] Seeker call failed:", e?.message)
-        );
-      } else {
-        console.log(`[Scheduler]   → No seeker phone (userId=${booking.userId})`);
-      }
-    } catch (e: any) {
-      console.error("[Scheduler] Seeker lookup error:", e?.message, e?.stack);
-    }
   }
 
   // ── Admin call — one consolidated call ────────────────────────────────────
@@ -252,11 +222,6 @@ export async function fireOneBooking(booking: any, now: Date = new Date()): Prom
     `Your consultation with ${patientName} is scheduled to start now. ` +
     `Please log in to the Perfusion portal to join the call.`;
 
-  const seekerMsg =
-    `Hello. This is a reminder from Perfusion Healthcare. ` +
-    `Your consultation is scheduled to start now. ` +
-    `Please log in to the Perfusion portal to join the call.`;
-
   const adminMsg =
     `Hello. This is a Perfusion Healthcare reminder. ` +
     `Consultation for ${patientName} is starting now.`;
@@ -276,28 +241,6 @@ export async function fireOneBooking(booking: any, now: Date = new Date()): Prom
     console.error("[Scheduler] Consultant lookup error:", e?.message, e?.stack);
   }
 
-  // ── Call seeker ────────────────────────────────────────────────────────────
-  try {
-    let seekerPhone: string | null = null;
-    if (booking.userId) {
-      const [seekerUser] = await db
-        .select({ phone: users.phone })
-        .from(users)
-        .where(eq(users.id, booking.userId));
-      seekerPhone = seekerUser?.phone || null;
-    }
-    if (seekerPhone) {
-      console.log(`[Scheduler]   → Calling seeker: ${seekerPhone}`);
-      triggerVoiceCall(seekerPhone, seekerMsg).catch((e) =>
-        console.error("[Scheduler] Seeker call failed:", e?.message)
-      );
-    } else {
-      console.log(`[Scheduler]   → No seeker phone on profile (userId=${booking.userId})`);
-    }
-  } catch (e: any) {
-    console.error("[Scheduler] Seeker lookup error:", e?.message, e?.stack);
-  }
-
   // ── Call admin ─────────────────────────────────────────────────────────────
   try {
     if (ADMIN_PHONE) {
@@ -314,7 +257,7 @@ export async function fireOneBooking(booking: any, now: Date = new Date()): Prom
 }
 
 /**
- * Fire Twilio voice calls to the consultant, seeker, and admin
+ * Fire Twilio voice calls to the consultant and admin
  * when a consultation booking's slot time arrives.
  *
  * Bookings for the same consultant at the same slot are batched into

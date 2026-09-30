@@ -5,6 +5,7 @@ import { registerRoutes } from "./routes/routes";
 import { seedDatabase } from "./seed";
 import { startConsultationScheduler } from "./services/consultation-scheduler";
 import { startCallbackDeviceReminderScheduler } from "./services/callback-device-reminders";
+import { startSeekerAppointmentReminderScheduler } from "./services/seeker-appointment-reminders";
 import { verifyMobileCallPush } from "./services/mobile-call-push";
 
 const rawPort = process.env["PORT"];
@@ -422,6 +423,7 @@ async function startServer() {
     // Start consultation reminder scheduler
     startConsultationScheduler();
     startCallbackDeviceReminderScheduler();
+    startSeekerAppointmentReminderScheduler();
 
     // Error handler
     app.use((err: any, _req: any, res: any, _next: any) => {

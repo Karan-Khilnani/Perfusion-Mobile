@@ -20,3 +20,4 @@
 export * from "./schema";
 export * from "./models/auth";
 export * from "./case-file";
+export * from "./seeker-appointment-reminders";

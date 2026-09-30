@@ -75,7 +75,8 @@ export async function triggerVoiceCall(
       from: TWILIO_PHONE_NUMBER,
     });
 
-    console.log("[Twilio] Voice call triggered:", formattedPhone, "SID:", call.sid);
+    // Operational logs should not disclose the selected staff contact number.
+    console.log("[Twilio] Voice call triggered to ***" + formattedPhone.slice(-4), "SID:", call.sid);
     return call.sid;
   } catch (error: any) {
     console.error("[Twilio] Voice call failed:", error?.message || error);
