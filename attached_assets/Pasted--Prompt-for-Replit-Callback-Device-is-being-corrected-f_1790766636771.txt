@@ -1,0 +1,22 @@
+## Prompt for Replit
+
+> **Callback Device is being corrected from account-level to per-consultation. This is a real functional correction, not a visual-only change.**
+>
+> **The problem with the current build:** Callback Device selection lives in the Profile section as a single account-wide setting. That's wrong — a hospital account can have multiple ongoing consultations at once, in different physical locations (e.g. one booked from ER, another from ICU), and each needs its own independent callback target. One global setting can't represent that.
+>
+> **Corrected model — two separate layers:**
+>
+> **1. Device directory (account-level, unchanged):** the list of named devices tied to this hospital account — e.g. "Dr. Rohan's S24 Ultra," "ICU Nursing Station iPad" — each registered with a device name and a personal mobile number (for admin emergency use only, per Section 4.11 of the reconciled spec). This is still set up once at first login and can be added to later from Settings. Keep whatever of this Replit already built — the bug is not here.
+>
+> **2. Device assignment (per consultation — this is what's missing):**
+> - At booking time (the Patient & Clinical Details step), the seeker selects which registered device from the directory is the callback target **for this specific patient**, defaulting to whichever device is currently making the booking. This is a per-booking field, stored against that consultation — not a global account value.
+> - Afterward, it's changeable **only from inside that specific patient's Case File** — not from Profile. Remove the callback-device control from Profile entirely; Profile/Settings should only manage the directory itself (rename/delete registered devices), never which device is assigned to which patient.
+> - **Location in Case File:** directly below the patient identity/name bar, above the allergy/comorbidity chips — see `perfusion-seeker-casefile-cs18.html` for the exact row position and visual treatment already designed. The only change needed here is that the value shown must be specific to that consultation's own assignment, not a single global value repeated identically across every patient's Case File.
+> - **Every 4 hours:** that specific consultation's callback-device row blinks in its own Case File (already correctly designed — keep this), and the Dashboard's existing notification bell gets a badge/push notification reminding the doctor to reconfirm it. **This does not mean a second blinking card on the Dashboard body** — that was tried earlier and explicitly removed for being visually cluttered. Bell badge and push notification only.
+> - Selecting (or re-confirming) a device for that consultation clears its "due" state. This only affects that one consultation's reminder — it has no effect on any other patient's callback-device status.
+>
+> **Data model implication, flag if this needs a real backend change:** callback device assignment must be stored as a field on the consultation/booking record, not on the user/account record. If the current schema only supports an account-level value, this is a real backend change, not just a UI fix — say so before proceeding rather than working around it with a client-side patch.
+>
+> **Before starting:** confirm you understand the two-layer split (directory vs. per-consultation assignment) and report back whether the existing data model already supports a per-booking callback field or needs to be added.
+>
+> **When finished:** screenshots of two different ongoing consultations' Case Files, each showing a different assigned callback device, to confirm they're genuinely independent — not the same value duplicated.

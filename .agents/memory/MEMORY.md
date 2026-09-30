@@ -8,7 +8,7 @@
 - [Consultation call routing](consultation-call-routing.md) — Stream is default after ring/accept; Daily is explicit rollback; Ward Contacts and cellular bridge stay dormant.
 - [Audio effect prompt limit](audio-effect-prompt-limit.md) — sound-effect requests must keep text under 450 characters or the provider rejects them.
 - [Consultation lifecycle authority](consultation-lifecycle-authority.md) — server owns IST timing and pause state; define booked-slot conflict policy before adding exclusion.
-- [Mobile Callback Device](mobile-callback-device.md) — keep account-level fallback phone separate from patient emergency contacts, ward contacts, and booking-specific callback numbers.
+- [Consultation callback devices](mobile-callback-device.md) — an account device directory is distinct from each consultation's assigned device and ward/cellular contacts.
 - [Android EAS Gradle logs](android-eas-gradle-logs.md) — EAS build log files may be Brotli-encoded despite a .txt extension; decode before diagnosing native failures.
 - [Expo native startup](expo-native-startup.md) — native OnCreate can run before JavaScript imports or login; inspect APK configuration and lifecycle, not just build success.
 - [pnpm peer-context type errors](pnpm-peer-context.md) — after dependency changes, identical library versions can link through different optional-peer contexts; realign before diagnosing type errors.
