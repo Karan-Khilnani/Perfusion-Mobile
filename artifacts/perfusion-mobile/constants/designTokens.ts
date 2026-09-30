@@ -28,6 +28,7 @@ export const designTokens = {
   },
   gradient: {
     brand: ["#F0654A", "#7A2E4D"] as const,
+    welcome: ["#EF644A", "#BC4D4B", "#963B4D", "#7A2E4D", "#7A2E4D"] as const,
     incoming: ["#5C2039", "#7A2E4D", "#C94B33"] as const,
     accept: ["#3CC583", "#1FA971"] as const,
     endCall: ["#F5473A", "#C4291F"] as const,

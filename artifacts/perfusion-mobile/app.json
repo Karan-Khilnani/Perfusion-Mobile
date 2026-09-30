@@ -44,10 +44,14 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/perfusion-logo-white-launch.png",
-          "imageWidth": 240,
+          "image": "./assets/images/perfusion-logo-welcome.png",
+          "imageWidth": 230,
           "resizeMode": "contain",
-          "backgroundColor": "#F0654A"
+          "backgroundColor": "#EF644A",
+          "dark": {
+            "image": "./assets/images/perfusion-logo-welcome.png",
+            "backgroundColor": "#EF644A"
+          }
         }
       ],
       "expo-web-browser",

@@ -30,3 +30,4 @@
 - [Inverted FlatList orientation](inverted-flatlist-orientation.md) — React Native already compensates header/footer wrappers in inverted lists; avoid extra child flips.
 - [Hospital location labels](hospital-location-labels.md) — prefer a verified city; do not guess one from a free-form hospital address in consultation cards.
 - [Development schema push safety](db-schema-push-safety.md) — schema push can propose unrelated data loss; review prompts and never force a destructive drift fix.
+- [Native welcome splash limits](native-welcome-splash.md) — Android's native splash is a solid-color, centered-logo frame; use the in-app welcome view for gradient and bottom tagline.

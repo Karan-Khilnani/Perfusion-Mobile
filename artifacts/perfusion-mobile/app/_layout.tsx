@@ -174,11 +174,8 @@ function RootLayoutNav({ fontsReady }: { fontsReady: boolean }) {
   useEffect(() => {
     if (notificationHref && pathname === notificationHref) setNotificationHref(null);
   }, [notificationHref, pathname]);
-  const canDismissSplash =
-    fontsReady &&
-    !loading &&
-    !waitingForCallbackDevice &&
-    redirectHref === null;
+  const showingWelcome = loading || waitingForCallbackDevice;
+  const canDismissSplash = fontsReady && (showingWelcome || redirectHref === null);
 
   useEffect(() => {
     if (!canDismissSplash || splashDismissed.current) return;
@@ -186,8 +183,7 @@ function RootLayoutNav({ fontsReady }: { fontsReady: boolean }) {
     void SplashScreen.hideAsync();
   }, [canDismissSplash]);
 
-  if (loading) return null;
-  if (waitingForCallbackDevice) return <BrandedLoading />;
+  if (showingWelcome) return <BrandedLoading />;
 
   return (
     <>
