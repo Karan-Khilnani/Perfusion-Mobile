@@ -21,6 +21,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { apiFetch } from "@/hooks/useApi";
 import { useColors } from "@/hooks/useColors";
 import { BRAND_GRADIENT, designTokens } from "@/constants/designTokens";
+import { cardShadow } from "@/constants/nativeShadows";
 import { Booking, isSeekerRole } from "@/lib/mobile-models";
 
 function useConsultations(role?: string) {
@@ -218,7 +219,7 @@ const styles = StyleSheet.create({
   livePulse: { width: 7, height: 7, borderRadius: 4, backgroundColor: designTokens.color.greenBright },
   livePillText: { color: "#FFFFFF", fontSize: 11, fontFamily: "Inter_600SemiBold" },
   content: { paddingHorizontal: 16, paddingTop: 20, gap: 18 },
-  newConsultation: { borderRadius: 18, minHeight: 76, paddingHorizontal: 16, flexDirection: "row", alignItems: "center", gap: 13, ...designTokens.shadow.card },
+  newConsultation: { borderRadius: 18, minHeight: 76, paddingHorizontal: 16, flexDirection: "row", alignItems: "center", gap: 13, ...cardShadow },
   newConsultationIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center" },
   newConsultationTitle: { color: "#FFFFFF", fontSize: 16, fontFamily: "Sora_600SemiBold" },
   newConsultationSubtitle: { color: "rgba(255,255,255,.82)", fontSize: 12, marginTop: 3, fontFamily: "Inter_400Regular" },

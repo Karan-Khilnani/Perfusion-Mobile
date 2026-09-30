@@ -37,6 +37,7 @@ import {
 
 import { useColors } from "@/hooks/useColors";
 import { BRAND_GRADIENT, END_CALL_GRADIENT, designTokens } from "@/constants/designTokens";
+import { elevatedShadow } from "@/constants/nativeShadows";
 
 interface StreamCredentials {
   apiKey: string;
@@ -767,7 +768,7 @@ const styles = StyleSheet.create({
   waitingTitle: { color: "#FFFFFF", fontSize: 22, lineHeight: 29, fontFamily: "Sora_700Bold", textAlign: "center" },
   waitingSubtitle: { color: "rgba(255,255,255,.78)", fontSize: 14, fontFamily: "Inter_400Regular", textAlign: "center" },
   voiceCallLabel: { color: "rgba(255,255,255,.72)", fontSize: 12, fontFamily: "Inter_500Medium", marginTop: 8 },
-  selfView: { position: "absolute", zIndex: 4, width: 112, height: 156, borderRadius: 18, overflow: "hidden", backgroundColor: "#3A2931", borderWidth: 1.5, borderColor: "rgba(255,255,255,.72)", ...designTokens.shadow.elevated },
+  selfView: { position: "absolute", zIndex: 4, width: 112, height: 156, borderRadius: 18, overflow: "hidden", backgroundColor: "#3A2931", borderWidth: 1.5, borderColor: "rgba(255,255,255,.72)", ...elevatedShadow },
   selfPlaceholder: { flex: 1, alignItems: "center", justifyContent: "center" },
   selfInitials: { color: "#FFFFFF", fontSize: 18, fontFamily: "Sora_600SemiBold" },
   videoFallback: {

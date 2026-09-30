@@ -33,6 +33,7 @@ import {
 } from "@/components/CaseFileMedia";
 import { SkeletonBlock, StateCard } from "@/components/SharedStates";
 import { BRAND_GRADIENT, designTokens } from "@/constants/designTokens";
+import { cardShadow } from "@/constants/nativeShadows";
 import {
   type AttachmentCategory,
   type AttachmentDraft,
@@ -1000,7 +1001,7 @@ const styles = StyleSheet.create({
   chartLink: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
   vitalStrip: { flexDirection: "row", alignItems: "stretch", gap: 8, paddingRight: 12, paddingBottom: 2 },
   vitalGrid: { flexDirection: "row", marginTop: 7 },
-  vitalCell: { width: 76, minHeight: 74, paddingHorizontal: 9, paddingVertical: 8, borderRadius: 14, borderWidth: 1, justifyContent: "center", ...designTokens.shadow.card },
+  vitalCell: { width: 76, minHeight: 74, paddingHorizontal: 9, paddingVertical: 8, borderRadius: 14, borderWidth: 1, justifyContent: "center", ...cardShadow },
   vitalLabel: { fontSize: 9, fontFamily: "Inter_700Bold", letterSpacing: 0.4 },
   vitalValue: { fontSize: 14, marginTop: 4, fontFamily: "Sora_600SemiBold" },
   vitalDetail: { fontSize: 8, lineHeight: 11, marginTop: 2, fontFamily: "Inter_400Regular" },
@@ -1019,7 +1020,7 @@ const styles = StyleSheet.create({
   senderAvatar: { width: 20, height: 20, borderRadius: 10, alignItems: "center", justifyContent: "center" },
   senderInitials: { fontSize: 8, fontFamily: "Inter_700Bold" },
   senderLabel: { fontSize: 10, fontFamily: "Inter_600SemiBold" },
-  bubble: { maxWidth: "100%", borderWidth: 1, paddingHorizontal: 14, paddingVertical: 12, ...designTokens.shadow.card },
+  bubble: { maxWidth: "100%", borderWidth: 1, paddingHorizontal: 14, paddingVertical: 12, ...cardShadow },
   ownBubble: { borderColor: "transparent", borderTopRightRadius: 5, borderTopLeftRadius: 18, borderBottomLeftRadius: 18, borderBottomRightRadius: 18 },
   otherBubble: { borderTopLeftRadius: 5, borderTopRightRadius: 18, borderBottomLeftRadius: 18, borderBottomRightRadius: 18 },
   advisoryHeading: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 7 },
@@ -1034,7 +1035,7 @@ const styles = StyleSheet.create({
   emptyChat: { alignItems: "center", paddingVertical: 54, gap: 8 },
   emptyChatTitle: { fontSize: 15, fontFamily: "Inter_600SemiBold" },
   emptyChatText: { fontSize: 12, lineHeight: 18, fontFamily: "Inter_400Regular", textAlign: "center", maxWidth: 270 },
-  composer: { flexDirection: "row", alignItems: "flex-end", gap: 7, paddingHorizontal: 12, paddingTop: 10, borderTopWidth: StyleSheet.hairlineWidth, ...designTokens.shadow.card },
+  composer: { flexDirection: "row", alignItems: "flex-end", gap: 7, paddingHorizontal: 12, paddingTop: 10, borderTopWidth: StyleSheet.hairlineWidth, ...cardShadow },
   composeIcon: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center" },
   messageInput: { flex: 1, minHeight: 44, maxHeight: 100, borderRadius: 22, borderWidth: 1, paddingHorizontal: 16, paddingVertical: 10, fontSize: 13, fontFamily: "Inter_400Regular" },
   send: { width: 44, height: 44, borderRadius: 22, overflow: "hidden" },

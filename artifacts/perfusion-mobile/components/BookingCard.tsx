@@ -15,6 +15,7 @@ import {
 import { useColors } from "@/hooks/useColors";
 import { apiFetch } from "@/hooks/useApi";
 import { designTokens } from "@/constants/designTokens";
+import { cardShadow } from "@/constants/nativeShadows";
 
 export type { Booking };
 
@@ -230,7 +231,7 @@ export function BookingCard({ booking, dashboard = false, onStatusToggle, status
             label={startingCall === "voice" ? "Calling…" : "Call"}
             disabled={!callsAvailable || !!startingCall}
             color={callsAvailable ? palette.success : palette.terminal}
-            tint={designTokens.color.greenTint}
+            tint={palette.muted}
             onPress={() => startCall("voice")}
           />
           <Action
@@ -238,22 +239,22 @@ export function BookingCard({ booking, dashboard = false, onStatusToggle, status
             label={startingCall === "video" ? "Calling…" : "Video"}
             disabled={!videoAvailable || !!startingCall}
             color={videoAvailable ? palette.blue : palette.terminal}
-            tint={designTokens.color.blueTint}
+            tint={palette.muted}
             onPress={() => startCall("video")}
           />
           <Action
             icon="folder"
             label="Case File"
-            color={palette.quiet}
-            tint={designTokens.color.plumTint}
+            color={palette.mutedForeground}
+            tint={palette.muted}
             onPress={() => router.push(`/case-file/${booking.id}`)}
           />
           <Action
             icon={seeker ? "file-text" : "edit-3"}
             label={seeker ? "Advisory" : "Advise"}
             disabled={!seeker && !callsAvailable}
-            color={palette.primary}
-            tint={designTokens.color.coralTint}
+            color={!seeker && !callsAvailable ? palette.terminal : palette.mutedForeground}
+            tint={palette.muted}
             badge={seeker ? booking.caseFileUnreadAdvisories : undefined}
             onPress={() => router.push(`/case-file/${booking.id}?focus=advisory`)}
           />
@@ -286,13 +287,14 @@ function Action({
       style={({ pressed }) => [
         styles.action,
         {
-          opacity: disabled ? 0.42 : pressed ? 0.75 : 1,
+          opacity: pressed ? 0.75 : 1,
           transform: [{ scale: pressed ? 0.96 : 1 }],
         },
       ]}
       disabled={disabled}
       onPress={onPress}
       accessibilityRole="button"
+      accessibilityState={{ disabled: !!disabled }}
       testID={`consultation-action-${label.toLowerCase().replace(" ", "-")}`}
     >
       <View style={[styles.actionIcon, { backgroundColor: tint }]}>
@@ -309,7 +311,7 @@ function Action({
 }
 
 const styles = StyleSheet.create({
-  row: { paddingVertical: 14, paddingHorizontal: 14, borderWidth: 1, borderRadius: 18, ...designTokens.shadow.card },
+  row: { paddingVertical: 14, paddingHorizontal: 14, borderWidth: 1, borderRadius: 18, ...cardShadow },
   rowMain: { flexDirection: "row", alignItems: "center", gap: 12 },
   badge: { width: 46, height: 46, borderRadius: 14, alignItems: "center", justifyContent: "center" },
   badgeText: { fontSize: 13, fontFamily: "Inter_700Bold", letterSpacing: -0.2 },

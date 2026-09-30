@@ -13,6 +13,7 @@ import {
 
 import { useColors } from "@/hooks/useColors";
 import { designTokens } from "@/constants/designTokens";
+import { cardShadow } from "@/constants/nativeShadows";
 
 type StateCardProps = {
   title: string;
@@ -117,7 +118,7 @@ const styles = StyleSheet.create({
     padding: 24,
     borderWidth: 1,
     borderRadius: designTokens.radius.card,
-    ...designTokens.shadow.card,
+    ...cardShadow,
   },
   stateIcon: {
     width: 46,
@@ -164,7 +165,7 @@ const styles = StyleSheet.create({
     borderRadius: designTokens.radius.card,
     borderWidth: 1,
     padding: 14,
-    ...designTokens.shadow.card,
+    ...cardShadow,
   },
   skeletonText: {
     flex: 1,
