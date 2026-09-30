@@ -1,0 +1,29 @@
+Good, this is useful — the Profile screen actually proves the light-theme fix *is* working (correct contrast, correct colors). Which means this a different, more specific bug, not a return of the dark-mode leak. Let me explain what I think is happening, since it changes how narrowly Replit should look.
+
+## Diagnosis
+
+**This isn't a theme problem — it's one or two specific components with the wrong text color.** Look at what's consistent across all three images: every gradient header renders perfectly, and Profile's white cards render with correct dark text and full contrast. But the **consultation row cards** — on both the Dashboard's "Active Consultations" list *and* the standalone Consultations screen — and the Dashboard's **"New Consultation"** card are washed out to near-invisibility. Same washed-out look in both places, on a screen that otherwise proves light mode is working correctly nearby.
+
+That pattern points at one thing: these specific card components still have a **leftover text/foreground color meant for a dark background**, never updated when their container background switched to light. Profile's cards must be using a different, correctly-fixed component. This also lines up with your own test — you confirmed the issue persists even with your phone set to bright, which rules out the system dark-mode leak as the cause here; it's independent of that.
+
+**On the icons:** this is a separate, real regression from what we specified. Section 4.1 of the design doc — and the Dashboard's own reference behavior in `perfusion-uiux-final-b.html` — set an explicit rule: Call and Video get their real enabled colors (green, blue) on an Ongoing consultation, Case File is *always* enabled and legible regardless of status, and only a genuinely closed consultation (Completed, etc.) shows Call/Video/Advise muted grey. Right now everything's rendering as one flat, undifferentiated grey — that's the "disabled" treatment applied everywhere, including where the consultation is actually live.
+
+## Prompt for Replit
+
+> **Two bugs, both scoped to consultation cards specifically — not a theme-wide issue. Profile screen confirms light mode is otherwise working correctly.**
+>
+> **Bug 1 — Consultation row cards and the "New Consultation" card are nearly invisible (washed-out text on a light background), on both the Dashboard's Active Consultations list and the Consultations screen.** Screenshots attached. This happens even with the phone's system appearance set to light, so it's not the earlier dark-mode-leak issue — it's specific to these components. Most likely cause: these cards' text/icon colors are still pointing at a value intended for a dark card background (e.g. white or light grey text), left over from before the light-theme fix, while other components like the Profile screen's cards were correctly updated. Find wherever the consultation-row component and the "New Consultation" card set their text color, and correct it to the same Ink/Ink-soft tokens Profile's cards already use correctly (`Perfusion_UIUX_Design_System.docx`, Section 2.1). These two components need the same fix Profile already has — find what's different about them specifically.
+>
+> **Bug 2 — Action icons (Call, Video, Case File, Advise) are not showing the enabled/disabled color logic at all; everything renders as one flat grey regardless of consultation status.** Per Section 4.1 of the document and the Dashboard reference behavior in `perfusion-uiux-final-b.html`:
+> - On an **Ongoing** consultation: Call shows green, Video shows blue — their real, recognizable enabled colors — Case File and Advise stay in the neutral Ink-soft tone but are fully legible and tappable.
+> - **Case File is always enabled and fully legible, on every consultation regardless of status** — it never gets the disabled treatment.
+> - On a genuinely closed consultation (Completed, Cancelled, etc.): Call, Video, and Advise switch to the muted, faint-grey disabled state — not tappable — while Case File remains enabled.
+> - Open the reference HTML file's Dashboard view and expand both the Ongoing row and the Completed row to see both states side by side before making changes.
+>
+> **Also confirm, don't skip:** re-verify the forced-light-theme fix from the previous round is actually applied everywhere, not only where it happens to look right. Test the Dashboard and Consultations screens specifically with the phone's system appearance set to dark — they should render identically to light mode, with no exceptions.
+>
+> **No functionality changes** — this is fixing broken/missing styling and restoring behavior we already specified, not changing what any screen does.
+>
+> **When finished:** screenshots of the Dashboard and Consultations screens, each showing at least one Ongoing and one Completed consultation row expanded, so the icon states are visible for comparison against the reference file.
+
+Attach the same doc + HTML file you already sent, plus these three screenshots.
