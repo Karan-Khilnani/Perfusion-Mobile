@@ -522,7 +522,7 @@ function MessageBubble({
           </View>
           <View style={{ flex: 1 }}>
             <Text style={[styles.attachmentName, { color: own ? palette.conversationPrimaryForeground : palette.foreground }]}>{message.attachment.originalFilename || "Clinical file"}</Text>
-            <Text style={[styles.attachmentMeta, { color: own ? "rgba(255,255,255,.68)" : palette.conversationMuted }]}>
+            <Text style={[styles.attachmentMeta, { color: own ? palette.conversationPrimaryForeground : palette.conversationMuted }]}>
                {message.attachment.mimeType?.split("/").pop()?.toUpperCase() || "File"}
               {message.attachment.byteSize ? ` · ${Math.max(1, Math.round(message.attachment.byteSize / 1024))} KB` : ""}
                {message.attachment.durationSeconds ? ` · ${Math.floor(message.attachment.durationSeconds / 60)}:${String(Math.floor(message.attachment.durationSeconds % 60)).padStart(2, "0")}` : ""}
@@ -538,7 +538,7 @@ function MessageBubble({
           <Text style={[styles.fullAdvisory, { color: palette.advisoryForeground }]}>View full</Text>
         </View>
       )}
-      {!advisory && <Text style={[styles.messageTime, { color: own ? "rgba(255,255,255,.65)" : palette.conversationMuted }]}>{time}</Text>}
+       {!advisory && <Text style={[styles.messageTime, { color: own ? palette.conversationPrimaryForeground : palette.conversationMuted }]}>{time}</Text>}
     </>
   );
 

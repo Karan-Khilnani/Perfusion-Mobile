@@ -7,7 +7,7 @@ export const designTokens = {
     canvas: "#FDF6F1",
     card: "#FFFFFF",
     ink: "#2E2220",
-    inkSoft: "#8C7A75",
+    inkSoft: "#75635F",
     border: "#EEDFD8",
     coralTint: "#FCE9E3",
     plumTint: "#F3E6EB",
