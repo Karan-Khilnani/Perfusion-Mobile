@@ -1,0 +1,181 @@
+# PERFUSION MOBILE — FIX UNREADABLE / DIMMED TEXT AND CONTENT
+
+There is a serious visual bug in the current mobile app.
+
+The text and content across the app are appearing extremely dark/dim and are difficult to read.
+
+I have provided screenshots showing the problem.
+
+IMPORTANT:
+DO NOT redesign the app.
+DO NOT change navigation.
+DO NOT change APIs, backend logic, or business logic.
+DO NOT change unrelated screens.
+
+Fix ONLY the readability/visibility problem.
+
+## CURRENT PROBLEM
+
+In the screenshots:
+
+1. Consultation cards are extremely dark and their text is barely visible.
+2. Case File/chat content is extremely dark and difficult to read.
+3. File/media information is barely visible.
+4. Some buttons and icons are also excessively dim.
+5. The overall screen appears to have an unintended dark overlay/opacity applied over normal content.
+
+The header and some primary elements are visible, but the content underneath is being rendered far too dark.
+
+## IMPORTANT — FIND THE ROOT CAUSE
+
+Do NOT simply make every Text color white.
+
+First inspect the implementation and determine WHY the content is being dimmed.
+
+Check for:
+
+- parent `opacity`
+- `opacity` values applied to containers
+- semi-transparent overlays
+- dark backdrop Views
+- Modal/backdrop layers
+- accidental `rgba(..., alpha)` backgrounds
+- `backgroundColor` alpha values
+- `TouchableOpacity` / press-state opacity
+- disabled-state styling being applied permanently
+- theme colors incorrectly resolving to dark/low-contrast values
+- `Animated.View` opacity
+- loading overlays
+- modal overlays
+- z-index/elevation layering
+- absolute-positioned overlay Views
+- `pointerEvents`
+- dark-mode styles accidentally being applied in the wrong state
+- conditional rendering that leaves a dimming layer visible
+- any parent container that is reducing the opacity of its children
+
+React Native opacity on a parent also affects its child content, so check the component hierarchy rather than only changing individual Text colors.
+
+## SCREENS THAT MUST BE CHECKED
+
+At minimum inspect:
+
+### 1. Consultations screen
+
+The following must be clearly readable:
+
+- doctor/provider name
+- specialty
+- certification
+- patient name
+- hospital
+- date/time
+- consultation status
+- filter buttons
+- search field
+- bottom navigation
+- card icons
+
+Cards must not appear blacked-out or disabled when they are actually active.
+
+### 2. Case File / Chat
+
+The following must be clearly readable:
+
+- date separators
+- sender name
+- message text
+- timestamps
+- media/file information
+- "Open complete file"
+- filename
+- file type/size
+- message composer
+- attachment icon
+- send button
+
+### 3. Latest Vitals
+
+Ensure these remain readable:
+
+- BP
+- pulse
+- I/O
+- RR
+- other vital labels
+- vital values
+- units
+
+## THEME REQUIREMENT
+
+Do NOT remove Dark Mode if it has already been implemented.
+
+Instead, make sure the selected theme has proper contrast.
+
+For DARK MODE:
+
+- background can remain dark
+- cards must be visibly separated from the background
+- primary text must be bright enough to read
+- secondary text must remain readable
+- icons must remain visible
+- borders/dividers must remain visible
+- buttons must remain distinguishable
+
+For LIGHT MODE:
+
+- background must be light
+- text must be dark
+- cards must be clearly visible
+- no dark overlay should appear
+
+Do NOT solve this by forcing the entire application into Light Mode.
+
+The selected theme must continue to work.
+
+## VERY IMPORTANT
+
+If you find a global overlay/dimming View causing the problem, fix/remove the incorrect overlay rather than compensating for it by making every text element brighter.
+
+Do not change individual text colors unnecessarily if the actual problem is a parent opacity or overlay.
+
+## VISUAL TARGET
+
+The user should be able to comfortably read the entire Consultation and Case File screens without increasing phone brightness or squinting.
+
+The content should have clear visual hierarchy:
+
+Primary text → clearly readable
+Secondary text → readable but less prominent
+Metadata → readable
+Icons → clearly visible
+Cards → clearly separated from background
+Disabled elements → only disabled when actually disabled
+
+Nothing that is normally interactive should look disabled merely because of opacity.
+
+## AFTER FIXING
+
+Run the mobile project and verify the following screens:
+
+1. Consultations
+2. Consultation cards
+3. Case File
+4. Chat
+5. Latest Vitals
+6. Bottom navigation
+7. Dark mode
+8. Light mode
+
+Confirm that:
+
+- text is readable
+- cards are visible
+- icons are visible
+- no unintended dark overlay remains
+- no accidental opacity remains on active content
+- no functionality was changed
+
+Make the SMALLEST possible code changes required to fix this issue.
+
+Do not modify artifacts/perfusion-web.
