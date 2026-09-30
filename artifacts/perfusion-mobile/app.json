@@ -8,11 +8,6 @@
     "scheme": "perfusion-mobile",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
-    "splash": {
-      "image": "./assets/images/splash.png",
-      "resizeMode": "cover",
-      "backgroundColor": "#5C2039"
-    },
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.perfusion.mobile",
@@ -46,6 +41,15 @@
         }
       ],
       "expo-font",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/perfusion-logo-white-launch.png",
+          "imageWidth": 240,
+          "resizeMode": "contain",
+          "backgroundColor": "#F0654A"
+        }
+      ],
       "expo-web-browser",
       [
         "expo-notifications",

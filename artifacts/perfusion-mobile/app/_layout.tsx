@@ -28,6 +28,7 @@ import { useColors } from "@/hooks/useColors";
 import { getBaseUrl } from "@/hooks/useApi";
 
 setBaseUrl(getBaseUrl());
+SplashScreen.setOptions({ duration: 220, fade: true });
 SplashScreen.preventAutoHideAsync();
 
 const queryClient = new QueryClient({
@@ -45,7 +46,7 @@ function RootLayoutNav() {
   const pathname = usePathname();
 
   if (loading || (user?.role !== "admin" && user && callbackDeviceLoading)) {
-    return <BrandedLoading />;
+    return <BrandedLoading showTagline={loading} />;
   }
 
   const publicPaths = [
