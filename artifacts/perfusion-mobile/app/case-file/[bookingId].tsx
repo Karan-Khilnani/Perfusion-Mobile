@@ -354,33 +354,9 @@ export default function CaseFileScreen() {
         </ScrollView>
       </View>
 
-      <FlatList
-        data={sortedMessages}
-        inverted
-        keyExtractor={(item) => item.id}
-        style={styles.chat}
-        contentContainerStyle={styles.chatContent}
-        keyboardDismissMode="interactive"
-        keyboardShouldPersistTaps="handled"
-        ListFooterComponent={sortedMessages.length > 0 ? (
-          <View style={styles.dateDivider}>
-            <View style={[styles.dateLine, { backgroundColor: palette.conversationBorder }]} />
-            <Text style={[styles.dateText, { color: palette.conversationMuted }]}>
-              {new Date(sortedMessages[sortedMessages.length - 1].createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" }).toUpperCase()}
-            </Text>
-            <View style={[styles.dateLine, { backgroundColor: palette.conversationBorder }]} />
-          </View>
-        ) : null}
-        renderItem={({ item }) => (
-          <MessageBubble
-            message={item}
-            bookingId={bookingId}
-            own={item.senderUserId === user?.id}
-            onAdvisory={() => setSheet("trail")}
-            onOpenAttachment={setViewerAttachment}
-          />
-        )}
-        ListHeaderComponent={sortedMessages.length === 0 ? (
+      {sortedMessages.length === 0 ? (
+        <View style={styles.chat}>
+          <View style={styles.chatContent}>
           <View style={styles.emptyChat}>
             <Feather name="message-circle" size={28} color={palette.mutedForeground} />
             <Text style={[styles.emptyChatTitle, { color: palette.foreground }]}>No messages yet</Text>
@@ -388,8 +364,37 @@ export default function CaseFileScreen() {
               {capabilities.readOnly ? "This Case File remains available as a permanent read-only record." : "Start the clinical conversation here."}
             </Text>
           </View>
-        ) : null}
-      />
+          </View>
+        </View>
+      ) : (
+        <FlatList
+          data={sortedMessages}
+          inverted
+          keyExtractor={(item) => item.id}
+          style={styles.chat}
+          contentContainerStyle={styles.chatContent}
+          keyboardDismissMode="interactive"
+          keyboardShouldPersistTaps="handled"
+          ListFooterComponent={
+            <View style={styles.dateDivider}>
+              <View style={[styles.dateLine, { backgroundColor: palette.conversationBorder }]} />
+              <Text style={[styles.dateText, { color: palette.conversationMuted }]}>
+                {new Date(sortedMessages[sortedMessages.length - 1].createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" }).toUpperCase()}
+              </Text>
+              <View style={[styles.dateLine, { backgroundColor: palette.conversationBorder }]} />
+            </View>
+          }
+          renderItem={({ item }) => (
+            <MessageBubble
+              message={item}
+              bookingId={bookingId}
+              own={item.senderUserId === user?.id}
+              onAdvisory={() => setSheet("trail")}
+              onOpenAttachment={setViewerAttachment}
+            />
+          )}
+        />
+      )}
 
       {!capabilities.readOnly && (
         <View style={[styles.composer, { paddingBottom: Platform.OS === "web" ? 34 : Math.max(insets.bottom, 10), backgroundColor: palette.conversationCard, borderTopColor: palette.conversationBorder }]}>

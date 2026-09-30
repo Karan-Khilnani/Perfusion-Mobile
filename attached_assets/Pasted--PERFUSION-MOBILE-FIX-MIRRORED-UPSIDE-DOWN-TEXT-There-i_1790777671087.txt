@@ -1,0 +1,103 @@
+# PERFUSION MOBILE — FIX MIRRORED / UPSIDE-DOWN TEXT
+
+There is a visual rendering bug in the Case File / Chat screen.
+
+In the empty chat state, text such as:
+
+"No messages yet"
+"Start the clinical conversation here."
+
+is appearing upside down/mirrored.
+
+This must be fixed so ALL text renders normally and looks polished/premium.
+
+IMPORTANT:
+This is NOT a request to redesign the screen.
+Do NOT change fonts, colors, spacing, typography, or the Perfusion design system.
+
+FIX THE ROOT CAUSE.
+
+Investigate the Case File / Chat message area and specifically inspect parent containers around:
+- message list
+- empty-state container
+- "No messages yet" text
+- empty-state subtitle
+- message composer
+
+Look for any of these affecting the message content:
+
+- transform: [{ scaleY: -1 }]
+- transform: [{ scaleX: -1 }]
+- rotate: "180deg"
+- rotateX
+- rotateY
+- matrix transforms
+- inverted FlatList
+- inverted ScrollView
+- conditional transform styles
+- Animated.View transforms
+- a parent container being flipped to implement chat-message ordering
+
+React Native transforms affect the rendered appearance of child components, so do NOT simply patch the Text component if its parent is being transformed.
+
+IMPORTANT CHAT-LIST REQUIREMENT:
+
+If the message list is intentionally inverted so newest messages appear at the bottom, preserve the message ordering behavior.
+
+Instead, isolate the inversion from the empty state.
+
+Correct behavior:
+
+MESSAGE LIST:
+- may use inversion internally if required for message ordering
+- actual message bubbles must remain visually upright
+
+EMPTY STATE:
+- "No messages yet" must be upright
+- subtitle must be upright
+- icon must be upright
+- empty-state layout must not inherit an accidental vertical flip
+
+COMPOSER:
+- attachment icon upright
+- message input upright
+- send button/icon upright
+
+Also inspect whether a transform is being applied to a common parent containing BOTH:
+1. the inverted message list
+2. the empty-state component
+
+If so, restructure the smallest possible part of the component hierarchy so the inversion only affects the message-list implementation and NOT the empty-state UI.
+
+DO NOT:
+- remove the existing chat functionality
+- change message ordering
+- change API/backend behavior
+- change the Case File design
+- change the composer design
+- change the navigation
+- add a new library just for this issue
+
+AFTER FIXING:
+Test the screen with:
+1. zero messages
+2. one message
+3. multiple messages
+4. provider-sent message
+5. seeker-sent message
+6. scrolling the message list
+
+Verify that:
+- every text string is upright
+- every icon is upright
+- message bubbles are upright
+- empty-state content is upright
+- message ordering still works correctly
+- composer remains upright
+
+Make the smallest code change necessary.
+
+At the end, tell me:
+1. Which file contained the incorrect inversion/transform.
+2. What transform or inverted-list behavior caused the bug.
+3. Exactly what you changed to isolate/fix it.
