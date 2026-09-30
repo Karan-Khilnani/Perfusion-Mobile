@@ -11,6 +11,19 @@ test("parses saved appointment slots as IST", () => {
   assert.equal(parseConsultationStart(appointmentSlot)?.toISOString(), startsAt.toISOString());
 });
 
+test("accepts the en-IN slot format generated for mobile bookings, including the comma after the month", () => {
+  const savedSlot = "Wed, 30 Sept, 2026, 10:30 PM – 11:00 PM";
+  const booking = { bookingType: "consultation", status: "booked", appointmentSlot: savedSlot };
+  const start = new Date("2026-09-30T17:00:00.000Z");
+  assert.equal(parseConsultationStart(savedSlot)?.toISOString(), start.toISOString());
+
+  const scheduled = resolveConsultationLifecycle(booking, new Date(start.getTime() - 1));
+  assert.equal(scheduled.status, "scheduled");
+  assert.equal(scheduled.scheduleAvailable, true);
+  assert.equal(resolveConsultationLifecycle(booking, start).status, "ongoing");
+  assert.equal(resolveConsultationLifecycle(booking, new Date(start.getTime() + 86_400_000)).status, "completed");
+});
+
 test("stays scheduled until the exact start time", () => {
   const before = resolveConsultationLifecycle(
     { bookingType: "consultation", status: "booked", appointmentSlot },

@@ -10,3 +10,9 @@ Availability windows are not reservations. The existing consultation flow does n
 **Why:** The shared web/mobile API and call gates must agree on the same server-clock lifecycle, and guessing a date could expose calls or writable records at an unsafe time.
 
 **How to apply:** Keep lifecycle derivation in the API. Any compatibility responses or controls that still use legacy call/video fields should reflect or transition the same status, while preserving existing ring/accept routing and unrelated upload/advisory data. Before implementing slot conflicts, agree on blocking statuses, time-window overlap rules, legacy schedule parsing, and race-safe booking enforcement.
+
+Treat the exact locale-formatted appointment label as a compatibility contract until schedules have a structured persisted timestamp. Reject newly generated slots at booking time if the lifecycle parser cannot read them, while preserving parsing of already saved labels.
+
+**Why:** A valid en-IN label included punctuation after the month that the parser did not accept. The booking was saved, but the shared fail-closed result then disabled Case File writes, calls, and booked-slot exclusion together.
+
+**How to apply:** When changing appointment formatting, test the formatter's exact saved output (including locale punctuation) against lifecycle and availability conflict checks. Do not loosen the failure policy for genuinely undated slots.

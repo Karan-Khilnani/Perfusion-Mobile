@@ -2407,6 +2407,9 @@ export async function registerRoutes(
           if (!requestedSlot) {
             return res.status(409).json({ message: "This appointment slot is no longer available. Please choose another time." });
           }
+          if (!resolveConsultationLifecycle({ appointmentSlot: requestedSlot.appointmentSlot }).scheduleAvailable) {
+            return res.status(503).json({ message: "This appointment time could not be confirmed. Please choose another slot." });
+          }
           bookingData.appointmentSlot = requestedSlot.appointmentSlot;
         }
         if (consultant && consultant.status !== "active") {

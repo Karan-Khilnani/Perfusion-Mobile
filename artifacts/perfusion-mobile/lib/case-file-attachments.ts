@@ -151,6 +151,16 @@ export async function pickCaseFileAttachment(source: AttachmentSource): Promise<
   });
 }
 
+export class CaseFileAttachmentUploadError extends Error {
+  readonly status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "CaseFileAttachmentUploadError";
+    this.status = status;
+  }
+}
+
 export async function uploadCaseFileAttachment(
   bookingId: string,
   draft: AttachmentDraft,
@@ -170,6 +180,6 @@ export async function uploadCaseFileAttachment(
   });
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
-    throw new Error(body.message || body.error || `Upload failed (${response.status}). Please try again.`);
+    throw new CaseFileAttachmentUploadError(body.message || body.error || `Upload failed (${response.status}). Please try again.`, response.status);
   }
 }

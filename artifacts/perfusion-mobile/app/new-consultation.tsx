@@ -26,6 +26,7 @@ import { designTokens } from "@/constants/designTokens";
 import { getPushDeviceId } from "@/lib/push-device";
 import {
   type AttachmentDraft,
+  CaseFileAttachmentUploadError,
   pickCaseFileAttachment,
   uploadCaseFileAttachment,
 } from "@/lib/case-file-attachments";
@@ -113,6 +114,7 @@ export default function NewConsultationScreen() {
   const [chartFiles, setChartFiles] = useState<AttachmentDraft[]>([]);
   const [createdBooking, setCreatedBooking] = useState<{ id?: string } | null>(null);
   const [attachmentUploadError, setAttachmentUploadError] = useState<string | null>(null);
+  const [attachmentUploadBlocked, setAttachmentUploadBlocked] = useState(false);
   const [uploadingAttachments, setUploadingAttachments] = useState(false);
   const [selectedCallbackDeviceId, setSelectedCallbackDeviceId] = useState<string | null>(null);
   const [form, setForm] = useState({
@@ -197,21 +199,26 @@ export default function NewConsultationScreen() {
   const uploadBookingDocuments = async (booking: { id?: string }) => {
     if (!booking.id) {
       setAttachmentUploadError("The booking was saved, but its Case File could not be identified.");
+      setAttachmentUploadBlocked(true);
       return;
     }
     setUploadingAttachments(true);
     setAttachmentUploadError(null);
+    setAttachmentUploadBlocked(false);
     try {
       for (const file of reportFiles) {
         await uploadCaseFileAttachment(booking.id, file, "general");
+        setReportFiles((current) => current.filter((item) => item !== file));
       }
       for (const file of chartFiles) {
         await uploadCaseFileAttachment(booking.id, file, "treatment_chart");
+        setChartFiles((current) => current.filter((item) => item !== file));
       }
       setCreatedBooking(null);
       finishBooking(booking);
     } catch (error) {
       setAttachmentUploadError(error instanceof Error ? error.message : "Please retry the document uploads.");
+      setAttachmentUploadBlocked(error instanceof CaseFileAttachmentUploadError && error.status >= 400 && error.status < 500);
     } finally {
       setUploadingAttachments(false);
     }
@@ -730,18 +737,24 @@ export default function NewConsultationScreen() {
             </>}
             {!!attachmentUploadError && (
               <Text accessibilityRole="alert" style={[styles.error, { color: palette.primary }]}>
-                Booking saved, but some files need a retry: {attachmentUploadError}
+                {attachmentUploadBlocked
+                  ? `Booking saved, but remaining files could not be added: ${attachmentUploadError}`
+                  : `Booking saved, but some files need a retry: ${attachmentUploadError}`}
               </Text>
             )}
             <Pressable
-              onPress={() => createdBooking ? void uploadBookingDocuments(createdBooking) : book.mutate()}
+              onPress={() => createdBooking
+                ? attachmentUploadBlocked ? finishBooking(createdBooking) : void uploadBookingDocuments(createdBooking)
+                : book.mutate()}
               disabled={book.isPending || uploadingAttachments}
               style={[styles.bookButton, { backgroundColor: palette.primary, opacity: book.isPending || uploadingAttachments ? 0.75 : 1 }]}
             >
               {book.isPending || uploadingAttachments
                 ? <ActivityIndicator color={palette.primaryForeground} />
                 : <Text style={[styles.bookButtonText, { color: palette.primaryForeground }]}>
-                    {createdBooking && attachmentUploadError ? "Retry document uploads" : "Confirm Booking"}
+                    {createdBooking && attachmentUploadBlocked
+                      ? "Open Case File"
+                      : createdBooking && attachmentUploadError ? "Retry document uploads" : "Confirm Booking"}
                   </Text>}
             </Pressable>
           </View>

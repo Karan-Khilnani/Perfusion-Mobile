@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { getConsultantAvailabilityPreview } from "../src/services/consultant-availability";
+import { getConsultantAvailabilityPreview, getConsultantBookableSlots } from "../src/services/consultant-availability";
 
 test("keeps a legacy time range available today until its end-time buffer", () => {
   const consultant = {
@@ -62,4 +62,16 @@ test("treats consultant pause as unavailable and uses IST for the current date",
   );
   assert.equal(active.label, "Available Today");
   assert.equal(active.date, "2026-09-27");
+});
+
+test("excludes a booked mobile slot whose en-IN date has a comma after the month", () => {
+  const dates = getConsultantBookableSlots(
+    { status: "active", slotSeries: [{ days: ["Wed"], from: "10:00 PM", to: "11:30 PM" }] },
+    [],
+    [{ status: "booked", appointmentSlot: "Wed, 30 Sept, 2026, 10:30 PM – 11:00 PM" }],
+    "2026-09-30",
+    "2026-09-30",
+    new Date("2026-09-30T16:00:00.000Z"),
+  );
+  assert.deepEqual(dates.flatMap((day) => day.slots.map((slot) => slot.start)), ["22:00", "23:00"]);
 });
