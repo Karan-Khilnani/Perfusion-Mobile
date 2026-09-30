@@ -121,7 +121,7 @@ export default function NewConsultationScreen() {
   const [selectedCallbackDeviceId, setSelectedCallbackDeviceId] = useState<string | null>(null);
   const [form, setForm] = useState({
     patientName: "", patientAge: "", patientGender: "", patientPhone: "", patientWeight: "", uhidIpNumber: "",
-    allergies: "", comorbidities: "", presentingComplaint: "", presentIllness: "",
+    allergies: "", comorbidities: "", presentingComplaint: "",
     provisionalDiagnosis: "", examination: "", investigations: "",
   });
 
@@ -269,7 +269,6 @@ export default function NewConsultationScreen() {
           patientAllergies: allergyNotSpecified ? undefined : form.allergies.trim(),
           comorbidities: form.comorbidities,
           presentingComplaint: form.presentingComplaint.trim(),
-          presentIllness: form.presentIllness.trim() || undefined,
           provisionalDiagnosis: form.provisionalDiagnosis.trim() || undefined,
           examination: form.examination.trim() || undefined,
           investigations: form.investigations.trim() || undefined,
@@ -456,7 +455,6 @@ export default function NewConsultationScreen() {
             Optional. Duplicate entries are saved once, ignoring case.
           </Text>
           <Input multiline label="Presenting Complaint*" value={form.presentingComplaint} placeholder="Main complaint or reason for seeking medical attention" onChangeText={(value) => update("presentingComplaint", value)} />
-          <Input multiline label="Present Illness" value={form.presentIllness} placeholder="History and details of the current illness or episode" onChangeText={(value) => update("presentIllness", value)} />
           <Text style={[styles.sectionTitle, { color: palette.foreground }]}>Clinical Details</Text>
           <Input multiline label="Examination" value={form.examination} placeholder="Physical examination findings, vitals, systemic examination…" onChangeText={(value) => update("examination", value)} />
           <Input multiline label="Investigations" value={form.investigations} placeholder="Lab results, imaging findings, ECG…" onChangeText={(value) => update("investigations", value)} />

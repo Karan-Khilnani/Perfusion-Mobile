@@ -43,7 +43,6 @@ const bookingSchema = z.object({
   comorbidities: z.string().optional(),
   uhidIpNumber: z.string().optional(),
   presentingComplaint: z.string().min(10, "Please describe the presenting complaint"),
-  presentIllness: z.string().optional(),
   provisionalDiagnosis: z.string().optional(),
   orderingPhysician: z.string().optional(),
   examination: z.string().optional(),
@@ -65,8 +64,7 @@ const followUpBookingSchema = z.object({
   patientAllergies: z.string().optional(),
   comorbidities: z.string().optional(),
   uhidIpNumber: z.string().optional(),
-  presentingComplaint: z.string().optional(),
-  presentIllness: z.string().min(10, "Please describe the patient's current illness or follow-up status"),
+  presentingComplaint: z.string().min(10, "Please describe the presenting complaint or current follow-up status"),
   provisionalDiagnosis: z.string().optional(),
   orderingPhysician: z.string().optional(),
   examination: z.string().optional(),
@@ -288,7 +286,6 @@ export default function ConsultationBookingPage() {
       comorbidities: "",
       uhidIpNumber: "",
       presentingComplaint: "",
-      presentIllness: "",
       provisionalDiagnosis: "",
       orderingPhysician: "",
       examination: "",
@@ -505,7 +502,6 @@ export default function ConsultationBookingPage() {
         } : {}),
         comorbidities: data.comorbidities || null,
         presentingComplaint: data.presentingComplaint || null,
-        presentIllness: data.presentIllness || null,
         provisionalDiagnosis: data.provisionalDiagnosis || null,
         referringPhysician: data.orderingPhysician || null,
         examination: data.examination || null,
@@ -730,7 +726,7 @@ export default function ConsultationBookingPage() {
     const hasSlots = !isEmergencyTeam && (consultantAvailableSlots.length > 0 || isCalendarMode);
 
     const handleFollowUpSubmit = async () => {
-      const isValid = await form.trigger(["presentIllness", ...(hasSlots ? ["appointmentSlot" as const] : [])]);
+      const isValid = await form.trigger(["presentingComplaint", ...(hasSlots ? ["appointmentSlot" as const] : [])]);
       if (!isValid) return;
       const selectedDeviceId = form.getValues("callbackDeviceId");
       if (!selectedDeviceId || !eligibleCallbackDevices.some((device) => device.id === selectedDeviceId)) {
@@ -1003,32 +999,13 @@ export default function ConsultationBookingPage() {
                     name="presentingComplaint"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Presenting Complaint (Optional)</FormLabel>
+                        <FormLabel>Presenting Complaint / Current Status *</FormLabel>
                         <FormControl>
                           <Textarea
-                            placeholder="Main complaint or reason for this follow-up"
+                            placeholder="Describe the current complaint or changes since the last consultation"
                             className="min-h-[88px]"
                             {...field}
                             data-testid="input-presenting-complaint"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="presentIllness"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Present Illness / Current Status *</FormLabel>
-                        <FormControl>
-                          <Textarea
-                            placeholder="Describe the current episode, symptoms, response to treatment, or changes since the last consultation"
-                            className="min-h-[120px]"
-                            {...field}
-                            data-testid="input-present-illness"
                           />
                         </FormControl>
                         <FormMessage />
@@ -1715,25 +1692,6 @@ export default function ConsultationBookingPage() {
                             className="min-h-[88px]"
                             {...field}
                             data-testid="input-presenting-complaint"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="presentIllness"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Present Illness (Optional)</FormLabel>
-                        <FormControl>
-                          <Textarea
-                            placeholder="History and details of the current illness or episode"
-                            className="min-h-[120px]"
-                            {...field}
-                            data-testid="input-present-illness"
                           />
                         </FormControl>
                         <FormMessage />

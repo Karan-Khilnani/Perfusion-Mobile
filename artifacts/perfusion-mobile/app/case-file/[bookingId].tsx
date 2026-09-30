@@ -268,6 +268,8 @@ export default function CaseFileScreen() {
 
   const caseFile = aggregate.data!;
   const comorbidityEntries = getComorbidityEntries(caseFile.summary.comorbidities);
+  const allergy = caseFile.summary.allergies?.trim();
+  const complaint = caseFile.summary.presentingComplaint?.trim();
   const status = booking.consultationLifecycleAvailable === false
     ? { label: "Schedule unavailable", dot: palette.warning, text: palette.warning }
     : statusPresentation(booking.status, {
@@ -340,6 +342,53 @@ export default function CaseFileScreen() {
 
       {callError && <Text style={[styles.callError, { color: palette.primary, backgroundColor: palette.conversationCard }]} accessibilityRole="alert">{callError}</Text>}
 
+      <View style={[styles.clinicalContext, { backgroundColor: palette.card, borderBottomColor: palette.conversationBorder }]}>
+        <View testID="case-file-conditions" style={styles.conditionRow}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips} style={{ flex: 1 }}>
+            {allergy ? (
+              <Pressable onPress={() => setSheet("summary")} accessibilityRole="button" accessibilityLabel={`Allergy: ${allergy}. Open Clinical Summary`} style={[styles.chip, { backgroundColor: designTokens.color.redTint, borderColor: palette.conversationBorder }]}>
+                <Feather name="alert-triangle" size={12} color={palette.destructive} />
+                <Text numberOfLines={1} style={[styles.chipText, { color: palette.destructive }]}>Allergy: {allergy}</Text>
+              </Pressable>
+            ) : (
+              <Pressable onPress={() => setSheet("summary")} accessibilityRole="button" accessibilityLabel="Allergies not recorded. Open Clinical Summary" style={[styles.chip, { backgroundColor: palette.conversationSoft, borderColor: palette.conversationBorder }]}>
+                <Text style={[styles.chipText, { color: palette.conversationMuted }]}>Allergies not recorded</Text>
+              </Pressable>
+            )}
+            {comorbidityEntries.length ? comorbidityEntries.map((entry, index) => (
+              <Pressable key={`${entry}-${index}`} onPress={() => setSheet("summary")} accessibilityRole="button" accessibilityLabel={`${entry}. Open Clinical Summary`} style={[styles.chip, { backgroundColor: palette.background, borderColor: palette.conversationBorder }]}>
+                <Text numberOfLines={1} style={[styles.chipText, { color: palette.foreground }]}>{entry}</Text>
+              </Pressable>
+            )) : (
+              <Pressable onPress={() => setSheet("summary")} accessibilityRole="button" accessibilityLabel="Comorbidities not recorded. Open Clinical Summary" style={[styles.chip, { backgroundColor: palette.background, borderColor: palette.conversationBorder }]}>
+                <Text style={[styles.chipText, { color: palette.conversationMuted }]}>Comorbidities not recorded</Text>
+              </Pressable>
+            )}
+          </ScrollView>
+          <Pressable onPress={() => setSheet("summary")} accessibilityRole="button" accessibilityLabel="Open allergies and comorbidities in Clinical Summary" style={styles.conditionChevron}>
+            <Feather name="chevron-right" size={17} color={palette.conversationMuted} />
+          </Pressable>
+        </View>
+        <Pressable
+          onPress={() => setSheet("summary")}
+          accessibilityRole="button"
+          accessibilityLabel={`Presenting complaint: ${complaint || "Not recorded"}. Open Clinical Summary`}
+          testID="case-file-presenting-complaint"
+          style={[styles.complaint, { borderTopColor: palette.conversationBorder }]}
+        >
+          <View style={[styles.complaintIcon, { backgroundColor: designTokens.color.blueTint }]}>
+            <Feather name="file-text" size={16} color={palette.blue} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.eyebrow, { color: palette.conversationMuted }]}>PRESENTING COMPLAINT</Text>
+            <Text numberOfLines={1} ellipsizeMode="tail" style={[styles.complaintText, { color: palette.foreground }]}>
+              {complaint || "Not recorded"}
+            </Text>
+          </View>
+          <Feather name="chevron-right" size={17} color={palette.conversationMuted} />
+        </Pressable>
+      </View>
+
       <View style={[styles.vitalsDock, { backgroundColor: palette.background, borderBottomColor: palette.conversationBorder }]}>
         <View style={styles.vitalsHeadingRow}>
           <View style={styles.vitalsTitle}>
@@ -359,7 +408,7 @@ export default function CaseFileScreen() {
             )}
           </View>
         </View>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.vitalStrip}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.vitalStrip} testID="case-file-vitals-strip">
           <VitalCell label="BP" value={latest?.systolicBp ? `${latest.systolicBp}/${latest.diastolicBp || "—"}` : "—"} detail="mmHg" accent={designTokens.color.coral} tint={designTokens.color.coralTint} />
           <VitalCell label="HR" value={latest?.heartRate != null ? `${latest.heartRate}` : "—"} detail="bpm" accent={designTokens.color.plum} tint={designTokens.color.plumTint} />
           <VitalCell label="I/O" value={latest?.intake != null || latest?.output != null ? `${(latest?.intake || 0) - (latest?.output || 0)} mL` : "—"} detail={`UO ${latest?.hourlyUrineOutput ?? "—"} mL/hr`} accent={designTokens.color.green} tint={designTokens.color.greenTint} />
@@ -1167,26 +1216,29 @@ const styles = StyleSheet.create({
   readOnly: { marginLeft: "auto", fontSize: 11, fontFamily: "Inter_500Medium" },
   followUp: { fontSize: 12, fontFamily: "Inter_700Bold", marginLeft: 5 },
   callError: { paddingHorizontal: 16, paddingVertical: 7, fontSize: 11, fontFamily: "Inter_500Medium" },
-  clinicalContext: { borderBottomWidth: StyleSheet.hairlineWidth, paddingBottom: 9 },
+  clinicalContext: { borderBottomWidth: StyleSheet.hairlineWidth },
+  conditionRow: { flexDirection: "row", alignItems: "center", minHeight: 48 },
+  conditionChevron: { minHeight: 44, width: 36, alignItems: "center", justifyContent: "center" },
   contextEmpty: { marginHorizontal: 14, marginTop: 6, fontSize: 11, fontFamily: "Inter_400Regular" },
-  chips: { paddingHorizontal: 14, paddingTop: 9, paddingBottom: 7, gap: 6 },
-  chip: { borderWidth: 1, borderRadius: 14, paddingHorizontal: 9, paddingVertical: 5, flexDirection: "row", alignItems: "center", gap: 5 },
+  chips: { paddingHorizontal: 14, paddingVertical: 8, gap: 6, alignItems: "center" },
+  chip: { borderWidth: 1, borderRadius: 14, paddingHorizontal: 9, paddingVertical: 6, flexDirection: "row", alignItems: "center", gap: 5, maxWidth: 240 },
   chipText: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
-  complaint: { marginHorizontal: 14, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8, flexDirection: "row", alignItems: "center", gap: 8 },
+  complaint: { minHeight: 53, paddingHorizontal: 14, paddingVertical: 8, borderTopWidth: StyleSheet.hairlineWidth, flexDirection: "row", alignItems: "center", gap: 10 },
+  complaintIcon: { width: 32, height: 32, borderRadius: 9, alignItems: "center", justifyContent: "center" },
   eyebrow: { fontSize: 8, letterSpacing: 1, fontFamily: "Inter_700Bold" },
-  complaintText: { fontSize: 11, lineHeight: 16, marginTop: 3, fontFamily: "Inter_500Medium" },
-  vitalsDock: { minHeight: 126, borderBottomWidth: 1, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 12 },
-  vitalsHeadingRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", minHeight: 38 },
+  complaintText: { fontSize: 12, lineHeight: 16, marginTop: 2, fontFamily: "Inter_600SemiBold" },
+  vitalsDock: { borderBottomWidth: 1, paddingLeft: 14, paddingRight: 12, paddingTop: 4, paddingBottom: 7 },
+  vitalsHeadingRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", minHeight: 33 },
   vitalsTitle: { flexDirection: "row", alignItems: "center", gap: 7 },
   vitalHeaderActions: { flexDirection: "row", alignItems: "center", gap: 5 },
   chartButton: { minWidth: 44, minHeight: 44, alignItems: "center", justifyContent: "center", paddingHorizontal: 5 },
   freshness: { width: 7, height: 7, borderRadius: 4 },
   chartLink: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
-  vitalStrip: { flexDirection: "row", alignItems: "stretch", gap: 8, paddingRight: 12, paddingBottom: 2 },
+  vitalStrip: { flexDirection: "row", alignItems: "stretch", gap: 7, paddingRight: 12, paddingBottom: 2 },
   vitalGrid: { flexDirection: "row", marginTop: 7 },
-  vitalCell: { width: 76, minHeight: 74, paddingHorizontal: 9, paddingVertical: 8, borderRadius: 14, borderWidth: 1, justifyContent: "center", ...cardShadow },
+  vitalCell: { width: 72, minHeight: 58, paddingHorizontal: 8, paddingVertical: 5, borderRadius: 12, borderWidth: 1, justifyContent: "center" },
   vitalLabel: { fontSize: 9, fontFamily: "Inter_700Bold", letterSpacing: 0.4 },
-  vitalValue: { fontSize: 14, marginTop: 4, fontFamily: "Sora_600SemiBold" },
+  vitalValue: { fontSize: 13, marginTop: 2, fontFamily: "Sora_600SemiBold" },
   vitalDetail: { fontSize: 8, lineHeight: 11, marginTop: 2, fontFamily: "Inter_400Regular" },
   addVital: { width: 44, height: 44, borderRadius: 22, overflow: "hidden", marginLeft: 2 },
   addVitalGradient: { flex: 1, alignItems: "center", justifyContent: "center" },
