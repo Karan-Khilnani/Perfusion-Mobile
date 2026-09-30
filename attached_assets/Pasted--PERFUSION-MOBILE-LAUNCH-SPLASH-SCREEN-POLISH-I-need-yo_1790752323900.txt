@@ -1,0 +1,382 @@
+# PERFUSION MOBILE — LAUNCH / SPLASH SCREEN POLISH
+
+I need you to fix ONLY the launch/splash experience of the Perfusion mobile app.
+
+Do NOT modify the Dashboard, Consultations, Case File, Chat, calling, navigation, backend, APIs, or any other application functionality.
+
+Use the existing Perfusion UI/UX Design System and the provided approved branding assets as the source of truth.
+
+The launch screen should feel like a polished production mobile application, NOT like an app icon temporarily appearing and then disappearing.
+
+==================================================
+1. CURRENT PROBLEM
+==================================================
+
+When the app launches, there is an awkward transition:
+
+- The launch screen appears with the Perfusion gradient.
+- A large rounded-square Perfusion app icon appears in the center.
+- That icon/box then disappears.
+- Another Perfusion logo/wordmark is visible afterward.
+
+This looks like a bug or an unintended intermediate screen.
+
+The user should NOT see the app icon/container suddenly appear and disappear during launch.
+
+The transition must feel like ONE continuous launch experience.
+
+==================================================
+2. DESIRED LAUNCH EXPERIENCE
+==================================================
+
+The intended user-visible launch sequence should be:
+
+APP ICON TAP
+        ↓
+SMOOTH PERFUSION LAUNCH SCREEN
+        ↓
+WELCOME / COVER SCREEN
+
+There should NOT be a separate visible app-icon screen between the app launch and the intended Perfusion launch screen.
+
+The launch screen itself should contain:
+
+- Full-screen Coral → Plum gradient
+- Approved white Perfusion wordmark/logo
+- Tagline at the bottom:
+  "Connected care, Everywhere."
+
+The logo, gradient, and tagline should belong to the SAME launch screen.
+
+Do not show the standalone rounded-square app icon as the center content of the launch screen.
+
+The app icon is for the Android launcher/home screen.
+The launch screen is a separate branded experience.
+
+==================================================
+3. FIX THE APP ICON → SPLASH CONFLICT
+==================================================
+
+Audit the existing Expo/Android splash configuration.
+
+Check:
+
+- app.json / app.config.*
+- expo-splash-screen configuration
+- Android splash configuration
+- android adaptive icon configuration
+- splash image
+- splash background
+- any custom launch component
+- app/_layout.tsx
+- root navigation initialization
+- any custom animated splash component
+- any image displayed during initial boot
+- any duplicate splash implementation
+
+Determine which layer is causing the large rounded-square icon to appear.
+
+IMPORTANT:
+
+Do NOT simply hide the icon with another overlay.
+
+Fix the underlying configuration/component causing the duplicate visual.
+
+The Android launcher icon and the in-app launch screen must be treated as separate assets.
+
+The Android app icon must remain correct on the phone's home screen.
+
+But the launch screen must NOT display the rounded-square launcher icon as an intermediate screen.
+
+==================================================
+4. APPROVED LAUNCH DESIGN
+==================================================
+
+Follow the Perfusion UI/UX Design System.
+
+The approved launch design is:
+
+FULL-BLEED CORAL → PLUM GRADIENT
+
+with the
+
+ALL-WHITE PERFUSION WORDMARK
+
+centered on the screen.
+
+The design system specifically defines the launch screen as a full-bleed Coral→Plum gradient with the all-white lockup centered.
+
+Do not invent a different launch design.
+
+Do not use the full-color logo here.
+
+Use the approved all-white Perfusion lockup.
+
+==================================================
+5. LOGO SIZE
+==================================================
+
+The current wordmark is too small.
+
+Increase the Perfusion wordmark to approximately 2× its current visible size.
+
+However:
+
+DO NOT use a fixed size that only looks correct on this particular phone.
+
+Make the size responsive to the device dimensions.
+
+The logo should:
+
+- be clearly visible
+- feel substantial
+- remain comfortably inside the screen
+- never touch screen edges
+- never be cropped
+- never stretch
+- preserve its aspect ratio
+- remain visually balanced on smaller phones
+- remain visually balanced on larger phones/tablets
+
+Use responsive sizing based on available screen dimensions.
+
+Do NOT make it so large that it dominates the entire screen.
+
+The target is:
+
+"large and confident, but still elegant and centered."
+
+==================================================
+6. TAGLINE
+==================================================
+
+Add this exact tagline:
+
+Connected care, Everywhere.
+
+It must appear ONLY on the launch screen.
+
+Do NOT show this tagline throughout the rest of the application.
+
+Position it toward the BOTTOM of the launch screen.
+
+It should respect the device's bottom safe area.
+
+Do not place it directly underneath the logo.
+
+There should be substantial visual separation between:
+
+CENTERED LOGO
+
+and
+
+BOTTOM TAGLINE
+
+The tagline should be clearly readable against the Coral → Plum gradient.
+
+Use the existing Perfusion typography system.
+
+Do not invent another font.
+
+==================================================
+7. RESPONSIVE LAYOUT
+==================================================
+
+The launch screen must work across different phone sizes and aspect ratios.
+
+Do NOT hard-code positions such as:
+
+top: 400
+marginTop: 350
+bottom: 50
+
+unless they are being used within a responsive layout system.
+
+Prefer:
+
+- flexbox
+- SafeAreaView/useSafeAreaInsets where appropriate
+- Dimensions/useWindowDimensions
+- responsive width/height calculations
+- percentage-based positioning where appropriate
+
+The visual relationship should remain approximately:
+
+                 PERFUSION LOGO
+                     CENTER
+
+
+             
+
+
+        Connected care, Everywhere.
+                 near bottom
+
+Do not let the tagline overlap the navigation/system area.
+
+==================================================
+8. SMOOTH TRANSITION
+==================================================
+
+The transition from the native splash to the first React Native screen must feel smooth.
+
+There must be no:
+
+- flashing
+- white screen
+- black screen
+- large icon popping in
+- large icon disappearing
+- duplicate logo
+- abrupt background-color change
+- layout jump
+- logo suddenly changing size
+- visible intermediate screen
+
+Use the proper Expo splash-screen mechanism rather than building a fake loading sequence.
+
+If a fade transition is appropriate, use a subtle fade.
+
+The goal is:
+
+Native launch
+   ↓
+continuous Perfusion-branded visual
+   ↓
+launch screen / Welcome
+
+not:
+
+Native launch
+   ↓
+large app icon
+   ↓
+icon disappears
+   ↓
+another logo appears
+
+Expo's splash-screen API supports controlled hiding/fade behavior. Use the existing project architecture and avoid introducing unnecessary dependencies.
+
+==================================================
+9. IMPORTANT — DO NOT CREATE TWO SPLASH SCREENS
+==================================================
+
+Audit whether the project currently has BOTH:
+
+1. Native Expo/Android splash
+AND
+2. A custom React Native splash component.
+
+If both exist, determine whether they are producing the visible duplicate transition.
+
+Do not automatically delete either one.
+
+Instead, configure them so the user sees one coherent launch experience.
+
+If the custom React Native launch screen is required for the tagline and branded layout, make the transition from the native splash into that screen visually seamless.
+
+The user must never perceive it as a separate unwanted screen.
+
+==================================================
+10. IMPORTANT — APP ICON MUST REMAIN CORRECT
+==================================================
+
+Do NOT remove or damage the Android launcher icon.
+
+The app icon should continue to use the approved Perfusion app-icon asset.
+
+The launcher icon and launch-screen logo serve different purposes:
+
+ANDROID HOME SCREEN:
+Perfusion app icon / mark
+
+LAUNCH SCREEN:
+Full-screen Coral → Plum gradient
++
+white Perfusion wordmark
++
+"Connected care, Everywhere."
+
+Do not replace the launcher icon with the wordmark.
+
+==================================================
+11. VERIFY AGAINST PROVIDED REFERENCES
+==================================================
+
+Use the provided:
+
+- Perfusion_UIUX_Design_System
+- perfusion-splash-and-icon-preview.html
+- approved Perfusion logo assets
+- approved Perfusion app icon
+
+The design system states that the launch screen uses:
+
+- full-bleed Coral → Plum gradient
+- centered all-white lockup
+
+and that the app icon uses the mark alone in a rounded-square container.
+
+These are two different uses and must not be visually confused.
+
+==================================================
+12. DO NOT CHANGE ANYTHING ELSE
+==================================================
+
+ONLY modify what is required for:
+
+- launch screen
+- splash configuration
+- launch transition
+- launch logo
+- launch tagline
+- responsive launch sizing
+
+Do NOT modify:
+
+- Dashboard
+- Consultations
+- Case File
+- Chat
+- Calls
+- Video
+- Profile
+- Settings
+- APIs
+- backend
+- database
+- web application
+- business logic
+
+==================================================
+13. FINAL TEST
+==================================================
+
+After implementing the fix, verify the launch sequence on an Android preview/release build.
+
+Test at least:
+
+1. Cold app launch
+2. App launched from Android home screen
+3. App reopened after being backgrounded
+4. Smaller phone dimensions
+5. Larger phone dimensions
+
+Verify:
+
+[ ] No large rounded-square app icon appears during launch
+[ ] No icon suddenly appears/disappears
+[ ] No duplicate logo
+[ ] No flashing/blank screen
+[ ] Coral → Plum gradient fills the launch screen
+[ ] White Perfusion wordmark is centered
+[ ] Logo is approximately 2× larger than before
+[ ] Logo still fits comfortably on different phone sizes
+[ ] "Connected care, Everywhere." appears at the bottom
+[ ] Tagline appears ONLY on the launch screen
+[ ] Tagline respects bottom safe area
+[ ] Transition feels smooth and intentional
+[ ] Android launcher icon still works correctly
+[ ] No unrelated files/features were changed
+
+Do not report this as complete until the actual launch sequence has been checked.
