@@ -1,0 +1,287 @@
+# PERFUSION MOBILE — REDESIGN CASE FILE MEDIA PRESENTATION
+
+Fix ONLY the media/attachment presentation inside the mobile Case File / Chat UI.
+
+CURRENT PROBLEM:
+Media currently looks like a document/file explorer.
+
+The UI is too focused on:
+- file names
+- file metadata
+- separate Open buttons
+- separate Download buttons
+
+I want the interaction to feel much closer to WhatsApp's media experience:
+the MEDIA itself should be the primary UI element.
+
+This is a UI/UX change. Do not change the backend media storage, upload API, attachment API, or unrelated Case File functionality unless absolutely required for the viewer.
+
+--------------------------------------------------
+DESIRED CHAT / CASE FILE MEDIA PRESENTATION
+--------------------------------------------------
+
+For IMAGE media:
+
+- Show a large image preview directly in the chat/case-file conversation.
+- The image should be the dominant element.
+- Do NOT make the filename the main visual element.
+- Do NOT show separate "Open" and "Download" buttons underneath.
+- Keep metadata minimal and secondary.
+- Preserve the existing sender/message/timestamp context.
+- Tapping the image opens a full-screen media viewer.
+
+For VIDEO media:
+
+- Show a large video thumbnail/preview in the conversation.
+- Show a clear play affordance.
+- Do NOT make the filename the dominant element.
+- Tapping the video opens the full-screen viewer/player.
+- The user should be able to play the video from the viewer.
+
+For PDF / DOCUMENT media:
+
+- Do NOT display them like a file-explorer row with large filename + Open + Download buttons.
+- Create a compact but visually clear document preview/card.
+- Show an appropriate document/PDF icon or preview thumbnail.
+- Filename can still exist, but it must be secondary.
+- The document preview itself should be tappable.
+- Tapping it opens the full-screen document viewer.
+
+For OTHER SUPPORTED MEDIA:
+
+Use the same interaction model:
+
+MEDIA PREVIEW
+      ↓ tap
+FULL-SCREEN VIEWER
+      ↓
+Download icon available
+
+Do not create a different interaction pattern for every file type unless the actual media format requires it.
+
+--------------------------------------------------
+FULL-SCREEN MEDIA VIEWER
+--------------------------------------------------
+
+Create/use ONE reusable full-screen media viewer for Case File media.
+
+When the user taps any supported media:
+
+- open a full-screen viewer
+- use the maximum practical screen area
+- provide a clear Back/Close control
+- provide a Download icon in the top navigation
+- preserve the correct media aspect ratio
+- do not crop important content unnecessarily
+- allow appropriate interaction for the media type
+
+IMAGE:
+- full-screen image
+- pinch-to-zoom if the existing React Native setup supports it safely
+- pan when zoomed
+- Download icon
+
+VIDEO:
+- full-screen video
+- play/pause
+- appropriate video controls
+- Download icon
+
+PDF:
+- full-screen PDF/document preview
+- scroll through the document
+- zoom if supported
+- Download icon
+
+OTHER DOCUMENTS:
+- use the existing supported preview mechanism if available
+- otherwise show a clean document viewer/fallback
+- Download remains available
+
+IMPORTANT:
+The Download action belongs INSIDE the full-screen viewer.
+
+Do NOT put:
+
+[Open] [Download]
+
+buttons underneath every media item in the chat.
+
+--------------------------------------------------
+CHAT / CASE FILE ITEM DESIGN
+--------------------------------------------------
+
+The hierarchy should be:
+
+1. MEDIA PREVIEW — dominant
+2. Small secondary metadata
+3. Sender/timestamp/message context where applicable
+
+NOT:
+
+1. Huge filename
+2. File metadata
+3. [Open]
+4. [Download]
+5. tiny media representation
+
+For images and videos especially, the user should be able to understand what was shared WITHOUT reading the filename.
+
+Think:
+"message containing media"
+
+not:
+"file management interface"
+
+--------------------------------------------------
+VISUAL STYLE
+--------------------------------------------------
+
+Use the existing Perfusion design system.
+
+Do NOT copy WhatsApp's colors or branding.
+
+Use Perfusion's existing:
+- Canvas
+- Card
+- Ink
+- Ink-soft
+- Coral
+- Plum
+- existing spacing
+- existing typography
+- existing card/message styling
+
+The goal is WhatsApp-LIKE INTERACTION, not WhatsApp branding.
+
+Keep the media presentation warm, clean, tactile and easy to scan.
+
+Avoid making the Case File look like a file manager.
+
+--------------------------------------------------
+IMPORTANT EXISTING FUNCTIONALITY
+--------------------------------------------------
+
+Do NOT break:
+- attachment loading
+- existing media URLs
+- signed download URLs
+- attachment permissions
+- sender information
+- timestamps
+- Case File data
+- chat messages
+- media upload
+- existing attachment categorization
+
+Reuse the existing media/attachment data and APIs.
+
+First inspect how the current Case File renders attachments and identify the existing media component(s).
+
+If there is already a reusable media viewer, improve/reuse it instead of creating a duplicate implementation.
+
+--------------------------------------------------
+RESPONSIVE / MOBILE BEHAVIOR
+--------------------------------------------------
+
+The media preview must work across different phone sizes.
+
+Do not use fixed dimensions that only work on one device.
+
+Use:
+- available screen width
+- aspect ratio
+- safe-area insets
+- responsive sizing
+
+Images/videos should feel large without overflowing the message bubble or screen.
+
+--------------------------------------------------
+REMOVE CURRENT UI
+--------------------------------------------------
+
+Remove the current separate per-item:
+
+Open
+Download
+
+buttons.
+
+Replace that interaction with:
+
+Tap media → Full-screen viewer → Download icon
+
+The only exception is if a particular unsupported format genuinely cannot be previewed.
+
+--------------------------------------------------
+TEST ALL MEDIA TYPES
+--------------------------------------------------
+
+Test inside an actual Case File:
+
+1. IMAGE
+   → large preview
+   → tap
+   → full-screen image viewer
+   → Download icon
+
+2. VIDEO
+   → large preview + play
+   → tap
+   → full-screen video viewer
+   → Download icon
+
+3. PDF
+   → document preview
+   → tap
+   → full-screen PDF viewer
+   → Download icon
+
+4. OTHER SUPPORTED DOCUMENT
+   → clean preview
+   → tap
+   → appropriate viewer
+   → Download icon
+
+5. LONG FILENAME
+   → filename must NOT dominate the media item
+   → truncate gracefully if necessary
+
+6. MULTIPLE MEDIA ITEMS
+   → each should remain easy to scan/tap
+   → no overlapping items
+   → no broken layout
+
+7. DOWNLOAD
+   → Download from the full-screen viewer
+   → verify the existing download functionality still works
+
+FINAL VISUAL GOAL:
+
+Current:
+[file icon] VERY-LARGE-FILENAME.pdf
+metadata...
+[OPEN] [DOWNLOAD]
+
+Desired:
+┌─────────────────────────┐
+│                         │
+│     LARGE MEDIA         │
+│       PREVIEW           │
+│                         │
+└─────────────────────────┘
+small secondary metadata
+
+Tap
+ ↓
+
+┌─────────────────────────┐
+│ ←                  ↓    │
+│                         │
+│     FULL-SCREEN         │
+│       MEDIA             │
+│                         │
+└─────────────────────────┘
+
+Do not change unrelated screens or functionality.
+Make the smallest safe implementation necessary.
