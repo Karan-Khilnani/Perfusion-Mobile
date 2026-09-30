@@ -1,0 +1,41 @@
+Before making ANY code changes, please inspect the current implementation of user/device login and call-routing for the Seeker Hospital app and tell me the CURRENT FLOW only.
+
+Problem we are trying to solve:
+
+One Seeker Hospital has ONE hospital account, but that account may be used by multiple people across different locations/shifts — e.g. MICU, ER, Ward. A consultation booking can be created by any of them.
+
+Example:
+- ER doctor books Consultation A.
+- MICU doctor books Consultation B.
+- Provider later calls Consultation A.
+- We do NOT want every device currently logged into the hospital account to receive the call.
+- The call should go only to the user/device currently assigned to receive the callback for that particular booking.
+- The same hospital account may therefore have multiple registered users/devices.
+- Different bookings can have different callback users/devices.
+- When a doctor leaves a shift, the callback recipient for their active bookings may need to be changed to another user/device.
+
+Before building anything, answer these questions from the CURRENT CODE:
+
+1. Can the app currently recognise a specific device on which the hospital account is logged in?
+2. Is that device identity persistent across app restarts/re-login, or does it exist only for the current login/session?
+3. Does the backend currently distinguish between:
+   - Hospital account
+   - Individual user/person
+   - Individual device
+   - Login/session
+4. If the same hospital account is logged into 3 different phones, how are those 3 devices currently represented in the system?
+5. When a Provider calls a booking, what exactly does the backend currently use to determine which Seeker device/user receives the call?
+6. Is there currently any booking-level mapping of a specific user/device as the callback recipient?
+7. If yes, explain the current data flow and where that mapping is stored.
+8. If no, explain exactly where the current architecture would need to change to support it.
+
+IMPORTANT:
+Do NOT implement anything yet.
+Do NOT change database schema.
+Do NOT change UI.
+Do NOT build APK.
+Do NOT make assumptions.
+
+I only want a concise explanation of the CURRENT implementation and the smallest architectural change that would be required to support booking-specific callback recipients.
+
+After explaining the current flow, wait for my confirmation before making any changes.
