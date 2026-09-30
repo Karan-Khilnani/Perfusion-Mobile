@@ -71,10 +71,12 @@ export default function CallScreen() {
   const [permissionRequesting, setPermissionRequesting] = useState(false);
   const [streamCredentialsTimedOut, setStreamCredentialsTimedOut] = useState(false);
   const [streamCredentialRetry, setStreamCredentialRetry] = useState(0);
+  const [cancelingOutgoingCall, setCancelingOutgoingCall] = useState(false);
   const isInPiPMode = useIsInPiPMode();
   const pipEnteringRef = useRef(false);
   const returningFromCallRef = useRef(false);
   const acceptedGenerationRef = useRef<string | null>(null);
+  const ringbackSuppressed = useRef(false);
   const ringback = useAudioPlayer(require("../../assets/audio/perfusion_ringback.mp3"));
   const permissionRequestRef = useRef<Promise<boolean> | null>(null);
 
@@ -189,20 +191,28 @@ export default function CallScreen() {
   }, [callMode, callStatus?.isCaller, currentStatus, requestMediaPermissions]);
 
   useEffect(() => {
-    if (Platform.OS === "web" || currentStatus !== "ringing" || !callStatus?.isCaller) {
+    if (
+      Platform.OS === "web" ||
+      currentStatus !== "ringing" ||
+      !callStatus?.isCaller ||
+      cancelingOutgoingCall
+    ) {
+      ringbackSuppressed.current = true;
       ringback.pause();
       return;
     }
 
+    ringbackSuppressed.current = false;
     let active = true;
     let stopTimeout: ReturnType<typeof setTimeout> | undefined;
     let nextBurstTimeout: ReturnType<typeof setTimeout> | undefined;
-    ringback.loop = true;
+    // Each burst is played once; the timer below controls the ring cadence.
+    ringback.loop = false;
 
     const playRingbackBurst = async () => {
-      if (!active) return;
+      if (!active || ringbackSuppressed.current) return;
       await ringback.seekTo(0).catch(() => {});
-      if (!active) return;
+      if (!active || ringbackSuppressed.current) return;
       ringback.play();
       stopTimeout = setTimeout(() => {
         ringback.pause();
@@ -218,7 +228,7 @@ export default function CallScreen() {
       ringback.pause();
       void ringback.seekTo(0).catch(() => {});
     };
-  }, [callStatus?.isCaller, callStatus?.sessionGeneration, currentStatus, ringback]);
+  }, [callStatus?.isCaller, callStatus?.sessionGeneration, cancelingOutgoingCall, currentStatus, ringback]);
 
   const { data: tokenData, isError: tokenError } = useQuery<{ token: string; userName: string }>({
     queryKey: ["daily-token", bookingId, callStatus?.videoRoomUrl],
@@ -283,6 +293,14 @@ export default function CallScreen() {
 
   const handleEndCall = useCallback(async () => {
     if (endPending) return;
+    const cancelingOutgoing =
+      currentStatus === "ringing" && callStatus?.isCaller === true;
+    if (cancelingOutgoing) {
+      setCancelingOutgoingCall(true);
+      ringbackSuppressed.current = true;
+      ringback.pause();
+      void ringback.seekTo(0).catch(() => {});
+    }
     setEndPending(true);
     setEndError(null);
     const sessionGeneration = generation || callStatus?.sessionGeneration;
@@ -329,10 +347,15 @@ export default function CallScreen() {
       returnFromCall();
     } catch (error) {
       setEndError(error instanceof Error ? error.message : "Could not end the call.");
+      if (cancelingOutgoing) {
+        ringbackSuppressed.current = false;
+        setCancelingOutgoingCall(false);
+        void refetchCallStatus();
+      }
     } finally {
       setEndPending(false);
     }
-  }, [bookingId, callStatus?.sessionGeneration, callStatus?.isCaller, currentStatus, endPending, generation, returnFromCall]);
+  }, [bookingId, callStatus?.sessionGeneration, callStatus?.isCaller, currentStatus, endPending, generation, refetchCallStatus, returnFromCall, ringback]);
 
   // The system may end a call from the other device, or the accepted session
   // may expire while this screen is open. Never clear another generation's call.

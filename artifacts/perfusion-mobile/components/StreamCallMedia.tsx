@@ -7,9 +7,12 @@ import React, {
   useState,
 } from "react";
 import {
+  Alert,
   Animated,
+  Linking,
   PanResponder,
   Pressable,
+  Platform,
   StyleSheet,
   Text,
   View,
@@ -17,6 +20,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
+import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
@@ -227,11 +231,15 @@ function ActiveStreamCall({
   const window = useWindowDimensions();
   const [muted, setMuted] = useState(false);
   const [cameraOn, setCameraOn] = useState(!voiceCall);
+  const [videoActive, setVideoActive] = useState(!voiceCall);
+  const [upgradingToVideo, setUpgradingToVideo] = useState(false);
   const [controlError, setControlError] = useState<string | null>(null);
   const [controlsVisible, setControlsVisible] = useState(true);
   const controlsOpacity = useRef(new Animated.Value(1)).current;
   const hideControlsTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const callStartedAt = useRef<number | null>(null);
+  const cameraActionInFlight = useRef(false);
+  const remoteUpgradeHandled = useRef(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const dragPosition = useRef({ x: 0, y: 0 });
   const dragOrigin = useRef({ x: 0, y: 0 });
@@ -304,6 +312,99 @@ function ActiveStreamCall({
     });
   }, [insets.bottom, insets.top, pan, revealControls, window.height, window.width]);
 
+  const remoteVideoActive = participants.some((participant) => {
+    if (participant.userId === localParticipant?.userId || !participant.videoStream) return false;
+    return participant.videoStream
+      .getVideoTracks()
+      .some((track) => track.readyState === "live");
+  });
+
+  const ensureCameraPermission = useCallback(async () => {
+    if (Platform.OS === "web") return false;
+    try {
+      const current = await ImagePicker.getCameraPermissionsAsync();
+      const permission = current.granted
+        ? current
+        : await ImagePicker.requestCameraPermissionsAsync();
+      if (permission.granted) return true;
+
+      const message = permission.canAskAgain
+        ? "Camera permission is required to enable video. Your audio call will continue."
+        : "Camera permission is blocked. Enable camera access in Settings to use video. Your audio call will continue.";
+      setControlError(message);
+      if (!permission.canAskAgain) {
+        Alert.alert("Camera permission required", message, [
+          { text: "Not now", style: "cancel" },
+          {
+            text: "Open Settings",
+            onPress: () => { void Linking.openSettings().catch(() => undefined); },
+          },
+        ]);
+      }
+      return false;
+    } catch {
+      setControlError("Camera permission could not be checked. Your audio call is still active.");
+      return false;
+    }
+  }, []);
+
+  const enableLocalCameraForVideo = useCallback(async () => {
+    if (!call) return false;
+    if (cameraOn) {
+      setVideoActive(true);
+      return true;
+    }
+    if (cameraActionInFlight.current) return false;
+
+    cameraActionInFlight.current = true;
+    setUpgradingToVideo(true);
+    setControlError(null);
+    try {
+      if (!(await ensureCameraPermission())) return false;
+
+      // Enable video on the current Stream call; do not leave or rejoin the session.
+      await call.camera.enable();
+      const deadline = Date.now() + 5000;
+      let hasLiveVideoTrack = false;
+      while (Date.now() < deadline) {
+        hasLiveVideoTrack = Boolean(
+          call.camera.state.mediaStream
+            ?.getVideoTracks()
+            .some((track) => track.readyState === "live"),
+        );
+        if (hasLiveVideoTrack) break;
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+      if (!hasLiveVideoTrack) {
+        throw new Error("The camera video track could not be started.");
+      }
+
+      setCameraOn(true);
+      setVideoActive(true);
+      return true;
+    } catch (error) {
+      await call.camera.disable().catch(() => undefined);
+      setCameraOn(false);
+      const reason = error instanceof Error ? error.message : "Camera could not be enabled.";
+      setControlError(`${reason} Your audio call is still active.`);
+      return false;
+    } finally {
+      cameraActionInFlight.current = false;
+      setUpgradingToVideo(false);
+    }
+  }, [call, cameraOn, ensureCameraPermission]);
+
+  useEffect(() => {
+    if (!voiceCall || !remoteVideoActive) return;
+
+    // A published remote video track is the signal to switch this same call
+    // into its existing video layout and make the local camera available.
+    setVideoActive(true);
+    if (remoteUpgradeHandled.current) return;
+    remoteUpgradeHandled.current = true;
+    if (!cameraOn) void enableLocalCameraForVideo();
+  }, [cameraOn, enableLocalCameraForVideo, remoteVideoActive, voiceCall]);
+
   const toggleMicrophone = async () => {
     try {
       await call?.microphone.toggle();
@@ -315,12 +416,21 @@ function ActiveStreamCall({
   };
 
   const toggleCamera = async () => {
+    if (!call || cameraActionInFlight.current) return;
+    if (!cameraOn) {
+      await enableLocalCameraForVideo();
+      return;
+    }
+
+    cameraActionInFlight.current = true;
     try {
-      await call?.camera.toggle();
-      setCameraOn((value) => !value);
+      await call.camera.disable();
+      setCameraOn(false);
       setControlError(null);
     } catch {
-      setControlError("Camera could not be changed. Check camera permissions.");
+      setControlError("Camera could not be changed. Your audio call is still active.");
+    } finally {
+      cameraActionInFlight.current = false;
     }
   };
 
@@ -396,14 +506,14 @@ function ActiveStreamCall({
 
   return (
     <View style={styles.container} onTouchStart={revealControls}>
-      {voiceCall || participants.length === 0 ? (
+      {!videoActive || participants.length === 0 ? (
         <LinearGradient colors={BRAND_GRADIENT} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.waitingStage}>
           <View style={styles.waitingAvatar}>
             <Text style={styles.waitingInitials}>{fallbackName || "P"}</Text>
           </View>
           <Text style={styles.waitingTitle}>{participantTitle}</Text>
           {!!participantSubtitle && <Text style={styles.waitingSubtitle}>{participantSubtitle}</Text>}
-          {voiceCall && <Text style={styles.voiceCallLabel}>Voice consultation</Text>}
+          {voiceCall && !videoActive && <Text style={styles.voiceCallLabel}>Voice consultation</Text>}
         </LinearGradient>
       ) : (
         <View style={styles.remoteStage}>
@@ -417,7 +527,7 @@ function ActiveStreamCall({
         </View>
       )}
 
-      {!voiceCall && (
+      {videoActive && (
         <Animated.View
           style={[styles.selfView, { top: insets.top + 108, right: 16, transform: pan.getTranslateTransform() }]}
           {...panResponder.panHandlers}
@@ -498,17 +608,28 @@ function ActiveStreamCall({
                 accessibilityLabel={muted ? "Unmute microphone" : "Mute microphone"}
                 testID="stream-toggle-microphone"
               />
-              {!voiceCall && (
+              {voiceCall && !videoActive ? (
+                <StreamControl
+                  icon="videocam"
+                  label={upgradingToVideo ? "Enabling…" : "Video"}
+                  onPress={() => void enableLocalCameraForVideo()}
+                  onPressIn={revealControls}
+                  disabled={upgradingToVideo}
+                  accessibilityLabel={upgradingToVideo ? "Enabling video" : "Upgrade audio call to video"}
+                  testID="stream-upgrade-to-video"
+                />
+              ) : videoActive ? (
                 <StreamControl
                   icon={cameraOn ? "videocam" : "videocam-off"}
-                  label={cameraOn ? "Camera" : "Camera off"}
+                  label={upgradingToVideo ? "Enabling…" : cameraOn ? "Camera" : "Camera off"}
                   active={!cameraOn}
                   onPress={() => void toggleCamera()}
                   onPressIn={revealControls}
-                  accessibilityLabel={cameraOn ? "Turn camera off" : "Turn camera on"}
+                  disabled={upgradingToVideo}
+                  accessibilityLabel={upgradingToVideo ? "Enabling camera" : cameraOn ? "Turn camera off" : "Turn camera on"}
                   testID="stream-toggle-camera"
                 />
-              )}
+              ) : null}
               <StreamControl
                 icon={speakerOn ? "volume-high" : "volume-medium"}
                 label="Speaker"
@@ -518,7 +639,7 @@ function ActiveStreamCall({
                 accessibilityLabel={speakerOn ? "Use earpiece audio" : "Use speaker audio"}
                 testID="stream-toggle-speaker"
               />
-              {!voiceCall && (
+              {videoActive && (
                 <StreamControl
                   icon="camera-reverse"
                   label="Flip"
@@ -574,6 +695,7 @@ function StreamControl({
   active,
   onPress,
   onPressIn,
+  disabled = false,
   accessibilityLabel,
   testID,
 }: {
@@ -582,6 +704,7 @@ function StreamControl({
   active?: boolean;
   onPress: () => void;
   onPressIn: () => void;
+  disabled?: boolean;
   accessibilityLabel: string;
   testID: string;
 }) {
@@ -589,7 +712,8 @@ function StreamControl({
     <Pressable
       onPress={onPress}
       onPressIn={onPressIn}
-      style={({ pressed }) => [styles.controlButton, active && styles.controlActive, { opacity: pressed ? 0.86 : 1, transform: [{ scale: pressed ? 0.96 : 1 }] }]}
+      disabled={disabled}
+      style={({ pressed }) => [styles.controlButton, active && styles.controlActive, { opacity: disabled ? 0.52 : pressed ? 0.86 : 1, transform: [{ scale: pressed ? 0.96 : 1 }] }]}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
       testID={testID}
