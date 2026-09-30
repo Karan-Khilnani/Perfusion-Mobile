@@ -1,0 +1,284 @@
+# PERFUSION MOBILE — FIX VIDEO CALL BLACK SCREEN + UNIFY CALL UI
+
+Fix ONLY the mobile video-call experience in:
+
+artifacts/perfusion-mobile
+
+There are TWO connected problems:
+
+PROBLEM 1 — CRITICAL VIDEO BUG
+
+When a video call is active:
+
+- I cannot see my own camera/video.
+- I cannot see the provider's camera/video.
+- The provider also cannot see my camera/video.
+- The call interface is essentially showing a black screen instead of live video.
+
+This happens on BOTH sides of the call.
+
+Do NOT solve this by merely changing the black background color.
+
+The actual local and remote video streams must render correctly.
+
+AUDIT THE ENTIRE EXISTING CALL PIPELINE FIRST:
+
+1. Find the mobile video-call screen/component.
+2. Find where the local camera stream is created.
+3. Find where the remote participant stream is received.
+4. Find how localVideo / remoteVideo / MediaStream / RTCView / VideoView or the project's equivalent is connected to the UI.
+5. Inspect the call/session initialization.
+6. Inspect how the remote participant is identified.
+7. Inspect camera and microphone permission handling.
+8. Check whether the camera is actually enabled when a video call starts.
+9. Check whether the remote track is being subscribed to/rendered.
+10. Check whether the video component is mounted but receiving a null/empty stream.
+11. Check whether z-index/layering/absolute positioning is hiding the video behind another black View.
+12. Check whether the video component is being unmounted/re-mounted during call state changes.
+13. Check outgoing and incoming call flows separately.
+
+IMPORTANT:
+Do not rewrite the calling architecture if the existing WebRTC/calling implementation is basically correct.
+
+Find the smallest root cause and fix it.
+
+The final functional behavior must be:
+
+OUTGOING:
+User A starts video call
+→ User A sees their own camera
+→ User B answers
+→ User A sees User B's live video
+→ User B sees User A's live video
+
+INCOMING:
+User B receives video call
+→ User B answers
+→ User B sees User A's live video
+→ User A sees User B's live video
+
+Both sides must receive actual live video.
+
+CAMERA/PERMISSIONS:
+Verify that camera and microphone permissions are correctly requested and available before starting the video session.
+
+Do not silently fall back to a fake avatar or placeholder when the video stream should be available.
+
+If a stream genuinely cannot connect, show a proper connection state such as:
+Connecting...
+Reconnecting...
+Camera unavailable
+
+Do NOT show an unexplained full black screen.
+
+--------------------------------------------------
+PROBLEM 2 — INCOMING / OUTGOING CALL UI
+--------------------------------------------------
+
+Incoming and outgoing calls currently have different interfaces.
+
+Sometimes only a top bar appears.
+Sometimes the call screen fills the entire screen.
+The full-screen call interface is currently black.
+Outgoing and incoming calls use different visual structures.
+
+Make BOTH incoming and outgoing active-call interfaces use the SAME Perfusion-branded full-screen call interface.
+
+The call screen must follow the existing Perfusion UI/UX Design System.
+
+APPROVED CALL LAYOUT:
+
+Layering from back to front:
+
+1. LIVE REMOTE VIDEO
+   - fills the entire call screen
+   - this is the primary background
+   - must remain visible behind the controls
+
+2. TOP AND BOTTOM DARK GRADIENT SCRIMS
+   - fixed overlays
+   - used only to keep text/icons readable over the video
+   - must not turn the entire screen black
+
+3. TOP IDENTITY AREA
+   - patient's name
+   - connection state
+   - live call timer when connected
+   - use the existing Perfusion typography/design system
+
+4. LOCAL SELF-VIEW
+   - floating above the remote video
+   - rounded corners, 18px radius
+   - subtle shadow
+   - show the user's own live camera feed
+   - draggable to a corner if the existing architecture supports it
+   - small mute indicator when muted
+
+5. SECONDARY ACTIONS
+   - Chat
+   - Case File
+   - Advise
+   - separate from the primary call controls
+   - visually quieter than the call controls
+
+6. PRIMARY CALL CONTROLS
+   - Mute
+   - Camera
+   - Speaker
+   - Flip
+   - End Call
+
+CONTROL SIZING FROM THE DESIGN SYSTEM:
+- Primary call controls: approximately 50px diameter
+- End Call: approximately 68px diameter
+- End Call must be visually larger than the other controls
+- Secondary Chat / Case File / Advise controls: approximately 42px
+
+Do not create a new visual style from scratch.
+Use the existing Perfusion design system.
+
+The design system specifically requires:
+- remote video as the full-screen background
+- gradient scrims above/below the video
+- identity bar above the scrim
+- self-view above the other layers
+- larger End Call control
+- quieter secondary actions
+- rounded floating self-view
+- controls that can auto-hide after inactivity and return when the screen is tapped.
+
+--------------------------------------------------
+INCOMING + OUTGOING CONSISTENCY
+--------------------------------------------------
+
+After this fix:
+
+OUTGOING ACTIVE CALL
+and
+INCOMING ACTIVE CALL
+
+must use the SAME active-call screen/component/layout.
+
+Do NOT maintain two visually unrelated active-call UIs.
+
+The only difference between incoming and outgoing should be the appropriate call state and actions before the call is connected.
+
+Once the call is connected, both sides should enter the same branded active video-call interface.
+
+Avoid:
+- black full-screen background
+- different incoming/outgoing layouts
+- top-bar-only call screen
+- duplicate call interfaces
+- duplicate video renderers
+- local video hidden underneath overlays
+- remote video hidden underneath overlays
+- arbitrary placeholder screen
+- separate styling implementation for incoming vs outgoing
+
+--------------------------------------------------
+IMPORTANT ARCHITECTURE RULE
+--------------------------------------------------
+
+Before changing code, identify:
+
+A. Where the call session is created
+B. Where the local media stream is created
+C. Where the remote media stream is received
+D. Where those streams are passed to the video renderer
+E. Where the active-call UI is rendered
+F. Whether incoming and outgoing calls currently use separate screens/components
+
+Then fix the actual root cause.
+
+Do not fake video.
+Do not use static avatars as a replacement for video.
+Do not simply change black to Coral/Plum.
+Do not modify the backend unless the investigation proves the backend is preventing the media streams from reaching the mobile client.
+
+--------------------------------------------------
+DO NOT CHANGE
+--------------------------------------------------
+
+Do NOT change:
+- Dashboard
+- Case File
+- Chat
+- Consultation functionality
+- Booking
+- Profile
+- authentication
+- unrelated navigation
+- web application
+- other mobile screens
+
+Only modify code necessary for:
+1. video stream rendering/connection
+2. camera/microphone handling directly related to the call
+3. incoming/outgoing active-call UI consistency
+
+--------------------------------------------------
+TEST BOTH SIDES
+--------------------------------------------------
+
+Test with two actual mobile sessions/accounts.
+
+Test:
+
+CASE 1:
+Provider → Seeker video call
+
+Verify:
+Provider sees Seeker video.
+Seeker sees Provider video.
+Provider sees own self-view.
+Seeker sees own self-view.
+
+CASE 2:
+Seeker → Provider video call
+
+Verify the same behavior in reverse.
+
+CASE 3:
+Incoming call accepted
+
+Verify the active call opens directly into the same full-screen Perfusion call interface.
+
+CASE 4:
+Camera toggle
+
+Turn camera OFF.
+Verify the remote side sees the expected camera-off state.
+
+Turn camera ON.
+Verify live video returns.
+
+CASE 5:
+Mute/unmute
+
+Verify audio state changes correctly and self-view mute indicator behaves correctly.
+
+CASE 6:
+Call end
+
+Verify both sides leave the active-call interface cleanly.
+
+FINAL REQUIREMENT:
+
+The result must look and behave like:
+
+LIVE REMOTE VIDEO
+        +
+Perfusion call identity
+        +
+floating LIVE SELF-VIEW
+        +
+Perfusion call controls
+
+NOT:
+
+BLACK SCREEN
+        +
+some buttons
+
+Make the smallest safe changes necessary and report the actual root cause you found before/after implementing the fix.
