@@ -8,6 +8,11 @@ import type {
   PasswordResetPassword,
   PasswordResetVerification,
 } from "@workspace/api-client-react";
+import type {
+  ConsultationDevice,
+  ConsultationDeviceInput,
+  ConsultationDeviceUpdate,
+} from "@workspace/api-client-react";
 
 import {
   apiFetch,
@@ -76,8 +81,11 @@ export interface User {
 }
 
 export interface CallbackDevice {
+  id: string;
   deviceName: string;
   phoneNumber: string;
+  installationId: string | null;
+  createdAt: string;
   updatedAt: string;
 }
 
@@ -172,11 +180,13 @@ async function storeSessionFromResponse(response: Response): Promise<void> {
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  callbackDevice: CallbackDevice | null;
-  callbackDeviceLoading: boolean;
-  callbackDeviceError: string | null;
-  refreshCallbackDevice: () => Promise<void>;
-  saveCallbackDevice: (deviceName: string, phoneNumber: string) => Promise<void>;
+  callbackDevices: CallbackDevice[];
+  callbackDevicesLoading: boolean;
+  callbackDevicesError: string | null;
+  refreshCallbackDevices: () => Promise<void>;
+  createCallbackDevice: (input: ConsultationDeviceInput) => Promise<CallbackDevice>;
+  updateCallbackDevice: (id: string, input: ConsultationDeviceUpdate) => Promise<CallbackDevice>;
+  deleteCallbackDevice: (id: string) => Promise<void>;
   login: (email: string, password: string) => Promise<User>;
   loginWithGoogle: () => Promise<User | null>;
   register: (input: RegistrationInput) => Promise<void>;
@@ -195,37 +205,55 @@ const AuthContext = createContext<AuthContextType | null>(null);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [callbackDevice, setCallbackDevice] = useState<CallbackDevice | null>(null);
-  const [callbackDeviceLoading, setCallbackDeviceLoading] = useState(true);
-  const [callbackDeviceError, setCallbackDeviceError] = useState<string | null>(null);
+  const [callbackDevices, setCallbackDevices] = useState<CallbackDevice[]>([]);
+  const [callbackDevicesLoading, setCallbackDevicesLoading] = useState(true);
+  const [callbackDevicesError, setCallbackDevicesError] = useState<string | null>(null);
 
-  const refreshCallbackDevice = async () => {
-    setCallbackDeviceLoading(true);
-    setCallbackDeviceError(null);
-    setCallbackDevice(null);
+  const refreshCallbackDevices = async () => {
+    setCallbackDevicesLoading(true);
+    setCallbackDevicesError(null);
     try {
-      const response = await apiFetch("/api/profile/callback-device");
-      if (!response.ok) throw new Error("Could not load Callback Device. Try again.");
-      setCallbackDevice((await response.json()) as CallbackDevice | null);
+      const response = await apiFetch("/api/profile/callback-devices");
+      const body = await response.json().catch(() => []);
+      if (!response.ok) throw new Error(body.message || "Could not load callback devices. Try again.");
+      if (!Array.isArray(body)) throw new Error("The callback device directory returned an invalid response.");
+      setCallbackDevices(body as CallbackDevice[]);
     } catch (error) {
-      setCallbackDevice(null);
-      setCallbackDeviceError(error instanceof Error ? error.message : "Could not load Callback Device.");
+      setCallbackDevicesError(error instanceof Error ? error.message : "Could not load callback devices.");
     } finally {
-      setCallbackDeviceLoading(false);
+      setCallbackDevicesLoading(false);
     }
   };
 
-  const saveCallbackDevice = async (deviceName: string, phoneNumber: string) => {
-    const response = await apiFetch("/api/profile/callback-device", {
-      method: "PUT",
-      body: JSON.stringify({ deviceName, phoneNumber }),
+  const createCallbackDevice = async (input: ConsultationDeviceInput): Promise<CallbackDevice> => {
+    const response = await apiFetch("/api/profile/callback-devices", {
+      method: "POST",
+      body: JSON.stringify(input),
     });
+    const body = await response.json().catch(() => ({}));
     if (!response.ok) {
-      const body = await response.json().catch(() => ({}));
-      throw new Error(body.message || "Could not save Callback Device.");
+      throw new Error(body.message || "Could not register this callback device.");
     }
-    setCallbackDevice((await response.json()) as CallbackDevice);
-    setCallbackDeviceError(null);
+    await refreshCallbackDevices();
+    return body as CallbackDevice;
+  };
+
+  const updateCallbackDevice = async (id: string, input: ConsultationDeviceUpdate): Promise<CallbackDevice> => {
+    const response = await apiFetch(`/api/profile/callback-devices/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      body: JSON.stringify(input),
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(body.message || "Could not update this callback device.");
+    await refreshCallbackDevices();
+    return body as CallbackDevice;
+  };
+
+  const deleteCallbackDevice = async (id: string): Promise<void> => {
+    const response = await apiFetch(`/api/profile/callback-devices/${encodeURIComponent(id)}`, { method: "DELETE" });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(body.message || "Could not remove this callback device.");
+    await refreshCallbackDevices();
   };
 
   const applyAuthenticatedUser = async (
@@ -238,11 +266,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       authenticatedUser.needsProfile ||
       authenticatedUser.approvalStatus !== "approved"
     ) {
-      setCallbackDevice(null);
-      setCallbackDeviceError(null);
-      setCallbackDeviceLoading(false);
+      setCallbackDevices([]);
+      setCallbackDevicesError(null);
+      setCallbackDevicesLoading(false);
     } else {
-      await refreshCallbackDevice();
+      await refreshCallbackDevices();
     }
     return authenticatedUser;
   };
@@ -255,13 +283,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await applyAuthenticatedUser(data);
       } else {
         setUser(null);
-        setCallbackDevice(null);
-        setCallbackDeviceLoading(false);
+        setCallbackDevices([]);
+        setCallbackDevicesLoading(false);
       }
     } catch {
       setUser(null);
-      setCallbackDevice(null);
-      setCallbackDeviceLoading(false);
+      setCallbackDevices([]);
+      setCallbackDevicesLoading(false);
     }
   };
 
@@ -410,9 +438,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     await storeSessionFromResponse(res);
     await applyAuthenticatedUser(data);
-    setCallbackDevice(null);
-    setCallbackDeviceLoading(false);
-    setCallbackDeviceError(null);
+    setCallbackDevices([]);
+    setCallbackDevicesLoading(false);
+    setCallbackDevicesError(null);
   };
 
   const verifyEmail = async (code: string) => {
@@ -532,9 +560,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch {}
     await clearCookie();
     setUser(null);
-    setCallbackDevice(null);
-    setCallbackDeviceError(null);
-    setCallbackDeviceLoading(false);
+    setCallbackDevices([]);
+    setCallbackDevicesError(null);
+    setCallbackDevicesLoading(false);
   };
 
   return (
@@ -542,8 +570,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       user, loading, login, loginWithGoogle, register, completeProfile,
       verifyEmail, resendVerification, verifyPasswordReset,
       changePasswordAfterRecovery, finishPasswordReset, logout, refreshUser,
-      callbackDevice, callbackDeviceLoading, callbackDeviceError,
-      refreshCallbackDevice, saveCallbackDevice,
+      callbackDevices, callbackDevicesLoading, callbackDevicesError,
+      refreshCallbackDevices, createCallbackDevice, updateCallbackDevice, deleteCallbackDevice,
     }}>
       {children}
     </AuthContext.Provider>

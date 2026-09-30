@@ -13,7 +13,7 @@ export type ProviderType = "lab" | "consultant" | "hospital" | "transport" | "te
 export type SlotSeries = { days: string[]; from: string; to: string };
 
 // Import ProviderStatus from auth
-import { ProviderStatus } from "./models/auth";
+import { ProviderStatus, users } from "./models/auth";
 
 // Providers table - for service provider accounts
 export const providers = pgTable("providers", {
@@ -248,6 +248,23 @@ export type PatientGender = "male" | "female" | "other";
 export type UrgencyType = "routine" | "emergency";
 export type PaymentStatus = "pending" | "partial" | "paid" | "overdue";
 
+// Account-owned directory. Assignment and confirmation live on individual bookings.
+// The legacy mobile_callback_devices table is retained for non-destructive migration.
+export const consultationCallbackDevices = pgTable("consultation_callback_devices", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  deviceName: varchar("device_name", { length: 100 }).notNull(),
+  phoneNumber: varchar("phone_number", { length: 25 }).notNull(),
+  installationId: varchar("installation_id", { length: 120 }),
+  legacyUserId: varchar("legacy_user_id"),
+  archivedAt: timestamp("archived_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("consultation_callback_devices_legacy_user_idx").on(table.legacyUserId),
+  uniqueIndex("consultation_callback_devices_installation_idx").on(table.userId, table.installationId),
+]);
+
 // Bookings table
 export const bookings = pgTable("bookings", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -327,6 +344,10 @@ export const bookings = pgTable("bookings", {
   // Callback contact for cellular calls (ward phone selected at booking time)
   callbackPhone: varchar("callback_phone", { length: 20 }),
   callbackWardName: varchar("callback_ward_name", { length: 100 }),
+  // Separate from the ward/cellular phone: this consultation's registered callback device.
+  callbackDeviceId: varchar("callback_device_id").references(() => consultationCallbackDevices.id, { onDelete: "set null" }),
+  callbackDeviceConfirmedAt: timestamp("callback_device_confirmed_at", { withTimezone: true }),
+  callbackDeviceRemindedAt: timestamp("callback_device_reminded_at", { withTimezone: true }),
   // Follow-up consultation tracking
   isFollowUp: boolean("is_follow_up").default(false),
   parentBookingId: varchar("parent_booking_id", { length: 255 }),

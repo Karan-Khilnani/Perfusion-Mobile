@@ -41,6 +41,125 @@ export const SaveCallbackDeviceResponse = zod.object({
 
 
 /**
+ * @summary List the signed-in hospital's registered callback devices
+ */
+export const ListConsultationDevicesResponseItem = zod.object({
+  "id": zod.string(),
+  "deviceName": zod.string(),
+  "phoneNumber": zod.string(),
+  "installationId": zod.string().nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+export const ListConsultationDevicesResponse = zod.array(ListConsultationDevicesResponseItem)
+
+
+/**
+ * @summary Register a named callback device
+ */
+export const createConsultationDeviceBodyDeviceNameMax = 100;
+
+export const createConsultationDeviceBodyPhoneNumberMin = 7;
+export const createConsultationDeviceBodyPhoneNumberMax = 25;
+
+export const createConsultationDeviceBodyInstallationIdMax = 120;
+
+
+
+export const CreateConsultationDeviceBody = zod.object({
+  "deviceName": zod.string().min(1).max(createConsultationDeviceBodyDeviceNameMax),
+  "phoneNumber": zod.string().min(createConsultationDeviceBodyPhoneNumberMin).max(createConsultationDeviceBodyPhoneNumberMax),
+  "installationId": zod.string().min(1).max(createConsultationDeviceBodyInstallationIdMax).optional()
+})
+
+
+/**
+ * @summary Rename, update, or link an owned callback device
+ */
+export const UpdateConsultationDeviceParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const updateConsultationDeviceBodyDeviceNameMax = 100;
+
+export const updateConsultationDeviceBodyPhoneNumberMin = 7;
+export const updateConsultationDeviceBodyPhoneNumberMax = 25;
+
+export const updateConsultationDeviceBodyInstallationIdMax = 120;
+
+
+
+export const UpdateConsultationDeviceBody = zod.object({
+  "deviceName": zod.string().min(1).max(updateConsultationDeviceBodyDeviceNameMax).optional(),
+  "phoneNumber": zod.string().min(updateConsultationDeviceBodyPhoneNumberMin).max(updateConsultationDeviceBodyPhoneNumberMax).optional(),
+  "installationId": zod.string().max(updateConsultationDeviceBodyInstallationIdMax).nullish()
+})
+
+export const UpdateConsultationDeviceResponse = zod.object({
+  "id": zod.string(),
+  "deviceName": zod.string(),
+  "phoneNumber": zod.string(),
+  "installationId": zod.string().nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Remove a device not assigned to an active consultation
+ */
+export const DeleteConsultationDeviceParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+
+/**
+ * @summary Assign or reconfirm the callback device for one consultation
+ */
+export const AssignConsultationCallbackDeviceParams = zod.object({
+  "bookingId": zod.coerce.string()
+})
+
+export const AssignConsultationCallbackDeviceBody = zod.object({
+  "deviceId": zod.string()
+})
+
+export const AssignConsultationCallbackDeviceResponse = zod.object({
+  "deviceId": zod.string().nullable(),
+  "deviceName": zod.string().nullable(),
+  "confirmedAt": zod.coerce.date().nullable(),
+  "dueAt": zod.coerce.date().nullable(),
+  "due": zod.boolean()
+})
+
+
+/**
+ * @summary Reveal the assigned device's personal number for an admin emergency
+ */
+export const GetAdminConsultationCallbackDeviceParams = zod.object({
+  "bookingId": zod.coerce.string()
+})
+
+export const GetAdminConsultationCallbackDeviceResponse = zod.union([zod.object({
+  "bookingId": zod.string(),
+  "deviceName": zod.string(),
+  "phoneNumber": zod.string()
+}),zod.null()])
+
+
+/**
+ * @summary Due callback-device confirmations for the signed-in seeker
+ */
+export const ListCallbackDeviceRemindersResponseItem = zod.object({
+  "bookingId": zod.string(),
+  "patientName": zod.string(),
+  "deviceName": zod.string().nullable(),
+  "dueAt": zod.coerce.date().nullable()
+})
+export const ListCallbackDeviceRemindersResponse = zod.array(ListCallbackDeviceRemindersResponseItem)
+
+
+/**
  * Returns server health status
  * @summary Health check
  */
@@ -472,6 +591,13 @@ export const GetCaseFileResponse = zod.object({
   "bookingType": zod.string(),
   "userId": zod.string(),
   "providerId": zod.string().nullable(),
+  "callbackDevice": zod.union([zod.object({
+  "deviceId": zod.string().nullable(),
+  "deviceName": zod.string().nullable(),
+  "confirmedAt": zod.coerce.date().nullable(),
+  "dueAt": zod.coerce.date().nullable(),
+  "due": zod.boolean()
+}),zod.null()]).optional(),
   "postRxCallsEnabled": zod.boolean(),
   "postRxVideoEnabled": zod.boolean()
 }),
@@ -481,6 +607,7 @@ export const GetCaseFileResponse = zod.object({
   "canAddVitals": zod.boolean(),
   "canComposeAdvisory": zod.boolean(),
   "canToggleFollowUp": zod.boolean(),
+  "canManageCallbackDevice": zod.boolean().optional(),
   "readOnly": zod.boolean(),
   "callsEnabled": zod.boolean(),
   "videoEnabled": zod.boolean()
@@ -733,6 +860,7 @@ export const UpdateCaseFileFollowUpAccessResponse = zod.object({
   "canAddVitals": zod.boolean(),
   "canComposeAdvisory": zod.boolean(),
   "canToggleFollowUp": zod.boolean(),
+  "canManageCallbackDevice": zod.boolean().optional(),
   "readOnly": zod.boolean(),
   "callsEnabled": zod.boolean(),
   "videoEnabled": zod.boolean()

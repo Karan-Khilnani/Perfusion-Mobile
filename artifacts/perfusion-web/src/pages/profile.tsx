@@ -15,6 +15,15 @@ import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { ImageCropDialog } from "@/components/ui/image-crop-dialog";
 import { apiRequest } from "@/lib/queryClient";
+import {
+  getListConsultationDevicesQueryKey,
+  useCreateConsultationDevice,
+  useDeleteConsultationDevice,
+  useListConsultationDevices,
+  useUpdateConsultationDevice,
+} from "@workspace/api-client-react";
+import type { ConsultationDevice } from "@workspace/api-client-react";
+import { getCallbackInstallationId } from "@/lib/callback-device";
 import { Camera, Loader2, Save, Building, User, Upload, FileText, X, Clock, PenLine, AlertCircle, CheckCircle2, Info, Phone, Plus, Pencil, Trash2, KeyRound } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ConsultantSlotEditor } from "@/components/consultant-slot-editor";
@@ -259,6 +268,139 @@ function WardContactsCard() {
             <Plus className="h-3.5 w-3.5 mr-1" />Add Ward Contact
           </Button>
         )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function CallbackDevicesCard({ userId }: { userId: string }) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const { data: devices = [], isLoading, isError, error } = useListConsultationDevices({
+    query: {
+      queryKey: [...getListConsultationDevicesQueryKey(), userId],
+      refetchOnWindowFocus: true,
+      refetchInterval: 60000,
+      staleTime: 0,
+    },
+  });
+  const browserInstallationId = getCallbackInstallationId();
+  const [deviceName, setDeviceName] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState("");
+  const [editingPhone, setEditingPhone] = useState("");
+  const createDevice = useCreateConsultationDevice();
+  const updateDevice = useUpdateConsultationDevice();
+  const deleteDevice = useDeleteConsultationDevice();
+  const refresh = () => queryClient.invalidateQueries({ queryKey: getListConsultationDevicesQueryKey() });
+
+  const saveNewDevice = () => {
+    if (!deviceName.trim() || !phoneNumber.trim()) {
+      toast({ title: "Device name and personal number are required", variant: "destructive" });
+      return;
+    }
+    createDevice.mutate({ data: { deviceName: deviceName.trim(), phoneNumber: phoneNumber.trim() } }, {
+      onSuccess: () => {
+        setDeviceName("");
+        setPhoneNumber("");
+        void refresh();
+        toast({ title: "Callback device registered" });
+      },
+      onError: (error) => toast({ title: "Could not register device", description: error.message, variant: "destructive" }),
+    });
+  };
+
+  const saveEdit = (device: ConsultationDevice) => {
+    if (!editingName.trim() || !editingPhone.trim()) {
+      toast({ title: "Device name and personal number are required", variant: "destructive" });
+      return;
+    }
+    updateDevice.mutate({ id: device.id, data: { deviceName: editingName.trim(), phoneNumber: editingPhone.trim() } }, {
+      onSuccess: () => {
+        setEditingId(null);
+        void refresh();
+        toast({ title: "Callback device updated" });
+      },
+      onError: (error) => toast({ title: "Could not update device", description: error.message, variant: "destructive" }),
+    });
+  };
+
+  const toggleLinkedDevice = (device: ConsultationDevice) => {
+    const installationId = browserInstallationId;
+    updateDevice.mutate({
+      id: device.id,
+      data: { installationId: device.installationId === installationId ? null : installationId },
+    }, {
+      onSuccess: () => {
+        void refresh();
+        toast({ title: device.installationId === installationId ? "Browser unlinked" : "This browser is linked" });
+      },
+      onError: (error) => toast({ title: "Could not link browser", description: error.message, variant: "destructive" }),
+    });
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base flex items-center gap-2"><Phone className="h-4 w-4" />Callback Devices</CardTitle>
+        <CardDescription>
+          Register personal phones for consultation call-backs. This directory is separate from Ward Contacts.
+          Link a device to this browser to use it as the booking default.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {isError && <p role="alert" className="text-sm text-destructive">Could not load callback devices. {error?.message}</p>}
+        {isLoading ? (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" />Loading devices…</div>
+        ) : devices.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No callback devices registered yet.</p>
+        ) : (
+          <div className="space-y-2">
+            {devices.map((device) => (
+              <div key={device.id} className="rounded-md border p-3 space-y-2" data-testid={`callback-device-${device.id}`}>
+                {editingId === device.id ? (
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <Input aria-label="Device name" value={editingName} onChange={(event) => setEditingName(event.target.value)} />
+                    <Input aria-label="Personal number" value={editingPhone} onChange={(event) => setEditingPhone(event.target.value)} />
+                  </div>
+                ) : (
+                  <div>
+                    <p className="text-sm font-medium">{device.deviceName}</p>
+                    <p className="text-xs text-muted-foreground">{device.phoneNumber}</p>
+                  </div>
+                )}
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button type="button" size="sm" variant={device.installationId === browserInstallationId ? "secondary" : "outline"} onClick={() => toggleLinkedDevice(device)} disabled={updateDevice.isPending} data-testid={`button-link-device-${device.id}`}>
+                    {device.installationId === browserInstallationId ? "Unlink this browser" : device.installationId ? "Linked elsewhere · Link this browser" : "Link this browser"}
+                  </Button>
+                  {editingId === device.id ? (
+                    <>
+                      <Button type="button" size="sm" onClick={() => saveEdit(device)} disabled={updateDevice.isPending}>Save</Button>
+                      <Button type="button" size="sm" variant="ghost" onClick={() => setEditingId(null)}>Cancel</Button>
+                    </>
+                  ) : (
+                    <Button type="button" size="sm" variant="ghost" onClick={() => { setEditingId(device.id); setEditingName(device.deviceName); setEditingPhone(device.phoneNumber); }} data-testid={`button-edit-device-${device.id}`}><Pencil className="mr-1 h-3.5 w-3.5" />Edit</Button>
+                  )}
+                  <Button type="button" size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => deleteDevice.mutate({ id: device.id }, { onSuccess: () => { void refresh(); toast({ title: "Callback device deleted" }); }, onError: (error) => toast({ title: "Could not delete device", description: error.message, variant: "destructive" }) })} disabled={deleteDevice.isPending} data-testid={`button-delete-device-${device.id}`}>
+                    <Trash2 className="mr-1 h-3.5 w-3.5" />Delete
+                  </Button>
+                </div>
+                {device.installationId && <p className="text-xs text-muted-foreground">{device.installationId === browserInstallationId ? "This installation will preselect this device when booking." : "Linking this browser changes the active browser association."}</p>}
+              </div>
+            ))}
+          </div>
+        )}
+        <div className="rounded-md border p-3 space-y-3">
+          <p className="text-sm font-medium">Add a callback device</p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1"><Label htmlFor="callback-device-name">Device name</Label><Input id="callback-device-name" placeholder="e.g. Personal mobile" value={deviceName} onChange={(event) => setDeviceName(event.target.value)} data-testid="input-callback-device-name" /></div>
+            <div className="space-y-1"><Label htmlFor="callback-device-phone">Personal number</Label><Input id="callback-device-phone" type="tel" placeholder="+91 98765 43210" value={phoneNumber} onChange={(event) => setPhoneNumber(event.target.value)} data-testid="input-callback-device-phone" /></div>
+          </div>
+          <Button type="button" size="sm" onClick={saveNewDevice} disabled={createDevice.isPending} data-testid="button-add-callback-device">
+            {createDevice.isPending ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <Plus className="mr-1 h-3.5 w-3.5" />}Add device
+          </Button>
+        </div>
       </CardContent>
     </Card>
   );
@@ -1345,6 +1487,7 @@ export default function ProfilePage() {
       </Card>
 
       {user?.role === "care_seeker" && <WardContactsCard />}
+      {user?.role === "care_seeker" && <CallbackDevicesCard userId={String(user.id)} />}
 
       <ChangePasswordCard />
 

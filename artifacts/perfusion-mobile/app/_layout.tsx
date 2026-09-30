@@ -13,8 +13,10 @@ import {
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { setBaseUrl } from "@workspace/api-client-react";
 import { Redirect, Stack, usePathname, type Href } from "expo-router";
+import * as Notifications from "expo-notifications";
 import * as SplashScreen from "expo-splash-screen";
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
+import { Platform } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { KeyboardProvider } from "react-native-keyboard-controller";
@@ -42,13 +44,15 @@ const queryClient = new QueryClient({
 });
 
 function RootLayoutNav({ fontsReady }: { fontsReady: boolean }) {
-  const { user, loading, callbackDevice, callbackDeviceLoading, callbackDeviceError } = useAuth();
+  const { user, loading, callbackDevices, callbackDevicesLoading, callbackDevicesError } = useAuth();
   const colors = useColors();
   const pathname = usePathname();
   const splashDismissed = useRef(false);
+  const handledReminderResponses = useRef(new Set<string>());
+  const [notificationHref, setNotificationHref] = useState<string | null>(null);
 
   const waitingForCallbackDevice = Boolean(
-    user && user.role !== "admin" && callbackDeviceLoading,
+    user && user.role !== "admin" && callbackDevicesLoading,
   );
 
   const publicPaths = [
@@ -88,7 +92,7 @@ function RootLayoutNav({ fontsReady }: { fontsReady: boolean }) {
       user &&
       user.role !== "admin" &&
       user.approvalStatus === "approved" &&
-      (!callbackDevice || callbackDeviceError) &&
+      (!callbackDevices.length || callbackDevicesError) &&
       pathname !== "/callback-device"
     ) {
       redirectHref = "/callback-device";
@@ -101,6 +105,49 @@ function RootLayoutNav({ fontsReady }: { fontsReady: boolean }) {
       redirectHref = "/(tabs)";
     }
   }
+  if (
+    !loading &&
+    !waitingForCallbackDevice &&
+    user &&
+    !user.needsProfile &&
+    user.approvalStatus === "approved" &&
+    callbackDevices.length > 0 &&
+    !callbackDevicesError &&
+    notificationHref &&
+    pathname !== notificationHref
+  ) {
+    redirectHref = notificationHref as Href;
+  }
+
+  useEffect(() => {
+    if (Platform.OS === "web") return;
+    const handleResponse = (response: Notifications.NotificationResponse) => {
+      const data = response.notification.request.content.data as Record<string, unknown>;
+      if (data.type !== "callback_device_reminder") return;
+      const bookingId = typeof data.bookingId === "string"
+        ? data.bookingId
+        : typeof data.booking_id === "string"
+          ? data.booking_id
+          : "";
+      if (!bookingId) return;
+      const responseId = response.notification.request.identifier;
+      if (handledReminderResponses.current.has(responseId)) return;
+      handledReminderResponses.current.add(responseId);
+      setNotificationHref(`/case-file/${encodeURIComponent(bookingId)}`);
+      void Notifications.clearLastNotificationResponseAsync().catch(() => {});
+    };
+    const subscription = Notifications.addNotificationResponseReceivedListener(handleResponse);
+    void Notifications.getLastNotificationResponseAsync()
+      .then((response) => {
+        if (response) handleResponse(response);
+      })
+      .catch(() => {});
+    return () => subscription.remove();
+  }, []);
+
+  useEffect(() => {
+    if (notificationHref && pathname === notificationHref) setNotificationHref(null);
+  }, [notificationHref, pathname]);
   const canDismissSplash =
     fontsReady &&
     !loading &&
@@ -150,7 +197,7 @@ function RootLayoutNav({ fontsReady }: { fontsReady: boolean }) {
         />
         <Stack.Screen
           name="callback-device"
-          options={{ title: "Callback Device", gestureEnabled: !!callbackDevice }}
+          options={{ title: "Callback Devices", gestureEnabled: callbackDevices.length > 0 }}
         />
         <Stack.Screen
           name="booking/[id]"

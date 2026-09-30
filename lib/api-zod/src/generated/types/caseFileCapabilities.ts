@@ -12,6 +12,7 @@ export interface CaseFileCapabilities {
   canAddVitals: boolean;
   canComposeAdvisory: boolean;
   canToggleFollowUp: boolean;
+  canManageCallbackDevice?: boolean;
   readOnly: boolean;
   callsEnabled: boolean;
   videoEnabled: boolean;

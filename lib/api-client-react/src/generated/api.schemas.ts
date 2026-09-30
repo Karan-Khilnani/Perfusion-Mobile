@@ -24,6 +24,83 @@ export interface CallbackDeviceInput {
   phoneNumber: string;
 }
 
+export interface ConsultationDevice {
+  id: string;
+  deviceName: string;
+  phoneNumber: string;
+  /** @nullable */
+  installationId: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ConsultationDeviceInput {
+  /**
+     * @minLength 1
+     * @maxLength 100
+     */
+  deviceName: string;
+  /**
+     * @minLength 7
+     * @maxLength 25
+     */
+  phoneNumber: string;
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  installationId?: string;
+}
+
+export interface ConsultationDeviceUpdate {
+  /**
+     * @minLength 1
+     * @maxLength 100
+     */
+  deviceName?: string;
+  /**
+     * @minLength 7
+     * @maxLength 25
+     */
+  phoneNumber?: string;
+  /**
+     * @maxLength 120
+     * @nullable
+     */
+  installationId?: string | null;
+}
+
+export interface ConsultationCallbackSelection {
+  deviceId: string;
+}
+
+export interface ConsultationCallbackAssignment {
+  /** @nullable */
+  deviceId: string | null;
+  /** @nullable */
+  deviceName: string | null;
+  /** @nullable */
+  confirmedAt: string | null;
+  /** @nullable */
+  dueAt: string | null;
+  due: boolean;
+}
+
+export interface CallbackDeviceReminder {
+  bookingId: string;
+  patientName: string;
+  /** @nullable */
+  deviceName: string | null;
+  /** @nullable */
+  dueAt: string | null;
+}
+
+export interface AdminConsultationCallbackDevice {
+  bookingId: string;
+  deviceName: string;
+  phoneNumber: string;
+}
+
 export interface HealthStatus {
   status: string;
 }
@@ -128,6 +205,7 @@ export interface CaseFileCapabilities {
   canAddVitals: boolean;
   canComposeAdvisory: boolean;
   canToggleFollowUp: boolean;
+  canManageCallbackDevice?: boolean;
   readOnly: boolean;
   callsEnabled: boolean;
   videoEnabled: boolean;
@@ -362,6 +440,7 @@ export interface CaseFileAggregateBooking {
   userId: string;
   /** @nullable */
   providerId: string | null;
+  callbackDevice?: ConsultationCallbackAssignment | null;
   postRxCallsEnabled: boolean;
   postRxVideoEnabled: boolean;
 }

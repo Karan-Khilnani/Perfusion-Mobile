@@ -45,6 +45,129 @@ paths:
                 $ref: "#/components/schemas/CallbackDevice"
         "400": { description: Invalid device name or phone number }
         "401": { description: Not authenticated }
+  /profile/callback-devices:
+    get:
+      operationId: listConsultationDevices
+      tags: [profile]
+      summary: List the signed-in hospital's registered callback devices
+      responses:
+        "200":
+          description: Active registered devices
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ConsultationDevice" }
+        "401": { description: Not authenticated }
+    post:
+      operationId: createConsultationDevice
+      tags: [profile]
+      summary: Register a named callback device
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ConsultationDeviceInput" }
+      responses:
+        "201":
+          description: Registered device
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ConsultationDevice" }
+        "400": { description: Invalid device details }
+        "409": { description: This installation is already registered }
+  /profile/callback-devices/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    patch:
+      operationId: updateConsultationDevice
+      tags: [profile]
+      summary: Rename, update, or link an owned callback device
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ConsultationDeviceUpdate" }
+      responses:
+        "200":
+          description: Updated device
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ConsultationDevice" }
+        "400": { description: Invalid device details }
+        "404": { description: Device not found }
+        "409": { description: This installation is already registered }
+    delete:
+      operationId: deleteConsultationDevice
+      tags: [profile]
+      summary: Remove a device not assigned to an active consultation
+      responses:
+        "204": { description: Device removed }
+        "404": { description: Device not found }
+        "409": { description: Reassign active consultations first }
+  /bookings/{bookingId}/callback-device:
+    put:
+      operationId: assignConsultationCallbackDevice
+      tags: [case-file]
+      summary: Assign or reconfirm the callback device for one consultation
+      parameters:
+        - name: bookingId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ConsultationCallbackSelection" }
+      responses:
+        "200":
+          description: Assignment with its new four-hour confirmation window
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ConsultationCallbackAssignment" }
+        "400": { description: Invalid selection }
+        "403": { description: Not the consultation's seeker or Case File closed }
+        "404": { description: Consultation or device not found }
+  /admin/bookings/{bookingId}/callback-device:
+    get:
+      operationId: getAdminConsultationCallbackDevice
+      tags: [admin]
+      summary: Reveal the assigned device's personal number for an admin emergency
+      parameters:
+        - name: bookingId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Assigned device contact, or null if not assigned
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/AdminConsultationCallbackDevice"
+                  - type: "null"
+        "401": { description: Not authenticated }
+        "403": { description: Admin access required or consultation closed }
+        "404": { description: Consultation not found }
+  /callback-device/reminders:
+    get:
+      operationId: listCallbackDeviceReminders
+      tags: [case-file]
+      summary: Due callback-device confirmations for the signed-in seeker
+      responses:
+        "200":
+          description: Consultations needing callback-device confirmation
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/CallbackDeviceReminder" }
+        "401": { description: Not authenticated }
   /healthz:
     get:
       operationId: healthCheck
@@ -683,6 +806,58 @@ components:
       properties:
         deviceName: { type: string, minLength: 1, maxLength: 100 }
         phoneNumber: { type: string, minLength: 7, maxLength: 25 }
+    ConsultationDevice:
+      type: object
+      required: [id, deviceName, phoneNumber, installationId, createdAt, updatedAt]
+      properties:
+        id: { type: string }
+        deviceName: { type: string }
+        phoneNumber: { type: string }
+        installationId: { type: ["string", "null"] }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    ConsultationDeviceInput:
+      type: object
+      required: [deviceName, phoneNumber]
+      properties:
+        deviceName: { type: string, minLength: 1, maxLength: 100 }
+        phoneNumber: { type: string, minLength: 7, maxLength: 25 }
+        installationId: { type: string, minLength: 1, maxLength: 120 }
+    ConsultationDeviceUpdate:
+      type: object
+      properties:
+        deviceName: { type: string, minLength: 1, maxLength: 100 }
+        phoneNumber: { type: string, minLength: 7, maxLength: 25 }
+        installationId: { type: ["string", "null"], maxLength: 120 }
+    ConsultationCallbackSelection:
+      type: object
+      required: [deviceId]
+      properties:
+        deviceId: { type: string }
+    ConsultationCallbackAssignment:
+      type: object
+      required: [deviceId, deviceName, confirmedAt, dueAt, due]
+      properties:
+        deviceId: { type: ["string", "null"] }
+        deviceName: { type: ["string", "null"] }
+        confirmedAt: { type: ["string", "null"], format: date-time }
+        dueAt: { type: ["string", "null"], format: date-time }
+        due: { type: boolean }
+    CallbackDeviceReminder:
+      type: object
+      required: [bookingId, patientName, deviceName, dueAt]
+      properties:
+        bookingId: { type: string }
+        patientName: { type: string }
+        deviceName: { type: ["string", "null"] }
+        dueAt: { type: ["string", "null"], format: date-time }
+    AdminConsultationCallbackDevice:
+      type: object
+      required: [bookingId, deviceName, phoneNumber]
+      properties:
+        bookingId: { type: string }
+        deviceName: { type: string }
+        phoneNumber: { type: string }
     HealthStatus:
       type: object
       properties:
@@ -777,6 +952,7 @@ components:
         canAddVitals: { type: boolean }
         canComposeAdvisory: { type: boolean }
         canToggleFollowUp: { type: boolean }
+        canManageCallbackDevice: { type: boolean }
         readOnly: { type: boolean }
         callsEnabled: { type: boolean }
         videoEnabled: { type: boolean }
@@ -941,6 +1117,10 @@ components:
         bookingType: { type: string }
         userId: { type: string }
         providerId: { type: ["string", "null"] }
+        callbackDevice:
+          oneOf:
+            - $ref: "#/components/schemas/ConsultationCallbackAssignment"
+            - type: "null"
         postRxCallsEnabled: { type: boolean }
         postRxVideoEnabled: { type: boolean }
     ConsultantAvailabilityPreviewWindow:

@@ -1,7 +1,20 @@
 import webpush from "web-push";
+import { createECDH } from "node:crypto";
 
-const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY;
 const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY;
+// The public key is distributable and can be recovered from the configured
+// private key, so an absent public-key setting need not disable existing pushes.
+const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY || (() => {
+  if (!VAPID_PRIVATE_KEY) return undefined;
+  try {
+    const key = createECDH("prime256v1");
+    key.setPrivateKey(Buffer.from(VAPID_PRIVATE_KEY, "base64url"));
+    return key.getPublicKey(undefined, "uncompressed").toString("base64url");
+  } catch {
+    console.error("[PushNotifications] Invalid VAPID private key; web push disabled");
+    return undefined;
+  }
+})();
 const VAPID_EMAIL = process.env.VAPID_EMAIL || "mailto:admin@perfusion.health";
 
 if (VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
@@ -11,11 +24,17 @@ if (VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
   // Warn clearly at startup so broken push config is immediately visible
   console.error(
     "[PushNotifications] VAPID keys not configured — push notifications DISABLED. " +
-    "Set VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, and VAPID_EMAIL environment variables."
+    "Configure a valid VAPID_PRIVATE_KEY to enable web push."
   );
 }
 
 export type PushPayload =
+  | {
+      type: "callback_device_reminder";
+      bookingId: string;
+      title: string;
+      body: string;
+    }
   | {
       type: "incoming_call";
       bookingId: string;

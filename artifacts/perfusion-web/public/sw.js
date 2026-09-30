@@ -1,4 +1,7 @@
 const CACHE_NAME = "perfusion-v1";
+const appBasePath = new URL(self.registration.scope).pathname.replace(/\/$/, "");
+const caseFilePath = (bookingId) =>
+  `${appBasePath}/case-file/${encodeURIComponent(bookingId)}`;
 
 self.addEventListener("install", (event) => {
   self.skipWaiting();
@@ -20,6 +23,20 @@ self.addEventListener("push", (event) => {
   }
 
   const { type, title, body, bookingId, sessionGeneration, callerName, videoRoomUrl, recipientRole } = payload;
+
+  if (type === "callback_device_reminder") {
+    if (!bookingId) return;
+    const caseFileUrl = caseFilePath(bookingId);
+    event.waitUntil(self.registration.showNotification(title || "Call-back device confirmation due", {
+      body: body || "Please confirm the consultation call-back device.",
+      icon: "/favicon.png",
+      badge: "/favicon.png",
+      tag: `callback-device-${bookingId}`,
+      renotify: false,
+      data: { type, bookingId, url: caseFileUrl },
+    }));
+    return;
+  }
 
   if (type === "incoming_call") {
     if (!bookingId || !sessionGeneration) {
@@ -114,6 +131,21 @@ self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   const data = event.notification.data || {};
   const { bookingId, sessionGeneration, videoRoomUrl, url } = data;
+
+  if (data.type === "callback_device_reminder") {
+    const targetUrl = url || (bookingId ? caseFilePath(bookingId) : `${appBasePath}/user/orders`);
+    event.waitUntil((async () => {
+      const allClients = await clients.matchAll({ type: "window", includeUncontrolled: true });
+      for (const client of allClients) {
+        if (client.url.includes(self.location.origin) && "focus" in client) {
+          client.navigate(targetUrl);
+          return client.focus();
+        }
+      }
+      if (clients.openWindow) return clients.openWindow(targetUrl);
+    })());
+    return;
+  }
 
   if (event.action === "decline" && bookingId && sessionGeneration) {
     // Bind the action to the generation that created this notification.

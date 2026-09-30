@@ -131,3 +131,31 @@ mtime_ms = 1790584375202
 storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:034c0c6d-c25b-491b-98e9-0bb19624165f/6b5a1d7d-b7cd-4814-aa44-aceeffd20d83/fd891acf-5b25-478c-9a3e-b27a389c018c"
 storage_version_token = "1790585235897622"
 content_type = "audio/mpeg"
+
+[[outputs]]
+id = "iwFV_xo5LGC_OUj4VlVyN"
+uri = "file://screenshots/callback-case-a.png"
+type = "image"
+title = "Case File A — Ward Tablet A, confirmation due"
+description = "Authenticated Web Case File showing an ongoing consultation with its assigned device and due pulse."
+logical_id = "2228e884-148d-40c5-b31a-7d0684521e16"
+content_hash = "sha256:e50df20292818b2c34006509b601e428d5372ca559ddb1f4911b2b5bfc7b5f94"
+size = 85403
+mtime_ms = 1790769846564
+storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:034c0c6d-c25b-491b-98e9-0bb19624165f/2228e884-148d-40c5-b31a-7d0684521e16/7f997501-f11a-4c35-8b9e-d08c40c5b2bc"
+storage_version_token = "1790770547921513"
+content_type = "image/png"
+
+[[outputs]]
+id = "kIRxYoo8KBoQQ9a9_vlqY"
+uri = "file://screenshots/callback-case-b.png"
+type = "image"
+title = "Case File B — Ward Tablet B, not due"
+description = "A separate ongoing consultation showing a different assigned device and no due badge."
+logical_id = "cfc51ad9-8f4b-475f-9b8d-b1e2bc1f84c2"
+content_hash = "sha256:7ac5a70859160b251e562da79c1949cedbde18fc1dc87441010c06cdbbb4a336"
+size = 79949
+mtime_ms = 1790769867196
+storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:034c0c6d-c25b-491b-98e9-0bb19624165f/cfc51ad9-8f4b-475f-9b8d-b1e2bc1f84c2/84ac21ef-86a4-49ed-a393-f30f21cfa5e7"
+storage_version_token = "1790770549530643"
+content_type = "image/png"

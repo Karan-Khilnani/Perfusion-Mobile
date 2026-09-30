@@ -18,10 +18,12 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AppAlert } from "@/components/AppAlert";
+import { useAuth } from "@/contexts/AuthContext";
 import { apiFetch, getBaseUrl } from "@/hooks/useApi";
 import { useColors } from "@/hooks/useColors";
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 import { designTokens } from "@/constants/designTokens";
+import { getPushDeviceId } from "@/lib/push-device";
 import {
   type AttachmentDraft,
   pickCaseFileAttachment,
@@ -93,6 +95,7 @@ export default function NewConsultationScreen() {
   const palette = useColors();
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
+  const { callbackDevices, callbackDevicesLoading, callbackDevicesError, refreshCallbackDevices } = useAuth();
   const [step, setStep] = useState<"explore" | "details">("explore");
   const [specialty, setSpecialty] = useState("All");
   const [todayOnly, setTodayOnly] = useState(false);
@@ -111,6 +114,7 @@ export default function NewConsultationScreen() {
   const [createdBooking, setCreatedBooking] = useState<{ id?: string } | null>(null);
   const [attachmentUploadError, setAttachmentUploadError] = useState<string | null>(null);
   const [uploadingAttachments, setUploadingAttachments] = useState(false);
+  const [selectedCallbackDeviceId, setSelectedCallbackDeviceId] = useState<string | null>(null);
   const [form, setForm] = useState({
     patientName: "", patientAge: "", patientGender: "", patientPhone: "", patientWeight: "", uhidIpNumber: "",
     allergies: "", comorbidities: "", presentingComplaint: "", presentIllness: "",
@@ -126,6 +130,13 @@ export default function NewConsultationScreen() {
       return response.json();
     },
   });
+  const currentInstallation = useQuery<string>({
+    queryKey: ["mobile-push-device-id"],
+    queryFn: getPushDeviceId,
+    staleTime: Infinity,
+  });
+  const linkedCurrentDevice = callbackDevices.find((device) => device.installationId && device.installationId === currentInstallation.data);
+  const effectiveCallbackDeviceId = selectedCallbackDeviceId || linkedCurrentDevice?.id || null;
   const slotsQuery = useQuery<SlotsResponse>({
     queryKey: ["mobile-bookable-slots", slotConsultant?.id, slotDate],
     enabled: !!slotConsultant && slotSheetOpen,
@@ -223,6 +234,7 @@ export default function NewConsultationScreen() {
   const book = useMutation({
     mutationFn: async () => {
       if (!selected) throw new Error("Choose a consultant and slot");
+      if (!effectiveCallbackDeviceId) throw new Error("Choose a callback device for this consultation.");
       const response = await apiFetch("/api/bookings", {
         method: "POST",
         body: JSON.stringify({
@@ -250,6 +262,7 @@ export default function NewConsultationScreen() {
           amount: selected.consultant.computedCustomerPrice || selected.consultant.consultationFee || "0",
           urgency: "routine",
           status: "booked",
+          callbackDeviceId: effectiveCallbackDeviceId,
         }),
       });
       const body = await response.json().catch(() => ({}));
@@ -275,7 +288,7 @@ export default function NewConsultationScreen() {
     },
   });
 
-  const valid = !!selected && !!form.patientName.trim() && !!form.patientAge && !!form.patientGender && !!form.patientPhone.trim() && !!form.presentingComplaint.trim() && (allergyNotSpecified || !!form.allergies.trim());
+  const valid = !!selected && !!effectiveCallbackDeviceId && !callbackDevicesLoading && !!form.patientName.trim() && !!form.patientAge && !!form.patientGender && !!form.patientPhone.trim() && !!form.presentingComplaint.trim() && (allergyNotSpecified || !!form.allergies.trim());
   const update = (key: keyof typeof form, value: string) => setForm((current) => ({ ...current, [key]: value }));
 
   return (
@@ -367,6 +380,45 @@ export default function NewConsultationScreen() {
             <Input compact label="Weight (kg)" value={form.patientWeight} keyboardType="numeric" onChangeText={(value) => update("patientWeight", value)} />
             <Input compact label="UHID / IP Number" value={form.uhidIpNumber} onChangeText={(value) => update("uhidIpNumber", value)} />
           </View>
+          <Text style={[styles.sectionTitle, { color: palette.foreground }]}>Callback device for this consultation*</Text>
+          <Text style={{ color: palette.mutedForeground, fontSize: 12, lineHeight: 18 }}>
+            Select the phone that can receive a callback if the in-app call is interrupted. This is saved only for this booking.
+          </Text>
+          {callbackDevicesLoading ? (
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 9 }}><ActivityIndicator size="small" color={palette.primary} /><Text style={{ color: palette.mutedForeground }}>Loading registered devices…</Text></View>
+          ) : callbackDevicesError ? (
+            <View style={{ gap: 8 }}>
+              <Text style={{ color: palette.destructive }}>{callbackDevicesError}</Text>
+              <Pressable onPress={() => void refreshCallbackDevices()}><Text style={{ color: palette.primary, fontFamily: "Inter_600SemiBold" }}>Try again</Text></Pressable>
+            </View>
+          ) : callbackDevices.length ? (
+            <View style={{ gap: 8 }}>
+              {callbackDevices.map((device) => {
+                const active = effectiveCallbackDeviceId === device.id;
+                return (
+                  <Pressable
+                    key={device.id}
+                    onPress={() => setSelectedCallbackDeviceId(device.id)}
+                    accessibilityRole="radio"
+                    accessibilityState={{ checked: active }}
+                    style={[styles.selectedCard, { backgroundColor: active ? `${palette.primary}12` : palette.card, borderColor: active ? palette.primary : palette.border }]}
+                    testID={`callback-device-choice-${device.id}`}
+                  >
+                    <Feather name={active ? "check-circle" : "smartphone"} size={19} color={active ? palette.primary : palette.mutedForeground} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.selectedName, { color: palette.foreground }]}>{device.deviceName}</Text>
+                      {device.installationId === currentInstallation.data && <Text style={[styles.selectedMeta, { color: palette.primary }]}>This installation · default</Text>}
+                    </View>
+                  </Pressable>
+                );
+              })}
+            </View>
+          ) : (
+            <View style={{ gap: 8 }}>
+              <Text style={{ color: palette.destructive }}>No callback devices are registered. Add one in Profile before booking.</Text>
+              <Pressable onPress={() => router.push("/callback-device")}><Text style={{ color: palette.primary, fontFamily: "Inter_600SemiBold" }}>Manage callback devices</Text></Pressable>
+            </View>
+          )}
           <Pressable onPress={() => setAllergyNotSpecified((value) => !value)} style={styles.checkboxRow}>
             <View style={[styles.checkbox, { backgroundColor: allergyNotSpecified ? palette.foreground : palette.card, borderColor: palette.foreground }]}>
               {allergyNotSpecified && <Feather name="check" size={13} color={palette.card} />}

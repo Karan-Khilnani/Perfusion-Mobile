@@ -2,12 +2,13 @@ import { Feather } from "@expo/vector-icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { VideoView, useVideoPlayer } from "expo-video";
 import { File as ExpoFile, Paths } from "expo-file-system";
 import * as Sharing from "expo-sharing";
 import {
   ActivityIndicator,
+  Animated,
   FlatList,
   Linking,
   Modal,
@@ -45,6 +46,7 @@ import {
 import {
   Advisory,
   CaseFileAggregate,
+  CaseFileCallbackDevice,
   CaseFileMessage,
   Vital,
   isSeekerRole,
@@ -93,6 +95,28 @@ export default function CaseFileScreen() {
   const [viewerAttachment, setViewerAttachment] = useState<NonNullable<CaseFileMessage["attachment"]> | null>(null);
   const [startingCall, setStartingCall] = useState<"voice" | "video" | null>(null);
   const [callError, setCallError] = useState<string | null>(null);
+  const [callbackPickerOpen, setCallbackPickerOpen] = useState(false);
+  const callbackDevices = useQuery<Array<{ id: string; deviceName: string; phoneNumber: string; installationId: string | null }>>({
+    queryKey: ["mobile-callback-devices"],
+    enabled: seeker,
+    queryFn: async () => {
+      const result = await requestJson("/api/profile/callback-devices");
+      if (!Array.isArray(result)) throw new Error("Callback device directory is invalid.");
+      return result;
+    },
+  });
+  const callbackDeviceMutation = useMutation({
+    mutationFn: (deviceId: string) => requestJson<CaseFileCallbackDevice>(`/api/bookings/${encodeURIComponent(bookingId)}/callback-device`, {
+      method: "PUT",
+      body: JSON.stringify({ deviceId }),
+    }),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["case-file", bookingId] }),
+        queryClient.invalidateQueries({ queryKey: ["mobile-callback-device-reminders"] }),
+      ]);
+    },
+  });
 
   const startCall = async (callType: "voice" | "video") => {
     if (startingCall) return;
@@ -281,6 +305,25 @@ export default function CaseFileScreen() {
         </View>
       </LinearGradient>
 
+      <View style={{ paddingHorizontal: 12, paddingTop: 9, paddingBottom: 8, backgroundColor: palette.background }}>
+        <CallbackDeviceRow
+          assignment={booking.callbackDevice || null}
+          canManage={seeker && capabilities.canManageCallbackDevice === true}
+          devices={callbackDevices.data || []}
+          loading={callbackDevices.isLoading}
+          directoryError={callbackDevices.isError ? (callbackDevices.error instanceof Error ? callbackDevices.error.message : "Could not load callback devices.") : null}
+          saving={callbackDeviceMutation.isPending}
+          mutationError={callbackDeviceMutation.isError ? (callbackDeviceMutation.error instanceof Error ? callbackDeviceMutation.error.message : "Could not update callback device.") : null}
+          pickerOpen={callbackPickerOpen}
+          onTogglePicker={() => setCallbackPickerOpen((open) => !open)}
+          onRefreshDevices={() => void callbackDevices.refetch()}
+          onSelect={(deviceId) => {
+            callbackDeviceMutation.mutate(deviceId);
+            setCallbackPickerOpen(false);
+          }}
+        />
+      </View>
+
       {callError && <Text style={[styles.callError, { color: palette.primary, backgroundColor: palette.conversationCard }]} accessibilityRole="alert">{callError}</Text>}
 
       <View style={[styles.vitalsDock, { backgroundColor: palette.background, borderBottomColor: palette.conversationBorder }]}>
@@ -428,6 +471,118 @@ export default function CaseFileScreen() {
         }}
       />
     </KeyboardAvoidingView>
+  );
+}
+
+function CallbackDeviceRow({
+  assignment,
+  canManage,
+  devices,
+  loading,
+  directoryError,
+  saving,
+  mutationError,
+  pickerOpen,
+  onTogglePicker,
+  onRefreshDevices,
+  onSelect,
+}: {
+  assignment: CaseFileCallbackDevice | null;
+  canManage: boolean;
+  devices: Array<{ id: string; deviceName: string; phoneNumber: string; installationId: string | null }>;
+  loading: boolean;
+  directoryError: string | null;
+  saving: boolean;
+  mutationError: string | null;
+  pickerOpen: boolean;
+  onTogglePicker: () => void;
+  onRefreshDevices: () => void;
+  onSelect: (deviceId: string) => void;
+}) {
+  const palette = useColors();
+  const opacity = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    if (!assignment?.due || !canManage) {
+      opacity.setValue(1);
+      return;
+    }
+    const animation = Animated.loop(Animated.sequence([
+      Animated.timing(opacity, { toValue: 0.28, duration: 550, useNativeDriver: true }),
+      Animated.timing(opacity, { toValue: 1, duration: 550, useNativeDriver: true }),
+    ]));
+    animation.start();
+    return () => animation.stop();
+  }, [assignment?.due, canManage, opacity]);
+
+  const currentDeviceName = assignment?.deviceName || "No callback device selected";
+  const dueLabel = assignment?.dueAt
+    ? `Confirmation due ${new Date(assignment.dueAt).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}`
+    : "Confirmation required";
+
+  return (
+    <View style={{ borderWidth: 1, borderColor: palette.border, backgroundColor: palette.background, borderRadius: 14, padding: 13, gap: 9 }}>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 9 }}>
+        <Feather name="phone-call" size={17} color={palette.primary} />
+        <Text style={{ flex: 1, color: palette.mutedForeground, fontSize: 10, letterSpacing: 0.5, fontFamily: "Inter_700Bold" }}>CALLBACK DEVICE</Text>
+        <Text numberOfLines={1} style={{ color: palette.foreground, fontSize: 13, fontFamily: "Inter_600SemiBold", maxWidth: "60%" }}>{currentDeviceName}</Text>
+      </View>
+      {canManage && loading && (
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          <ActivityIndicator size="small" color={palette.primary} />
+          <Text style={{ color: palette.mutedForeground, fontSize: 11 }}>Loading callback device directory…</Text>
+        </View>
+      )}
+      {canManage && assignment?.confirmedAt && (
+        <Text style={{ color: palette.mutedForeground, fontSize: 11 }}>
+          Last confirmed {new Date(assignment.confirmedAt).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}
+        </Text>
+      )}
+      {canManage && assignment?.due && (
+        <Animated.Text style={{ color: palette.warning, fontSize: 12, fontFamily: "Inter_700Bold", opacity }}>{dueLabel} · please reconfirm</Animated.Text>
+      )}
+      {canManage && (
+        <>
+          <Pressable
+            onPress={onTogglePicker}
+            disabled={saving || loading}
+            style={{ minHeight: 40, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7, borderRadius: 10, borderWidth: 1, borderColor: palette.border, backgroundColor: palette.card }}
+            accessibilityRole="button"
+          >
+            {saving ? <ActivityIndicator size="small" color={palette.primary} /> : <Feather name={assignment?.deviceId ? "check-circle" : "edit-2"} size={15} color={palette.primary} />}
+            <Text style={{ color: palette.primary, fontSize: 12, fontFamily: "Inter_600SemiBold" }}>
+              {saving ? "Saving…" : assignment?.deviceId ? "Change or confirm device" : "Choose callback device"}
+            </Text>
+          </Pressable>
+          {!!mutationError && <Text style={{ color: palette.destructive, fontSize: 12 }} accessibilityRole="alert">{mutationError}</Text>}
+          {pickerOpen && (
+            <View style={{ gap: 7 }}>
+              {loading ? <ActivityIndicator color={palette.primary} /> : directoryError ? (
+                <View style={{ gap: 5 }}>
+                  <Text style={{ color: palette.destructive, fontSize: 12 }}>{directoryError}</Text>
+                  <Pressable onPress={onRefreshDevices}><Text style={{ color: palette.primary }}>Retry</Text></Pressable>
+                </View>
+              ) : devices.length ? devices.map((device) => (
+                <Pressable
+                  key={device.id}
+                  disabled={saving}
+                  onPress={() => onSelect(device.id)}
+                  style={{ padding: 11, borderRadius: 9, backgroundColor: device.id === assignment?.deviceId ? `${palette.primary}12` : palette.card, borderColor: device.id === assignment?.deviceId ? palette.primary : palette.border, borderWidth: 1, flexDirection: "row", alignItems: "center", gap: 8 }}
+                  accessibilityRole="button"
+                >
+                  <Feather name={device.id === assignment?.deviceId ? "check-circle" : "smartphone"} size={15} color={device.id === assignment?.deviceId ? palette.primary : palette.mutedForeground} />
+                  <Text style={{ color: palette.foreground, fontSize: 13, fontFamily: "Inter_600SemiBold" }}>{device.deviceName}</Text>
+                </Pressable>
+              )) : (
+                <View style={{ gap: 6 }}>
+                  <Text style={{ color: palette.mutedForeground, fontSize: 12 }}>No registered devices. Add one to your directory first.</Text>
+                  <Pressable onPress={() => router.push("/callback-device")}><Text style={{ color: palette.primary, fontFamily: "Inter_600SemiBold" }}>Manage devices</Text></Pressable>
+                </View>
+              )}
+            </View>
+          )}
+        </>
+      )}
+    </View>
   );
 }
 

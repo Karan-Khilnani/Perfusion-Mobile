@@ -73,7 +73,7 @@ function ProfileRow({
 export default function ProfileScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { user, logout, callbackDevice } = useAuth();
+  const { user, logout, callbackDevices } = useAuth();
   const queryClient = useQueryClient();
   const [loggingOut, setLoggingOut] = useState(false);
   const providerConsultants = useQuery<ProviderConsultant[]>({
@@ -360,9 +360,11 @@ export default function ProfileScreen() {
           style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border, padding: 16 }]}
           testID="edit-callback-device"
         >
-          <Text style={[styles.cardTitle, { color: colors.foreground, padding: 0 }]}>Callback Device</Text>
+          <Text style={[styles.cardTitle, { color: colors.foreground, padding: 0 }]}>Callback Devices</Text>
           <Text style={[styles.rowValue, { color: colors.mutedForeground, marginTop: 6 }]}>
-            {callbackDevice ? `${callbackDevice.deviceName} · ${callbackDevice.phoneNumber}` : "Set up your callback number"}
+            {callbackDevices.length
+              ? `${callbackDevices.length} registered · manage names, phone numbers, and linked installations`
+              : "Register a callback phone for consultation calls"}
           </Text>
         </Pressable>
       )}

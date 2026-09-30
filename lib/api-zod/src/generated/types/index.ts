@@ -6,10 +6,12 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from './adminConsultationCallbackDevice';
 export * from './bookableSlot';
 export * from './bookingCallInfo';
 export * from './callbackDevice';
 export * from './callbackDeviceInput';
+export * from './callbackDeviceReminder';
 export * from './callStatus';
 export * from './callStatusMediaProvider';
 export * from './caseFileAdvisory';
@@ -40,6 +42,11 @@ export * from './consultantAvailabilitySlotSeriesItem';
 export * from './consultantAvailabilityStatus';
 export * from './consultantAvailabilityUpdate';
 export * from './consultantAvailabilityUpdateStatus';
+export * from './consultationCallbackAssignment';
+export * from './consultationCallbackSelection';
+export * from './consultationDevice';
+export * from './consultationDeviceInput';
+export * from './consultationDeviceUpdate';
 export * from './getCaseFileAttachmentSignedUrl200';
 export * from './getCaseFileAttachmentSignedUrlDisposition';
 export * from './getCaseFileAttachmentSignedUrlParams';

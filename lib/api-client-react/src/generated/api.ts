@@ -20,10 +20,12 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  AdminConsultationCallbackDevice,
   BookingCallInfo,
   CallStatus,
   CallbackDevice,
   CallbackDeviceInput,
+  CallbackDeviceReminder,
   CaseFileAdvisory,
   CaseFileAdvisoryInput,
   CaseFileAggregate,
@@ -37,6 +39,11 @@ import type {
   CaseFileVitalInput,
   ConsultantAvailability,
   ConsultantAvailabilityUpdate,
+  ConsultationCallbackAssignment,
+  ConsultationCallbackSelection,
+  ConsultationDevice,
+  ConsultationDeviceInput,
+  ConsultationDeviceUpdate,
   GetCaseFileAttachmentSignedUrl200,
   GetCaseFileAttachmentSignedUrlParams,
   GetCaseFileMessagesParams,
@@ -214,6 +221,522 @@ export const useSaveCallbackDevice = <TError = ErrorType<void>,
       > => {
       return useMutation(getSaveCallbackDeviceMutationOptions(options));
     }
+
+export const getListConsultationDevicesUrl = () => {
+
+
+
+
+  return `/api/profile/callback-devices`
+}
+
+/**
+ * @summary List the signed-in hospital's registered callback devices
+ */
+export const listConsultationDevices = async ( options?: RequestInit): Promise<ConsultationDevice[]> => {
+
+  return customFetch<ConsultationDevice[]>(getListConsultationDevicesUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListConsultationDevicesQueryKey = () => {
+    return [
+    `/api/profile/callback-devices`
+    ] as const;
+    }
+
+
+export const getListConsultationDevicesQueryOptions = <TData = Awaited<ReturnType<typeof listConsultationDevices>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listConsultationDevices>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListConsultationDevicesQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listConsultationDevices>>> = ({ signal }) => listConsultationDevices({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listConsultationDevices>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListConsultationDevicesQueryResult = NonNullable<Awaited<ReturnType<typeof listConsultationDevices>>>
+export type ListConsultationDevicesQueryError = ErrorType<void>
+
+
+/**
+ * @summary List the signed-in hospital's registered callback devices
+ */
+
+export function useListConsultationDevices<TData = Awaited<ReturnType<typeof listConsultationDevices>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listConsultationDevices>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListConsultationDevicesQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreateConsultationDeviceUrl = () => {
+
+
+
+
+  return `/api/profile/callback-devices`
+}
+
+/**
+ * @summary Register a named callback device
+ */
+export const createConsultationDevice = async (consultationDeviceInput: ConsultationDeviceInput, options?: RequestInit): Promise<ConsultationDevice> => {
+
+  return customFetch<ConsultationDevice>(getCreateConsultationDeviceUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      consultationDeviceInput,)
+  }
+);}
+
+
+
+
+export const getCreateConsultationDeviceMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createConsultationDevice>>, TError,{data: BodyType<ConsultationDeviceInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createConsultationDevice>>, TError,{data: BodyType<ConsultationDeviceInput>}, TContext> => {
+
+const mutationKey = ['createConsultationDevice'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createConsultationDevice>>, {data: BodyType<ConsultationDeviceInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createConsultationDevice(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateConsultationDeviceMutationResult = NonNullable<Awaited<ReturnType<typeof createConsultationDevice>>>
+    export type CreateConsultationDeviceMutationBody = BodyType<ConsultationDeviceInput>
+    export type CreateConsultationDeviceMutationError = ErrorType<void>
+
+    /**
+ * @summary Register a named callback device
+ */
+export const useCreateConsultationDevice = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createConsultationDevice>>, TError,{data: BodyType<ConsultationDeviceInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createConsultationDevice>>,
+        TError,
+        {data: BodyType<ConsultationDeviceInput>},
+        TContext
+      > => {
+      return useMutation(getCreateConsultationDeviceMutationOptions(options));
+    }
+
+export const getUpdateConsultationDeviceUrl = (id: string,) => {
+
+
+
+
+  return `/api/profile/callback-devices/${id}`
+}
+
+/**
+ * @summary Rename, update, or link an owned callback device
+ */
+export const updateConsultationDevice = async (id: string,
+    consultationDeviceUpdate: ConsultationDeviceUpdate, options?: RequestInit): Promise<ConsultationDevice> => {
+
+  return customFetch<ConsultationDevice>(getUpdateConsultationDeviceUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      consultationDeviceUpdate,)
+  }
+);}
+
+
+
+
+export const getUpdateConsultationDeviceMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateConsultationDevice>>, TError,{id: string;data: BodyType<ConsultationDeviceUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateConsultationDevice>>, TError,{id: string;data: BodyType<ConsultationDeviceUpdate>}, TContext> => {
+
+const mutationKey = ['updateConsultationDevice'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateConsultationDevice>>, {id: string;data: BodyType<ConsultationDeviceUpdate>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateConsultationDevice(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateConsultationDeviceMutationResult = NonNullable<Awaited<ReturnType<typeof updateConsultationDevice>>>
+    export type UpdateConsultationDeviceMutationBody = BodyType<ConsultationDeviceUpdate>
+    export type UpdateConsultationDeviceMutationError = ErrorType<void>
+
+    /**
+ * @summary Rename, update, or link an owned callback device
+ */
+export const useUpdateConsultationDevice = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateConsultationDevice>>, TError,{id: string;data: BodyType<ConsultationDeviceUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateConsultationDevice>>,
+        TError,
+        {id: string;data: BodyType<ConsultationDeviceUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateConsultationDeviceMutationOptions(options));
+    }
+
+export const getDeleteConsultationDeviceUrl = (id: string,) => {
+
+
+
+
+  return `/api/profile/callback-devices/${id}`
+}
+
+/**
+ * @summary Remove a device not assigned to an active consultation
+ */
+export const deleteConsultationDevice = async (id: string, options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getDeleteConsultationDeviceUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeleteConsultationDeviceMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteConsultationDevice>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteConsultationDevice>>, TError,{id: string}, TContext> => {
+
+const mutationKey = ['deleteConsultationDevice'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteConsultationDevice>>, {id: string}> = (props) => {
+          const {id} = props ?? {};
+
+          return  deleteConsultationDevice(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteConsultationDeviceMutationResult = NonNullable<Awaited<ReturnType<typeof deleteConsultationDevice>>>
+
+    export type DeleteConsultationDeviceMutationError = ErrorType<void>
+
+    /**
+ * @summary Remove a device not assigned to an active consultation
+ */
+export const useDeleteConsultationDevice = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteConsultationDevice>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteConsultationDevice>>,
+        TError,
+        {id: string},
+        TContext
+      > => {
+      return useMutation(getDeleteConsultationDeviceMutationOptions(options));
+    }
+
+export const getAssignConsultationCallbackDeviceUrl = (bookingId: string,) => {
+
+
+
+
+  return `/api/bookings/${bookingId}/callback-device`
+}
+
+/**
+ * @summary Assign or reconfirm the callback device for one consultation
+ */
+export const assignConsultationCallbackDevice = async (bookingId: string,
+    consultationCallbackSelection: ConsultationCallbackSelection, options?: RequestInit): Promise<ConsultationCallbackAssignment> => {
+
+  return customFetch<ConsultationCallbackAssignment>(getAssignConsultationCallbackDeviceUrl(bookingId),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      consultationCallbackSelection,)
+  }
+);}
+
+
+
+
+export const getAssignConsultationCallbackDeviceMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof assignConsultationCallbackDevice>>, TError,{bookingId: string;data: BodyType<ConsultationCallbackSelection>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof assignConsultationCallbackDevice>>, TError,{bookingId: string;data: BodyType<ConsultationCallbackSelection>}, TContext> => {
+
+const mutationKey = ['assignConsultationCallbackDevice'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof assignConsultationCallbackDevice>>, {bookingId: string;data: BodyType<ConsultationCallbackSelection>}> = (props) => {
+          const {bookingId,data} = props ?? {};
+
+          return  assignConsultationCallbackDevice(bookingId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AssignConsultationCallbackDeviceMutationResult = NonNullable<Awaited<ReturnType<typeof assignConsultationCallbackDevice>>>
+    export type AssignConsultationCallbackDeviceMutationBody = BodyType<ConsultationCallbackSelection>
+    export type AssignConsultationCallbackDeviceMutationError = ErrorType<void>
+
+    /**
+ * @summary Assign or reconfirm the callback device for one consultation
+ */
+export const useAssignConsultationCallbackDevice = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof assignConsultationCallbackDevice>>, TError,{bookingId: string;data: BodyType<ConsultationCallbackSelection>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof assignConsultationCallbackDevice>>,
+        TError,
+        {bookingId: string;data: BodyType<ConsultationCallbackSelection>},
+        TContext
+      > => {
+      return useMutation(getAssignConsultationCallbackDeviceMutationOptions(options));
+    }
+
+export const getGetAdminConsultationCallbackDeviceUrl = (bookingId: string,) => {
+
+
+
+
+  return `/api/admin/bookings/${bookingId}/callback-device`
+}
+
+/**
+ * @summary Reveal the assigned device's personal number for an admin emergency
+ */
+export const getAdminConsultationCallbackDevice = async (bookingId: string, options?: RequestInit): Promise<AdminConsultationCallbackDevice | null> => {
+
+  return customFetch<AdminConsultationCallbackDevice | null>(getGetAdminConsultationCallbackDeviceUrl(bookingId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAdminConsultationCallbackDeviceQueryKey = (bookingId: string,) => {
+    return [
+    `/api/admin/bookings/${bookingId}/callback-device`
+    ] as const;
+    }
+
+
+export const getGetAdminConsultationCallbackDeviceQueryOptions = <TData = Awaited<ReturnType<typeof getAdminConsultationCallbackDevice>>, TError = ErrorType<void>>(bookingId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminConsultationCallbackDevice>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAdminConsultationCallbackDeviceQueryKey(bookingId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminConsultationCallbackDevice>>> = ({ signal }) => getAdminConsultationCallbackDevice(bookingId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(bookingId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAdminConsultationCallbackDevice>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetAdminConsultationCallbackDeviceQueryResult = NonNullable<Awaited<ReturnType<typeof getAdminConsultationCallbackDevice>>>
+export type GetAdminConsultationCallbackDeviceQueryError = ErrorType<void>
+
+
+/**
+ * @summary Reveal the assigned device's personal number for an admin emergency
+ */
+
+export function useGetAdminConsultationCallbackDevice<TData = Awaited<ReturnType<typeof getAdminConsultationCallbackDevice>>, TError = ErrorType<void>>(
+ bookingId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminConsultationCallbackDevice>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetAdminConsultationCallbackDeviceQueryOptions(bookingId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getListCallbackDeviceRemindersUrl = () => {
+
+
+
+
+  return `/api/callback-device/reminders`
+}
+
+/**
+ * @summary Due callback-device confirmations for the signed-in seeker
+ */
+export const listCallbackDeviceReminders = async ( options?: RequestInit): Promise<CallbackDeviceReminder[]> => {
+
+  return customFetch<CallbackDeviceReminder[]>(getListCallbackDeviceRemindersUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListCallbackDeviceRemindersQueryKey = () => {
+    return [
+    `/api/callback-device/reminders`
+    ] as const;
+    }
+
+
+export const getListCallbackDeviceRemindersQueryOptions = <TData = Awaited<ReturnType<typeof listCallbackDeviceReminders>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCallbackDeviceReminders>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListCallbackDeviceRemindersQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listCallbackDeviceReminders>>> = ({ signal }) => listCallbackDeviceReminders({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listCallbackDeviceReminders>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListCallbackDeviceRemindersQueryResult = NonNullable<Awaited<ReturnType<typeof listCallbackDeviceReminders>>>
+export type ListCallbackDeviceRemindersQueryError = ErrorType<void>
+
+
+/**
+ * @summary Due callback-device confirmations for the signed-in seeker
+ */
+
+export function useListCallbackDeviceReminders<TData = Awaited<ReturnType<typeof listCallbackDeviceReminders>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCallbackDeviceReminders>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListCallbackDeviceRemindersQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
 
 export const getHealthCheckUrl = () => {
 

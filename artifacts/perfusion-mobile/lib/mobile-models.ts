@@ -41,6 +41,15 @@ export type CaseFileCapabilities = {
   readOnly: boolean;
   callsEnabled: boolean;
   videoEnabled: boolean;
+  canManageCallbackDevice?: boolean;
+};
+
+export type CaseFileCallbackDevice = {
+  deviceId: string | null;
+  deviceName: string | null;
+  confirmedAt: string | null;
+  dueAt: string | null;
+  due: boolean;
 };
 
 export type CaseFileSummary = {
@@ -113,6 +122,7 @@ export type CaseFileAggregate = {
     appointmentSlot?: string | null;
     postRxCallsEnabled: boolean;
     postRxVideoEnabled: boolean;
+    callbackDevice?: CaseFileCallbackDevice | null;
   };
   capabilities: CaseFileCapabilities;
   summary: CaseFileSummary;

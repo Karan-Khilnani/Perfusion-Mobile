@@ -24,6 +24,11 @@ import { Search, Plus, Edit, Eye, Filter, Stethoscope, FlaskConical, ScanLine, D
 import type { Booking, Consultant, LabTest, RadiologyModality, BookingStatus } from "@shared/schema";
 
 type BookingFilter = "all" | "consultation" | "lab" | "teleradiology";
+type EmergencyCallbackDevice = {
+  bookingId: string;
+  deviceName: string;
+  phoneNumber: string;
+};
 
 export default function AdminBookingsPage() {
   const { toast } = useToast();
@@ -45,6 +50,48 @@ export default function AdminBookingsPage() {
       apiRequest("GET", `/api/admin/bookings/${callLogsBookingId}/call-logs`).then((r) => r.json()),
     enabled: !!callLogsBookingId,
   });
+
+  // Emergency device details are intentionally fetched only after an admin opens a booking's reveal dialog.
+  const [emergencyDeviceBookingId, setEmergencyDeviceBookingId] = useState<string | null>(null);
+  const emergencyDeviceQueryKey = ["/api/admin/bookings", emergencyDeviceBookingId, "callback-device"];
+  const {
+    data: emergencyDevice,
+    isLoading: emergencyDeviceLoading,
+    isError: emergencyDeviceIsError,
+    error: emergencyDeviceError,
+  } = useQuery<EmergencyCallbackDevice | null>({
+    queryKey: emergencyDeviceQueryKey,
+    queryFn: async () => {
+      if (!emergencyDeviceBookingId) throw new Error("Select a consultation to reveal its emergency device.");
+      const response = await fetch(`/api/admin/bookings/${encodeURIComponent(emergencyDeviceBookingId)}/callback-device`, {
+        credentials: "include",
+        cache: "no-store",
+      });
+      if (response.status === 403) {
+        const error = new Error("Emergency device details are unavailable because this consultation is closed or access is denied.") as Error & { status: number };
+        error.status = 403;
+        throw error;
+      }
+      if (!response.ok) {
+        const details = await response.json().catch(() => ({}));
+        throw new Error(details.message || `Could not load emergency device (${response.status}).`);
+      }
+      return response.json() as Promise<EmergencyCallbackDevice | null>;
+    },
+    enabled: !!emergencyDeviceBookingId,
+    retry: false,
+    staleTime: 0,
+  });
+
+  const closeEmergencyDeviceDialog = () => {
+    if (emergencyDeviceBookingId) {
+      queryClient.removeQueries({
+        queryKey: ["/api/admin/bookings", emergencyDeviceBookingId, "callback-device"],
+        exact: true,
+      });
+    }
+    setEmergencyDeviceBookingId(null);
+  };
 
   async function downloadAdminReceipt(bookingId: string, type: "seeker" | "provider", bookingNumber?: string) {
     try {
@@ -642,8 +689,8 @@ export default function AdminBookingsPage() {
                       {booking.bookingType === "consultation" && (
                         <p className="text-xs text-muted-foreground">
                           {(booking as any).callbackPhone
-                            ? <>Call-back: {(booking as any).callbackPhone}{(booking as any).callbackWardName ? ` (${(booking as any).callbackWardName})` : ""}</>
-                            : <span className="text-amber-600 dark:text-amber-400">No call-back number set</span>
+                            ? <>Ward call-back: {(booking as any).callbackPhone}{(booking as any).callbackWardName ? ` (${(booking as any).callbackWardName})` : ""}</>
+                            : <span className="text-amber-600 dark:text-amber-400">No ward call-back number set</span>
                           }
                         </p>
                       )}
@@ -692,7 +739,16 @@ export default function AdminBookingsPage() {
                           data-testid={`button-set-callback-${booking.id}`}
                         >
                           <Phone className="mr-1 h-3.5 w-3.5" />
-                          {(booking as any).callbackPhone ? "Edit Callback" : "Set Callback"}
+                          {(booking as any).callbackPhone ? "Edit Ward Callback" : "Set Ward Callback"}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setEmergencyDeviceBookingId(booking.id)}
+                          data-testid={`button-emergency-device-${booking.id}`}
+                        >
+                          <ShieldCheck className="mr-1 h-3.5 w-3.5" />
+                          Emergency device
                         </Button>
                         <Button
                           size="sm"
@@ -1037,6 +1093,54 @@ export default function AdminBookingsPage() {
         </DialogContent>
       </Dialog>
 
+      {/* Emergency device details are audited by the admin-only reveal endpoint. */}
+      <Dialog open={!!emergencyDeviceBookingId} onOpenChange={(open) => { if (!open) closeEmergencyDeviceDialog(); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ShieldCheck className="h-4 w-4" />
+              Emergency device
+            </DialogTitle>
+            <DialogDescription>
+              Personal number for emergency use only. This number is separate from the Ward call-back number.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="min-h-20 py-2" aria-live="polite" data-testid="emergency-device-details">
+            {emergencyDeviceLoading ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />Loading emergency device…
+              </div>
+            ) : emergencyDeviceIsError ? (
+              <p role="alert" className="text-sm text-destructive">
+                {(emergencyDeviceError as (Error & { status?: number }) | null)?.status === 403
+                  ? "Emergency device details are unavailable because this consultation is closed or access is denied."
+                  : emergencyDeviceError?.message || "Could not load emergency device details. Please try again."}
+              </p>
+            ) : emergencyDevice ? (
+              <div className="space-y-2 rounded-md border bg-muted/30 p-3">
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Assigned device</p>
+                  <p className="font-medium" data-testid="text-emergency-device-name">{emergencyDevice.deviceName}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Personal number · emergency use only</p>
+                  <p className="font-mono text-lg" data-testid="text-emergency-device-phone">{emergencyDevice.phoneNumber}</p>
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground" data-testid="text-emergency-device-unassigned">
+                No emergency device is assigned to this consultation.
+              </p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={closeEmergencyDeviceDialog} data-testid="button-close-emergency-device">
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Set / Edit Callback Phone Dialog */}
       <Dialog open={!!callbackPhoneBooking} onOpenChange={(open) => { if (!open) { setCallbackPhoneBooking(null); setCallbackPhoneInput("+91"); } }}>
         <DialogContent className="max-w-sm">
@@ -1046,12 +1150,12 @@ export default function AdminBookingsPage() {
               {callbackPhoneBooking && (callbackPhoneBooking as any).callbackPhone ? "Edit Call-back Number" : "Set Call-back Number"}
             </DialogTitle>
             <DialogDescription>
-              The ward phone number Exotel will ring first when a call is initiated for this consultation booking.
+              The ward call-back number Exotel will ring first when a call is initiated for this consultation booking.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 py-2">
             <div className="space-y-1">
-              <Label htmlFor="callbackPhoneInput">Ward / Call-back Phone Number</Label>
+              <Label htmlFor="callbackPhoneInput">Ward call-back phone number</Label>
               <PhoneInput
                 id="callbackPhoneInput"
                 value={callbackPhoneInput}

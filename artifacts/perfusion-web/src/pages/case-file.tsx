@@ -10,7 +10,11 @@ import {
   useGetCaseFileAdvisories, getGetCaseFileAdvisoriesQueryKey,
   useCreateCaseFileAdvisory,
   useCreateCaseFileAttachment,
-  useUpdateCaseFileFollowUpAccess
+  useUpdateCaseFileFollowUpAccess,
+  getListConsultationDevicesQueryKey,
+  useListConsultationDevices,
+  useAssignConsultationCallbackDevice,
+  getListCallbackDeviceRemindersQueryKey,
 } from "@workspace/api-client-react";
 import { useCallEvents, CallEvent } from "@/hooks/use-call-events";
 import { useAuth } from "@/hooks/use-auth";
@@ -29,7 +33,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   ArrowLeft, Send, Paperclip, Activity, FileText,
   Stethoscope, Clock, ShieldCheck, User, Plus, X, Video, Image as ImageIcon, ExternalLink,
-  Phone
+  Phone, PhoneCall
 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -103,6 +107,26 @@ export default function CaseFilePage() {
     }
   });
 
+  const { data: callbackDevices = [], isError: callbackDevicesError, error: callbackDevicesErrorDetails } = useListConsultationDevices({
+    query: {
+      queryKey: [...getListConsultationDevicesQueryKey(), user?.id],
+      enabled: !!caseFile?.capabilities.canManageCallbackDevice,
+      refetchOnWindowFocus: true,
+      refetchInterval: 60000,
+      staleTime: 0,
+    },
+  });
+  const assignCallbackDeviceMutation = useAssignConsultationCallbackDevice({
+    mutation: {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getGetCaseFileQueryKey(bookingId) });
+        queryClient.invalidateQueries({ queryKey: getListCallbackDeviceRemindersQueryKey() });
+        toast({ title: "Call-back device confirmed" });
+      },
+      onError: (error) => toast({ title: "Could not confirm device", description: error.message, variant: "destructive" }),
+    },
+  });
+
   // Mutations
   const sendMessageMutation = useCreateCaseFileMessage({
     mutation: {
@@ -169,6 +193,7 @@ export default function CaseFilePage() {
   // We determine the "latest" message by looking at msgs after processing, so we'll do this effect lower down.
 
   const [messageInput, setMessageInput] = useState("");
+  const [selectedCallbackDeviceId, setSelectedCallbackDeviceId] = useState("");
   const [activeTab, setActiveTab] = useState(() => {
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
@@ -337,6 +362,8 @@ export default function CaseFilePage() {
 
   const caps = caseFile.capabilities;
   const comorbidityEntries = getComorbidityEntries(caseFile.summary.comorbidities);
+  const callbackDevice = caseFile.booking.callbackDevice;
+  const selectedCallbackDevice = selectedCallbackDeviceId || callbackDevice?.deviceId || "";
 
   const vts = vitals || [];
   const advs = advisories || [];
@@ -394,6 +421,58 @@ export default function CaseFilePage() {
           )}
         </div>
       </header>
+
+      {caseFile.booking.bookingType === "consultation" && <section className="flex-none border-b bg-card px-4 py-2" data-testid="case-file-callback-device">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-2">
+            <PhoneCall className="h-4 w-4 shrink-0 text-primary" />
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Consultation call-back device</span>
+            <span className="truncate text-sm font-medium" data-testid="text-callback-device-name">
+              {callbackDevice?.deviceName || "Not selected"}
+            </span>
+            {callbackDevice?.due && (
+              <Badge variant="destructive" className="gap-1" data-testid="badge-callback-device-due">
+                <span className="h-2 w-2 animate-pulse rounded-full bg-current" />Confirmation due
+              </Badge>
+            )}
+          </div>
+          {caps.canManageCallbackDevice && (
+            <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+              {callbackDevicesError && <p role="alert" className="w-full text-xs text-destructive">Could not load registered devices. {callbackDevicesErrorDetails?.message}</p>}
+              {callbackDevices.length ? (
+                <Select value={selectedCallbackDevice} onValueChange={setSelectedCallbackDeviceId}>
+                  <SelectTrigger className="h-8 w-full sm:w-56" data-testid="select-case-file-callback-device">
+                    <SelectValue placeholder="Choose a registered device" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {callbackDevices.map((device) => (
+                      <SelectItem key={device.id} value={device.id}>{device.deviceName}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Link href="/user/profile" className="text-xs text-primary underline">Register a callback device in Profile</Link>
+              )}
+              {callbackDevices.length > 0 && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="h-8"
+                  disabled={!selectedCallbackDevice || assignCallbackDeviceMutation.isPending}
+                  onClick={() => assignCallbackDeviceMutation.mutate({ bookingId, data: { deviceId: selectedCallbackDevice } })}
+                  data-testid="button-confirm-callback-device"
+                >
+                  {callbackDevice?.deviceId === selectedCallbackDevice ? "Reconfirm device" : "Choose device"}
+                </Button>
+              )}
+            </div>
+          )}
+        </div>
+        {callbackDevice?.dueAt && callbackDevice.due && (
+          <p className="mt-1 pl-6 text-xs text-muted-foreground">Please reconfirm this device for the next call-back.</p>
+        )}
+      </section>}
 
       <section data-testid="section-comorbidities" className="flex-none border-b bg-card px-4 py-2.5">
         <h2 className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">

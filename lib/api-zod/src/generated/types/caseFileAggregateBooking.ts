@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { CaseFileAggregateBookingStatus } from './caseFileAggregateBookingStatus';
+import type { ConsultationCallbackAssignment } from './consultationCallbackAssignment';
 
 export interface CaseFileAggregateBooking {
   id: string;
@@ -25,6 +26,7 @@ export interface CaseFileAggregateBooking {
   userId: string;
   /** @nullable */
   providerId: string | null;
+  callbackDevice?: ConsultationCallbackAssignment | null;
   postRxCallsEnabled: boolean;
   postRxVideoEnabled: boolean;
 }

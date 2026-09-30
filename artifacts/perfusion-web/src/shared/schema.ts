@@ -327,6 +327,10 @@ export const bookings = pgTable("bookings", {
   // Callback contact for cellular calls (ward phone selected at booking time)
   callbackPhone: varchar("callback_phone", { length: 20 }),
   callbackWardName: varchar("callback_ward_name", { length: 100 }),
+  // Separate from ward/cellular contacts; each consultation owns its assignment.
+  callbackDeviceId: varchar("callback_device_id"),
+  callbackDeviceConfirmedAt: timestamp("callback_device_confirmed_at", { withTimezone: true }),
+  callbackDeviceRemindedAt: timestamp("callback_device_reminded_at", { withTimezone: true }),
   // Follow-up consultation tracking
   isFollowUp: boolean("is_follow_up").default(false),
   parentBookingId: varchar("parent_booking_id", { length: 255 }),
