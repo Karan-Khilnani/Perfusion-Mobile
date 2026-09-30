@@ -1,0 +1,81 @@
+# PERFUSION MOBILE — REMOVE UNNECESSARY INTERMEDIATE STARTUP SCREEN
+
+Fix ONLY the startup navigation flow in:
+artifacts/perfusion-mobile
+
+CURRENT PROBLEM:
+After the launch/splash screen finishes, an additional screen briefly appears before the Welcome/Cover screen.
+
+This intermediate screen is unnecessary and must NOT appear at all.
+
+REQUIRED FLOW:
+App Icon
+    ↓
+Launch / Splash Screen
+    ↓
+Welcome / Cover Screen
+
+There must be NO additional screen, blank screen, logo-only screen, loading screen, duplicate splash, or temporary route between the launch screen and Welcome/Cover.
+
+IMPORTANT:
+- Do NOT redesign the Welcome/Cover screen.
+- Do NOT change dashboard functionality.
+- Do NOT change authentication logic unless it is directly responsible for creating the unwanted intermediate screen.
+- Do NOT change unrelated UI.
+- Keep the previous launch-screen work intact.
+
+AUDIT THE STARTUP FLOW:
+1. Inspect artifacts/perfusion-mobile/app/_layout.tsx
+2. Inspect the initial/index route and Welcome/Cover route.
+3. Search for any custom SplashScreen, LaunchScreen, StartupScreen, LoadingScreen, InitialScreen, or similar component.
+4. Search for navigation/redirect logic that runs immediately after launch.
+5. Check whether the native Expo splash is being followed by a custom React Native splash/startup component.
+6. Check whether the router first renders an intermediate route and then redirects to Welcome/Cover.
+7. Check authentication/session initialization logic for an unnecessary temporary route.
+
+FIX:
+- Make Welcome/Cover the first actual React Native screen rendered after the native launch screen is dismissed.
+- Remove or bypass any unnecessary intermediate startup route/component.
+- If startup initialization is required, keep the native splash visible until the app is ready instead of rendering an intermediate screen.
+- Then dismiss the native splash directly into Welcome/Cover.
+- Do not use a temporary blank View or placeholder screen as a workaround.
+- Do not create another splash screen to replace the existing one.
+
+The intended behavior is:
+
+NATIVE LAUNCH SPLASH
+        ↓
+WELCOME / COVER
+        ↓
+normal app navigation
+
+There should be no visible transition through another screen.
+
+IMPORTANT TRANSITION REQUIREMENT:
+The handoff from the launch screen to Welcome/Cover should be smooth. Avoid:
+- flash of another logo
+- flash of white/black screen
+- duplicate Perfusion logo
+- intermediate loading screen
+- route flicker
+- dashboard briefly appearing before Welcome/Cover
+- Welcome/Cover briefly appearing and disappearing
+- navigation animation that exposes an unwanted screen
+
+Use the existing Expo splash-screen mechanism correctly. Expo supports keeping the native splash visible with preventAutoHideAsync() and hiding it once the intended initial UI is ready. :contentReference[oaicite:1]{index=1}
+
+IF YOU FIND MULTIPLE STARTUP LAYERS:
+Do not simply hide them with opacity/display:none.
+Determine which one is actually responsible for the unwanted intermediate screen and remove the redundant navigation/rendering layer.
+
+AFTER THE FIX:
+Test a cold app launch and verify the exact sequence:
+
+App Icon → Launch/Splash → Welcome/Cover
+
+NOT:
+
+App Icon → Launch/Splash → Intermediate Screen → Welcome/Cover
+
+Make the smallest safe change necessary.
+Do not modify other features.

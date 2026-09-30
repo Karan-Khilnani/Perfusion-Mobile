@@ -14,7 +14,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { setBaseUrl } from "@workspace/api-client-react";
 import { Redirect, Stack, usePathname, type Href } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { KeyboardProvider } from "react-native-keyboard-controller";
@@ -40,14 +40,15 @@ const queryClient = new QueryClient({
   },
 });
 
-function RootLayoutNav() {
+function RootLayoutNav({ fontsReady }: { fontsReady: boolean }) {
   const { user, loading, callbackDevice, callbackDeviceLoading, callbackDeviceError } = useAuth();
   const colors = useColors();
   const pathname = usePathname();
+  const splashDismissed = useRef(false);
 
-  if (loading || (user?.role !== "admin" && user && callbackDeviceLoading)) {
-    return <BrandedLoading showTagline={loading} />;
-  }
+  const waitingForCallbackDevice = Boolean(
+    user && user.role !== "admin" && callbackDeviceLoading,
+  );
 
   const publicPaths = [
     "/login",
@@ -63,40 +64,56 @@ function RootLayoutNav() {
     "/account-status",
   ];
   let redirectHref: Href | null = null;
-  if (!user && !publicPaths.includes(pathname)) {
-    redirectHref = "/login";
-  } else if (
-    !isRecoveryFlow &&
-    user?.needsProfile &&
-    pathname !== "/complete-profile"
-  ) {
-    redirectHref = "/complete-profile";
-  } else if (
-    !isRecoveryFlow &&
-    user &&
-    !user.needsProfile &&
-    (user.approvalStatus === "pending" ||
-      user.approvalStatus === "rejected") &&
-    pathname !== "/account-status"
-  ) {
-    redirectHref = "/account-status";
-  } else if (
-    !isRecoveryFlow &&
-    user &&
-    user.role !== "admin" &&
-    user.approvalStatus === "approved" &&
-    (!callbackDevice || callbackDeviceError) &&
-    pathname !== "/callback-device"
-  ) {
-    redirectHref = "/callback-device";
-  } else if (
-    !isRecoveryFlow &&
-    user &&
-    (user.role === "admin" || user.approvalStatus === "approved") &&
-    onboardingPaths.includes(pathname)
-  ) {
-    redirectHref = "/(tabs)";
+  if (!loading && !waitingForCallbackDevice) {
+    if (!user && !publicPaths.includes(pathname)) {
+      redirectHref = "/login";
+    } else if (
+      !isRecoveryFlow &&
+      user?.needsProfile &&
+      pathname !== "/complete-profile"
+    ) {
+      redirectHref = "/complete-profile";
+    } else if (
+      !isRecoveryFlow &&
+      user &&
+      !user.needsProfile &&
+      (user.approvalStatus === "pending" ||
+        user.approvalStatus === "rejected") &&
+      pathname !== "/account-status"
+    ) {
+      redirectHref = "/account-status";
+    } else if (
+      !isRecoveryFlow &&
+      user &&
+      user.role !== "admin" &&
+      user.approvalStatus === "approved" &&
+      (!callbackDevice || callbackDeviceError) &&
+      pathname !== "/callback-device"
+    ) {
+      redirectHref = "/callback-device";
+    } else if (
+      !isRecoveryFlow &&
+      user &&
+      (user.role === "admin" || user.approvalStatus === "approved") &&
+      onboardingPaths.includes(pathname)
+    ) {
+      redirectHref = "/(tabs)";
+    }
   }
+  const canDismissSplash =
+    fontsReady &&
+    !loading &&
+    !waitingForCallbackDevice &&
+    redirectHref === null;
+
+  useEffect(() => {
+    if (!canDismissSplash || splashDismissed.current) return;
+    splashDismissed.current = true;
+    void SplashScreen.hideAsync();
+  }, [canDismissSplash]);
+
+  if (loading) return null;
+  if (waitingForCallbackDevice) return <BrandedLoading />;
 
   return (
     <>
@@ -168,13 +185,8 @@ export default function RootLayout() {
     Sora_700Bold,
   });
 
-  useEffect(() => {
-    if (fontsLoaded || fontError) {
-      SplashScreen.hideAsync();
-    }
-  }, [fontsLoaded, fontError]);
-
-  if (!fontsLoaded && !fontError) return null;
+  const fontsReady = fontsLoaded || !!fontError;
+  if (!fontsReady) return null;
 
   return (
     <SafeAreaProvider>
@@ -184,7 +196,7 @@ export default function RootLayout() {
             <KeyboardProvider>
               <AuthProvider>
                 <CallProvider>
-                  <RootLayoutNav />
+                  <RootLayoutNav fontsReady={fontsReady} />
                 </CallProvider>
               </AuthProvider>
             </KeyboardProvider>
