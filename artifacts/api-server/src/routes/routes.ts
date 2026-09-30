@@ -1194,9 +1194,21 @@ export async function registerRoutes(
             : null;
         }
       }
+      const portfolioMedia = await getPool().query(
+        `SELECT id, original_filename, object_path
+         FROM consultant_profile_media
+         WHERE consultant_id = $1 AND kind = 'portfolio_photo'
+         ORDER BY created_at, id`,
+        [consultant.id],
+      );
       res.json({
         ...consultant,
         photoUrl,
+        portfolioPhotos: portfolioMedia.rows.map((item: any) => ({
+          id: item.id,
+          filename: item.original_filename,
+          url: item.object_path,
+        })),
         computedCustomerPrice: pricing.customerPrice.toFixed(2),
         availabilityPreview,
       });

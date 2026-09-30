@@ -18,7 +18,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AppAlert } from "@/components/AppAlert";
-import { apiFetch } from "@/hooks/useApi";
+import { apiFetch, getBaseUrl } from "@/hooks/useApi";
 import { useColors } from "@/hooks/useColors";
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 import { designTokens } from "@/constants/designTokens";
@@ -36,9 +36,14 @@ type Consultant = {
   qualification?: string;
   hospital?: string;
   institute?: string;
+  affiliatedInstitution?: string | null;
+  registeredOrganization?: string | null;
   city?: string;
   photo?: string | null;
   profilePhoto?: string | null;
+  photoUrl?: string | null;
+  portfolio?: string | null;
+  portfolioPhotos?: Array<{ id: string; filename: string; url: string }>;
   consultationFee?: string;
   computedCustomerPrice?: string;
   yearsOfExperience?: number | string;
@@ -52,6 +57,13 @@ const SPECIALTIES = ["All", "Critical Care", "Nephrology", "Orthopedics", "Cardi
 
 function istDate(date: Date) {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit" }).format(date);
+}
+
+function absoluteFileUrl(uri?: string | null) {
+  if (!uri) return undefined;
+  return /^https?:\/\//i.test(uri)
+    ? uri
+    : `${getBaseUrl()}${uri.startsWith("/") ? uri : `/${uri}`}`;
 }
 
 function shiftDate(value: string, amount: number) {
@@ -87,6 +99,7 @@ export default function NewConsultationScreen() {
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<{ consultant: Consultant; slot: BookableSlot } | null>(null);
   const [slotConsultant, setSlotConsultant] = useState<Consultant | null>(null);
+  const [portfolioConsultant, setPortfolioConsultant] = useState<Consultant | null>(null);
   const [slotSheetOpen, setSlotSheetOpen] = useState(false);
   const [slotDate, setSlotDate] = useState(istDate(new Date()));
   const [monthView, setMonthView] = useState(false);
@@ -126,9 +139,19 @@ export default function NewConsultationScreen() {
     },
     staleTime: 0,
   });
+  const portfolioQuery = useQuery<Consultant>({
+    queryKey: ["mobile-consultant-profile", portfolioConsultant?.id],
+    enabled: !!portfolioConsultant,
+    queryFn: async () => {
+      if (!portfolioConsultant) throw new Error("Choose a consultant");
+      const response = await apiFetch(`/api/consultants/${encodeURIComponent(portfolioConsultant.id)}`);
+      if (!response.ok) throw new Error("Consultant profile could not be loaded.");
+      return response.json();
+    },
+  });
   const datesWithSlots = useMemo(() => new Map((slotsQuery.data?.dates || []).map((item) => [item.date, item.slots])), [slotsQuery.data]);
   const filtered = useMemo(() => (consultants.data || []).filter((item) => {
-    const text = `${item.displayName || item.name || ""} ${item.specialization || ""} ${item.hospital || item.institute || ""}`.toLowerCase();
+    const text = `${item.displayName || item.name || ""} ${item.specialization || ""} ${item.affiliatedInstitution || item.hospital || item.institute || ""}`.toLowerCase();
     const specialtyMatch = specialty === "All" || (item.specialization || "").toLowerCase().includes(specialty.toLowerCase());
     const availabilityMatch = !todayOnly || item.nextAvailableSlot?.date === istDate(new Date());
     return specialtyMatch && text.includes(search.trim().toLowerCase()) && availabilityMatch;
@@ -302,7 +325,13 @@ export default function NewConsultationScreen() {
               </Pressable>
             </View>
           ) : filtered.length ? filtered.map((consultant) => (
-            <ConsultantCard key={consultant.id} consultant={consultant} onChoose={(slot) => chooseSlot(consultant, slot)} onOpen={() => openSlots(consultant)} />
+            <ConsultantCard
+              key={consultant.id}
+              consultant={consultant}
+              onChoose={(slot) => chooseSlot(consultant, slot)}
+              onOpenPortfolio={() => setPortfolioConsultant(consultant)}
+              onOpenSlots={() => openSlots(consultant)}
+            />
           )) : (
             <Text style={{ color: palette.mutedForeground, textAlign: "center", marginTop: 28 }}>
               {todayOnly
@@ -521,6 +550,95 @@ export default function NewConsultationScreen() {
       </Modal>
 
       <Modal
+        visible={!!portfolioConsultant}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setPortfolioConsultant(null)}
+      >
+        <View style={styles.portfolioBackdrop}>
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={() => setPortfolioConsultant(null)}
+            accessibilityLabel="Close consultant profile"
+          />
+          <View style={[styles.portfolioSheet, { backgroundColor: palette.card, borderColor: palette.border }]}>
+            <View style={styles.portfolioHeader}>
+              <Text style={[styles.portfolioHeaderTitle, { color: palette.foreground }]}>Consultant profile</Text>
+              <Pressable
+                onPress={() => setPortfolioConsultant(null)}
+                style={[styles.closeButton, { backgroundColor: palette.accent }]}
+                accessibilityLabel="Close consultant profile"
+              >
+                <Feather name="x" size={18} color={palette.foreground} />
+              </Pressable>
+            </View>
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.portfolioContent}>
+              {(() => {
+                const profile = portfolioQuery.data || portfolioConsultant;
+                if (!profile) return null;
+                const profilePhoto = absoluteFileUrl(profile.photoUrl || profile.photo || profile.profilePhoto);
+                const hospital = profile.affiliatedInstitution || profile.hospital || profile.institute || "Hospital not listed";
+                return (
+                  <>
+                    <View style={styles.portfolioLead}>
+                      <View style={[styles.portfolioAvatar, { backgroundColor: palette.accent }]}>
+                        {profilePhoto
+                          ? <Image source={{ uri: profilePhoto }} style={styles.portfolioAvatarImage} />
+                          : <Feather name="user" size={30} color={palette.mutedForeground} />}
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.portfolioName, { color: palette.foreground }]}>{profile.displayName || profile.name || "Consultant"}</Text>
+                        <Text style={[styles.portfolioMeta, { color: palette.primary }]}>{profile.specialization || "Specialist"}</Text>
+                        <Text style={[styles.portfolioMeta, { color: palette.mutedForeground }]}>{profile.qualification || "Verified provider"}</Text>
+                        <Text style={[styles.portfolioMeta, { color: palette.mutedForeground }]}>{hospital}</Text>
+                      </View>
+                    </View>
+                    {portfolioQuery.isLoading ? (
+                      <ActivityIndicator color={palette.primary} style={{ marginVertical: 12 }} />
+                    ) : portfolioQuery.isError ? (
+                      <View style={styles.portfolioEmpty}>
+                        <Text style={[styles.emptyHint, { color: palette.mutedForeground }]}>Consultant portfolio could not be loaded.</Text>
+                        <Pressable onPress={() => void portfolioQuery.refetch()} accessibilityRole="button">
+                          <Text style={[styles.allSlotsText, { color: palette.primary }]}>Try again</Text>
+                        </Pressable>
+                      </View>
+                    ) : (
+                      <>
+                        {!!profile.portfolio && (
+                          <>
+                            <Text style={[styles.portfolioSectionTitle, { color: palette.foreground }]}>ABOUT</Text>
+                            <Text style={[styles.portfolioDescription, { color: palette.mutedForeground }]}>{profile.portfolio}</Text>
+                          </>
+                        )}
+                        <Text style={[styles.portfolioSectionTitle, { color: palette.foreground }]}>PORTFOLIO</Text>
+                        {profile.portfolioPhotos?.length ? (
+                          <View style={styles.portfolioPhotoGrid}>
+                            {profile.portfolioPhotos.map((photo) => {
+                              const photoUri = absoluteFileUrl(photo.url);
+                              return photoUri ? (
+                                <Image
+                                  key={photo.id}
+                                  source={{ uri: photoUri }}
+                                  style={styles.portfolioPhotoTile}
+                                  accessibilityLabel={photo.filename || "Consultant portfolio photo"}
+                                />
+                              ) : null;
+                            })}
+                          </View>
+                        ) : (
+                          <Text style={[styles.portfolioDescription, { color: palette.mutedForeground }]}>No portfolio photos shared yet.</Text>
+                        )}
+                      </>
+                    )}
+                  </>
+                );
+              })()}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
         transparent
         visible={confirming}
         animationType="slide"
@@ -581,32 +699,50 @@ export default function NewConsultationScreen() {
   );
 }
 
-function ConsultantCard({ consultant, onChoose, onOpen }: { consultant: Consultant; onChoose: (slot: BookableSlot) => void; onOpen: () => void }) {
+function ConsultantCard({
+  consultant,
+  onChoose,
+  onOpenPortfolio,
+  onOpenSlots,
+}: {
+  consultant: Consultant;
+  onChoose: (slot: BookableSlot) => void;
+  onOpenPortfolio: () => void;
+  onOpenSlots: () => void;
+}) {
   const palette = useColors();
   const next = consultant.nextAvailableSlot;
-  const photo = consultant.photo || consultant.profilePhoto;
+  const photo = absoluteFileUrl(consultant.photoUrl || consultant.photo || consultant.profilePhoto);
+  const name = consultant.displayName || consultant.name || "Consultant";
+  const affiliation = consultant.affiliatedInstitution || consultant.hospital || consultant.institute || "Hospital not listed";
   return (
-    <Pressable disabled={!next} onPress={onOpen} style={[styles.consultantCard, { backgroundColor: palette.card, borderColor: palette.border, opacity: next ? 1 : 0.82 }]}>
-      <View style={styles.cardMain}>
+    <View style={[styles.consultantCard, { backgroundColor: palette.card, borderColor: palette.border }]}>
+      <Pressable
+        onPress={onOpenPortfolio}
+        accessibilityRole="button"
+        accessibilityLabel={`View ${name}'s portfolio`}
+        style={styles.cardMain}
+      >
         <View style={[styles.cardPhoto, { backgroundColor: palette.accent }]}>
           {photo ? <Image source={{ uri: photo }} style={styles.cardImage} /> : <Feather name="user" size={23} color={palette.mutedForeground} />}
         </View>
         <View style={styles.cardCopy}>
-          <Text numberOfLines={1} style={[styles.consultantName, { color: palette.foreground }]}>{consultant.displayName || consultant.name || "Consultant"}</Text>
+          <Text numberOfLines={1} style={[styles.consultantName, { color: palette.foreground }]}>{name}</Text>
           <Text numberOfLines={1} style={[styles.specialization, { color: palette.primary }]}>{consultant.specialization || "Specialist"}</Text>
-          <Text numberOfLines={2} style={[styles.credentials, { color: palette.mutedForeground }]}>{consultant.qualification || "Verified provider"} · {consultant.hospital || consultant.institute || consultant.city || "Perfusion network"}</Text>
+          <Text numberOfLines={2} style={[styles.credentials, { color: palette.mutedForeground }]}>{consultant.qualification || "Verified provider"} · {affiliation}</Text>
         </View>
-      </View>
+        <Feather name="chevron-right" size={17} color={palette.mutedForeground} />
+      </Pressable>
       <View style={[styles.nextRow, { borderTopColor: palette.border }]}>
         {next ? <>
           <View style={{ flex: 1 }}>
             <Text style={[styles.nextLabel, { color: palette.mutedForeground }]}>NEXT AVAILABLE</Text>
-            <Pressable onPress={(event) => { event.stopPropagation(); onChoose(next); }} style={styles.nextChip}>
+            <Pressable onPress={() => onChoose(next)} style={styles.nextChip}>
               <Feather name="clock" size={13} color={palette.success} />
               <Text style={styles.nextChipText}>{next.appointmentSlot || `${prettyDate(next.date)} · ${timeLabel(next.start)}`}</Text>
             </Pressable>
           </View>
-          <Pressable onPress={(event) => { event.stopPropagation(); onOpen(); }} style={styles.allSlots} accessibilityRole="button">
+          <Pressable onPress={onOpenSlots} style={styles.allSlots} accessibilityRole="button">
             <Text style={[styles.allSlotsText, { color: palette.primary }]}>All slots</Text><Feather name="chevron-right" size={15} color={palette.primary} />
           </Pressable>
         </> : <View style={[styles.bookedOut, { backgroundColor: palette.accent }]}>
@@ -614,7 +750,7 @@ function ConsultantCard({ consultant, onChoose, onOpen }: { consultant: Consulta
           <Text style={[styles.bookedOutText, { color: palette.mutedForeground }]}>Fully booked for now</Text>
         </View>}
       </View>
-    </Pressable>
+    </View>
   );
 }
 
@@ -755,4 +891,19 @@ const styles = StyleSheet.create({
   slotSkeleton: { height: 40, borderRadius: 10 },
   slotFooter: { borderTopWidth: StyleSheet.hairlineWidth, paddingVertical: 12, paddingHorizontal: 18 },
   footerText: { textAlign: "center", fontSize: 10, fontFamily: "Inter_500Medium" },
+  portfolioBackdrop: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.46)" },
+  portfolioSheet: { maxHeight: "84%", borderTopLeftRadius: 22, borderTopRightRadius: 22, borderTopWidth: 1, paddingTop: 10 },
+  portfolioHeader: { minHeight: 54, paddingHorizontal: 18, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  portfolioHeaderTitle: { fontSize: 16, fontFamily: "Sora_600SemiBold" },
+  portfolioContent: { paddingHorizontal: 18, paddingTop: 8, paddingBottom: 26, gap: 12 },
+  portfolioLead: { flexDirection: "row", alignItems: "center", gap: 14, paddingVertical: 5 },
+  portfolioAvatar: { width: 76, height: 76, borderRadius: 38, overflow: "hidden", alignItems: "center", justifyContent: "center" },
+  portfolioAvatarImage: { width: "100%", height: "100%" },
+  portfolioName: { fontSize: 17, lineHeight: 23, fontFamily: "Sora_600SemiBold" },
+  portfolioMeta: { fontSize: 11, lineHeight: 17, fontFamily: "Inter_500Medium" },
+  portfolioSectionTitle: { fontSize: 11, letterSpacing: 0.6, fontFamily: "Inter_700Bold", marginTop: 5 },
+  portfolioDescription: { fontSize: 12, lineHeight: 19, fontFamily: "Inter_400Regular" },
+  portfolioEmpty: { alignItems: "center", gap: 10, paddingVertical: 24 },
+  portfolioPhotoGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  portfolioPhotoTile: { width: "31%", aspectRatio: 1, borderRadius: 12, backgroundColor: designTokens.color.plumTint },
 });
