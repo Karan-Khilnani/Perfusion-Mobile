@@ -4,7 +4,6 @@ import { router } from "expo-router";
 import React, { useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Image,
   Modal,
   Platform,
@@ -18,6 +17,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { AppAlert } from "@/components/AppAlert";
 import { apiFetch } from "@/hooks/useApi";
 import { useColors } from "@/hooks/useColors";
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
@@ -193,7 +193,7 @@ export default function NewConsultationScreen() {
       if (kind === "report") setReportFiles(addFile);
       else setChartFiles(addFile);
     } catch (error) {
-      Alert.alert("Could not add file", error instanceof Error ? error.message : "Choose a supported document and try again.");
+      AppAlert.alert("Could not add file", error instanceof Error ? error.message : "Choose a supported document and try again.");
     }
   };
 

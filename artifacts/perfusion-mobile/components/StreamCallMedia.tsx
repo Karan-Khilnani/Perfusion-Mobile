@@ -7,7 +7,6 @@ import React, {
   useState,
 } from "react";
 import {
-  Alert,
   Animated,
   Linking,
   PanResponder,
@@ -36,6 +35,7 @@ import {
 } from "@stream-io/video-react-native-sdk";
 
 import { useColors } from "@/hooks/useColors";
+import { AppAlert } from "@/components/AppAlert";
 import { BRAND_GRADIENT, END_CALL_GRADIENT, designTokens } from "@/constants/designTokens";
 import { elevatedShadow } from "@/constants/nativeShadows";
 
@@ -334,7 +334,7 @@ function ActiveStreamCall({
         : "Camera permission is blocked. Enable camera access in Settings to use video. Your audio call will continue.";
       setControlError(message);
       if (!permission.canAskAgain) {
-        Alert.alert("Camera permission required", message, [
+        AppAlert.alert("Camera permission required", message, [
           { text: "Not now", style: "cancel" },
           {
             text: "Open Settings",

@@ -1,7 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React, { useState } from "react";
-import { Alert, LayoutAnimation, Platform, Pressable, StyleSheet, Text, UIManager, View } from "react-native";
+import { LayoutAnimation, Platform, Pressable, StyleSheet, Text, UIManager, View } from "react-native";
 import * as Haptics from "expo-haptics";
 
 import { useAuth } from "@/contexts/AuthContext";
@@ -16,6 +16,7 @@ import { useColors } from "@/hooks/useColors";
 import { apiFetch } from "@/hooks/useApi";
 import { designTokens } from "@/constants/designTokens";
 import { cardShadow } from "@/constants/nativeShadows";
+import { AppAlert } from "@/components/AppAlert";
 
 export type { Booking };
 
@@ -138,9 +139,11 @@ export function BookingCard({ booking, dashboard = false, onStatusToggle, status
       if (Platform.OS !== "web") {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       }
-      Alert.alert(
+      AppAlert.alert(
         "Cannot start call",
-        error instanceof Error ? error.message : "The call window may not be open yet."
+        error instanceof Error && error.message.trim()
+          ? error.message
+          : "The call window may not be open yet.",
       );
     } finally {
       setStartingCall(null);

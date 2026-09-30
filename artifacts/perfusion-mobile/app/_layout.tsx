@@ -22,6 +22,7 @@ import { KeyboardProvider } from "react-native-keyboard-controller";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { BrandedLoading } from "@/components/BrandedLoading";
 import { IncomingCallOverlay } from "@/components/IncomingCallOverlay";
+import { AppAlertHost } from "@/components/AppAlert";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { CallProvider } from "@/contexts/CallContext";
 import { useColors } from "@/hooks/useColors";
@@ -197,6 +198,7 @@ export default function RootLayout() {
               <AuthProvider>
                 <CallProvider>
                   <RootLayoutNav fontsReady={fontsReady} />
+                  <AppAlertHost />
                 </CallProvider>
               </AuthProvider>
             </KeyboardProvider>

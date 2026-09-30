@@ -6,7 +6,6 @@ import { enterPiPAndroid, useIsInPiPMode } from "@stream-io/video-react-native-s
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   BackHandler,
   Linking,
   PermissionsAndroid,
@@ -18,6 +17,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { AppAlert } from "@/components/AppAlert";
 import { CallMedia } from "@/components/CallMedia";
 import { StreamCallMedia } from "@/components/StreamCallMedia";
 import { apiFetch } from "@/hooks/useApi";
@@ -75,10 +75,16 @@ export default function CallScreen() {
   const isInPiPMode = useIsInPiPMode();
   const pipEnteringRef = useRef(false);
   const returningFromCallRef = useRef(false);
+  const dismissBackConfirmationRef = useRef<(() => void) | null>(null);
   const acceptedGenerationRef = useRef<string | null>(null);
   const ringbackSuppressed = useRef(false);
   const ringback = useAudioPlayer(require("../../assets/audio/perfusion_ringback.mp3"));
   const permissionRequestRef = useRef<Promise<boolean> | null>(null);
+
+  useEffect(() => () => {
+    dismissBackConfirmationRef.current?.();
+    dismissBackConfirmationRef.current = null;
+  }, []);
 
   const { data: booking } = useQuery<CallInfo>({
     queryKey: ["booking", bookingId],
@@ -292,6 +298,8 @@ export default function CallScreen() {
   }, [callStatus?.videoRoomUrl, callMode, currentStatus, tokenData?.token]);
 
   const handleEndCall = useCallback(async () => {
+    dismissBackConfirmationRef.current?.();
+    dismissBackConfirmationRef.current = null;
     if (endPending) return;
     const cancelingOutgoing =
       currentStatus === "ringing" && callStatus?.isCaller === true;
@@ -402,6 +410,7 @@ export default function CallScreen() {
     if (Platform.OS !== "android") return;
     const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
       if (isInPiPMode) return true;
+      if (endPending || dismissBackConfirmationRef.current) return true;
       if (statusLoading && generation) return true;
       if (currentStatus !== "accepted" && currentStatus !== "ringing") return false;
       if (currentStatus === "accepted" && isStreamCall) {
@@ -410,25 +419,28 @@ export default function CallScreen() {
         void Promise.resolve(enterPiPAndroid(9, 16))
           .then((entered) => {
             if (entered === false) {
-              Alert.alert("Picture-in-picture unavailable", "The call is still active. Stay on this screen and use the red button when you want to end it.");
+              AppAlert.alert("Picture-in-picture unavailable", "The call is still active. Stay on this screen and use the red button when you want to end it.");
             }
           })
-          .catch(() => Alert.alert("Picture-in-picture unavailable", "The call is still active. Stay on this screen and use the red button when you want to end it."))
+          .catch(() => AppAlert.alert("Picture-in-picture unavailable", "The call is still active. Stay on this screen and use the red button when you want to end it."))
           .finally(() => { pipEnteringRef.current = false; });
       } else {
-        Alert.alert(
+        dismissBackConfirmationRef.current = AppAlert.alert(
           currentStatus === "ringing" ? "Cancel this call?" : "Call still connecting",
           "Leaving this screen would disconnect the call without ending it.",
           [
-            { text: "Stay", style: "cancel" },
-            { text: "End call", style: "destructive", onPress: () => { void handleEndCall(); } },
+            { text: "Stay", style: "cancel", onPress: () => { dismissBackConfirmationRef.current = null; } },
+            { text: "End call", style: "destructive", onPress: () => {
+              dismissBackConfirmationRef.current = null;
+              void handleEndCall();
+            } },
           ],
         );
       }
       return true;
     });
     return () => subscription.remove();
-  }, [currentStatus, generation, handleEndCall, isInPiPMode, isStreamCall, statusLoading]);
+  }, [currentStatus, endPending, generation, handleEndCall, isInPiPMode, isStreamCall, statusLoading]);
 
   const showConnectingCallUi =
     statusLoading ||

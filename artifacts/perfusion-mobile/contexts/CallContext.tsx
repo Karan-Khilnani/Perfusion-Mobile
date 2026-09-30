@@ -7,10 +7,11 @@ import React, {
   useState,
 } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { Alert, AppState, Platform } from "react-native";
+import { AppState, Platform } from "react-native";
 import { router } from "expo-router";
 
 import { useAuth } from "@/contexts/AuthContext";
+import { AppAlert } from "@/components/AppAlert";
 import { apiFetch } from "@/hooks/useApi";
 import {
   endNativeCallForSession,
@@ -71,7 +72,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
       await AsyncStorage.setItem(FULL_SCREEN_ACCESS_PROMPTED_KEY, "true");
       if (!active) return;
 
-      Alert.alert(
+      AppAlert.alert(
         "Enable full-screen call alerts",
         "Android has blocked full-screen call alerts, so incoming calls may appear only as banners. Enable access to show Answer and Decline over the lock screen.",
         [
@@ -80,7 +81,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
             text: "Open Settings",
             onPress: () => {
               if (!openFullScreenCallSettings()) {
-                Alert.alert(
+                AppAlert.alert(
                   "Open Android settings",
                   "Find Perfusion in your phone's app settings and enable full-screen call alerts.",
                 );

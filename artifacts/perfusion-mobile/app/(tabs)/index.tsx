@@ -4,7 +4,6 @@ import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import React from "react";
 import {
-  Alert,
   Platform,
   Pressable,
   RefreshControl,
@@ -15,6 +14,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { AppAlert } from "@/components/AppAlert";
 import { BookingCard } from "@/components/BookingCard";
 import { ConsultationSkeletons, StateCard } from "@/components/SharedStates";
 import { useAuth } from "@/contexts/AuthContext";
@@ -77,7 +77,7 @@ export default function DashboardScreen() {
       queryClient.invalidateQueries({ queryKey: ["case-file"] });
     },
     onError: (error) => {
-      Alert.alert("Status not updated", error instanceof Error ? error.message : "Please try again.");
+      AppAlert.alert("Status not updated", error instanceof Error ? error.message : "Please try again.");
     },
   });
 

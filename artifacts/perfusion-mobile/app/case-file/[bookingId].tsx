@@ -8,7 +8,6 @@ import { File as ExpoFile, Paths } from "expo-file-system";
 import * as Sharing from "expo-sharing";
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   Linking,
   Modal,
@@ -23,6 +22,7 @@ import {
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { AppAlert } from "@/components/AppAlert";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiFetch } from "@/hooks/useApi";
 import { useColors } from "@/hooks/useColors";
@@ -107,7 +107,7 @@ export default function CaseFileScreen() {
     } catch (error) {
       const reason = error instanceof Error ? error.message : "Could not start the call.";
       setCallError(reason);
-      if (Platform.OS !== "web") Alert.alert("Cannot start call", reason);
+      if (Platform.OS !== "web") AppAlert.alert("Cannot start call", reason);
     } finally {
       setStartingCall(null);
     }
@@ -130,7 +130,7 @@ export default function CaseFileScreen() {
       setAttachmentError(message);
       setSheet("source");
       if (Platform.OS !== "web" && message.includes("device settings")) {
-        Alert.alert("Permission needed", message, [
+        AppAlert.alert("Permission needed", message, [
           { text: "Not now", style: "cancel" },
           { text: "Open Settings", onPress: () => void Linking.openSettings() },
         ]);
@@ -154,7 +154,7 @@ export default function CaseFileScreen() {
       }
     } catch (error) {
       const reason = error instanceof Error ? error.message : "The file could not be opened.";
-      Alert.alert(disposition === "inline" ? "Could not open file" : "Could not download file", reason);
+      AppAlert.alert(disposition === "inline" ? "Could not open file" : "Could not download file", reason);
     } finally {
       setOpeningAttachmentId(null);
     }
@@ -641,7 +641,7 @@ function CaseFileSheet({
   const openAdvisoryPdf = async (item: Advisory) => {
     const attachmentId = item.attachmentIds?.[0];
     if (!attachmentId) {
-      Alert.alert("PDF unavailable", "This Clinical Advisory does not have a PDF attachment.");
+      AppAlert.alert("PDF unavailable", "This Clinical Advisory does not have a PDF attachment.");
       return;
     }
     setDownloadingAdvisoryId(item.id);
@@ -652,7 +652,7 @@ function CaseFileSheet({
       await Linking.openURL(url);
     } catch (error) {
       const reason = error instanceof Error ? error.message : "Could not open the PDF.";
-      Alert.alert("Could not open PDF", reason);
+      AppAlert.alert("Could not open PDF", reason);
     } finally {
       setDownloadingAdvisoryId(null);
     }
@@ -686,7 +686,7 @@ function CaseFileSheet({
       if (type === "advisory") {
         const savedAdvisory = result as Advisory;
         if (savedAdvisory.attachmentIds?.[0]) void openAdvisoryPdf(savedAdvisory);
-        else Alert.alert("Clinical Advisory saved", "The record was saved, but its PDF is not available.");
+        else AppAlert.alert("Clinical Advisory saved", "The record was saved, but its PDF is not available.");
       }
     },
   });

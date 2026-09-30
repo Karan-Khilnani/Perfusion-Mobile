@@ -2,7 +2,6 @@ import { Feather } from "@expo/vector-icons";
 import { router, Stack } from "expo-router";
 import React, { useRef, useState } from "react";
 import {
-  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -14,6 +13,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { AppAlert } from "@/components/AppAlert";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiFetch } from "@/hooks/useApi";
 import { useColors } from "@/hooks/useColors";
@@ -106,7 +106,7 @@ export default function ChangePasswordScreen() {
         return;
       }
 
-      Alert.alert("Password changed", "Your password has been updated.", [
+      AppAlert.alert("Password changed", "Your password has been updated.", [
         { text: "OK", onPress: () => router.back() },
       ]);
     } catch (error) {

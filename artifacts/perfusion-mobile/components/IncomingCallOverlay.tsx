@@ -5,7 +5,6 @@ import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
-  Alert,
   Animated,
   Platform,
   Pressable,
@@ -15,6 +14,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { AppAlert } from "@/components/AppAlert";
 import { useCall } from "@/contexts/CallContext";
 import { ACCEPT_CALL_GRADIENT, INCOMING_CALL_GRADIENT, designTokens } from "@/constants/designTokens";
 
@@ -77,7 +77,7 @@ export function IncomingCallOverlay() {
       router.push(`/call/${incomingCall.bookingId}?mode=${incomingCall.callType === "voice" ? "voice" : "video"}&generation=${incomingCall.sessionGeneration || ""}`);
     } catch (error) {
       ringtone.play();
-      Alert.alert(
+      AppAlert.alert(
         "Could not accept call",
         error instanceof Error ? error.message : "Please check your connection and try again.",
       );
@@ -97,7 +97,7 @@ export function IncomingCallOverlay() {
       await declineCall(incomingCall.bookingId);
     } catch (error) {
       ringtone.play();
-      Alert.alert(
+      AppAlert.alert(
         "Could not decline call",
         error instanceof Error ? error.message : "Please check your connection and try again.",
       );

@@ -5,7 +5,6 @@ import { router, useFocusEffect } from "expo-router";
 import React, { useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Image,
   Linking,
   Modal,
@@ -24,6 +23,7 @@ import * as DocumentPicker from "expo-document-picker";
 import { File as ExpoFile } from "expo-file-system";
 import { fetch as expoFetch } from "expo/fetch";
 
+import { AppAlert, AppAlertPanel } from "@/components/AppAlert";
 import { useAuth } from "@/contexts/AuthContext";
 import { BrandMark } from "@/components/BrandMark";
 import { ScreenHeading } from "@/components/ScreenHeading";
@@ -117,7 +117,7 @@ export default function ProfileScreen() {
       logout();
       return;
     }
-    Alert.alert("Sign out", "Are you sure you want to sign out?", [
+    AppAlert.alert("Sign out", "Are you sure you want to sign out?", [
       { text: "Cancel", style: "cancel" },
       {
         text: "Sign out",
@@ -379,7 +379,7 @@ export default function ProfileScreen() {
             icon="help-circle"
             title="Help & Support"
             colors={colors}
-            onPress={() => Alert.alert("Help & Support", "Contact support through your Perfusion administrator.")}
+            onPress={() => AppAlert.alert("Help & Support", "Contact support through your Perfusion administrator.")}
           />
         </>
       )}
@@ -517,6 +517,10 @@ function ProviderMyProfile() {
   const [loggingOut, setLoggingOut] = useState(false);
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [selectedPortfolioPhoto, setSelectedPortfolioPhoto] = useState<ConsultantPortfolioPhoto | null>(null);
+  const [portfolioDeleteConfirming, setPortfolioDeleteConfirming] = useState(false);
+  const [portfolioDeleteError, setPortfolioDeleteError] = useState<string | null>(null);
+  const [portfolioDeletePending, setPortfolioDeletePending] = useState(false);
+  const portfolioDeletePendingRef = React.useRef(false);
 
   const account = useQuery<AccountProfile>({
     queryKey: ["provider-profile-account", user?.id],
@@ -587,7 +591,7 @@ function ProviderMyProfile() {
       ? await ImagePicker.requestCameraPermissionsAsync()
       : await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
-      Alert.alert("Permission needed", useCamera
+      AppAlert.alert("Permission needed", useCamera
         ? "Allow camera access to take a profile photo."
         : "Allow photo access to choose a profile photo.");
       return;
@@ -634,13 +638,13 @@ function ProviderMyProfile() {
       await refreshProfile();
       await refreshUser();
     } catch (error) {
-      Alert.alert("Photo upload failed", error instanceof Error ? error.message : "Could not update your photo.");
+      AppAlert.alert("Photo upload failed", error instanceof Error ? error.message : "Could not update your photo.");
     } finally {
       setBusyAction(null);
     }
   };
 
-  const changePhoto = () => Alert.alert("Profile photo", "Choose a source", [
+  const changePhoto = () => AppAlert.alert("Profile photo", "Choose a source", [
     { text: "Camera", onPress: () => void chooseImage(true) },
     { text: "Gallery", onPress: () => void chooseImage(false) },
     { text: "Cancel", style: "cancel" },
@@ -648,7 +652,7 @@ function ProviderMyProfile() {
 
   const uploadRegistrationDocument = async () => {
     if (!selectedConsultant?.id) {
-      Alert.alert("Unable to add document", "A consultant profile is required to save a professional registration document.");
+      AppAlert.alert("Unable to add document", "A consultant profile is required to save a professional registration document.");
       return;
     }
     const result = await DocumentPicker.getDocumentAsync({
@@ -659,7 +663,7 @@ function ProviderMyProfile() {
     if (result.canceled || !result.assets[0]) return;
     const file = result.assets[0];
     if (file.size && file.size > 5 * 1024 * 1024) {
-      Alert.alert("File too large", "Choose a file smaller than 5 MB.");
+      AppAlert.alert("File too large", "Choose a file smaller than 5 MB.");
       return;
     }
     setBusyAction("document");
@@ -667,7 +671,7 @@ function ProviderMyProfile() {
       await uploadProviderProfileMedia(selectedConsultant.id, "registration_document", file.uri, file.name, file.file);
       await refreshProfile();
     } catch (error) {
-      Alert.alert("Document upload failed", error instanceof Error ? error.message : "Could not save this document.");
+      AppAlert.alert("Document upload failed", error instanceof Error ? error.message : "Could not save this document.");
     } finally {
       setBusyAction(null);
     }
@@ -675,12 +679,12 @@ function ProviderMyProfile() {
 
   const updateSignature = async () => {
     if (!selectedConsultant?.id) {
-      Alert.alert("Unable to update signature", "A consultant profile is required to save a signature.");
+      AppAlert.alert("Unable to update signature", "A consultant profile is required to save a signature.");
       return;
     }
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
-      Alert.alert("Permission needed", "Allow photo access to choose a signature image.");
+      AppAlert.alert("Permission needed", "Allow photo access to choose a signature image.");
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -702,7 +706,7 @@ function ProviderMyProfile() {
       );
       await refreshProfile();
     } catch (error) {
-      Alert.alert("Signature upload failed", error instanceof Error ? error.message : "Could not save this signature.");
+      AppAlert.alert("Signature upload failed", error instanceof Error ? error.message : "Could not save this signature.");
     } finally {
       setBusyAction(null);
     }
@@ -714,7 +718,7 @@ function ProviderMyProfile() {
       const response = await apiFetch(`/api/provider/consultants/${selectedConsultant.id}/media/${document.id}/signed-url`);
       const data = await response.json().catch(() => ({}));
       if (!response.ok || !data.url) {
-        Alert.alert("Unable to open file", data.message || "Could not open the registration document.");
+        AppAlert.alert("Unable to open file", data.message || "Could not open the registration document.");
         return;
       }
       url = data.url;
@@ -724,18 +728,18 @@ function ProviderMyProfile() {
     try {
       await Linking.openURL(documentUri);
     } catch {
-      Alert.alert("Unable to open file", "This document link could not be opened on this device.");
+      AppAlert.alert("Unable to open file", "This document link could not be opened on this device.");
     }
   };
 
   const addPortfolioPhoto = async () => {
     if (!selectedConsultant?.id) {
-      Alert.alert("Unable to add photo", "A consultant profile is required to save portfolio photos.");
+      AppAlert.alert("Unable to add photo", "A consultant profile is required to save portfolio photos.");
       return;
     }
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
-      Alert.alert("Permission needed", "Allow photo access to choose a portfolio image.");
+      AppAlert.alert("Permission needed", "Allow photo access to choose a portfolio image.");
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -756,32 +760,45 @@ function ProviderMyProfile() {
       );
       await refreshProfile();
     } catch (error) {
-      Alert.alert("Photo upload failed", error instanceof Error ? error.message : "Could not save this portfolio photo.");
+      AppAlert.alert("Photo upload failed", error instanceof Error ? error.message : "Could not save this portfolio photo.");
     } finally {
       setBusyAction(null);
     }
   };
 
   const deletePortfolioPhoto = (photo: ConsultantPortfolioPhoto) => {
-    if (!selectedConsultant?.id) return;
-    Alert.alert("Delete portfolio photo", "This photo will be removed from your portfolio.", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Delete",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            const response = await apiFetch(`/api/provider/consultants/${selectedConsultant.id}/media/${photo.id}`, { method: "DELETE" });
-            const data = await response.json().catch(() => ({}));
-            if (!response.ok) throw new Error(data.message || "Could not delete this photo.");
-            setSelectedPortfolioPhoto(null);
-            await refreshProfile();
-          } catch (error) {
-            Alert.alert("Delete failed", error instanceof Error ? error.message : "Could not delete this photo.");
-          }
-        },
-      },
-    ]);
+    if (!selectedConsultant?.id || portfolioDeletePendingRef.current) return;
+    setPortfolioDeleteError(null);
+    setPortfolioDeleteConfirming(true);
+  };
+
+  const confirmDeletePortfolioPhoto = async (photo: ConsultantPortfolioPhoto) => {
+    const consultantId = selectedConsultant?.id;
+    if (!consultantId || portfolioDeletePendingRef.current) return;
+    portfolioDeletePendingRef.current = true;
+    setPortfolioDeletePending(true);
+    try {
+      const response = await apiFetch(`/api/provider/consultants/${consultantId}/media/${photo.id}`, { method: "DELETE" });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.message || "Could not delete this photo.");
+      await refreshProfile();
+      setSelectedPortfolioPhoto(null);
+      setPortfolioDeleteConfirming(false);
+      setPortfolioDeleteError(null);
+    } catch (error) {
+      setPortfolioDeleteConfirming(false);
+      setPortfolioDeleteError(error instanceof Error ? error.message : "Could not delete this photo.");
+    } finally {
+      portfolioDeletePendingRef.current = false;
+      setPortfolioDeletePending(false);
+    }
+  };
+
+  const closePortfolioPhotoViewer = () => {
+    if (portfolioDeletePendingRef.current) return;
+    setSelectedPortfolioPhoto(null);
+    setPortfolioDeleteConfirming(false);
+    setPortfolioDeleteError(null);
   };
 
   const doLogout = () => {
@@ -789,7 +806,7 @@ function ProviderMyProfile() {
       void logout();
       return;
     }
-    Alert.alert("Log out", "You'll need to log in again to use Perfusion.", [
+    AppAlert.alert("Log out", "You'll need to log in again to use Perfusion.", [
       { text: "Cancel", style: "cancel" },
       {
         text: "Log Out",
@@ -994,28 +1011,56 @@ function ProviderMyProfile() {
           <View style={providerProfileStyles.footerLinks}>
             <ProfileLink icon="calendar" title="Availability" subtitle="Weekly hours, pause consultations" colors={colors} onPress={() => router.push("/availability" as never)} />
             <ProfileLink icon="lock" title="Change Password" colors={colors} onPress={() => router.push("/change-password" as never)} />
-            <ProfileLink icon="help-circle" title="Help & Support" colors={colors} onPress={() => Alert.alert("Help & Support", "Contact support through your Perfusion administrator.")} />
+            <ProfileLink icon="help-circle" title="Help & Support" colors={colors} onPress={() => AppAlert.alert("Help & Support", "Contact support through your Perfusion administrator.")} />
           </View>
           <Pressable onPress={doLogout} disabled={loggingOut} style={providerProfileStyles.logoutArea}>
             <Text style={[providerProfileStyles.logoutText, { color: colors.mutedForeground }]}>{loggingOut ? "Logging out…" : "Log Out"}</Text>
           </Pressable>
         </>
       )}
-      <Modal visible={!!selectedPortfolioPhoto} transparent animationType="fade" onRequestClose={() => setSelectedPortfolioPhoto(null)}>
+      <Modal visible={!!selectedPortfolioPhoto} transparent animationType="fade" onRequestClose={closePortfolioPhotoViewer}>
         <View style={providerProfileStyles.photoModalBackdrop}>
           <View style={[providerProfileStyles.photoModal, { backgroundColor: colors.card }]}>
             <View style={providerProfileStyles.modalHeading}>
               <Text style={[providerProfileStyles.modalTitle, { color: colors.foreground }]} numberOfLines={1}>
                 {selectedPortfolioPhoto?.filename || "Portfolio photo"}
               </Text>
-              <Pressable onPress={() => setSelectedPortfolioPhoto(null)} accessibilityLabel="Close photo"><Feather name="x" size={22} color={colors.mutedForeground} /></Pressable>
+              <Pressable onPress={closePortfolioPhotoViewer} disabled={portfolioDeletePending} accessibilityLabel="Close photo"><Feather name="x" size={22} color={colors.mutedForeground} /></Pressable>
             </View>
             {selectedPortfolioPhoto && <Image source={{ uri: absoluteFileUrl(selectedPortfolioPhoto.url) }} resizeMode="contain" style={providerProfileStyles.photoPreview} />}
-            {selectedPortfolioPhoto && <Pressable onPress={() => deletePortfolioPhoto(selectedPortfolioPhoto)} style={[providerProfileStyles.deletePhoto, { borderColor: colors.destructive }]}>
+            {selectedPortfolioPhoto && <Pressable onPress={() => deletePortfolioPhoto(selectedPortfolioPhoto)} disabled={portfolioDeletePending} style={[providerProfileStyles.deletePhoto, { borderColor: colors.destructive, opacity: portfolioDeletePending ? 0.55 : 1 }]}>
               <Feather name="trash-2" size={16} color={colors.destructive} />
               <Text style={{ color: colors.destructive, fontFamily: "Inter_600SemiBold" }}>Delete photo</Text>
             </Pressable>}
           </View>
+          {(portfolioDeleteConfirming || portfolioDeleteError) && (
+            <View style={providerProfileStyles.photoDeleteOverlay}>
+              <View
+                pointerEvents="none"
+                style={[StyleSheet.absoluteFillObject, { backgroundColor: colors.foreground, opacity: 0.46 }]}
+              />
+              <AppAlertPanel
+                title={portfolioDeleteError ? "Delete failed" : "Delete portfolio photo"}
+                message={portfolioDeleteError || "This photo will be removed from your portfolio."}
+                buttons={portfolioDeleteError
+                  ? [{ text: "OK", disabled: portfolioDeletePending }]
+                  : [
+                    { text: "Cancel", style: "cancel", disabled: portfolioDeletePending },
+                    { text: "Delete", style: "destructive", disabled: portfolioDeletePending },
+                  ]}
+                onPressButton={(button) => {
+                  if (portfolioDeletePendingRef.current) return;
+                  if (portfolioDeleteError) {
+                    setPortfolioDeleteError(null);
+                  } else if (button.style === "cancel") {
+                    setPortfolioDeleteConfirming(false);
+                  } else if (button.style === "destructive" && selectedPortfolioPhoto) {
+                    void confirmDeletePortfolioPhoto(selectedPortfolioPhoto);
+                  }
+                }}
+              />
+            </View>
+          )}
         </View>
       </Modal>
     </ScrollView>
@@ -1304,6 +1349,7 @@ const providerProfileStyles = StyleSheet.create({
   inlineAction: { minHeight: 44, minWidth: 44, alignItems: "center", justifyContent: "center" },
   photoModalBackdrop: { flex: 1, justifyContent: "center", padding: 22, backgroundColor: "rgba(0,0,0,0.62)" },
   photoModal: { borderRadius: 16, padding: 16 },
+  photoDeleteOverlay: { ...StyleSheet.absoluteFillObject, justifyContent: "center", alignItems: "center", paddingHorizontal: designTokens.spacing.gutter },
   photoPreview: { width: "100%", height: 360, borderRadius: 10 },
   deletePhoto: { marginTop: 12, minHeight: 44, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, borderWidth: 1, borderRadius: 10 },
 });
