@@ -1,0 +1,283 @@
+# PERFUSION MOBILE — AUDIO→VIDEO UPGRADE + PROFESSIONAL OUTGOING RINGTONE
+
+Fix ONLY these two call functionalities in:
+
+artifacts/perfusion-mobile
+
+Do not modify unrelated screens or features.
+
+==================================================
+1. AUDIO CALL → VIDEO CALL UPGRADE
+==================================================
+
+CURRENT PROBLEM:
+
+During an active audio call, there is no option to switch/upgrade the call from:
+
+AUDIO CALL
+    ↓
+VIDEO CALL
+
+Add an in-call Video/Camera action that allows the user to upgrade an active audio call to a video call.
+
+EXPECTED BEHAVIOR:
+
+User starts an Audio Call
+        ↓
+Audio call connects
+        ↓
+Active audio-call screen shows a Video/Camera upgrade control
+        ↓
+User taps Video/Camera
+        ↓
+Request/confirm camera permission if required
+        ↓
+Enable the user's camera
+        ↓
+Upgrade the existing call session to video
+        ↓
+Both participants transition into the existing active video-call interface
+
+IMPORTANT:
+
+This must upgrade the EXISTING CALL SESSION.
+
+Do NOT:
+- end the audio call
+- create a second call
+- start a duplicate call
+- disconnect/reconnect unnecessarily
+- send the user back to the dashboard
+- force the user to manually call again
+
+The audio connection should remain intact while video is being enabled.
+
+--------------------------------------------------
+REMOTE-SIDE BEHAVIOR
+--------------------------------------------------
+
+When User A upgrades an audio call to video:
+
+User A:
+- camera becomes active
+- User A sees the remote video when available
+- User A sees their self-view
+
+User B:
+- receives the transition to video
+- User B can see User A's video
+- User B's camera should become available according to the existing video-call behavior / user permission state
+
+The existing video-call media implementation should be reused.
+
+Do not create a second video implementation specifically for audio-to-video upgrade.
+
+--------------------------------------------------
+CAMERA PERMISSION
+--------------------------------------------------
+
+Before enabling video:
+
+- Check the existing camera permission state.
+- If permission has not been granted, request it using the existing mobile permission flow.
+- If permission is denied, keep the audio call active and show a clear message explaining that camera permission is required to enable video.
+- Do NOT terminate the audio call because camera permission was denied.
+
+If permission is granted:
+- enable local camera
+- publish/enable the video track using the existing call/media architecture
+- transition the UI into the existing video-call interface
+
+--------------------------------------------------
+CALL STATE
+--------------------------------------------------
+
+Make sure the call state correctly changes:
+
+audio-only
+    →
+video-upgrading
+    →
+video-active
+
+Avoid race conditions where:
+- the camera button is tapped multiple times
+- multiple video tracks are created
+- multiple calls are started
+- the UI says video is active before the video track actually exists
+
+Disable/debounce the upgrade control while the upgrade is processing.
+
+If the existing call architecture already has a media-track enable/disable mechanism, reuse it.
+
+==================================================
+2. OUTGOING CALL RINGING SOUND
+==================================================
+
+CURRENT PROBLEM:
+
+The outgoing call currently plays a "tring tring" style sound.
+
+It does not feel like a conventional professional calling experience.
+
+Replace it with a simple, conventional outgoing-call ringback tone.
+
+The sound should feel:
+- professional
+- neutral
+- clean
+- familiar
+- suitable for a medical/clinical communication application
+
+Do NOT use:
+- cartoon sounds
+- notification sounds
+- message sounds
+- exaggerated alarm sounds
+- "tring tring" effects
+- loud musical tones
+
+Use a short repeating ringback pattern rather than playing one sound continuously.
+
+--------------------------------------------------
+RINGBACK BEHAVIOR
+--------------------------------------------------
+
+Outgoing call:
+
+CALLING / RINGING
+    ↓
+play ringback tone
+    ↓
+pause
+    ↓
+repeat
+
+Stop the ringback immediately when:
+- recipient answers
+- recipient declines
+- caller cancels
+- call fails
+- call times out
+- call state changes from outgoing/ringing to connected
+
+IMPORTANT:
+There must never be a ringing sound continuing after the call has connected or ended.
+
+Also prevent multiple ringback audio instances from playing simultaneously.
+
+If the user navigates/re-renders the call screen, the existing ringback instance should not restart repeatedly.
+
+Use the existing project's audio/call infrastructure if available.
+
+If a local audio asset is required, add ONE appropriate lightweight ringtone/ringback asset and keep it local to the mobile app.
+
+Do not introduce a large audio library just for this sound.
+
+Expo's current audio APIs support local audio playback and lifecycle-managed audio players; use the audio solution already present in the project where possible rather than introducing unnecessary dependencies. :contentReference[oaicite:1]{index=1}
+
+==================================================
+IMPORTANT — DO NOT CHANGE
+==================================================
+
+Do NOT modify:
+- Dashboard
+- Consultation screens
+- Case File
+- Chat
+- Booking
+- Profile
+- authentication
+- launch/splash
+- media viewer
+- unrelated video-call UI
+- web application
+
+Only modify code necessary for:
+
+1. Audio → Video upgrade during an active call
+2. Outgoing call ringback sound
+
+==================================================
+TESTING
+==================================================
+
+TEST 1 — AUDIO → VIDEO
+
+Provider starts audio call to Seeker.
+
+Verify:
+- audio call connects
+- Video/Camera upgrade control is visible
+- tapping it does not end the call
+- camera permission is handled correctly
+- existing call becomes a video call
+- local camera activates
+- remote video becomes available
+- both users remain in the same consultation/call session
+
+TEST 2 — PERMISSION DENIED
+
+Start audio call.
+
+Attempt Audio → Video.
+
+Deny camera permission.
+
+Verify:
+- audio call continues
+- no duplicate call is created
+- no call termination
+- clear permission message is shown
+- user can continue the audio call
+
+TEST 3 — RINGBACK
+
+Start an outgoing call.
+
+Verify:
+- professional conventional ringback starts
+- it repeats naturally while recipient is being called
+- it stops immediately when recipient answers
+
+TEST 4 — DECLINE
+
+Start outgoing call.
+
+Recipient declines.
+
+Verify:
+- ringback stops immediately
+- no sound continues after the call ends
+
+TEST 5 — CANCEL
+
+Start outgoing call.
+
+Caller cancels.
+
+Verify:
+- ringback stops immediately
+- no audio player remains running
+
+TEST 6 — RE-RENDER / NAVIGATION
+
+During outgoing ringing, trigger normal React Native re-renders/navigation state changes.
+
+Verify:
+- ringback does NOT restart from the beginning
+- multiple ringback sounds do NOT overlap
+
+FINAL REQUIREMENT:
+
+Audio Call:
+[Audio controls] + [Video upgrade]
+
+After upgrade:
+[Existing active Video Call interface]
+
+Outgoing call:
+[Professional repeating ringback]
+
+Do not rewrite the entire calling system.
+Inspect the existing implementation first and make the smallest safe changes necessary.
