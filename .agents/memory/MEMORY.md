@@ -24,7 +24,7 @@
 - [Android call ringtone channels](android-call-ringtone-channels.md) — ringtone changes need a new channel identity and native build; JS audio cannot ring when the app is closed.
 - [Workspace package installation](workspace-package-installation.md) — generic package-install callback may target the pnpm workspace root; filtered installs belong in the artifact.
 - [Stream Android PiP bridge](stream-android-pip.md) — installed JS PiP helper references a native enter method absent from the SDK; verify the native bridge during prebuild.
-- [Expo browser preview limitation](expo-browser-preview.md) — native Stream/WebRTC views can break Expo web preview; verify mobile changes with an Android bundle.
+- [Expo browser route imports](expo-browser-preview.md) — native-only SDK imports in eagerly loaded routes can crash web preview; split those imports by platform without altering native calls.
 - [Case File video originals](case-file-video-originals.md) — keep the private original for downloads and use a private MP4 playback copy only when the original is not cross-platform playable.
 - [Shared availability compatibility](shared-availability-compatibility.md) — preserve Web schedule editing; Mobile day-off windows remain stored but must not become bookable.
 - [Inverted FlatList orientation](inverted-flatlist-orientation.md) — React Native already compensates header/footer wrappers in inverted lists; avoid extra child flips.

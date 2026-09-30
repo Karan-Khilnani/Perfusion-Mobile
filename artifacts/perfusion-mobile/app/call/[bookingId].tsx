@@ -2,7 +2,6 @@ import { Ionicons } from "@expo/vector-icons";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAudioPlayer } from "expo-audio";
 import { router, useLocalSearchParams } from "expo-router";
-import { enterPiPAndroid, useIsInPiPMode } from "@stream-io/video-react-native-sdk";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -25,6 +24,7 @@ import { apiFetch } from "@/hooks/useApi";
 import { useColors } from "@/hooks/useColors";
 import { endNativeCallForSession } from "@/lib/native-calls";
 import { getPushDeviceId } from "@/lib/push-device";
+import { enterPiPAndroid, useIsInPiPMode } from "@/lib/stream-pip";
 
 interface CallInfo {
   videoRoomId?: string;

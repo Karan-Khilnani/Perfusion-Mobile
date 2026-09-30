@@ -1,10 +1,10 @@
 ---
-name: Expo browser preview limitation
-description: Expo web preview can fail when the app imports native Stream WebRTC views.
+name: Expo browser route imports
+description: Why native-only imports can break the Expo browser preview even on screens that never use them.
 ---
 
-The mobile app's Expo browser preview can fail with `requireNativeComponent is not a function` from Stream WebRTC's native camera preview. An Android Expo export can still bundle successfully.
+Expo Router loads route modules eagerly for web. A native-only SDK imported by a call route can crash the entire browser preview with `requireNativeComponent is not a function` even on a sign-in screen. Keep native call behavior, but isolate native-only imports behind platform-specific modules; web implementations should explain unsupported call functionality rather than pretending it works.
 
-**Why:** The browser runtime does not provide native RTC view components. Changing call routing or removing native call UI just to make the browser preview render can regress the supported mobile call flow.
+**Why:** The browser lacks native RTC view components, but installed Android/iOS builds need the real native call code. A runtime platform guard inside a route is too late if its top-level imports already evaluated.
 
-**How to apply:** When this preview error appears, verify mobile code with typechecking and an Android bundle. Only change RTC routing or add a web-specific call implementation if mobile-web support is explicitly in scope.
+**How to apply:** When native-only modules are introduced in routes, split their imports into native and web files at the module boundary. Verify both web preview and an Android bundle; this is for design preview, not a substitute for device testing of native calls.
