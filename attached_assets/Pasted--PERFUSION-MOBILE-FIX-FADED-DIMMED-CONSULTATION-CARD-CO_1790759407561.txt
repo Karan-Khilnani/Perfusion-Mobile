@@ -1,0 +1,100 @@
+# PERFUSION MOBILE — FIX FADED/DIMMED CONSULTATION CARD CONTENT
+
+The previous attempt did NOT fix the issue.
+
+In the current mobile Preview, the "Recent Consultations" section is visible, but the content inside the consultation cards is extremely faded/washed out.
+
+Visible correctly:
+- Recent Consultations heading
+- View all consultations
+- Bottom navigation
+- Header
+
+Incorrect:
+- Patient names inside consultation cards
+- Personal account text
+- Time
+- Availability status
+- Case File action
+- Other card text/icons
+
+The card content appears to have very low opacity or a white/transparent overlay.
+
+TARGET:
+Make the consultation-card content clearly readable while preserving the existing Perfusion design system.
+
+IMPORTANT:
+Do NOT simply change all text to white.
+Do NOT redesign the consultation cards.
+Do NOT change the dashboard layout.
+Do NOT change navigation.
+Do NOT change backend/API behavior.
+
+INVESTIGATE THE ACTUAL ROOT CAUSE FIRST.
+
+Inspect the consultation card component and its parent containers for:
+
+1. opacity / opacity styles
+2. rgba() colors with very low alpha
+3. disabled-state styling
+4. conditional styles based on availability/schedule status
+5. white/cream overlays positioned above the card
+6. absolute-positioned Views covering card content
+7. Animated.View opacity values
+8. pointer/interaction layers
+9. zIndex/elevation/layering problems
+10. theme/light-mode styles accidentally making content nearly invisible
+11. inherited styles from a parent View
+12. loading/skeleton styles accidentally remaining active
+13. blur/transparency effects
+14. any "disabled", "inactive", "unavailable", "muted", "faded", or similar state that is incorrectly applied to the entire card
+
+IMPORTANT:
+The screenshot shows "Schedule unavailable" on the consultation cards.
+
+That status must NOT cause the entire card to become nearly invisible.
+
+If "Schedule unavailable" is a legitimate status:
+- keep that status visually subtle
+- keep patient name and primary information fully readable
+- keep Case File/action controls readable
+- only the status indicator should be visually secondary
+
+Use the existing Perfusion design tokens:
+- Canvas: #FDF6F1
+- Card: #FFFFFF
+- Ink: #2E2220
+- Ink-soft: #8C7A75
+- Coral: #F0654A
+- Plum: #7A2E4D
+
+Typography:
+- Sora for names/key information
+- Inter for secondary/body information
+
+Do not invent a new visual style.
+
+AFTER IDENTIFYING THE ROOT CAUSE:
+- make the smallest necessary code change
+- remove only the incorrect opacity/overlay/disabled styling
+- preserve legitimate unavailable-state styling
+- make sure all card text/icons render at normal readable contrast
+- verify both consultation cards
+
+THEN VERIFY:
+1. Dashboard opens normally.
+2. Recent Consultations remains in the same position.
+3. Patient names are clearly readable.
+4. Personal account text is readable.
+5. Time is readable.
+6. "Schedule unavailable" remains subtle but readable.
+7. Case File remains readable.
+8. No white overlay is covering the card.
+9. No unrelated screens are changed.
+
+IMPORTANT:
+After making the code change, report:
+- which file caused the faded content
+- the exact style/state causing it
+- what you changed
+- whether the Preview is using the newly changed bundle.
