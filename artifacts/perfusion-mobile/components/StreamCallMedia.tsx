@@ -1,4 +1,11 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  type ComponentProps,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   Animated,
   PanResponder,
@@ -366,13 +373,18 @@ function ActiveStreamCall({
   const durationLabel = `${String(Math.floor(elapsedSeconds / 60)).padStart(2, "0")}:${String(elapsedSeconds % 60).padStart(2, "0")}`;
   const speakerOn = audioDeviceStatus?.currentEndpointType === "Speaker";
   const fallbackName = participantTitle.trim().split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase()).join("");
-  const selfInitials = localDisplayName.trim().split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase()).join("");
 
   if (compact) {
     return (
       <View style={styles.compactStage}>
         {participants.length ? (
-          <ParticipantView participant={participants[0]} />
+          <ParticipantView
+            participant={participants[0]}
+            style={styles.participantFill}
+            objectFit="cover"
+            videoZOrder={0}
+            ParticipantVideoFallback={CallVideoFallback}
+          />
         ) : (
           <LinearGradient colors={BRAND_GRADIENT} style={styles.compactWaiting}>
             <Text style={styles.compactInitials}>{fallbackName || "P"}</Text>
@@ -395,7 +407,13 @@ function ActiveStreamCall({
         </LinearGradient>
       ) : (
         <View style={styles.remoteStage}>
-          <ParticipantView participant={participants[0]} />
+          <ParticipantView
+            participant={participants[0]}
+            style={styles.participantFill}
+            objectFit="cover"
+            videoZOrder={0}
+            ParticipantVideoFallback={CallVideoFallback}
+          />
         </View>
       )}
 
@@ -406,10 +424,22 @@ function ActiveStreamCall({
           accessibilityLabel="Your draggable camera preview"
         >
           {localParticipant && cameraOn ? (
-            <ParticipantView participant={localParticipant} />
+            <ParticipantView
+              participant={localParticipant}
+              style={styles.participantFill}
+              objectFit="cover"
+              videoZOrder={1}
+              ParticipantVideoFallback={CallVideoFallback}
+            />
+          ) : cameraOn ? (
+            <View style={styles.videoFallback}>
+              <Ionicons name="videocam-outline" size={22} color="#FFFFFF" />
+              <Text style={styles.videoFallbackText}>Connecting camera…</Text>
+            </View>
           ) : (
             <LinearGradient colors={["#5A4250", designTokens.color.callScrim]} style={styles.selfPlaceholder}>
-              <Text style={styles.selfInitials}>{selfInitials || "You"}</Text>
+              <Ionicons name="videocam-off-outline" size={22} color="#FFFFFF" />
+              <Text style={styles.selfInitials}>Camera off</Text>
             </LinearGradient>
           )}
           <View style={styles.selfLabel}>
@@ -523,6 +553,21 @@ function ActiveStreamCall({
   );
 }
 
+function CallVideoFallback({
+  participant,
+}: {
+  participant: ComponentProps<typeof ParticipantView>["participant"];
+}) {
+  return (
+    <View style={styles.videoFallback}>
+      <Ionicons name="videocam-off-outline" size={26} color="#FFFFFF" />
+      <Text style={styles.videoFallbackText}>
+        {participant.isLocalParticipant ? "Camera unavailable" : "Remote video unavailable"}
+      </Text>
+    </View>
+  );
+}
+
 function StreamControl({
   icon,
   label,
@@ -581,6 +626,7 @@ function QuickAccess({
 
 const styles = StyleSheet.create({
   container: { flex: 1, overflow: "hidden", backgroundColor: designTokens.color.callScrim },
+  participantFill: { flex: 1 },
   connecting: { flex: 1, alignItems: "center", justifyContent: "center", gap: 16, paddingHorizontal: 28 },
   connectingText: { color: "#FFFFFF", fontSize: 15, fontFamily: "Inter_500Medium" },
   connectionGlyph: { width: 62, height: 62, borderRadius: 22, alignItems: "center", justifyContent: "center" },
@@ -600,6 +646,20 @@ const styles = StyleSheet.create({
   selfView: { position: "absolute", zIndex: 4, width: 112, height: 156, borderRadius: 18, overflow: "hidden", backgroundColor: "#3A2931", borderWidth: 1.5, borderColor: "rgba(255,255,255,.72)", ...designTokens.shadow.elevated },
   selfPlaceholder: { flex: 1, alignItems: "center", justifyContent: "center" },
   selfInitials: { color: "#FFFFFF", fontSize: 18, fontFamily: "Sora_600SemiBold" },
+  videoFallback: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingHorizontal: 12,
+    backgroundColor: designTokens.color.callScrim,
+  },
+  videoFallbackText: {
+    color: "#FFFFFF",
+    fontSize: 11,
+    textAlign: "center",
+    fontFamily: "Inter_500Medium",
+  },
   selfLabel: { position: "absolute", bottom: 7, left: 7, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999, backgroundColor: "rgba(30,12,22,.68)" },
   selfLabelText: { color: "#FFFFFF", fontSize: 10, fontFamily: "Inter_600SemiBold" },
   topScrim: { position: "absolute", top: 0, left: 0, right: 0, height: 220 },
