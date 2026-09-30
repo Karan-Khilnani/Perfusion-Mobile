@@ -248,7 +248,7 @@ export default function NewConsultationScreen() {
   const book = useMutation({
     mutationFn: async () => {
       if (!selected) throw new Error("Choose a consultant and slot");
-      if (seeker && !effectiveCallbackDeviceId) throw new Error("Choose an eligible staff member and device for this consultation.");
+      if (seeker && !effectiveCallbackDeviceId) throw new Error("Choose a user and device for this consultation.");
       const response = await apiFetch("/api/bookings", {
         method: "POST",
         body: JSON.stringify({
@@ -395,12 +395,12 @@ export default function NewConsultationScreen() {
           </View>
           {seeker && (
             <>
-              <Text style={[styles.sectionTitle, { color: palette.foreground }]}>Assign staff and device*</Text>
+              <Text style={[styles.sectionTitle, { color: palette.foreground }]}>Assign user and device*</Text>
               <Text style={{ color: palette.mutedForeground, fontSize: 12, lineHeight: 18 }}>
-                Choose the registered staff member and installation responsible for this consultation. This can be handed off between shifts.
+                Choose the registered user and device for this consultation. You can change this later.
               </Text>
               {callbackDevicesLoading || currentInstallation.isLoading ? (
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 9 }}><ActivityIndicator size="small" color={palette.primary} /><Text style={{ color: palette.mutedForeground }}>Loading eligible staff and devices…</Text></View>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 9 }}><ActivityIndicator size="small" color={palette.primary} /><Text style={{ color: palette.mutedForeground }}>Loading users and devices…</Text></View>
               ) : callbackDevicesError ? (
                 <View style={{ gap: 8 }}>
                   <Text style={{ color: palette.destructive }}>{callbackDevicesError}</Text>
@@ -430,7 +430,7 @@ export default function NewConsultationScreen() {
                 </View>
               ) : (
                 <View style={{ gap: 8 }}>
-                  <Text style={{ color: palette.destructive }}>No eligible staff/device pairs are registered. Each pair needs a staff name and linked installation.</Text>
+                  <Text style={{ color: palette.destructive }}>No devices are ready. Add a name and link a phone to a device.</Text>
                   <Pressable onPress={() => router.push("/callback-device")}><Text style={{ color: palette.primary, fontFamily: "Inter_600SemiBold" }}>Manage registered devices</Text></Pressable>
                 </View>
               )}

@@ -593,9 +593,9 @@ function CallbackDeviceRow({
       <View style={{ flexDirection: "row", alignItems: "center", gap: 9 }}>
         <Feather name="users" size={17} color={palette.primary} />
         <View style={{ flex: 1 }}>
-          <Text style={{ color: palette.mutedForeground, fontSize: 10, letterSpacing: 0.5, fontFamily: "Inter_700Bold" }}>ASSIGNED STAFF · DEVICE</Text>
+          <Text style={{ color: palette.mutedForeground, fontSize: 10, letterSpacing: 0.5, fontFamily: "Inter_700Bold" }}>ASSIGNED USER · DEVICE</Text>
           <Text numberOfLines={1} style={{ color: palette.foreground, fontSize: 13, fontFamily: "Inter_600SemiBold", marginTop: 3 }}>
-            {assignedStaffName || "No staff assigned"}
+            {assignedStaffName || "No user assigned"}
           </Text>
           {!!currentDeviceName && <Text numberOfLines={1} style={{ color: palette.mutedForeground, fontSize: 11, marginTop: 2 }}>{currentDeviceName}</Text>}
         </View>
@@ -603,7 +603,7 @@ function CallbackDeviceRow({
       {canManage && loading && (
         <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
           <ActivityIndicator size="small" color={palette.primary} />
-          <Text style={{ color: palette.mutedForeground, fontSize: 11 }}>Loading eligible staff and devices…</Text>
+          <Text style={{ color: palette.mutedForeground, fontSize: 11 }}>Loading users and devices…</Text>
         </View>
       )}
       {canManage && assignment?.confirmedAt && (
@@ -624,7 +624,7 @@ function CallbackDeviceRow({
           >
             {saving ? <ActivityIndicator size="small" color={palette.primary} /> : <Feather name={assignment?.deviceId ? "check-circle" : "edit-2"} size={15} color={palette.primary} />}
             <Text style={{ color: palette.primary, fontSize: 12, fontFamily: "Inter_600SemiBold" }}>
-            {saving ? "Saving…" : assignment?.deviceId ? "Change assigned staff/device" : "Assign staff and device"}
+            {saving ? "Saving…" : assignment?.deviceId ? "Change assigned user/device" : "Assign user and device"}
             </Text>
           </Pressable>
           {!!mutationError && <Text style={{ color: palette.destructive, fontSize: 12 }} accessibilityRole="alert">{mutationError}</Text>}
@@ -651,7 +651,7 @@ function CallbackDeviceRow({
                 </Pressable>
               )) : (
                 <View style={{ gap: 6 }}>
-                  <Text style={{ color: palette.mutedForeground, fontSize: 12 }}>No eligible staff/device pairs. Each registered pair needs a staff name and linked installation.</Text>
+                  <Text style={{ color: palette.mutedForeground, fontSize: 12 }}>No devices are ready. Add a name and link a phone to a device.</Text>
                   <Pressable onPress={() => router.push("/callback-device")}><Text style={{ color: palette.primary, fontFamily: "Inter_600SemiBold" }}>Manage registered devices</Text></Pressable>
                 </View>
               )}

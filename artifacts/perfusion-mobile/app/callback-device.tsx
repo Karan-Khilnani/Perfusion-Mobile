@@ -28,7 +28,7 @@ export default function CallbackDeviceScreen() {
     enabled: user?.role === "care_seeker" && user.approvalStatus === "approved" && !user.needsProfile,
     staleTime: Infinity,
   });
-  const [staffName, setStaffName] = useState("");
+  const [userName, setUserName] = useState("");
   const [deviceName, setDeviceName] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -41,11 +41,14 @@ export default function CallbackDeviceScreen() {
       !!device.staffName?.trim(),
   );
   const onboarding = !linkedCurrentDevice;
+  const visibleDevices = onboarding
+    ? callbackDevices.filter((device) => !!device.staffName?.trim())
+    : callbackDevices;
 
   const save = async () => {
     setError(null);
-    if (!staffName.trim() || staffName.trim().length > 100) {
-      setError("Enter the staff member's name (up to 100 characters).");
+    if (!userName.trim() || userName.trim().length > 100) {
+      setError("Enter your name (up to 100 characters).");
       return;
     }
     if (!deviceName.trim() || deviceName.trim().length > 100) {
@@ -53,30 +56,30 @@ export default function CallbackDeviceScreen() {
       return;
     }
     if (phoneNumber.replace(/\D/g, "").length < 7) {
-      setError("Enter a valid callback phone number.");
+      setError("Enter a valid phone number.");
       return;
     }
     setSaving(true);
     try {
       const installationId = currentInstallation.data;
       if (!installationId) {
-        throw new Error("This installation could not be identified. Please try again.");
+        throw new Error("This phone could not be identified. Please try again.");
       }
       let saved;
       if (editingId) {
         const editingDevice = callbackDevices.find((device) => device.id === editingId);
         if (onboarding && editingDevice?.installationId && editingDevice.installationId !== installationId) {
-          throw new Error("This registration belongs to another installation. Use its Link button to move it here.");
+          throw new Error("This device is on another phone. Choose it from the directory to move it here.");
         }
         saved = await updateCallbackDevice(editingId, {
-          staffName: staffName.trim(),
+          staffName: userName.trim(),
           deviceName: deviceName.trim(),
           phoneNumber: phoneNumber.trim(),
           ...(onboarding && !editingDevice?.installationId ? { installationId } : {}),
         });
       } else {
         saved = await createCallbackDevice({
-          staffName: staffName.trim(),
+          staffName: userName.trim(),
           deviceName: deviceName.trim(),
           phoneNumber: phoneNumber.trim(),
           installationId,
@@ -86,9 +89,9 @@ export default function CallbackDeviceScreen() {
         onboarding &&
         (saved.installationId !== installationId || !saved.staffName?.trim())
       ) {
-        throw new Error("The callback device was saved, but it is not linked to this installation. Please link it to continue.");
+        throw new Error("The device was saved, but it is not linked to this phone. Please try again.");
       }
-      setStaffName("");
+      setUserName("");
       setDeviceName("");
       setPhoneNumber("");
       setEditingId(null);
@@ -102,7 +105,7 @@ export default function CallbackDeviceScreen() {
 
   const edit = (item: (typeof callbackDevices)[number]) => {
     setEditingId(item.id);
-    setStaffName(item.staffName || "");
+    setUserName(item.staffName || "");
     setDeviceName(item.deviceName);
     setPhoneNumber(item.phoneNumber);
     setError(null);
@@ -122,7 +125,7 @@ export default function CallbackDeviceScreen() {
             .then(() => {
               if (editingId === item.id) {
                 setEditingId(null);
-                setStaffName("");
+                setUserName("");
                 setDeviceName("");
                 setPhoneNumber("");
               }
@@ -143,7 +146,7 @@ export default function CallbackDeviceScreen() {
         router.replace("/(tabs)");
       }
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Could not link this installation.");
+      setError(cause instanceof Error ? cause.message : "Could not use this device. Try again.");
     } finally {
       setSaving(false);
     }
@@ -163,24 +166,26 @@ export default function CallbackDeviceScreen() {
       }]}
       keyboardShouldPersistTaps="handled"
     >
-      <View style={[styles.icon, { backgroundColor: `${colors.primary}14` }]}>
-        <Feather name="phone-call" size={27} color={colors.primary} />
-      </View>
+      {!onboarding && (
+        <View style={[styles.icon, { backgroundColor: `${colors.primary}14` }]}>
+          <Feather name="phone-call" size={27} color={colors.primary} />
+        </View>
+      )}
       <Text style={[styles.title, { color: colors.foreground }]}>
-        {onboarding ? "Set up callback device" : "Callback devices"}
+        {onboarding ? "Set up your device" : "Callback devices"}
       </Text>
-      <Text style={[styles.description, { color: colors.mutedForeground }]}>
-        {onboarding
-          ? "Register who is using this installation. The device will be assigned to individual bookings; its contact number is saved for a future pre-appointment reminder."
-          : "Each consultation chooses its own staff member and device. The contact number is saved for a future pre-appointment reminder, not for in-app calling."}
-      </Text>
+      {onboarding && (
+        <Text style={[styles.description, { color: colors.mutedForeground }]}>
+          Choose your device below, or add a new one.
+        </Text>
+      )}
 
       {currentInstallation.isLoading ? (
-        <View style={styles.loading}><ActivityIndicator color={colors.primary} /><Text style={{ color: colors.mutedForeground }}>Identifying this installation…</Text></View>
+        <View style={styles.loading}><ActivityIndicator color={colors.primary} /><Text style={{ color: colors.mutedForeground }}>Checking this phone…</Text></View>
       ) : null}
       {currentInstallation.isError && (
         <View style={[styles.notice, { borderColor: colors.destructive }]}>
-          <Text style={{ color: colors.destructive }}>Could not identify this installation. Callback setup cannot continue until its identity is available.</Text>
+          <Text style={{ color: colors.destructive }}>Could not identify this phone. Please try again.</Text>
           <Pressable onPress={() => void currentInstallation.refetch()} testID="retry-installation-id">
             <Text style={{ color: colors.primary, fontFamily: "Inter_600SemiBold" }}>Try again</Text>
           </Pressable>
@@ -199,7 +204,10 @@ export default function CallbackDeviceScreen() {
         </View>
       )}
 
-      {callbackDevices.map((device) => {
+      {onboarding && visibleDevices.length > 0 && (
+        <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Choose an existing device</Text>
+      )}
+      {visibleDevices.map((device) => {
         const linked = !!device.installationId && device.installationId === currentInstallation.data;
         return (
           <View key={device.id} style={[styles.deviceCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -207,60 +215,85 @@ export default function CallbackDeviceScreen() {
               {!!device.staffName && <Text style={[styles.deviceMeta, { color: colors.mutedForeground }]}>{device.staffName}</Text>}
               <Text style={[styles.deviceName, { color: colors.foreground }]}>{device.deviceName}</Text>
               <Text style={[styles.deviceMeta, { color: colors.mutedForeground }]}>{device.phoneNumber}</Text>
-              <Text style={[styles.deviceMeta, { color: linked ? colors.success : colors.mutedForeground }]}>
-                {linked ? "Linked to this installation" : "Not linked to this installation"}
-              </Text>
+              {(!onboarding || !!device.installationId) && (
+                <Text style={[styles.deviceMeta, { color: linked ? colors.success : colors.mutedForeground }]}>
+                  {linked ? "This phone" : device.installationId ? "On another phone" : "Ready to use"}
+                </Text>
+              )}
             </View>
-            <View style={styles.actions}>
-              <Pressable onPress={() => edit(device)} accessibilityLabel={`Edit ${device.deviceName}`} hitSlop={8}>
-                <Feather name="edit-2" size={17} color={colors.primary} />
-              </Pressable>
+            {onboarding ? (
               <Pressable
                 disabled={saving || !currentInstallation.data}
                 onPress={() => {
-                  if (!linked && device.installationId) {
+                  if (device.installationId && !linked) {
                     AppAlert.alert(
-                      "Move registration to this installation?",
-                      "This stops the old installation from using this registration. Bookings assigned to it will need to use this installation when targeted calling is enabled.",
+                      "Use this device on this phone?",
+                      "This will unlink it from the other phone. Existing consultation assignments will stay with this device.",
                       [
                         { text: "Cancel", style: "cancel" },
-                        { text: "Move registration", onPress: () => void linkCurrentInstallation(device.id, false) },
+                        { text: "Use this device", onPress: () => void linkCurrentInstallation(device.id, false) },
                       ],
                     );
                   } else {
-                    void linkCurrentInstallation(device.id, linked);
+                    void linkCurrentInstallation(device.id, false);
                   }
                 }}
-                accessibilityLabel={linked ? "Unlink this installation" : "Link this installation"}
-                hitSlop={8}
+                style={[styles.useDeviceButton, { borderColor: colors.primary }]}
+                accessibilityLabel={`Use ${device.staffName || "this user"}'s ${device.deviceName} on this phone`}
+                testID={`use-callback-device-${device.id}`}
               >
-                <Feather name={linked ? "smartphone" : "link"} size={17} color={linked ? colors.success : colors.primary} />
+                <Text style={[styles.useDeviceText, { color: colors.primary }]}>Use this</Text>
               </Pressable>
-              <Pressable disabled={saving} onPress={() => remove(device)} accessibilityLabel={`Remove ${device.deviceName}`} hitSlop={8}>
-                <Feather name="trash-2" size={17} color={colors.destructive} />
-              </Pressable>
-            </View>
+            ) : (
+              <View style={styles.actions}>
+                <Pressable onPress={() => edit(device)} accessibilityLabel={`Edit ${device.deviceName}`} hitSlop={8}>
+                  <Feather name="edit-2" size={17} color={colors.primary} />
+                </Pressable>
+                <Pressable
+                  disabled={saving || !currentInstallation.data}
+                  onPress={() => {
+                    if (!linked && device.installationId) {
+                      AppAlert.alert(
+                        "Move registration to this phone?",
+                        "This stops the other phone from using this registration. Existing consultation assignments will stay with this device.",
+                        [
+                          { text: "Cancel", style: "cancel" },
+                          { text: "Move registration", onPress: () => void linkCurrentInstallation(device.id, false) },
+                        ],
+                      );
+                    } else {
+                      void linkCurrentInstallation(device.id, linked);
+                    }
+                  }}
+                  accessibilityLabel={linked ? "Unlink this phone" : "Link this phone"}
+                  hitSlop={8}
+                >
+                  <Feather name={linked ? "smartphone" : "link"} size={17} color={linked ? colors.success : colors.primary} />
+                </Pressable>
+                <Pressable disabled={saving} onPress={() => remove(device)} accessibilityLabel={`Remove ${device.deviceName}`} hitSlop={8}>
+                  <Feather name="trash-2" size={17} color={colors.destructive} />
+                </Pressable>
+              </View>
+            )}
           </View>
         );
       })}
 
-      {!callbackDevicesLoading && !callbackDevicesError && callbackDevices.length === 0 && (
-        <Text style={{ color: colors.mutedForeground }}>No devices registered yet. Add at least one phone to continue.</Text>
-      )}
-
-      <Text style={[styles.sectionTitle, { color: colors.foreground }]}>{editingId ? "Edit callback registration" : onboarding ? "This installation" : "Add another device"}</Text>
-      <Text style={[styles.label, { color: colors.foreground }]}>Staff member</Text>
+      <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
+        {editingId ? "Edit device" : onboarding && visibleDevices.length > 0 ? "Or add a new device" : onboarding ? "Add your device" : "Add another device"}
+      </Text>
+      <Text style={[styles.label, { color: colors.foreground }]}>Your name</Text>
       <TextInput
         style={[styles.input, { backgroundColor: colors.card, color: colors.foreground, borderColor: colors.border }]}
-        placeholder="Name of the staff member using this phone"
+        placeholder="Your full name"
         placeholderTextColor={colors.mutedForeground}
-        value={staffName}
-        onChangeText={setStaffName}
+        value={userName}
+        onChangeText={setUserName}
         maxLength={100}
         autoComplete="name"
         testID="callback-staff-name"
       />
-      <Text style={[styles.label, { color: colors.foreground }]}>Device name</Text>
+      <Text style={[styles.label, { color: colors.foreground }]}>Your device name</Text>
       <TextInput
         style={[styles.input, { backgroundColor: colors.card, color: colors.foreground, borderColor: colors.border }]}
         placeholder="e.g. My mobile"
@@ -270,7 +303,7 @@ export default function CallbackDeviceScreen() {
         maxLength={100}
         testID="callback-device-name"
       />
-      <Text style={[styles.label, { color: colors.foreground }]}>Callback phone number</Text>
+      <Text style={[styles.label, { color: colors.foreground }]}>Your number</Text>
       <TextInput
         style={[styles.input, { backgroundColor: colors.card, color: colors.foreground, borderColor: colors.border }]}
         placeholder="+91 98765 43210"
@@ -289,10 +322,10 @@ export default function CallbackDeviceScreen() {
         style={[styles.button, { backgroundColor: colors.primary, opacity: saving || callbackDevicesLoading || !!callbackDevicesError || !currentInstallation.data ? 0.6 : 1 }]}
         testID="save-callback-device"
       >
-        {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>{editingId ? "Save registration" : "Register this installation"}</Text>}
+        {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>{editingId ? "Save changes" : onboarding ? "Save and continue" : "Add device"}</Text>}
       </Pressable>
       {editingId && (
-        <Pressable onPress={() => { setEditingId(null); setStaffName(""); setDeviceName(""); setPhoneNumber(""); setError(null); }} style={styles.cancel}>
+        <Pressable onPress={() => { setEditingId(null); setUserName(""); setDeviceName(""); setPhoneNumber(""); setError(null); }} style={styles.cancel}>
           <Text style={{ color: colors.mutedForeground }}>Cancel editing</Text>
         </Pressable>
       )}
@@ -317,6 +350,8 @@ const styles = StyleSheet.create({
   deviceName: { fontFamily: "Inter_600SemiBold", fontSize: 15 },
   deviceMeta: { fontFamily: "Inter_400Regular", fontSize: 12 },
   actions: { flexDirection: "row", alignItems: "center", gap: 15 },
+  useDeviceButton: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 9 },
+  useDeviceText: { fontFamily: "Inter_600SemiBold", fontSize: 12 },
   sectionTitle: { fontSize: 17, fontFamily: "Sora_600SemiBold", marginTop: 12 },
   label: { fontSize: 14, fontFamily: "Inter_600SemiBold", marginTop: 4 },
   input: { height: 50, borderWidth: 1, borderRadius: 10, paddingHorizontal: 14, fontSize: 16 },
