@@ -20,11 +20,23 @@ export type { Booking };
 
 type Props = {
   booking: Booking;
+  dashboard?: boolean;
   onStatusToggle?: (booking: Booking) => void;
   statusTogglePending?: boolean;
 };
 
-export function BookingCard({ booking, onStatusToggle, statusTogglePending = false }: Props) {
+function patientAgeSex(age: Booking["patientAge"], gender: Booking["patientGender"]) {
+  const ageLabel = age != null ? String(age) : "";
+  const sexLabel = gender?.trim().charAt(0).toUpperCase() || "";
+  return `${ageLabel}${sexLabel}` || "—";
+}
+
+function cityAbbreviation(city?: string | null) {
+  const cityName = city?.trim().split(/[\s,]+/)[0] || "";
+  return cityName.slice(0, 3).toUpperCase() || "—";
+}
+
+export function BookingCard({ booking, dashboard = false, onStatusToggle, statusTogglePending = false }: Props) {
   const palette = useColors();
   const { user } = useAuth();
   const [expanded, setExpanded] = useState(false);
@@ -64,6 +76,20 @@ export function BookingCard({ booking, onStatusToggle, statusTogglePending = fal
     : providerConsultation
       ? booking.seekerCity || booking.city
       : booking.seekerHospitalLocation || booking.city;
+  const dashboardProviderConsultation = dashboard && providerConsultation;
+  const dashboardSeekerConsultation = dashboard && seeker && booking.bookingType === "consultation";
+  const dashboardLocation = dashboardProviderConsultation
+    ? booking.seekerCity || booking.city || booking.seekerHospitalLocation
+    : dashboardSeekerConsultation
+      ? booking.providerCity
+      : location;
+  const hospitalAndLocation = [hospital?.trim(), dashboardLocation?.trim()].filter(Boolean).join(", ");
+  const seekerHeadline = [service, booking.providerName?.trim()].filter(Boolean).join(" · ");
+  const badgeLabel = dashboardProviderConsultation
+    ? patientAgeSex(booking.patientAge, booking.patientGender)
+    : dashboardSeekerConsultation
+      ? cityAbbreviation(dashboardLocation)
+      : initials;
   const title = providerConsultation ? hospital || "Consultation" : service;
   const patientContext = seeker ? booking.patientName : null;
   const time = formatTime(booking.appointmentSlot || booking.timeSlot || booking.scheduledDate);
@@ -124,7 +150,7 @@ export function BookingCard({ booking, onStatusToggle, statusTogglePending = fal
     <View style={[styles.row, { backgroundColor: palette.card, borderColor: palette.border }]}>
       <View style={styles.rowMain}>
         <View style={[styles.badge, { backgroundColor: seeker ? designTokens.color.coralTint : designTokens.color.plumTint }]}>
-          <Text style={[styles.badgeText, { color: seeker ? palette.primary : palette.quiet }]}>{initials}</Text>
+          <Text style={[styles.badgeText, { color: seeker ? palette.primary : palette.quiet }]}>{badgeLabel}</Text>
         </View>
         <View style={styles.rowBody}>
           <Pressable
@@ -134,19 +160,34 @@ export function BookingCard({ booking, onStatusToggle, statusTogglePending = fal
             accessibilityState={{ expanded }}
             testID={`consultation-row-${booking.id}`}
           >
-            <Text style={[styles.person, { color: palette.foreground }]}>{person || (seeker ? "Consultant" : "Patient")}</Text>
-            <Text style={[styles.title, { color: palette.mutedForeground }]}>{title}</Text>
-            {patientContext ? <Text style={[styles.patientContext, { color: palette.mutedForeground }]}>For patient: {patientContext}</Text> : null}
-            {providerConsultation ? (
-              location ? (
-                <Text style={[styles.place, { color: palette.mutedForeground }]}>· {location}</Text>
-              ) : null
-            ) : (hospital || location) ? (
-              <View style={styles.placeLine}>
-                {hospital ? <Text style={[styles.placeStrong, { color: palette.foreground }]}>{hospital}</Text> : null}
-                {location ? <Text style={[styles.place, { color: palette.mutedForeground }]}>{hospital ? ` · ${location}` : location}</Text> : null}
-              </View>
-            ) : null}
+            {dashboardProviderConsultation ? (
+              <>
+                <Text style={[styles.person, { color: palette.foreground }]}>{hospitalAndLocation || "Consultation"}</Text>
+                <Text style={[styles.title, { color: palette.mutedForeground }]}>{booking.patientName || "Patient"}</Text>
+              </>
+            ) : dashboardSeekerConsultation ? (
+              <>
+                <Text style={[styles.person, { color: palette.foreground }]}>{seekerHeadline}</Text>
+                {hospitalAndLocation ? <Text style={[styles.title, { color: palette.mutedForeground }]}>{hospitalAndLocation}</Text> : null}
+                {booking.patientName ? <Text style={[styles.patientContext, { color: palette.mutedForeground }]}>{booking.patientName}</Text> : null}
+              </>
+            ) : (
+              <>
+                <Text style={[styles.person, { color: palette.foreground }]}>{person || (seeker ? "Consultant" : "Patient")}</Text>
+                <Text style={[styles.title, { color: palette.mutedForeground }]}>{title}</Text>
+                {patientContext ? <Text style={[styles.patientContext, { color: palette.mutedForeground }]}>For patient: {patientContext}</Text> : null}
+                {providerConsultation ? (
+                  location ? (
+                    <Text style={[styles.place, { color: palette.mutedForeground }]}>· {location}</Text>
+                  ) : null
+                ) : (hospital || location) ? (
+                  <View style={styles.placeLine}>
+                    {hospital ? <Text style={[styles.placeStrong, { color: palette.foreground }]}>{hospital}</Text> : null}
+                    {location ? <Text style={[styles.place, { color: palette.mutedForeground }]}>{hospital ? ` · ${location}` : location}</Text> : null}
+                  </View>
+                ) : null}
+              </>
+            )}
           </Pressable>
           <View style={styles.scheduleLine}>
             <Feather name="calendar" size={13} color={palette.mutedForeground} />

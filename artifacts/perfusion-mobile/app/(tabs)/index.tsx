@@ -193,6 +193,7 @@ export default function DashboardScreen() {
             <BookingCard
               key={booking.id}
               booking={booking}
+              dashboard
               onStatusToggle={user?.role === "provider" ? (value) => consultationStatus.mutate(value) : undefined}
               statusTogglePending={consultationStatus.isPending}
             />

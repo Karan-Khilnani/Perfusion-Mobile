@@ -27,3 +27,4 @@
 - [Case File video originals](case-file-video-originals.md) — keep the private original for downloads and use a private MP4 playback copy only when the original is not cross-platform playable.
 - [Shared availability compatibility](shared-availability-compatibility.md) — preserve Web schedule editing; Mobile day-off windows remain stored but must not become bookable.
 - [Inverted FlatList orientation](inverted-flatlist-orientation.md) — React Native already compensates header/footer wrappers in inverted lists; avoid extra child flips.
+- [Hospital location labels](hospital-location-labels.md) — prefer a verified city; do not guess one from a free-form hospital address in consultation cards.
