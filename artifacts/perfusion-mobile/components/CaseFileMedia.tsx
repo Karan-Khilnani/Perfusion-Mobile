@@ -24,6 +24,10 @@ import type { CaseFileMessage } from "@/lib/mobile-models";
 type CaseFileAttachment = NonNullable<CaseFileMessage["attachment"]>;
 type MediaKind = "image" | "video" | "pdf" | "document";
 
+function boundedAspectRatio(width: number, height: number): number {
+  return width > 0 && height > 0 ? Math.max(0.72, Math.min(width / height, 1.7)) : 4 / 5;
+}
+
 function getMediaKind(attachment: CaseFileAttachment): MediaKind {
   const mimeType = attachment.mimeType?.toLowerCase() || "";
   const extension = attachment.originalFilename?.split(".").pop()?.toLowerCase() || "";
@@ -97,7 +101,8 @@ export function CaseFileAttachmentPreview({
   const kind = getMediaKind(attachment);
   const [url, setUrl] = useState<string | null>(null);
   const [previewError, setPreviewError] = useState(false);
-  const previewWidth = Math.max(150, Math.min(screenWidth * 0.68, 360));
+  const [mediaAspect, setMediaAspect] = useState(kind === "video" ? 4 / 5 : 4 / 3);
+  const previewWidth = Math.max(150, Math.min((screenWidth - 32) * 0.86 - 32, 340));
   const details = getAttachmentDetails(attachment, kind);
 
   useEffect(() => {
@@ -122,23 +127,27 @@ export function CaseFileAttachmentPreview({
       <Pressable
         onPress={() => onOpen(attachment)}
         accessibilityRole="button"
-        accessibilityLabel={`Open ${getFileTypeLabel(attachment, kind)} ${attachment.originalFilename || "attachment"}`}
+        accessibilityLabel={`Open ${getFileTypeLabel(attachment, kind)}${attachment.category && attachment.category !== "uncategorized" ? `, ${attachment.category.replace(/_/g, " ")}` : ""}`}
         testID={`open-case-file-attachment-${attachment.id}`}
         style={({ pressed }) => [
           styles.previewPressable,
-          { opacity: pressed ? 0.9 : 1 },
+          { opacity: pressed ? 0.9 : 1, borderColor: palette.conversationBorder },
         ]}
       >
         {kind === "image" ? (
           url && !previewError ? (
             <Image
               source={{ uri: url }}
-              style={[styles.imagePreview, { width: previewWidth }]}
-              resizeMode="cover"
+              style={[styles.imagePreview, { width: previewWidth, aspectRatio: mediaAspect }]}
+              resizeMode="contain"
+              onLoad={(event) => {
+                const { width, height } = event.nativeEvent.source;
+                setMediaAspect(boundedAspectRatio(width, height));
+              }}
               onError={() => setPreviewError(true)}
             />
           ) : (
-            <View style={[styles.loadingPreview, styles.imagePreview, { width: previewWidth }]}>
+            <View style={[styles.loadingPreview, styles.imagePreview, { width: previewWidth, aspectRatio: mediaAspect }]}>
               {previewError
                 ? <Feather name="image" size={25} color={palette.conversationPrimary} />
                 : <ActivityIndicator color={palette.conversationPrimary} />}
@@ -146,9 +155,9 @@ export function CaseFileAttachmentPreview({
             </View>
           )
         ) : kind === "video" ? (
-          <View style={[styles.videoPreview, { width: previewWidth }]}>
+          <View style={[styles.videoPreview, { width: previewWidth, aspectRatio: mediaAspect }]}>
             {url && !previewError ? (
-              <CaseFileVideoThumbnail uri={url} />
+              <CaseFileVideoThumbnail uri={url} onAspectRatio={setMediaAspect} />
             ) : (
               <View style={styles.videoPlaceholder}>
                 {previewError
@@ -158,8 +167,17 @@ export function CaseFileAttachmentPreview({
               </View>
             )}
             <View pointerEvents="none" style={styles.playAffordance}>
-              <Feather name="play" size={23} color={palette.conversationPrimaryForeground} />
+              <View style={styles.playBadge}>
+                <Feather name="play" size={23} color={palette.conversationPrimaryForeground} />
+              </View>
             </View>
+            {!!attachment.durationSeconds && (
+              <View pointerEvents="none" style={styles.durationBadge}>
+                <Text style={styles.durationText}>
+                  {Math.floor(attachment.durationSeconds / 60)}:{String(Math.floor(attachment.durationSeconds % 60)).padStart(2, "0")}
+                </Text>
+              </View>
+            )}
           </View>
         ) : (
           <View style={[styles.documentPreview, { width: previewWidth,
@@ -177,9 +195,6 @@ export function CaseFileAttachmentPreview({
               <Text style={[styles.documentType, { color: palette.conversationPrimary }]} numberOfLines={1}>
                 {kind === "pdf" ? "PDF preview" : `${getFileTypeLabel(attachment, kind)} document`}
               </Text>
-              <Text style={[styles.documentName, { color: palette.foreground }]} numberOfLines={1} ellipsizeMode="middle">
-                {attachment.originalFilename || "Clinical document"}
-              </Text>
               <Text style={[styles.documentDetails, { color: palette.conversationMuted }]} numberOfLines={1}>
                 {details}
               </Text>
@@ -189,30 +204,29 @@ export function CaseFileAttachmentPreview({
         )}
       </Pressable>
 
-      {(kind === "image" || kind === "video") && (
-        <View style={[styles.mediaMetadata, { width: previewWidth }]}>
-          <Text style={[styles.mediaName, { color: palette.foreground }]} numberOfLines={1} ellipsizeMode="middle">
-            {attachment.originalFilename || (kind === "image" ? "Image" : "Video")}
-          </Text>
-          <Text style={[styles.mediaDetails, { color: palette.conversationMuted }]} numberOfLines={1}>
-            {details}
-          </Text>
-        </View>
-      )}
     </View>
   );
 }
 
-function CaseFileVideoThumbnail({ uri }: { uri: string }) {
+function CaseFileVideoThumbnail({ uri, onAspectRatio }: { uri: string; onAspectRatio: (ratio: number) => void }) {
   const palette = useColors();
   const player = useVideoPlayer({ uri });
   const [failed, setFailed] = useState(false);
   useEffect(() => {
     const subscription = player.addListener("statusChange", ({ status }) => {
       setFailed(status === "error");
+      if (status === "readyToPlay" && player.videoTrack?.size) {
+        onAspectRatio(boundedAspectRatio(player.videoTrack.size.width, player.videoTrack.size.height));
+      }
     });
-    return () => subscription.remove();
-  }, [player]);
+    const trackSubscription = player.addListener("videoTrackChange", ({ videoTrack }) => {
+      if (videoTrack?.size) onAspectRatio(boundedAspectRatio(videoTrack.size.width, videoTrack.size.height));
+    });
+    return () => {
+      subscription.remove();
+      trackSubscription.remove();
+    };
+  }, [onAspectRatio, player]);
 
   return failed ? (
     <View style={[styles.videoPlaceholder, { backgroundColor: palette.conversationPrimary }]}>
@@ -249,9 +263,7 @@ export function CaseFileMediaViewer({
   const [error, setError] = useState<string | null>(null);
   const [reload, setReload] = useState(0);
   const kind = attachment ? getMediaKind(attachment) : "document";
-  const fileName = attachment?.originalFilename || (
-    attachment ? getFileTypeLabel(attachment, kind) : "Clinical attachment"
-  );
+  const mediaLabel = attachment ? getFileTypeLabel(attachment, kind) : "Clinical attachment";
   const previewHeight = Math.max(240, height - insets.top - insets.bottom - 68);
 
   useEffect(() => {
@@ -293,8 +305,8 @@ export function CaseFileMediaViewer({
             <Feather name="arrow-left" size={21} color={palette.conversationPrimaryForeground} />
           </Pressable>
           <View style={styles.viewerTitle}>
-            <Text style={[styles.viewerFileName, { color: palette.conversationPrimaryForeground }]} numberOfLines={1} ellipsizeMode="middle">
-              {fileName}
+            <Text style={[styles.viewerFileName, { color: palette.conversationPrimaryForeground }]} numberOfLines={1}>
+              {mediaLabel}
             </Text>
             {!!attachment && (
               <Text style={[styles.viewerDetails, { color: palette.conversationPrimaryForeground }]}>
@@ -307,7 +319,7 @@ export function CaseFileMediaViewer({
             disabled={downloading}
             style={[styles.viewerIcon, { opacity: downloading ? 0.65 : 1 }]}
             accessibilityRole="button"
-            accessibilityLabel={`Download original ${fileName}`}
+            accessibilityLabel={`Download original ${mediaLabel}`}
             testID="download-case-file-media"
           >
             {downloading
@@ -399,9 +411,6 @@ function DocumentFallback({
       <Text style={[styles.fallbackTitle, { color: palette.conversationPrimaryForeground }]}>
         {getFileTypeLabel(attachment, kind)} document
       </Text>
-      <Text style={[styles.fallbackName, { color: palette.conversationPrimaryForeground }]} numberOfLines={2} ellipsizeMode="middle">
-        {attachment.originalFilename || "Clinical document"}
-      </Text>
       <Text style={[styles.viewerStatusText, { color: palette.conversationPrimaryForeground }]}>
         This file type does not have an in-app preview. Use the download icon above to save the original.
       </Text>
@@ -445,11 +454,11 @@ function CaseFileVideo({
 
 const styles = StyleSheet.create({
   preview: { alignSelf: "stretch", marginBottom: 8 },
-  previewPressable: { alignSelf: "flex-start", maxWidth: "100%", overflow: "hidden", borderRadius: 14 },
-  imagePreview: { aspectRatio: 4 / 3, borderRadius: 14, backgroundColor: designTokens.color.callScrim },
+  previewPressable: { alignSelf: "flex-start", maxWidth: "100%", overflow: "hidden", borderRadius: 14, borderWidth: 1 },
+  imagePreview: { backgroundColor: designTokens.color.callScrim },
   loadingPreview: { alignItems: "center", justifyContent: "center", gap: 8 },
   previewHint: { fontSize: 11, fontFamily: "Inter_500Medium" },
-  videoPreview: { aspectRatio: 16 / 9, overflow: "hidden", borderRadius: 14, backgroundColor: designTokens.color.callScrim },
+  videoPreview: { overflow: "hidden", backgroundColor: designTokens.color.callScrim },
   videoFrame: { ...StyleSheet.absoluteFillObject },
   videoPlaceholder: { ...StyleSheet.absoluteFillObject, alignItems: "center", justifyContent: "center", gap: 8 },
   videoHint: { fontSize: 11, fontFamily: "Inter_500Medium" },
@@ -457,17 +466,15 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(20, 12, 18, 0.16)",
   },
+  playBadge: { width: 52, height: 52, borderRadius: 26, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(20, 12, 18, 0.6)" },
+  durationBadge: { position: "absolute", bottom: 9, left: 9, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 3, backgroundColor: "rgba(20, 12, 18, 0.7)" },
+  durationText: { color: designTokens.color.card, fontFamily: "Inter_600SemiBold", fontSize: 11 },
   documentPreview: { minHeight: 76, borderWidth: 1, borderRadius: 14, padding: 12, flexDirection: "row", alignItems: "center", gap: 10 },
   documentIcon: { width: 42, height: 42, borderRadius: 12, alignItems: "center", justifyContent: "center" },
   documentText: { flex: 1, minWidth: 0, gap: 3 },
   documentType: { fontSize: 10, fontFamily: "Inter_600SemiBold" },
-  documentName: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
   documentDetails: { fontSize: 10, fontFamily: "Inter_400Regular", textTransform: "capitalize" },
-  mediaMetadata: { paddingHorizontal: 2, paddingTop: 6, gap: 2 },
-  mediaName: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
-  mediaDetails: { fontSize: 9, fontFamily: "Inter_400Regular", textTransform: "capitalize" },
   viewer: { flex: 1 },
   viewerHeader: { minHeight: 64, paddingHorizontal: 10, paddingBottom: 8, flexDirection: "row", alignItems: "center", gap: 6 },
   viewerIcon: { width: 42, height: 42, alignItems: "center", justifyContent: "center" },
@@ -485,5 +492,4 @@ const styles = StyleSheet.create({
   documentFallback: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12, padding: 28 },
   fallbackIcon: { width: 72, height: 72, borderRadius: 22, alignItems: "center", justifyContent: "center" },
   fallbackTitle: { fontSize: 17, fontFamily: "Sora_600SemiBold" },
-  fallbackName: { maxWidth: "90%", fontSize: 12, textAlign: "center", fontFamily: "Inter_500Medium" },
 });

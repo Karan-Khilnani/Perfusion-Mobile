@@ -1091,33 +1091,40 @@ function AttachmentViewer({ attachment, bookingId }: { attachment: any; bookingI
       setBusy(false);
     }
   };
-  const filename = attachment.originalFilename || `Attachment (${attachment.category})`;
+  const mediaLabel = isImg ? "Image" : isVideo ? "Video" : attachment.mimeType === "application/pdf" ? "PDF" : "Document";
+  const duration = isVideo && attachment.durationSeconds
+    ? `${Math.floor(attachment.durationSeconds / 60)}:${String(Math.floor(attachment.durationSeconds % 60)).padStart(2, "0")}`
+    : null;
 
   return (
-    <div className="flex flex-col gap-2 min-w-[190px]">
-      <div className="flex items-center gap-2">
-        {isImg ? <ImageIcon className="h-4 w-4 text-primary" /> : isVideo ? <Video className="h-4 w-4 text-primary" /> : <FileText className="h-4 w-4 text-primary" />}
-        <span className="text-sm font-medium truncate max-w-[200px]">{filename}</span>
-        {attachment.category && attachment.category !== 'uncategorized' && (
-          <Badge variant="outline" className="text-[9px] uppercase ml-1 px-1 py-0 h-4">{attachment.category.replace('_', ' ')}</Badge>
+    <div className="flex flex-col gap-2 min-w-0 w-[min(70vw,320px)] max-w-full">
+      <button type="button" onClick={() => void open("inline")} disabled={busy} aria-label={`Open ${mediaLabel}`} className="block w-full overflow-hidden rounded-xl border border-border/50 bg-muted/50 hover:bg-muted/70">
+        {isImg ? (
+          previewUrl
+            ? <img src={previewUrl} alt={mediaLabel} className="block w-full max-h-[380px] object-contain" loading="lazy" />
+            : <div className="flex h-[230px] items-center justify-center"><ImageIcon className="h-7 w-7 text-muted-foreground" /></div>
+        ) : isVideo ? (
+          <div className="relative flex min-h-[210px] max-h-[380px] items-center justify-center bg-slate-900 text-white">
+            {previewUrl && <video src={previewUrl} preload="metadata" muted playsInline className="block w-full max-h-[380px] object-contain" />}
+            <span className="absolute z-10 rounded-full bg-black/60 p-3"><Video className="h-6 w-6" /></span>
+            {duration && <span className="absolute bottom-2 left-2 z-10 rounded bg-black/70 px-1.5 py-0.5 text-[11px]">{duration}</span>}
+          </div>
+        ) : (
+          <div className="flex min-h-[90px] items-center gap-3 px-4 py-3 text-left">
+            <FileText className="h-6 w-6 shrink-0 text-primary" />
+            <div className="min-w-0">
+              <div className="text-sm font-medium">{mediaLabel}</div>
+              {attachment.category && attachment.category !== "uncategorized" && <div className="text-xs text-muted-foreground capitalize">{attachment.category.replace(/_/g, " ")}</div>}
+            </div>
+          </div>
         )}
-      </div>
-
-      <button type="button" onClick={() => void open("inline")} disabled={busy} className="text-left mt-1 rounded border border-border/50 overflow-hidden hover:bg-muted/50">
-        {isImg && previewUrl ? <img src={previewUrl} alt={filename} className="max-w-[240px] max-h-[160px] object-cover" loading="lazy" /> :
-          isVideo ? <div className="relative w-[240px] h-[145px] bg-slate-900 flex items-center justify-center text-white">
-            {previewUrl && <video src={previewUrl} preload="metadata" muted playsInline className="absolute inset-0 w-full h-full object-cover" />}
-            <span className="relative z-10 bg-black/60 rounded-full p-3"><Video className="h-6 w-6" /></span>
-          </div> :
-          <div className="flex items-center gap-2 px-4 py-3 text-sm text-primary"><FileText className="h-5 w-5" /> {attachment.mimeType === "application/pdf" ? "Open PDF" : "Open file"}</div>}
       </button>
-      <p className="text-xs text-muted-foreground">{isVideo && attachment.durationSeconds ? `${Math.floor(attachment.durationSeconds / 60)}:${String(Math.floor(attachment.durationSeconds % 60)).padStart(2, "0")} · ` : ""}{attachment.mimeType?.split("/").pop()?.toUpperCase() || "File"}{attachment.byteSize ? ` · ${(attachment.byteSize / 1024 / 1024).toFixed(1)} MB` : ""}</p>
-      <button type="button" onClick={() => void open("attachment")} disabled={busy} className="text-xs text-primary underline text-left">Download original</button>
+      {!isImg && !isVideo && <button type="button" onClick={() => void open("attachment")} disabled={busy} className="text-xs text-primary underline text-left">Download original</button>}
       {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
       <Dialog open={!!openUrl} onOpenChange={(open) => { if (!open) setOpenUrl(null); }}>
         <DialogContent className="max-w-4xl">
-          <DialogHeader><DialogTitle>{filename}</DialogTitle></DialogHeader>
-          {openUrl && (isImg ? <img src={openUrl} alt={filename} className="max-h-[75vh] max-w-full object-contain mx-auto" /> :
+          <DialogHeader><DialogTitle>{mediaLabel}</DialogTitle></DialogHeader>
+          {openUrl && (isImg ? <img src={openUrl} alt={mediaLabel} className="max-h-[75vh] max-w-full object-contain mx-auto" /> :
             <video key={openUrl} src={openUrl} controls autoPlay playsInline className="w-full max-h-[75vh] bg-black" onError={() => setError("Playback unavailable on this browser. Download the original video to view it.")} />)}
           <button type="button" onClick={() => void open("attachment")} className="text-sm text-primary underline">Download original</button>
         </DialogContent>
