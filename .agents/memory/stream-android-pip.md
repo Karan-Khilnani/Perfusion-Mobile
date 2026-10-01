@@ -21,8 +21,8 @@ The Stream auto-PiP hook alone only covers Android 12+; Android 8–11 requires 
 
 **How to apply:** Verify the generated leave-hint override after prebuild and do not infer older-device Home behavior from a successful Android 12+ test.
 
-When `MainActivity` directly calls the SDK's Kotlin PiP singleton, also declare the Stream Android project as an app-level Gradle dependency from the config plugin. The native package may be discovered for React Native package registration without its classes being visible to app-source compilation in a cloud build.
+When the Perfusion PiP config plugin adds a fully-qualified Stream singleton reference before Stream's MainActivity mod runs, Stream's import helper can mistake that reference for an existing import and skip the import needed by its unqualified lifecycle callback.
 
-**Why:** An EAS Kotlin compile reported the singleton unresolved even though the locked SDK source defined it and Expo autolinking found its Android package.
+**Why:** The helper checks whether the source contains the package string rather than checking for an import declaration; clean prebuild then emits an unqualified `StreamVideoReactNative` call with no import.
 
-**How to apply:** Resolve the autolinked Gradle project name from the package name, inject the direct dependency with `withAppBuildGradle`, and verify it appears after Expo prebuild; do not edit generated Android files alone.
+**How to apply:** Keep the SDK project as an app-level Gradle dependency and make the custom config plugin idempotently add `import com.streamvideo.reactnative.StreamVideoReactNative` after all generated MainActivity mods; verify on clean prebuild.

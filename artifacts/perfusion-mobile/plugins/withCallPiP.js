@@ -32,9 +32,24 @@ module.exports = function withCallPiP(config) {
 
   config = withMainActivity(config, (updated) => {
     const marker = "// Perfusion: Home-to-PiP on Android 8–11";
-    const source = updated.modResults.contents;
+    let source = updated.modResults.contents;
+    if (updated.modResults.language !== "kt") {
+      throw new Error("Cannot enable call PiP: MainActivity must use Kotlin");
+    }
+
+    const streamImport = "import com.streamvideo.reactnative.StreamVideoReactNative";
+    if (!source.split(/\r?\n/).includes(streamImport)) {
+      const packageDeclaration = /^package [^\r\n]+(?:\r?\n)/m;
+      if (!packageDeclaration.test(source)) {
+        throw new Error("Cannot enable call PiP: MainActivity package declaration was not found");
+      }
+      // Stream's config plugin skips this import when it sees the fully-qualified
+      // reference below, but also adds an unqualified lifecycle callback.
+      source = source.replace(packageDeclaration, (declaration) => `${declaration}${streamImport}\n`);
+    }
+    updated.modResults.contents = source;
     if (source.includes(marker)) return updated;
-    if (updated.modResults.language !== "kt" || source.includes("override fun onUserLeaveHint")) {
+    if (source.includes("override fun onUserLeaveHint")) {
       throw new Error("Cannot enable call PiP: MainActivity leave-hint implementation changed");
     }
     const end = source.lastIndexOf("\n}");
