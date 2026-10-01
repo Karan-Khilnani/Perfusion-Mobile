@@ -1,6 +1,11 @@
 const fs = require("node:fs");
 const path = require("node:path");
-const { withAndroidManifest, withDangerousMod, withMainActivity } = require("expo/config-plugins");
+const {
+  withAndroidManifest,
+  withAppBuildGradle,
+  withDangerousMod,
+  withMainActivity,
+} = require("expo/config-plugins");
 
 // The installed Stream SDK has the JS enterPiPAndroid helper and PiP callbacks,
 // but does not expose the enterPipMode native method that its JS helper calls.
@@ -53,6 +58,23 @@ module.exports = function withCallPiP(config) {
         }
     }
 ` + source.slice(end);
+    return updated;
+  });
+
+  config = withAppBuildGradle(config, (updated) => {
+    const dependency = "implementation project(':stream-io_video-react-native-sdk')";
+    const source = updated.modResults.contents;
+    if (source.includes(dependency)) return updated;
+    const dependenciesBlock = /dependencies\s*\{/;
+    if (!dependenciesBlock.test(source)) {
+      throw new Error("Cannot enable call PiP: Android app dependencies block was not found");
+    }
+    // MainActivity calls the SDK's public Kotlin singleton directly. Explicitly
+    // put the autolinked SDK project on the app compile classpath for EAS builds.
+    updated.modResults.contents = source.replace(
+      dependenciesBlock,
+      (match) => `${match}\n    // Perfusion: MainActivity uses Stream's native PiP API\n    ${dependency}`,
+    );
     return updated;
   });
 
